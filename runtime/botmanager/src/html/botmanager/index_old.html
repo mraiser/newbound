@@ -1,0 +1,69 @@
+<html>
+  <head>
+    <title>App Manager</title>
+
+    <link rel='stylesheet' href='../botmanager/themes/font.css'>
+    <link rel="stylesheet" href="../botmanager/themes/newbound.min.css" />
+    <link rel="stylesheet" href="../botmanager/themes/jquery.mobile.icons.min.css" />
+    <link rel="stylesheet" href="../botmanager/jquerymobile_1_4_2/jquery.mobile.structure-1.4.2.min.css" />
+    <script src="../botmanager/jquerymobile/jquery-1.9.1.min.js"></script>
+    <script src="../botmanager/jquerymobile_1_4_2/jquery.mobile-1.4.2.min.js"></script>
+    <script src="../botmanager/nav.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <script src="botmanager.js"></script>
+    <style>
+    	.controls {
+    		display: none;
+    	}
+    </style>
+
+  </head>
+  <body>
+	<div id='botcontrols' data-role='page'>
+		<div data-role="header">
+			<h1 id="headertitle">App Manager</h1>
+			<div data-role="navbar" class="ui-body-b">
+				<ul>
+					<li><a onclick="swapControls(0);" id="topnav0" class="topnavitem">Bots</a></li>
+					<li><a onclick="swapControls(1);" id="topnav2" class="topnavitem">Settings</a></li>
+				</ul>
+			</div><!-- /navbar -->
+		</div><!-- /header -->
+		<div data-role="content" data-theme="c"> 
+			<div id='controls-1' class='controls'>
+				<h6>ACCESS DENIED</h6>
+			</div>
+			<div id='controls0' class='controls'>
+			     <div id='thereareupdates'></div>
+				<div id='botlist'></div>
+			</div>
+			<div id='controls1' class='controls'>
+			  <div id='settingserror'></div>
+			  <div id='hidesettings'>
+				<div data-role="fieldcontain">
+			 		<label for='devicename'>Device Name:</label>
+			 		<input type='text' id='devicename' value=''>
+				</div>
+				<div data-role="fieldcontain">
+			 		<label for='devicename'>Port Number:</label>
+			 		<input type='text' id='portnum' value=''>
+			 	</div>
+				<div data-role="fieldcontain">
+			 		<label for='defaultbot'>Default Bot:</label>
+			 		<select name='defaultbot' id='defaultbot' data-role="select">
+			 			<option>ABC</option>
+			 		</select>
+			 	</div>
+				 <br>
+				 <br>
+				<div id='settingsmsg'></div>
+				<input type='button' value='save' onclick='saveSettings();' data-theme='a'>
+				<hr>
+				<input type='button' value='restart' onclick='restart();'>
+			  </div>
+          	</div>
+      	</div>
+    </div>
+  </body>
+</html>

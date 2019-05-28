@@ -1,0 +1,1 @@
+{"data":{"java":"return ((MetaBot)BotBase.getBot(\"metabot\")).buildJSAPI(lib, id);","import":"import java.util.*;\nimport org.json.*;\nimport com.newbound.robot.*;","returntype":"String","params":[{"name":"lib","type":"String"},{"name":"id","type":"String"}],"desc":""},"id":"xthhzr161cdf9f687k1e","sessionid":"jhtpuq15d03ce0a74q0","time":1519579310780,"username":"mraiser"}

@@ -1,0 +1,115 @@
+<html>
+  <head>
+    <title>Expired</title>
+
+    <link rel="stylesheet" href="../botmanager/jquerymobile_1_4_2/jquery.mobile-1.4.2.min.css" />
+    <script src="../botmanager/jquerymobile/jquery-1.9.1.min.js"></script>
+    <script src="../botmanager/jquerymobile_1_4_2/jquery.mobile-1.4.2.min.js"></script>
+    <script src="../botmanager/nav.js"></script>
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1">
+    
+    <style>
+    
+.controls {
+  	display: none;
+}
+    </style>
+
+  </head>
+  <body>
+    <div id='check' data-role='page'>
+        <div data-role="header">
+            <h1 id="headertitle">Expired</h1>
+        </div><!-- /header -->
+        <div data-role="content"> 
+            <div id='noaccount'>
+	          <h3>We're sorry...</h3>
+	          <i>Your trial period for the <span id='whichbot'></span> app has expired.</i>
+	          <br><br>
+	          You will need a valid registration code to reactivate this app. If you don't have a registration code, you can get one at the <a href='http://newboundnetwork.com/store/'>Newbound Store</a>.
+	          <div data-role="fieldcontain">
+	              <label for="registrationcode">Registration Code</label>
+	              <input type='text' id='registrationcode'>
+	          </div>
+	          <a data-role='button' data-theme='a' onclick='register();' data-inline='true'>register</a>
+          </div>
+          <div id='accountinfo' style='display:none;'>
+              <div id='displayaccountinfo'>
+                  <h3>Your Account</h3>
+                  Real Name: <span id='da_name'></span><br>
+                  Username: <span id='da_user'></span><br>
+                  <br>
+                  Devices:
+                  <div id='da_devices'></div>
+                  <a data-role='button' onclick='goOn();'>continue</a>
+              </div>
+          </div>
+          
+          
+          
+        </div>
+    </div>
+	
+    <script type='text/javascript'>
+    
+var STORE = 'a51f6394-730b-4f64-83b0-96ad75f84537';
+var STOREADDR = 'store.newbound.com:5773';
+
+function register(){
+    var code = encodeURIComponent($('#registrationcode').val().trim());
+    json('../peerbot/remote/'+STORE+'/transaction/register', 'code='+code, function(result){
+        if (result.status == 'ok'){
+        	accountInfo();
+       	   $.getJSON('../appstore/listapps', function(result){
+       		   console.log(result);
+       	   });
+        }
+        else{
+            alert(result.msg);
+        }
+    });
+}
+
+function accountInfo(cb) {
+    $.getJSON('../peerbot/remote/'+STORE+"/transaction/accountinfo", function(result) {
+        if (result.status == 'ok'){
+            console.log(result);
+            $('#accountinfo').css('display', 'block');
+            $('#noaccount').css('display', 'none');
+            $('#da_name').text(result.data.name);
+            $('#da_user').text(result.data.user);
+            var d = result.data.devices;
+            var newhtml = '';
+            for (var i in d){
+                newhtml += d[i].name+' ('+i+')<br>';
+            }
+            $('#da_devices').html(newhtml);
+        }
+        else {
+            $('#accountinfo').css('display', 'none');
+            $('#noaccount').css('display', 'block');
+        }
+    });
+    if (cb) setTimeout(cb, 500);
+}
+
+function goOn(){
+    var bot = getQueryParameter('bot');
+    window.location.href = '../'+bot;
+}
+
+function populate(bot){
+	json("listbots", null, function(result){
+		for (var item in result.data){
+			if (result.data[item].id == bot) $('#whichbot').text(result.data[item].name);
+		}
+	});
+}
+
+$(document).ready(function(){
+  var bot = getQueryParameter('bot');
+  populate(bot);
+});
+    </script>
+  </body>
+</html>

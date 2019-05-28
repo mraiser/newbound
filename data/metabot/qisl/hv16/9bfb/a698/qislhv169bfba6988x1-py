@@ -1,0 +1,1 @@
+{"data":{"python":"libraries = metabot.appproperties['libraries'].split(',')\nfor lib in libraries: metabot.rebuildLibrary(lib)\nreturn 'OK'\n","import":"","returntype":"String","params":[{"name":"metabot","type":"Bot"}],"desc":""},"id":"qislhv169bfba6988x1799","sessionid":"jhtpuq15d03ce0a74q0","time":1553699933685,"addr":"/0:0:0:0:0:0:0:1:64442","username":"mraiser"}

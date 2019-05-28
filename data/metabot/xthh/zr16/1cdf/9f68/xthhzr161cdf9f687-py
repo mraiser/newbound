@@ -1,0 +1,1 @@
+{"data":{"python":"return metabot.buildJSAPI(lib, id);","import":"","returntype":"String","params":[{"name":"metabot","type":"Bot"},{"name":"lib","type":"String"},{"name":"id","type":"String"}],"desc":""},"id":"xthhzr161cdf9f687k1e","sessionid":"jhtpuq15d03ce0a74q0","time":1519579310780,"username":"mraiser"}

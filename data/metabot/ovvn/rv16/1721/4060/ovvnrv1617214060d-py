@@ -1,0 +1,1 @@
+{"data":{"python":"return metabot.apps({})","import":"","returntype":"JSONObject","groups":"anonymous","params":[{"name":"metabot","type":"Bot"}],"desc":"List the apps installed on this device"},"readers":["anonymous"],"id":"ovvnrv1617214060d-py","sessionid":"jhtpuq15d03ce0a74q0","time":1541266683422,"addr":"/0:0:0:0:0:0:0:1:53472","username":"mraiser"}

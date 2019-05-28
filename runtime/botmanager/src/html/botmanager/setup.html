@@ -1,0 +1,1380 @@
+<html>
+  <head>
+    <title>Welcome to the Newbound Network</title>
+
+    <link rel="stylesheet" href="../botmanager/jquerymobile_1_4_2/jquery.mobile-1.4.2.min.css" />
+    <script src="../botmanager/jquerymobile/jquery-1.9.1.min.js"></script>
+    <script src="../botmanager/jquerymobile_1_4_2/jquery.mobile-1.4.2.min.js"></script>
+    <script src="../botmanager/nav.js"></script>
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1">
+    
+    <style>
+    
+.controls {
+  	display: none;
+}
+
+#nbnav_peer {
+  display: none;
+}
+
+#crumbs {
+  font-size: x-small;
+  padding: 3px;
+}
+
+.navstep {
+	border-style:solid;
+	border-color:black;
+	border-width:thin;
+	position:relative;
+	display:inline-block;
+	padding-left: 20px;
+	padding-right: 20px;
+	margin-right: 20px;
+}
+
+.navstepon {
+	background-color: black;
+	color:white;
+	position:relative;
+	display:inline-block;
+	padding-left: 20px;
+	padding-right: 20px;
+	margin-right: 20px;
+}
+
+.floatright {
+	float: right;
+}
+
+.well{
+	border-style:solid;
+	border-color:black;
+	border-width:thin;
+	padding:20px;
+}
+
+.saving{
+	display:none;
+}
+
+.setupstep{
+    display:none;
+}
+    </style>
+
+  </head>
+  <body>
+    <div id='check' data-role='page'>
+        <div data-role="header">
+            <h1 id="headertitle">Welcome!</h1>
+        </div><!-- /header -->
+        <div data-role="content"> 
+          <h3>Verifying Installation</h3>
+          <i>Please wait while we verify your installation of the Newbound Network...</i>
+          <br><br>
+          <div id='verifyjavascript'><b>Javascript is required</b></div>
+          <div id='verifycookies'></div>
+          <div id='verifypeer'></div>
+          <div id='verifyinternet'></div>
+          <div id='verifyreg'></div>
+        </div>
+    </div>
+    <div id='start' data-role='page' class='setupstep'>
+        <div data-role="header">
+            <a data-rel-'back' data-role='button' data-icon='back' href='#check'>back</a>
+            <h1 id="headertitle">Welcome!</h1>
+        </div><!-- /header -->
+        <div data-role="content"> 
+          <h3>Getting Started...</h3>
+          In order to get you communicating securely as quickly and easily as possible, let's walk through some basic settings.
+          <br><br>
+          We'll get you up and running in just <i>four easy steps!</i>
+          <ol>
+            <li>Security<br><i>Basic information about you and this device so you can login to this device and connect to other devices.</i></li>
+            <li>Connections<br><i>Connect this device directly and securely to other devices.</i></li>
+            <li>File Sharing<br><i>Choose the folders on this device you want to share.</i></li>
+            <li>Email<br><i>Configure this device to act as your own private email gateway.</i></li>
+          </ol>
+          <a data-role='button' data-theme='b' data-inline='true' data-change-hash='false' onclick='begin();'>continue</a>
+        </div>
+      </div>
+	<div id='security' data-role='page' class='setupstep'>
+		<div data-role="header">
+            <a data-rel-'back' data-role='button' data-icon='back' href='#start'>back</a>
+			<h1 id="headertitle">Security</h1>
+		</div><!-- /header -->
+		<div data-role="content"> 
+		  <div class='floatright'>Steps: <div class='navstepon'>1</div><div class='navstep'>2</div><div class='navstep'>3</div><div class='navstep'>4</div></div>
+		  <h3>Step 1: Basic Security Settings</h3>
+		  Before you can connect this device to any other devices, we need to configure your basic user and device settings.
+		  <br><br>
+		  What is your name?
+		  <input type='text' id='realname' class='start_req startf' onblur='validate(this);'>
+		  What would you like your username to be?
+		  <input type='text' id='username' onfocus='this.allset=true;' class='start_req startf' onblur='this.value=clean(this.value.toLowerCase());validate(this);'>
+		  What would you like your password to be?
+		  <input type='password' id='password' class='start_req startf' onblur='validate(this);'>
+		  Please enter a name for this device to identify it on the Newbound Network:
+		  <input type='text' id='devicename' class='start_req startf' onblur='this.value=clean(this.value);validate(this);'>
+		  <div id='securitymsg'></div>
+		  <a data-role='button' data-theme='b' data-inline='true' data-change-hash='false' onclick='saveSecurity();'>next</a>
+      	</div>
+    </div>
+	<div id='fileshare' data-role='page' class='setupstep'>
+		<div data-role="header">
+            <a data-rel-'back' data-role='button' data-icon='back' href='#connections'>back</a>
+			<h1 id="headertitle">File Sharing</h1>
+		</div><!-- /header -->
+		<div data-role="content"> 
+		  <div class='floatright'>Steps: <div class='navstep'>1</div><div class='navstep'>2</div><div class='navstepon'>3</div><div class='navstep'>4</div></div>
+          <h3>Step 3: Select some folders to share</h3>
+          We created a new empty folder called "files" for you, where you can drop files you want to share over the Newbound Network. Select any of the other folders that 
+          you want to share as well.
+          <div id='folderlist'></div>
+          <div id='foldersmsg'></div>
+          <a data-role='button' data-theme='b' data-inline='true' data-change-hash='false' onclick='saveFolders();'>next</a>
+      	</div>
+    </div>
+	<div id='email' data-role='page' class='setupstep'>
+		<div data-role="header">
+          <a data-rel-'back' data-role='button' data-icon='back' href='#fileshare'>back</a>
+			<h1 id="headertitle">Email</h1>
+		</div><!-- /header -->
+		<div data-role="content"> 
+		  <div class='floatright'>Steps: <div class='navstep'>1</div><div class='navstep'>2</div><div class='navstep'>3</div><div class='navstepon'>4</div></div>
+<!--  
+		  <h3>Step 4: Email Setup</h3>
+		  Setting up secure private email over the Newbound Network is just like any other email application... Typically you can just set it and forget it. 
+		  <br><br>
+		  By far the easiest 
+		  way to get started is to just create a new email address that only works with others on the Newbound Network. A private email address is limited, though, in that messages
+		  sent from a private address can only include recipients that are also on the Newbound Network. 
+		  <br><br>
+		  The second option is to use your existing email address. Setting up an existing
+		  email address is a little more complicated, however, in that you have to specify the settings for receiving email from your current account (either POP3 or IMAP) as well
+		  as your settings for sending mail (SMTP). Typically, these are the same settings that you entered into your existing email client application when you originally set that up.
+		  <br><br>
+		  Once the Newbound Network software is setup, you will then need to configure your email client application to point to your local
+		  device for sending and receiving email, instead of the settings you have entered here. 
+		  <br><br>
+		  The thing about setting up the Newbound Network as your primary email gateway is that in order for someone to send you email, the gateway device has to be turned on, and the 
+		  Newbound Network software has to be running. Also, you probably don't want to have a different email address for every device you send email from, so pick one computer that 
+		  you can leave on with the Newbound Network software running, and set that up as your primary email gateway. Then configure any other devices you send email from to point to
+		  that computer, using the "Connected Device" option below.
+          <div data-role="fieldcontain">
+              <fieldset data-role="controlgroup" data-type="horizontal" >
+                     <label><input type="radio" class="emailtype" name="emailtype" id="emailtype_simple" value="simple" onclick="switchEmailType(1);" checked />New Email Address</label>
+                     <label><input type="radio" class="emailtype" name="emailtype" id="emailtype_hard" value="hard" onclick="switchEmailType(2);" />Existing Email Address</label>
+                     <label><input type="radio" class="emailtype" name="emailtype" id="emailtype_hard" value="other" onclick="switchEmailType(3);" />Connected Device</label>
+              </fieldset>
+          </div>
+		  
+		  <div id='emailsimple' class='emailtype'>
+			  <h3>Choose a private email address</h3>
+			  <input type='text' id='emailaddress'>
+		  </div>
+		  <div id='emailother' class='emailtype' style='display:none;'>
+		      [COMING SOON]
+		  </div>
+		  <div id='emailhard' style='display:none;' class='emailtype'>
+			  <table border='0' cellpadding='0' cellspacing='0' width='100%'>
+			  	<tr>
+			  		<td valign='top' class='well'>
+						<h3>Receiving Mail Server Settings</h3>
+						<div data-role="fieldcontain">
+							<label for="acctemail">Email Address</label>
+							<input type='text' id='acctemail'>
+						</div>
+						<div data-role="fieldcontain">
+							<div role="heading" class="ui-controlgroup-label">Server Type:</div>
+							<fieldset data-role="controlgroup" data-type="horizontal" >
+								   <label><input type="radio" class="protocol" name="protocol" id="protocol_pop3" value="pop3" onclick="$('#notlocal').css('display', 'block');" checked />POP3</label>
+								   <label><input type="radio" class="protocol" name="protocol" id="protocol_imap" value="imap" onclick="$('#notlocal').css('display', 'block');" />IMAP</label>
+							</fieldset>
+						</div>
+						<div id='notlocal' style='display: block;'>
+							<div data-role="fieldcontain">
+								<fieldset data-role="controlgroup">
+									<input type="checkbox" name="usessl" id="usessl" checked="true"/>
+									<label for="usessl">Use SSL</label>
+								</fieldset>
+							</div>
+							<div data-role="fieldcontain">
+								<label for="acctserver">Server</label>
+								<input type='text' id='acctserver' value='pop.gmail.com'>
+							</div>
+							<div data-role="fieldcontain">
+								<label for="acctport">Port</label>
+								<input type='text' id='acctport' value='995'>
+							</div>
+							<div data-role="fieldcontain">
+								<label for="serveruser">Username</label>
+								<input type='text' id='serveruser'>
+							</div>
+							<div data-role="fieldcontain">
+								<label for="serverpass">Password</label>
+								<input type='password' id='serverpass'>
+							</div>
+						</div>
+					</td>
+					<td width='20px'></td>
+			  		<td valign='top' class='well'>
+						<h3>Outbound SMTP Server</h3>
+						<div data-role="fieldcontain">
+							<label for="smtpserver">Server</label>
+							<input type='text' id='smtpserver' value='smtp.comcast.net'>
+						</div>
+						<div data-role="fieldcontain">
+							<label for="smtpport">Port</label>
+							<input type='text' id='smtpport' value='465'>
+						</div>
+						<div data-role="fieldcontain">
+							<fieldset data-role="controlgroup">
+								<input type="checkbox" name="smtpssl" id="smtpssl" checked="true"/>
+								<label for="smtpssl">Use SSL</label>
+							</fieldset>
+						</div>
+						<div data-role="fieldcontain">
+							<fieldset data-role="controlgroup">
+								<input type="checkbox" name="smtpusepass" id="smtpusepass" checked="true" onclick="$('#hidenopass').css('display', $(this).prop('checked') ? 'block' : 'none');"/>
+								<label for="smtpusepass">Use Password</label>
+							</fieldset>
+						</div>
+						<div id='hidenopass'>
+							<div data-role="fieldcontain">
+								<label for="smtpuser">Username</label>
+								<input type='text' id='smtpuser'>
+							</div>
+							<div data-role="fieldcontain">
+								<label for="smtppass">Password</label>
+								<input type='password' id='smtppass'>
+							</div>
+						</div>
+					</td>
+				</tr>
+			</table>
+		  </div>
+		  <br><br>
+		  Click next to save your settings and view instructions for setting up your email client application to send and receive email over the Newbound Network.
+		  <br>
+          <a data-role='button' data-theme='b' data-inline='true' data-change-hash='false' onclick='saveEmail();'>next</a>
+-->
+
+
+
+            <h3>Step 4: Primary Email Gateway</h3>
+            For best results, you'll want to pick a computer that you can leave running all the time to act as your primary email gateway. That's because there's no server 
+            in the middle, so for someone else to send you mail, your primary email gateway needs to be running in order to receive it. Since all of your devices can be 
+            connected over the Newbound Network, you only need to set up one of them as your primary gateway, and configure the other devices that you send and receive email 
+            on to use that computer as your primary email gateway.
+            <fieldset data-role="controlgroup">
+                <input type="radio" name="relay" id="relay_on" value="relay_on" onclick="chooseRelay($('#relaydevice').val());$('#localrelay').css('display', 'none');"/>
+                <label for="relay_on">Use <select data-mini='true' data-inline='true' id='relaydevice' onchange='chooseRelay(this.value);'></select> as my primary email gateway</label>
+                <input type="radio" name="relay" id="relay_off" value="relay_off" onclick="chooseRelay('');" />
+                <label for="relay_off">Use this device</label>
+            </fieldset>
+            <div id='localrelay' style='display:none;margin-top:20px;'>
+                <h3>Receiving Mail</h3>
+                <fieldset data-role="controlgroup">
+                    <input type="radio" name="accounttype" id="accounttype_private" value="private" onclick="chooseAccountType(this.value);" checked/>
+                    <label for="accounttype_private">Create new private email address</label>
+                    <input type="radio" name="accounttype" id="accounttype_existing" value="existing" onclick="chooseAccountType(this.value);" />
+                    <label for="accounttype_existing">Use my existing email address</label>
+                </fieldset>
+                <div id='emailtype_private' class='emailtype'>
+                    <div data-role="fieldcontain"> 
+                        <label for="privateemailaddress">Private Email Address</label>
+                        <input type='text' id='privateemailaddress'>
+                    </div>
+                    Your new private email address can only be used to send or receive email over the Newbound Network.
+                </div>
+                <div id='emailtype_existing' class='emailtype' style='display: none;'>
+                      In order to use an existing email address you will need to specify the settings for receiving email from that account (either POP3 or IMAP) as well
+                      as your settings for sending mail (SMTP). Typically, these are the same settings that you entered into your existing email client application when you originally 
+                      set that up.
+                      <br><br>
+		              <table border='0' cellpadding='0' cellspacing='0' width='100%'>
+		                <tr>
+		                    <td valign='top' class='well'>
+		                        <h3>Receiving Email (POP3/IMAP) Settings </h3>
+		                        <div data-role="fieldcontain">
+		                            <label for="acctemail">Email Address</label>
+		                            <input type='text' id='acctemail'>
+		                        </div>
+		                        <div data-role="fieldcontain">
+		                            <div role="heading" class="ui-controlgroup-label">Server Type:</div>
+		                            <fieldset data-role="controlgroup" data-type="horizontal" >
+		                                   <label><input type="radio" class="protocol" name="protocol" id="protocol_pop3" value="pop3" onclick="$('#notlocal').css('display', 'block');" checked />POP3</label>
+		                                   <label><input type="radio" class="protocol" name="protocol" id="protocol_imap" value="imap" onclick="$('#notlocal').css('display', 'block');" />IMAP</label>
+		                            </fieldset>
+		                        </div>
+		                        <div id='notlocal' style='display: block;'>
+		                            <div data-role="fieldcontain">
+		                                <fieldset data-role="controlgroup">
+		                                    <input type="checkbox" name="usessl" id="usessl" checked="true"/>
+		                                    <label for="usessl">Use SSL</label>
+		                                </fieldset>
+		                            </div>
+		                            <div data-role="fieldcontain">
+		                                <label for="acctserver">Server</label>
+		                                <input type='text' id='acctserver' value='pop.gmail.com'>
+		                            </div>
+		                            <div data-role="fieldcontain">
+		                                <label for="acctport">Port</label>
+		                                <input type='text' id='acctport' value='995'>
+		                            </div>
+		                            <div data-role="fieldcontain">
+		                                <label for="serveruser">Username</label>
+		                                <input type='text' id='serveruser'>
+		                            </div>
+		                            <div data-role="fieldcontain">
+		                                <label for="serverpass">Password</label>
+		                                <input type='password' id='serverpass'>
+		                            </div>
+		                        </div>
+		                    </td>
+		                    <td width='20px'></td>
+		                    <td valign='top' class='well'>
+		                        <h3>Sending Email (SMTP) Settings</h3>
+		                        <div data-role="fieldcontain">
+		                            <label for="smtpserver">Server</label>
+		                            <input type='text' id='smtpserver' value='smtp.comcast.net'>
+		                        </div>
+		                        <div data-role="fieldcontain">
+		                            <label for="smtpport">Port</label>
+		                            <input type='text' id='smtpport' value='465'>
+		                        </div>
+		                        <div data-role="fieldcontain">
+		                            <fieldset data-role="controlgroup">
+		                                <input type="checkbox" name="smtpssl" id="smtpssl" checked="true"/>
+		                                <label for="smtpssl">Use SSL</label>
+		                            </fieldset>
+		                        </div>
+		                        <div data-role="fieldcontain">
+		                            <fieldset data-role="controlgroup">
+		                                <input type="checkbox" name="smtpusepass" id="smtpusepass" checked="true" onclick="$('#hidenopass').css('display', $(this).prop('checked') ? 'block' : 'none');"/>
+		                                <label for="smtpusepass">Use Password</label>
+		                            </fieldset>
+		                        </div>
+		                        <div id='hidenopass'>
+		                            <div data-role="fieldcontain">
+		                                <label for="smtpuser">Username</label>
+		                                <input type='text' id='smtpuser'>
+		                            </div>
+		                            <div data-role="fieldcontain">
+		                                <label for="smtppass">Password</label>
+		                                <input type='password' id='smtppass'>
+		                            </div>
+		                        </div>
+		                    </td>
+		                </tr>
+		            </table>
+                </div>
+                <h3>Sending Mail</h3>
+                You also need to link any email address you want to send to over the Newbound Network with the gateway (connected device from Step 2) for that email address.
+                Select the email addresses you would like to send to over the Newbound Network from the list below.
+                <br><br>
+                <b>Remote Email Addresses:</b>
+                <div id='remoteemailaddresses' style='margin-left:20px;'><font>No remote email accounts found on any of the devices you are connected to.</font></div>
+                <br><br>
+            </div> 
+            <a data-inline='true' data-role='button' data-theme='b' onclick='finishEmail();'>finish</a>
+      	</div>
+    </div>
+    <div id='emaildone' data-role='page' class='setupstep'>
+        <div data-role="header">
+            <h1 id="headertitle">Finished</h1>
+        </div><!-- /header -->
+        <div data-role="content"> 
+            <h3>Congratulations, your Newbound Network software is set up and ready to use!</h3>
+            If you would like to configure your email client application to connect to the Newbound Network, the settings you will need are listed below. Rather 
+            than changing your current account, it is recommended that you create 
+            a new account and deactivate your old account only once you've established that the new one is working for you.
+            <br><br>
+            Incoming mail:
+            <div style='margin-left: 20px;'>
+	            Type: POP3<br>
+	            User: <span id='s_user'></span><br>
+	            Password: <span id='s_pass'></span><br>
+	            Address: localhost<br>
+	            Port: 1100<br>
+	            SSL: No<br>
+	        </div>
+	        <br>
+            Outgoing mail:
+            <div style='margin-left: 20px;'>
+                Type: SMTP<br>
+                Address: localhost<br>
+                Port: 2525<br>
+                SSL: No<br>
+                Security: None<br>
+            </div>
+            <br>
+            <a data-role='button' data-theme='b' data-inline='true' data-change-hash='false' onclick='runNN();'>main menu</a>
+        </div>
+    </div>
+	<div id='saving' data-role='page' class='setupstep'>
+		<div data-role="header">
+			<h1 id="headertitle">Saving Information</h1>
+		</div><!-- /header -->
+		<div data-role="content"> 
+			<div class='floatright'>Steps: <div class='navstep'>1</div><div class='navstep'>2</div><div class='navstepon'>3</div><div class='navstep'>4</div></div>
+			<h3>Saving your settings...</h3>
+			<div id='saveuserdisplay' class='saving'>Saving user account information... <span id='saveusermsg'></span></div>
+			<div id='savedevice' class='saving'>Saving device information... <span id='savedevicemsg'></span></div>
+			<div id='savefolders' class='saving'>Saving shared folder information... <span id='savefoldersmsg'></span></div>
+			<div id='saveemail' class='saving'>Saving email information... <span id='saveemailsmsg'></span></div>
+			<a id='alldonebutton' data-role='button' data-theme='b' data-inline='true' data-change-hash='false' onclick='setConnections();' style='display:none;width:100px;'>continue</a>
+		</div>
+	</div>
+	<div id='connections' data-role='page' class='setupstep'>
+		<div data-role="header">
+            <a data-rel-'back' data-role='button' data-icon='back' href='#security'>back</a>
+			<h1 id="headertitle">Connect to other Devices</h1>
+		</div><!-- /header -->
+		<div data-role="content"> 
+			<div class='floatright'>Steps: <div class='navstep'>1</div><div class='navstepon'>2</div><div class='navstep'>3</div><div class='navstep'>4</div></div>
+			<h3>Step 2: Connect to Devices</h3>
+			You are now ready to connect to other devices directly and securely over the Newbound Network.
+			<h4>Connect to devices on your local network</h4>
+			<div id='zeroconflist'><i>Checking for devices in your local network...</i></div>
+			<a id='zcrescanbutton' data-role='button' data-theme='a' data-inline='true' data-change-hash='false' onclick='setConnections();' style='display:none;width:100px;'>rescan</a>
+			<h4>Lookup Server</h4>
+            You need a lookup server in order to connect to a device outside your local network. We've already connected you to ours, but you can change it if you like.
+			<div id='lsdiv1'>
+				<div data-role="fieldcontain">
+					<label for="lsid">Server ID</label>
+					<input type='text' id='lsid' value='a51f6394-730b-4f64-83b0-96ad75f84537'>
+				</div>
+				<div data-role="fieldcontain">
+					<label for="lsaddr">Address</label>
+					<input type='text' id='lsaddr' value='store.newbound.com'>
+				</div>
+				<div data-role="fieldcontain">
+					<label for="lsport">Port</label>
+					<input type='text' id='lsport' value='60892'>
+				</div>
+				<div id='lsmsg'></div>
+				<a id='lsresetbutton' data-role='button' data-theme='a' data-inline='true' data-change-hash='false' onclick='resetLookup();'>reset</a>
+				<a id='lsconnectbutton' data-role='button' data-theme='b' data-inline='true' data-change-hash='false' onclick='connectToLookup();'>connect</a>
+			</div>
+			<div id='lsdiv2' style='display:none;'></div>
+			<div id='rddiv' style='display:none;'>
+				<h4>Remote devices</h4>
+				Connect to any device that's connected to your lookup server. Paste the Universal ID of the device you want to connect to in the field below.
+				If you have an access code for that device as well, that will allow the remote device to configure its security settings so you can get access
+				to specific functions like filesharing or VOIP with that device. Select a group for the connection, so that the remote device can access functions
+				on this device.
+				<br><br>
+				<div id='remotes'></div>
+				<div data-role="fieldcontain">
+					<label for="rdid">Universal ID</label>
+					<input type='text' id='rdid'>
+				</div>
+				<div data-role="fieldcontain">
+					<label for="rdac">Access Code</label>
+					<input type='text' id='rdac'>
+				</div>
+				<div data-role="fieldcontain">
+					<label for="rdgroup">Group</label>
+					<select id='rdgroup' class='ldgroup'></select>
+				</div>
+				<div id='rdmsg'></div>
+				<a data-role='button' data-theme='b' data-inline='true' onclick='connectRemote()'>connect</a>
+				<h4>Universal ID</h4>
+				Your Universal ID is: <b><span class='myuuid'></span></b>
+				<br><br>For other devices to initiate a connection to this device, they will need your Universal ID. 
+				<h4>Access Codes</h4>
+				Access codes allow other devices to connect to this device with specific security configurations. For example, if you want to invite someone to 
+				connect to this device but only have access to filesharing, send them your Universal ID and the access code labeled "files" below. Share the
+				"trusted" access code for normal access to all of your apps. Only give out the "admin" access code if you want the connecting device to be able to 
+				change settings and access all functions on this device.
+				<br><br>
+				<div id='accesscodes'></div>
+				<br><br>
+                <a data-role='button' data-theme='b' data-inline='true' data-change-hash='false' onclick='saveConnections();'>next</a>
+			</div>
+		</div>
+	</div>
+	
+    <script type='text/javascript'>
+    
+function begin(){
+    $("body").pagecontainer("change", "#security", { 'changeHash':false });
+}
+
+function runNN(){
+	window.location = 'index.html';
+}
+    
+function switchEmailType(i){
+	$('.emailtype').css('display', 'none');
+    if (i==1) $('#emailsimple').css('display', 'block');
+    else if (i==2) $('#emailhard').css('display', 'block');
+    else if (i==3) $('#emailother').css('display', 'block');
+}
+    
+function saveConnections(){
+	json('../filebot/listcommonfolders', null, function(result){
+	    newhtml = '';
+	    var fname = null;
+	    for (var name in result.data) {
+	      var folder = result.data[name];
+	      if (name == 'files') fname = folder;
+	      else newhtml += '<label><input type="checkbox" class="shared" id="folder_'+name+'">'+name+" ("+folder+')<'+'/label>';
+	    }
+	    newhtml = '<label><input type="checkbox" class="shared" id="folder_files" checked>files ('+fname+')<'+'/label>'+newhtml;
+	    $('#folderlist').html(newhtml);
+	    $('#folderlist').trigger('create');
+	    $("body").pagecontainer("change", "#fileshare", { 'changeHash':false });
+	    
+	    for (var name in result.data) {
+	      var folder = result.data[name];
+	      var x = dget('folder_'+name);
+	      x.sname = name;
+	      x.sfolder = folder;
+	    }
+	});
+    $("body").pagecontainer("change", "#fileshare", { 'changeHash':false });
+}
+        
+function connectToLookup(){
+	var uuid = encodeURIComponent($('#lsid').val());
+	var addr = encodeURIComponent($('#lsaddr').val());
+	var port = encodeURIComponent($('#lsport').val());
+	json('../peerbot/connect', 'uuid='+uuid+'&addr='+addr+'&port='+port, function(result){
+		if (result.status == 'ok'){
+			$('#lsdiv1').css('display', 'none');
+			$('#lsdiv2').css('display', 'block');
+			$('#rddiv').css('display', 'block');
+			$('#lsdiv2').html('<font color="green">Connected to '+addr+'<'+'/font><br><a data-role="button" data-inline="true" onclick="$(\'#lsdiv1\').css(\'display\', \'block\');$(\'#lsdiv2\').css(\'display\', \'none\');">change</a>').trigger('create');
+			$('#rdgroup').val('trusted');
+			$('#rdgroup').selectmenu('refresh', true);
+			
+			json('../peerbot/togglekeepalive', 'keepalive=true&uuid='+uuid, function(result){
+			});
+		}
+		else {
+			$('#lsmsg').html('<font color="red">Error connecting to '+addr+': '+result.msg+'<'+'/font>');
+		}
+	});
+}
+
+function resetLookup(){
+	$('#lsid').val('a51f6394-730b-4f64-83b0-96ad75f84537');
+	$('#lsaddr').val('store.newbound.com');
+	$('#lsport').val('60892');
+}
+
+function afterLogin(){
+    var username = encodeURIComponent($('#username').val());
+    var password = encodeURIComponent($('#password').val());
+    var realname = encodeURIComponent($('#realname').val());
+    var devicename = encodeURIComponent($('#devicename').val());
+    
+    json('../botmanager/getsettings', 'issetup=true&machineid='+devicename, function(result){
+        if (result.status == 'ok'){
+            $("body").pagecontainer("change", "#connections", { 'changeHash':false });
+            
+            $('#zeroconflist').html('<i>Checking for devices in your local network...<'+'/i>');
+            json('../peerbot/listzeroconf', null, function(result){
+                var newhtml = '';
+                var count = 0;
+                for (var i in result.data) {
+                    var rdi = result.data[i];
+                    var peer = rdi.peerinfo;
+                    newhtml += '<div id="'+peer.id+'">' 
+                    + peer.name + ' (' + rdi.address + ':' + peer.port + ') <div id="ldcon_'+peer.id+'" style="display:inline-block;">';
+                    if (peer.connected) newhtml += '<font color="green">CONNECTED</font>';
+                    else newhtml += '<select class="ldgroup" id="ld_'+peer.id+'" data-inline="true" data-mini="true"><'+'/select>'
+                        + 'Access Code: <div style="display:inline-block;width:200px;"><input type="text" data-inline="true" data-mini="true" id="ldac_'
+                        + peer.id+'"><'+'/div> '
+                        + '<input type="button" value="connect" onclick="connect(\''
+                        + peer.id+'\',\''+rdi.address+'\',\''+peer.port+'\');" data-inline="true" data-mini="true" style="width:200px;"><div id="ldmsg_'+peer.id+'"><'
+                        + '/div>';
+                    newhtml += '<'+'/div><'+'/div>';
+                    count++;
+                }
+                if (count == 0) newhtml = 'No devices running the Newbound Network were found on your local network.';
+                $('#zeroconflist').html(newhtml);
+                
+                newhtml = '';
+                json('../securitybot/listgroups', null, function(result){
+                    for (var g in result.data){
+                        g = result.data[g];
+                        newhtml += '<option value="'+g+'">'+g+'<'+'/option>';
+                    }
+                    $('.ldgroup').html(newhtml);
+                    $('.ldgroup').val('admin');
+                    $('#zeroconflist').trigger('create');
+                    $('#zcrescanbutton').css('display', 'block');
+                    
+                    connectToLookup();
+
+//                    function doitlater(){
+                        if (username != 'admin') {
+                            json('../securitybot/listusers', null, function(result){
+                                for (var i in result.data) {
+                                    var rdi = result.data[i];
+                                    if (rdi.username == 'admin' && rdi.password == 'admin') {
+                                        json('../securitybot/deleteuser', 'username=admin', function(result){ });
+                                    }
+                                }
+                            });
+                        }
+//                    }
+//                    setTimeout(doitlater, 1000);
+                });
+            });
+        }
+        else {
+            $('#securitymsg').html('<font color="red">Error saving security information: '+result.msg+'</font>');
+        }
+    });
+}
+
+function saveSecurity(){
+    $('#username').val(clean($('#username').val()));
+    $('#devicename').val(clean($('#devicename').val()));
+    
+    var b = true;
+    $('.startf').each(function(){
+        b &= validate(this);
+    });
+    if (b) {
+		$('#securitymsg').html('<i>Saving security information...</i>');
+		
+	    var username = encodeURIComponent($('#username').val());
+	    var password = encodeURIComponent($('#password').val());
+	    var realname = encodeURIComponent($('#realname').val());
+	    var devicename = encodeURIComponent($('#devicename').val());
+	    
+	    json('../securitybot/newuser', 'username='+username+'&realname='+realname+'&password='+password+'&groups=admin', function(result){
+	    	if (result.status == 'ok'){
+	    		$.getJSON('../securitybot/login?user='+username+'&pass='+password, function(result) {
+	    			if (result.status == 'ok'){
+	    				sessionid = result.sessionid;
+	    				setCookie("sessionid", sessionid, 365);
+                        $.getJSON('remembersession?sessionid='+result.sessionid, function(result){
+                            json('../securitybot/deviceinfo', 'requirepassword=true', function(result){
+                            	afterLogin();
+                            });
+                        });
+	    			}
+	                else {
+	                    $('#securitymsg').html('<font color="red">Error saving security information: '+result.msg+'</font>');
+	                }
+	    		});
+	    	}
+	    	else {
+	    		$('#securitymsg').html('<font color="red">Error saving security information: '+result.msg+'</font>');
+	    	}
+	    });
+    }
+}
+
+function saveEmail(){
+    var type;
+    var email;
+    var b = $('#emailhard').css('display') == 'block';
+    if (!b){
+        type = 0;
+        email = $('#privateemailaddress').val();
+    }
+    else {
+        type = $('#protocol_none').prop('checked') ? 0 : $('#protocol_pop3').prop('checked') ? 1 : 2;
+        if (type != 0 && $('#usessl').prop('checked')) type += 2;
+        email = $('#acctemail').val();
+    }
+    
+    var server = $('#acctserver').val();
+    var port = $('#acctport').val();
+    var userid = $('#serveruser').val();
+    var spassword = $('#serverpass').val();
+    
+    var p = 'username='+encodeURIComponent(username)
+        + '&email='+encodeURIComponent(email)
+        + '&type='+encodeURIComponent(type)
+        + '&server='+encodeURIComponent(server)
+        + '&port='+encodeURIComponent(port)
+        + '&userid='+encodeURIComponent(userid)
+        + '&password='+encodeURIComponent(spassword);
+    
+    json('../emailbot/addaccount', p, function(result){
+        if (b) saveSMTP();
+        $("body").pagecontainer("change", "#emaildone", { 'changeHash':false });
+        $('#s_user').text($('#username').val());
+        $('#s_pass').text($('#password').val());
+    });
+}
+    
+function finish(){
+	$("body").pagecontainer("change", "#saving", { 'changeHash':false });
+
+	var username = encodeURIComponent($('#username').val());
+	var password = encodeURIComponent($('#password').val());
+	var realname = encodeURIComponent($('#realname').val());
+	var devicename = encodeURIComponent($('#devicename').val());
+	
+	$('#saveuserdisplay').css('display', 'block');
+	json('../securitybot/newuser', 'username='+username+'&realname='+realname+'&password='+password+'&groups=admin', function(result){
+		$.getJSON('../securitybot/login?user='+username+'&pass='+password, function(result) {
+			setCookie("sessionid", result.sessionid, 365);
+			if (username != 'admin' && password != 'admin') {
+				json('../securitybot/listusers', null, function(result){
+					for (var i in result.data) {
+						var rdi = result.data[i];
+						if (rdi.username == 'admin' && rdi.password == 'admin') {
+							json('../securitybot/deleteuser', 'username=admin', function(result){
+							});
+						}
+					}
+				});
+			}
+			$('#saveusermsg').text('DONE');
+			$('#savedevice').css('display', 'block');
+			json('../botmanager/getsettings', 'issetup=true&machineid='+devicename, function(result){
+				$('#savedevicemsg').text('DONE');
+				$('#savefolders').css('display', 'block');
+				var vars = ''
+				$('.shared').each(function(){
+					if ($(this).prop('checked')) {
+						if (vars != '') vars += '\r'
+						vars += this.sname+'\t'+this.sfolder;
+					}
+				});
+				vars = 'v='+encodeURIComponent(vars);
+				json('../filebot/updatefileshare', vars, function(result){
+					$('#savefoldersmsg').text('DONE');
+					$('#saveemail').css('display', 'block');
+					
+					var type;
+					var email;
+					var b = $('#emailsimple').css('display') == 'block';
+					if (b){
+						type = 0;
+						email = $('#privateemailaddress').val();
+					}
+					else {
+						type = $('#protocol_none').prop('checked') ? 0 : $('#protocol_pop3').prop('checked') ? 1 : 2;
+						if (type != 0 && $('#usessl').prop('checked')) type += 2;
+						email = $('#acctemail').val();
+					}
+					
+					var server = $('#acctserver').val();
+					var port = $('#acctport').val();
+					var userid = $('#serveruser').val();
+					var spassword = $('#serverpass').val();
+					
+					var p = 'username='+encodeURIComponent(username)
+						+ '&email='+encodeURIComponent(email)
+						+ '&type='+encodeURIComponent(type)
+						+ '&server='+encodeURIComponent(server)
+						+ '&port='+encodeURIComponent(port)
+						+ '&userid='+encodeURIComponent(userid)
+						+ '&password='+encodeURIComponent(spassword);
+					
+					json('../emailbot/addaccount', p, function(result){
+						$('#saveemailsmsg').text('DONE');
+						$('#alldonebutton').css('display', 'block');
+						$('#alldonebutton').trigger('create');
+						if (!b) saveSMTP();
+					});
+					
+				});
+			});
+		});
+	});
+}
+
+function finishEmail(){
+	if ($('#relay_on').prop('checked')) saveSMTP(saveRemoteAddresses());
+	else {
+		// TODO Create private email account
+		
+	    var username = encodeURIComponent($('#username').val());
+	    
+	    var type;
+	    var email;
+	    var b = $('#emailtype_private').css('display') == 'block';
+	    if (b){
+	        type = 0;
+	        email = $('#privateemailaddress').val();
+	    }
+	    else {
+	        type = $('#protocol_none').prop('checked') ? 0 : $('#protocol_pop3').prop('checked') ? 1 : 2;
+	        if (type != 0 && $('#usessl').prop('checked')) type += 2;
+	        email = $('#acctemail').val();
+	    }
+	    
+	    var server = $('#acctserver').val();
+	    var port = $('#acctport').val();
+	    var userid = $('#serveruser').val();
+	    var spassword = $('#serverpass').val();
+	    
+	    var p = 'username='+encodeURIComponent(username)
+	        + '&email='+encodeURIComponent(email)
+	        + '&type='+encodeURIComponent(type)
+	        + '&server='+encodeURIComponent(server)
+	        + '&port='+encodeURIComponent(port)
+	        + '&userid='+encodeURIComponent(userid)
+	        + '&password='+encodeURIComponent(spassword);
+	    
+	    json('../emailbot/addaccount', p, function(result){
+//	        if (b) saveRemoteAddresses();
+//	        else 
+	        	saveSMTP(saveRemoteAddresses);
+	    });
+	}
+}
+
+function saveRemoteAddresses(){
+    if ($('#relay_on').prop('checked')) {
+        var s = $('#relaydevice').val();
+        s = '<font color="#AAAAAA">set by primary gateway ('+s+')</font>'
+        $('#s_user').html(s);
+        $('#s_pass').html(s);
+    }
+    else {
+        $('#s_user').text($('#username').val());
+        $('#s_pass').text($('#password').val());
+    }               
+    
+    var emails = null;
+	$('.remoteemailaddress').each(function(){
+		if ($(this).prop('checked')){
+            if (emails == null) emails='';
+            else emails += '\t';
+            emails += this.peer+"="+this.email;
+		}
+	});
+    if (emails == null){
+        $("body").pagecontainer("change", "#emaildone", { 'changeHash':false });
+    } 
+    else {
+        emails = 'emails='+encodeURIComponent(emails);
+        json('../emailbot/setemails', emails, function(result){
+            if (result.status == 'ok') {
+                $("body").pagecontainer("change", "#emaildone", { 'changeHash':false });
+            }
+            else alert(result.msg);
+        });
+    }
+}
+
+function saveSMTP(cb){
+    var type = $('#smtpssl').prop('checked') ? '6' : '5';
+    var server = $('#smtpserver').val();
+    var port = $('#smtpport').val();
+    var userid = $('#smtpuser').val();
+    var password = $('#smtppass').val();
+    var smtpport = "2525";
+    var pop3port = "1100";
+    var usepass = $('#smtpusepass').prop('checked')
+    
+    var p = 'type='+encodeURIComponent(type)
+        + '&server='+encodeURIComponent(server)
+        + '&port='+encodeURIComponent(port)
+        + '&smtpport='+encodeURIComponent(smtpport)
+        + '&pop3port='+encodeURIComponent(pop3port)
+        + '&userid='+encodeURIComponent(userid)
+        + '&password='+encodeURIComponent(password);
+
+    if (mailsettings.smtprelay) p += '&smtprelay='+encodeURIComponent(mailsettings.smtprelay);
+    if (mailsettings.pop3relay) p += '&pop3relay='+encodeURIComponent(mailsettings.pop3relay);
+    
+    json('../emailbot/savesettings', p, function(result){
+    	if (cb) cb();
+    });
+}
+
+function connect(uuid, addr, port) {
+    var groups = encodeURIComponent($('#ld_'+uuid).val());
+    var code = encodeURIComponent($('#ldac_'+uuid).val());
+	$('#ldcon_'+uuid).html('<font color="green">Connecting to '+addr+'...<'+'/font>');
+	json('../peerbot/connect', 'uuid='+uuid+'&addr='+addr+'&port='+port+'&groups='+groups+'&code='+code, function(result){
+		if (result.status == 'ok'){
+			$('#ldcon_'+uuid).html('<font color="green">CONNECTED<'+'/font>');
+		}
+		else {
+			$('#ldcon_'+uuid).html('<font color="red">Error connecting to '+addr+': '+result.msg+'<'+'/font>');
+		}
+	});
+}
+
+function connectRemote(){
+	var uuid = encodeURIComponent($('#rdid').val());
+	var code = encodeURIComponent($('#rdac').val());
+	var group = encodeURIComponent($('#rdgroup').val());
+
+	$('#rdmsg').html('Connecting to '+uuid+"...");
+	json('../peerbot/connect', 'uuid='+uuid+'&code='+code+'&groups='+group, function(result){
+		if (result.status == 'ok'){
+			json('../peerbot/remote/'+uuid+'/peerbot/getpeerinfo', null, function(result){
+//				if (result.status == 'ok'){
+					$('#rdmsg').html('');
+					$('#remotes').append(result.name+' ('+result.addr+':'+result.port+') <font color="green">CONNECTED<'+'/font><br>');
+//				}
+//				else {
+//					$('#rdmsg').html('<font color="red">Error connecting to '+uuid+': '+result.msg+'<'+'/font>');
+//				}
+			});
+		}
+		else {
+			$('#rdmsg').html('<font color="red">Error connecting to '+uuid+': '+result.msg+'<'+'/font>');
+		}
+	});
+}
+
+function setConnections(){
+	$("body").pagecontainer("change", "#finish", { 'changeHash':false });
+	$('#zeroconflist').html('<i>Checking for devices in your local network...<'+'/i>');
+	json('../peerbot/listzeroconf', null, function(result){
+		var newhtml = '';
+		var count = 0;
+		for (var i in result.data) {
+			var rdi = result.data[i];
+			var peer = rdi.peerinfo;
+			newhtml += '<div id="'+peer.id+'">' 
+				+ peer.name + ' (' + rdi.address + ':' + peer.port + ') <div id="ldcon_'+peer.id+'" style="display:inline-block;">';
+			if (peer.connected) newhtml += '<font color="green">CONNECTED</font>';
+			else newhtml += '<select class="ldgroup" id="ld_'+peer.id+'" data-inline="true" data-mini="true"><'+'/select>'
+				+ 'Access Code: <div style="display:inline-block;width:200px;"><input type="text" data-inline="true" data-mini="true" id="ldac_'
+				+ peer.id+'"><'+'/div> '
+				+ '<input type="button" value="connect" onclick="connect(\''
+				+ peer.id+'\',\''+rdi.address+'\',\''+peer.port+'\');" data-inline="true" data-mini="true" style="width:200px;"><div id="ldmsg_'+peer.id+'"><'
+				+ '/div>';
+			newhtml += '<'+'/div><'+'/div>';
+			count++;
+		}
+		if (count == 0) newhtml = 'No devices running the Newbound Network were found on your local network.';
+		$('#zeroconflist').html(newhtml);
+		
+		newhtml = '';
+		json('../securitybot/listgroups', null, function(result){
+			for (var g in result.data){
+				g = result.data[g];
+				newhtml += '<option value="'+g+'">'+g+'<'+'/option>';
+			}
+			$('.ldgroup').html(newhtml);
+			$('.ldgroup').val('admin');
+			$('#zeroconflist').trigger('create');
+			$('#zcrescanbutton').css('display', 'block');
+		});
+	});
+	
+//	json('../securitybot/listgroups', null, function(result){
+		var rd = [ 'admin', 'trusted', 'files', 'talk', 'email' ];
+		var o = new Object();
+		json('../peerbot/accesscodes', null, function(result){
+			for (var i in result.data){
+				var rdi = result.data[i];
+				if (rdi.delete != 'true') o[rdi.groups] = i;
+			}
+			var newhtml = '';
+			for (var i in rd){
+				var rdi = rd[i];
+				if (rdi != 'anonymous'){
+					newhtml += '<b>'+rdi + ':<'+'/b> ';
+					if (o[rdi]){
+						newhtml += o[rdi];
+					}
+					else { 
+						newhtml += '<span id="ac_'+rdi+'"><'+'/span>';
+						popAC(rdi);
+					}
+					newhtml += '<br>';
+				}
+			}
+			$('#accesscodes').html(newhtml);
+		});
+//	});
+}
+
+function popAC(rdi){
+	json('../peerbot/suggestaccesscode', null, function(result){
+		$('#ac_'+rdi).text(result.msg);
+		json('../peerbot/addaccesscode', 'code='+encodeURIComponent(result.msg)+'&groups='+encodeURIComponent(rdi)+'&delete=false', function(result){
+		});
+	});
+}
+    
+function validate(f){
+	var b = $(f).val().trim() != '';
+	if (!b) {
+		$(f).css('border-style', 'solid');
+		$(f).css('border-width', 'thin');
+		$(f).css('border-color', 'red');
+	}
+	else {
+		$(f).css('border-style', 'none');
+	}
+	return b;
+}
+
+function switchHard(){
+	$('#emailsimple').css('display', 'none');
+	$('#emailhard').css('display', 'block');
+}
+    
+function switchEasy(){
+	$('#emailsimple').css('display', 'block');
+	$('#emailhard').css('display', 'none');
+}
+    
+function saveFolders(){
+    $('#foldersmsg').html('<i>Saving folder information...</i>');
+    var vars = ''
+    $('.shared').each(function(){
+        if ($(this).prop('checked')) {
+            if (vars != '') vars += '\r'
+            vars += this.sname+'\t'+this.sfolder;
+        }
+    });
+    vars = 'v='+encodeURIComponent(vars);
+    json('../filebot/updatefileshare', vars, function(result){
+    	if (result.status == 'ok'){
+    	    $('#privateemailaddress').val($('#username').val()+'@'+$('#devicename').val().toLowerCase()+'.nn');
+    	    $("body").pagecontainer("change", "#email", { 'changeHash':false });
+    	    populatePeers(populateSettings);
+//    	    populateRemote();
+    	}
+    	else{
+    		$('#foldersmsg').html('<font color="red">Error saving folder information: '+result.msg+'<'+'/font>');
+    	}
+    });
+}
+
+function populatePeers(cb){
+    json('../peerbot/connections', null, function(result){
+        var newhtml = '<option value="">(select device)</option>';
+//        $('#remoteemailaddresses').html('');
+        for (var id in result.data) {
+            var peer = result.data[id];
+            if (id != "a51f6394-730b-4f64-83b0-96ad75f84537") {
+            	newhtml += '<option value="'+id+'">'+peer.name+' ('+id+')</option>';
+            	appendRemoteEmails(peer);
+            }
+        }
+        
+        $('#relaydevice').html(newhtml).selectmenu('refresh');
+        if (cb) cb();
+    });
+}
+
+function appendRemoteEmails(peer){
+	var oldhtml = $('#remoteemailaddresses').html();
+	$.getJSON('../peerbot/remote/'+peer.id+'/emailbot/available', function(result){
+		if (result.status == 'ok') {
+			if ($('#remoteemailaddresses').html().indexOf('<font') == 0) $('#remoteemailaddresses').html('');
+			for (var i in result.data){
+				var email = result.data[i];
+	            var newhtml = '<input type="checkbox" class="remoteemailaddress" id="re_'+email+'" checked> ' + email + ' (' + peer.name + '/' + peer.id + ')<br>';
+	            $('#remoteemailaddresses').append(newhtml);
+	            var el = document.getElementById('re_'+email);
+	            el.email = email;
+	            el.peer = peer.id;
+			}
+			if ($('#remoteemailaddresses').html() == '') $('#remoteemailaddresses').html(oldhtml);
+		}
+	});
+}
+
+var mailsettings = null;
+
+function populateSettings(){
+    json('../emailbot/settings', null, function(result){
+    	if (result.status != 'ok'){
+    		mailsettings = new Object();
+    		mailsettings.server = $('#smtpserver').val();
+    		mailsettings.port = $('#smtpport').val();
+    		mailsettings.type = 6;
+    		mailsettings.userid = "";
+    		mailsettings.password = "";
+            $('#relay_on').prop('checked', false).checkboxradio('refresh');
+            $('#relay_off').prop('checked', true).checkboxradio('refresh');
+            $('#localrelay').css('display', 'block');
+    	}
+    	else {
+	        var d = result.data;
+	        mailsettings = d;
+	        
+	        $('#smtpserver').val(d.server);
+	        $('#smtpport').val(d.port);
+	        $('#smtpssl').prop('checked', d.type == 6);
+	        $('#smtpusepass').prop('checked', d.userid != '');
+	        $('#smtpuser').val(d.userid);
+	        $('#smtppass').val(d.password);
+	        $('#hidenopass').css('display', d.userid == '' ? 'none' : 'block');
+	        
+	        if (d.smtprelay) {
+	            $('#relay_on').prop('checked', true).checkboxradio('refresh');
+	            $('#relay_off').prop('checked', false).checkboxradio('refresh');
+	            $('#localrelay').css('display', 'none');
+	            $('#relaydevice').val(d.smtprelay).selectmenu('refresh');
+	        }
+	        else {
+	            $('#relay_on').prop('checked', false).checkboxradio('refresh');
+	            $('#relay_off').prop('checked', true).checkboxradio('refresh');
+	            $('#localrelay').css('display', 'block');
+	        }
+    	}
+    });
+}
+
+function saveSettings(){
+    var v = '';
+    for (var i in mailsettings){
+        if (v != '') v += '&';
+        v += i + '=' + encodeURIComponent(mailsettings[i]);
+    }
+    json('../emailbot/savesettings', v, function(result){
+        if (result.status != 'ok') alert(msg);
+    });
+}
+
+function populateRemote(){
+    json('../emailbot/getemails', null, function(result){
+        var newhtml = '';
+        for (var email in result.data){
+            var uuid = result.data[email];
+            newhtml += email+' ('+uuid+') [<a onclick="editRemote(\''+email+'\');">edit</a>]<br>';
+        }
+        if (newhtml != '') $('#remoteemailaddresses').html(newhtml);
+        else $('#remoteemailaddresses').html('<font color="red">No remote email addresses configured...</font>');
+    });
+}
+
+function chooseRelay(val){
+    if (val) {
+        $('#localrelay').css('display', 'none');
+        mailsettings.smtprelay = val;
+        mailsettings.pop3relay = val;
+    }
+    else {
+        $('#localrelay').css('display', 'block');
+        delete mailsettings['smtprelay'];
+        delete mailsettings['pop3relay'];
+    }
+    saveSettings();
+}
+
+function chooseAccountType(val){
+    $('.emailtype').css('display', 'none');
+    $('#emailtype_'+val).css('display', 'block');
+}
+    
+function userNext(){
+	var b = true;
+	$('.startf').each(function(){
+		b &= validate(this);
+	});
+	if (b) {
+		json('../filebot/listcommonfolders', null, function(result){
+		  newhtml = '';
+		  var fname = null;
+		  for (var name in result.data) {
+			var folder = result.data[name];
+			if (name == 'files') fname = folder;
+			else newhtml += '<label><input type="checkbox" class="shared" id="folder_'+name+'">'+name+" ("+folder+')<'+'/label>';
+		  }
+		  newhtml = '<label><input type="checkbox" class="shared" id="folder_files" checked>files ('+fname+')<'+'/label>'+newhtml;
+		  $('#folderlist').html(newhtml);
+		  $('#folderlist').trigger('create');
+		  $("body").pagecontainer("change", "#fileshare", { 'changeHash':false });
+		  
+		  for (var name in result.data) {
+			var folder = result.data[name];
+		  	var x = dget('folder_'+name);
+		  	x.sname = name;
+		  	x.sfolder = folder;
+		  }
+		});
+	}
+}
+
+/*
+function setUsername(name){
+  if (dget('realname').allset) {}
+  else $('#username').val(clean(name.toLowerCase()));
+}
+*/
+
+var okchars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-_';
+function clean(s){
+  var o = '';
+  var i = s.length;
+  while (i-->0) {
+    var c = s.substring(i,i+1);
+    if (okchars.indexOf(c) != -1) o = c+o;
+  }
+  return o;
+}
+
+function beginSetup(){
+  $("body").pagecontainer("change", "#start", { 'changeHash':false });
+  json('../botmanager/getsettings', null, function(result){
+    $('#devicename').val(clean(result.machineid));
+    $('#username').val(result.sysuser);
+    json('../peerbot/getpeerinfo', null, function(result){
+        $('.myuuid').text(result.id);
+        var rd = [ 'admin', 'trusted', 'files', 'talk', 'email' ];
+        var o = new Object();
+        json('../peerbot/accesscodes', null, function(result){
+            for (var i in result.data){
+                var rdi = result.data[i];
+                if (rdi.delete != 'true') o[rdi.groups] = i;
+            }
+            var newhtml = '';
+            for (var i in rd){
+                var rdi = rd[i];
+                if (rdi != 'anonymous'){
+                    newhtml += '<b>'+rdi + ':<'+'/b> ';
+                    if (o[rdi]){
+                        newhtml += o[rdi];
+                    }
+                    else { 
+                        newhtml += '<span id="ac_'+rdi+'"><'+'/span>';
+                        popAC(rdi);
+                    }
+                    newhtml += '<br>';
+                }
+            }
+            $('#accesscodes').html(newhtml);
+        });
+     });
+  });
+}
+
+function register(){
+	var code = encodeURIComponent($('#regcode').val().trim());
+	json('../peerbot/remote/'+STORE+'/transaction/register', 'code='+code, function(result){
+		if (result.status == 'ok'){
+			verifyRegistration();
+		}
+		else{
+			alert(result.msg);
+		}
+	});
+}
+
+function verifyRegistration(){
+}
+
+function verifyRegistration(){
+    $('#verifyreg').html('<b>Verifying registration... </b><span id="regok"></span>');
+/*
+    json('../peerbot/remote/'+STORE+'/transaction/accountinfo', null, function(result){
+        if (result.status == 'ok'){
+        	var i = 5;
+        	$.each(result.data.devices, function(k,v){ i--; });
+        	var t = 'Your registration code allows up to 5 devices to be registered. You have '+i+' device';
+        	if (i != 1) t += 's';
+        	t += ' left. </i>'; 
+        	var newhtml = '<b><font color="green">OK</font></b>'
+        		   +'<br><i>Registered to '+result.data.name+'. '+t
+        		   +'<br><a onclick="beginSetup();" data-role="button" data-theme="b" data-inline="true">begin setup</a>';
+            $('#regok').html(newhtml).trigger('create');
+            $('#realname').val(result.data.name);
+        }
+        else {
+        	if (result.msg.indexOf("UNAUTHORIZED") == 0) window.location = 'login.html';
+        	else {
+*/        		
+				var newhtml = '<br>Enter Registration Code: <input type="text" id="regcode"><a data-role="button" data-inline="true" data-theme="b" onclick="register();">submit code</a>';
+				newhtml += '<a data-role="button" data-inline="true" data-theme="a" onclick="beginSetup();">30 day free trial</a>'
+				$('#regok').html(newhtml).trigger('create');
+				$('#regcode').focus();
+//			}
+//        }
+//    });
+}
+
+function verifyInternet(){
+	var ipisok = false;
+
+    $('#verifyinternet').html('<b>Verifying internet connection... <span id="ipok"></span></b>');
+    json('http://'+STOREADDR+'/peerbot/noop', null, function(result){
+    	ipisok = true;
+        if (result.status == 'ok'){
+            $('#ipok').html('<font color="green">OK</font>');
+            verifyRegistration()
+        }
+        else {
+            $('#ipok').html('<br><font color="red">The Newbound server is experiencing technical difficulties... Please try again later.</font>');
+        }
+    });	
+
+    function wasok(){
+        if (!ipisok){
+            $('#ipok').html('<br><font color="red">Unable to connect to Newbound server... Please check your internet connection and try again.</font>');
+        }
+    }
+    setTimeout(wasok, 10000);
+}
+
+var numrestarts = 0;
+
+function attemptRestart(){
+	if (numrestarts++ < 3) {
+	    $('#vpok').html('<br><font color="red">NO RESPONSE. Restarting services... (Attempt '+numrestarts+' of 3)</font>');
+	    json('../securitybot/deviceinfo', 'requirepassword=false', function(result){
+		    json('restart', null, function(result){ console.log(result); });
+	        var isready = false;
+	        function checkReady() {
+	            json('getsettings', null, function(result) {
+	                isready = true;
+	                verifyInstall();
+	            });
+	            if (!isready) setTimeout(checkReady, 1000);
+	        }
+	        setTimeout(checkReady, 1000);
+        });
+	}
+	else {
+        $('#vpok').html('<br><font color="red">Unable to start background services... Please check your firewall settings and try again.</font>');
+	}
+}
+
+function verifyInstall(){
+	$('#verifypeer').html('<b>Checking to make sure background services started correctly... <span id="vpok"></span></b>');
+	json('../peerbot/noop', null, function(result){
+		if (result.status == 'ok'){
+			$('#vpok').html('<font color="green">OK</font>');
+			verifyInternet();
+		}
+		else {
+			attemptRestart();
+		}
+	});
+}
+
+function verifyCookies(){
+    $('#verifycookies').html('<b>Checking to make sure cookies are enabled... </b><span id="cookieok"></span>');
+    setCookie('testcookies', 'true');
+	if (getCookie('testcookies')){
+        $('#cookieok').html('<b><font color="green">OK</font></b>');
+        verifyInstall();
+	}
+	else{
+        $('#cookieok').html('<b><font color="red">ERROR</font></b><br><i>Please enable cookies in your web browser.</i>');
+	}
+}
+
+function verifyJS(){
+    $('#verifyjavascript').html('<b>Checking to make sure Javascript is enabled... <font color="green">OK</font></b>');
+    verifyCookies();
+}
+
+var STORE = 'a51f6394-730b-4f64-83b0-96ad75f84537';
+var STOREADDR = 'store.newbound.com:5773';
+
+$(document).ready(function(){
+  if (getQueryParameter('header') == 'false') $('#headertitle').css('display', 'none');
+  verifyJS();
+});
+    </script>
+  </body>
+</html>

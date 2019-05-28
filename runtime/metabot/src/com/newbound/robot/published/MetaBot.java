@@ -1,0 +1,1 @@
+package com.newbound.robot.published;public class MetaBot extends com.newbound.robot.MetaBot {	public MetaBot()	{		super();				DB = "metabot";		ID = "jhlxnj1613883950bj298";//		LIBRARIES = new String[]{ "coreapps", "dashboard", "taskbot", "metabot" };	}		public String getServiceName() 	{		return "metabot";	}}

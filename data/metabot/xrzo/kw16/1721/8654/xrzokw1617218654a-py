@@ -1,0 +1,1 @@
+{"data":{"python":"return metabot.handleLibraries({})","import":"","returntype":"JSONObject","groups":"anonymous","params":[{"name":"metabot","type":"Bot"}],"desc":"List the libraries installed on this device"},"readers":["anonymous"],"id":"xrzokw1617218654a-py","sessionid":"jhtpuq15d03ce0a74q0","time":1552937888832,"addr":"/0:0:0:0:0:0:0:1:56307","username":"mraiser"}

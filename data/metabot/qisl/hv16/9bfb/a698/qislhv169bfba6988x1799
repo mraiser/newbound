@@ -1,0 +1,1 @@
+{"data":{"java":"((MetaBot)BotBase.getBot(\"metabot\")).compileAll();\nreturn \"OK\";","import":"import org.json.*;\nimport com.newbound.robot.*;\n","returntype":"String","params":[],"desc":""},"id":"qislhv169bfba6988x1799","sessionid":"jhtpuq15d03ce0a74q0","time":1553699933685,"addr":"/0:0:0:0:0:0:0:1:64442","username":"mraiser"}

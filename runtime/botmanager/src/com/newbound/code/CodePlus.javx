@@ -1,0 +1,363 @@
+package com.newbound.code;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Hashtable;
+import java.util.Iterator;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import com.newbound.code.primitive.Primitive;
+import com.newbound.code.primitive.math.Divide;
+import com.newbound.code.primitive.math.Equals;
+import com.newbound.code.primitive.math.Int;
+import com.newbound.code.primitive.math.Minus;
+import com.newbound.code.primitive.math.Mod;
+import com.newbound.code.primitive.math.Multiply;
+import com.newbound.code.primitive.math.Plus;
+import com.newbound.code.primitive.object.Get;
+import com.newbound.code.primitive.object.Insert;
+import com.newbound.code.primitive.object.Put;
+import com.newbound.code.primitive.object.Remove;
+import com.newbound.robot.BotBase;
+import com.newbound.robot.JSONTransform;
+import com.newbound.robot.PeerBot;
+import com.newbound.robot.SYS;
+import com.newbound.util.DataList;
+import com.newbound.util.DataObject;
+import com.newbound.util.DataSet;
+
+public class CodePlus extends DataObject implements JSONTransform
+{
+	private static final boolean DEBUG = true;
+	private static final Hashtable<String,Class> EXT = new Hashtable();
+	private static File ROOT = null;
+	
+	public static JSONObject PRIMS = new JSONObject();
+	
+	static
+	{
+		try {
+			// MATH
+			PRIMS.put("+", new Plus());
+			PRIMS.put("-", new Minus());
+			PRIMS.put("*", new Multiply());
+			PRIMS.put("/", new Divide());
+			PRIMS.put("%", new Mod());
+			PRIMS.put("int", new Int());
+			PRIMS.put("equals", new Equals());
+
+			// OBJECT
+			PRIMS.put("Get", new Get());
+			PRIMS.put("Put", new Put());
+			PRIMS.put("Remove", new Remove());
+
+			//ARRAY
+			PRIMS.put("insert", new Insert());
+		}
+		catch (Exception x) { x.printStackTrace(); }
+	}
+
+	public CodePlus(InputStream is) throws IOException 
+	{
+		super(is);
+	}
+
+	public CodePlus() 
+	{
+		super();
+	}
+
+	public CodePlus(DataObject code) 
+	{
+		super();
+		mFirstProperty = code.mFirstProperty;
+		mLastProperty = code.mLastProperty;
+		mNumProperties = code.mNumProperties;
+	}
+
+	public CodePlus(JSONObject code) 
+	{
+		super(code);
+	}
+
+	public JSONObject execute(JSONObject args) 
+	{
+		try
+		{
+			if (DEBUG) System.out.println("Evaluating code");
+			
+			String type = !has("type") ? "flow" : getString("type");
+			if (type.equals("java"))
+			{
+			  String claz = "com.newbound.robot.published.botmanager.code."+getString("id");
+			  Class c = EXT.get(claz);
+			  if (c == null)
+			  {
+			    c = SYS.loadClass(getRootDir(), claz, false);
+			    EXT.put(claz, c);
+			  }
+			  JSONTransform jt = (JSONTransform)c.newInstance();
+			  
+			  return jt.execute(args);
+			}
+			
+			int i;
+			boolean done = false;
+			
+			JSONObject out = new JSONObject();
+//			put("out", out);
+			
+			DataList cmds = getDataList("cmds");
+			DataList cons = getDataList("cons");
+			
+			int n = cons.length();
+			int n2 = cmds.length();
+			
+			for (i=0;i<n2;i++) 
+			{
+				DataObject cmd = cmds.getDataObject(i);
+				if (DEBUG) System.out.println("pre-processing cmd "+i+": "+cmd);
+				if (!cmd.has("done") || !cmd.getBoolean("done"))
+				{
+					DataObject in = cmd.getDataObject("in");
+					Iterator<String> it = in.keys();
+					if (DEBUG) System.out.println(it.hasNext() ? "Analyzing inputs" : "No inputs, evaluating cmd");
+					if (!it.hasNext()) evaluate(cmd);
+					else 
+					{
+						boolean b = true;
+						
+						while (it.hasNext())
+						{
+							String key = it.next();
+							in.getDataObject(key).put("done", false);
+							DataObject con = lookupConnection(i, key, "in");
+							if (con == null) 
+								in.getDataObject(key).put("done", true);
+							else b = false; //b && (in.has("done") && in.getBoolean("done"));
+						}
+						
+						if (DEBUG) System.out.println(b ? "No connections to any inputs, evaluating cmd" : "Command requires input to evaluate");
+						if (b) evaluate(cmd);
+					}
+				}
+			}
+			
+			while (!done)
+			{
+				if (DEBUG) System.out.println("Evaluating connections...");
+				boolean c = true;
+				
+				for (i=0;i<n;i++)
+				{
+					DataObject con = cons.getDataObject(i);
+					if (DEBUG) System.out.println("Evaluating connection "+i+": "+con);
+					if (!con.has("done") || !con.getBoolean("done"))
+					{
+						c = false;
+						DataList ja = con.getDataList("src");
+						int src = ja.getInt(0);
+						String srcname = ja.getString(1);
+						ja = con.getDataList("dest");
+						int dest = ja.getInt(0);
+						String destname = ja.getString(1);
+									
+						boolean b = false;
+						Object val = null;
+						if (src == -1) 
+						{
+							val = args.has(srcname) ? args.get(srcname) : null;
+							b = true;
+							if (DEBUG) System.out.println("Value from input bar node "+srcname+" is "+val);
+						}
+						else
+						{
+							DataObject cmd = cmds.getDataObject(src);
+							if (cmd.has("done") && cmd.getBoolean("done"))
+							{
+								DataObject vals = cmd.getDataObject("out");
+								val = vals.has(srcname) ? vals.get(srcname) : null;
+								b = true;
+								if (DEBUG) System.out.println("Value from command "+src+" output node "+srcname+" is "+val);
+							}
+							else if (DEBUG) System.out.println("Value from command "+src+" output node "+srcname+" is not ready yet");
+						}
+						
+						if (b)
+						{
+							if (DEBUG) System.out.println("Connection "+i+" is done");
+							con.put("done",  true);
+							if (dest == -2)
+							{
+								if (val != null) out.put(destname, val);
+								if (DEBUG) System.out.println("Value "+val+" passed to output node "+destname);
+							}
+							else
+							{
+								DataObject cmd = cmds.getDataObject(dest);
+								if (cmd.getString("type").equals("undefined")) 
+								{
+									cmd.put("done", true);
+									if (DEBUG) System.out.println("Marking undefined command as done");
+								}
+								else
+								{
+									DataObject ins = cmd.getDataObject("in");
+									DataObject var = ins.getDataObject(destname);
+									if (val != null) var.put("val", val);
+									var.put("done",  true);
+									
+									Iterator it = ins.keys();
+									while (it.hasNext() && b)
+									{
+										DataObject in = ins.getDataObject((String)it.next());
+										b = b && in.has("done") && in.getBoolean("done");
+									}
+									
+									if (DEBUG) System.out.println(b ? "All inputs to dest cmd done, evaluating" : "Not all inputs to cmd done yet");
+									if (b)
+										evaluate(cmd);
+								}
+							}		
+						}
+					}
+					else if (DEBUG) System.out.println("Connection "+i+" is done");
+
+				}
+
+				if (DEBUG) System.out.println(c ? "All connections had already fired. We must be done" : "One or more connections fired. Check all the commands");
+
+				if (c) done = true;
+/*
+				else
+				{
+					boolean b = true;
+					for (i=0;i<n2;i++)
+					{
+						JSONObject cmd = cmds.getJSONObject(i);
+						if (!cmd.has("done") || !cmd.getBoolean("done")) { b = false; break; }
+					}
+					done = b;
+					if (DEBUG) System.out.println(done ? "Done!" : "Not done yet, keep trying!");
+				}
+*/			
+			}
+			return out;
+		}
+		catch (Exception x) 
+		{
+			x.printStackTrace();
+			throw new RuntimeException(x.getMessage());
+		}
+	}
+	
+	private static File getRootDir()
+	{
+		if (ROOT == null) ROOT = new File(BotBase.getBot("botmanager").getRootDir().getParentFile().getParentFile(), "generated");
+		return ROOT;
+	}
+
+
+	private DataObject lookupConnection(int cmd, String name, String which) throws Exception
+	{
+		DataList cons = getDataList("cons");
+		int i = cons.length();
+		while (i-->0)
+		{
+			DataObject con = cons.getDataObject(i);
+			DataList bar = con.getDataList(which.equals("in") ? "dest" : "src");
+			if (bar.getString(1).equals(name)) return con;
+		}
+		return null;
+	}
+
+	private void evaluate(DataObject cmd) throws Exception
+	{
+		JSONObject in = new JSONObject();
+		DataObject in2 = cmd.getDataObject("in");
+		Iterator keys = in2.keys();
+		while (keys.hasNext())
+		{
+			String name = (String)keys.next();
+			DataObject in3 = in2.getDataObject(name);
+			if (in3.has("val")) in.put(name, in3.get("val"));
+			if (DEBUG) System.out.println(in3.has("val") ? "HAS "+name : "MISSING: "+name+"("+in3+")");
+		}
+		if (DEBUG) System.out.println("in: "+in);
+		if (DEBUG) System.out.println("in2: "+in2);
+
+		JSONObject out;
+		
+		String type = cmd.getString("type");
+		if (type.equals("primitive")) out = ((Primitive)PRIMS.get(cmd.getString("name"))).execute(in); 
+		else 
+			if (type.equals("code"))
+		{
+			DataObject code = cmd.getDataObject("code");
+			CodePlus c = new CodePlus(code);
+			out = c.execute(in);
+		}
+		else if (type.equals("peer"))
+		{
+			PeerBot pb = PeerBot.getPeerBot();
+			String bot = cmd.getString("btype");
+			String name = cmd.getString("name");
+			JSONObject jo = in; //cmd.getJSONObject("args");
+			Hashtable params = new Hashtable();
+			Iterator<String> list = jo.keys();
+			while (list.hasNext())
+			{
+				String k = list.next();
+				params.put(k, jo.get(k));
+			}
+			
+			if (false) //(cmd.has("uuid"))
+			{
+				String id = cmd.getString("uuid");
+				out = pb.sendCommand(id, bot, name, params);
+			}
+			else 
+			{
+				out = new JSONObject();
+				out.put("result", pb.sendCommand(bot, name, params));
+			}
+		}
+		else if (type.equals("constant"))
+		{
+			DataObject d = cmd.getDataObject("out");
+			out = new JSONObject();
+			Iterator<String> i = d.keys();
+			while (i.hasNext()) 
+			{
+				String key = i.next();
+				Object val = cmd.get("name");
+				String ctype = cmd.getString("ctype");
+				if (ctype.equals("int")) val = Integer.parseInt(""+val);
+				else if (ctype.equals("decimal")) val = Double.parseDouble(""+val);
+				else if (ctype.equals("boolean")) val = Boolean.parseBoolean(""+val);
+				else if (ctype.equals("object")) val = new JSONObject(""+val);
+				else if (ctype.equals("array")) val = new JSONArray(""+val);
+				out.put(key, val);
+			}
+		}
+		else out = new JSONObject();
+		
+		cmd.put("out", out);
+		cmd.put("done",  true);
+	}
+
+	public static void main(String[] args) 
+	{
+		try {
+			String s = "{ cons: [ { src:[-1,'a'], dest:[0,'a'] },{ src:['-1','b'], dest:[0,'b'] },{ src:[1,'a'], dest:[3,'a'] },{ src:[0,'c'], dest:[2,'a'] },{ src:[2,'b'], dest:[3,'b'] },{ src:[3,'c'], dest:[-2,'a'] }], cmds: [ { name:'+', in: { a: {}, b: {} }, type:'primitive', },{ name:'3', in: {}, type:'constant', out:{a:3}, done:true },{ name:'int', in: { a: {} }, type:'primitive', },{ name:'equals', in: { a: {}, b: {} }, type:'primitive', }] }";
+			CodePlus jo = new CodePlus(new JSONObject(s));
+			JSONObject in = new JSONObject("{a:-2,b:4}");
+			System.out.println(jo);
+			System.out.println(jo.execute(in));
+		}
+		catch (Exception x) { x.printStackTrace(); }
+	}
+}

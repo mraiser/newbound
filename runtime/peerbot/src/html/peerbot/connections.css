@@ -1,0 +1,34 @@
+.peercell {
+    padding: 5px;
+    font-size: x-small;
+    border-width: thin;
+    border-color: black;
+    border-style: solid;
+    margin: 2px;
+    cursor: pointer;
+    display: inline-block;
+}
+
+.pc_connected {
+    background-color: #aaffaa;
+}
+
+.pc_connected_hover {
+    background-color: #ccffcc;
+}
+
+.pc_connecting {
+    background-color: #ffffcc;
+}
+
+.pc_offline {
+    background-color: #cccccc;
+}
+
+.pc_offline_hover {
+    background-color: #ccccff;
+}
+
+.pc_unavailable {
+    background-color: red;
+}
