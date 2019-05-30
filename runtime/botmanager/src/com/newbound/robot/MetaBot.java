@@ -47,8 +47,6 @@ public abstract class MetaBot extends BotBase
 */ 
 			addNumThreads(1); // Everybody gets one
 		
-//		recompile();
-		
 		File tempdir = newTempFile();
 		
 		JSONObject jo = app(getServiceName());
@@ -69,6 +67,8 @@ public abstract class MetaBot extends BotBase
 			x.printStackTrace();
 		}
 		
+		recompile();
+
 		if (tempdir != null) deleteDir(tempdir);
 	}
 
