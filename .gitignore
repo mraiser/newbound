@@ -11,6 +11,11 @@ bin/
 generated/
 # for mixed in Java files
 *.class
+runtime/metabot/botd.properties
+runtime/peerbot/botd.properties
+runtime/securitybot/botd.properties
+runtime/securitybot/rules/
+runtime/securitybot/users/
 
 # Distribution / packaging
 .Python
