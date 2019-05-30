@@ -59,7 +59,7 @@ class BotUtil(object):
 		self.nextid += 1
 		return sid
 		
-	def lettersAndNumbersOnly(s):
+	def lettersAndNumbersOnly(self, s):
 		o = '';
 		for c in s: 
 			if c in self.hexchars or c in self.nonhexchars:
