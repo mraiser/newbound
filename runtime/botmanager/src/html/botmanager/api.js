@@ -433,9 +433,16 @@ function json(cmd, vars, cb) {
 	$.getJSON(cmd+vars, function(result) { 
   //    console.log(result); 
 	  if (cb) cb(result); 
-	}).fail(function(x) {
+	}).fail(function(x,y) {
+	  //debugger;
 	  console.log('This should not happen');
-	  if (cb && x.status && x.status == 200) cb(x); // FIXME - WTF?
+	  console.log(x);
+	  console.log(y);
+	  if (cb && x.status && x.status == 200) {
+        t = x.responseText;
+        x = JSON.parse(t);
+        cb(x); // FIXME - WTF?
+	  }
 	  else{
 		  console.log( "error" );
 		  console.log( x );
