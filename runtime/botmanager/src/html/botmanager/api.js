@@ -522,4 +522,4 @@ function parseDate(date){
 	return a0+' '+a1;
 }
 
-//if (typeof NEWBOUND_AJAX == 'undefined') try{ startWebSocket(); } catch (x) {}
+if (typeof NEWBOUND_AJAX == 'undefined') try{ startWebSocket(); } catch (x) {}
