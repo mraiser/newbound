@@ -297,8 +297,8 @@ public class CompilingClassLoader extends ClassLoader
 
 		Iterable<? extends JavaFileObject> compilationUnits = Arrays.asList(src);
 		
-		String version = System.getProperty("java.version");
-		version = version.startsWith("1.8") ? "1.8" : "1.6";
+//		String version = System.getProperty("java.version");
+//		version = version.startsWith("1.8") ? "1.8" : "1.6";
 
 		char cc = File.pathSeparatorChar;
 		String path = System.getProperty("java.class.path");
@@ -330,7 +330,8 @@ public class CompilingClassLoader extends ClassLoader
 		while (i-->0) sourcepath = (sourcepath == null ? "" : sourcepath + cc) + mRoot.elementAt(i).getCanonicalPath();
 		System.out.println(sourcepath);
 		
-		String[] commandLine =  {"-source", version, "-target", version, "-cp", path, "-sourcepath", sourcepath, "-Xlint:none", "-Xlint:-unchecked", "-proc:none" };
+//		String[] commandLine =  {"-source", version, "-target", version, "-cp", path, "-sourcepath", sourcepath, "-Xlint:none", "-Xlint:-unchecked", "-proc:none" };
+		String[] commandLine =  {"-cp", path, "-sourcepath", sourcepath, "-Xlint:none", "-Xlint:-unchecked", "-proc:none" };
 		Iterable<String> options = Arrays.asList(commandLine);
 		
 		CompilationTask task = compiler.getTask(null, jfm, diagnostics, options, null, compilationUnits);
