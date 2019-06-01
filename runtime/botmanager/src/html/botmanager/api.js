@@ -442,6 +442,14 @@ function json(cmd, vars, cb) {
         t = x.responseText;
         x = JSON.parse(t);
         cb(x); // FIXME - WTF?
+
+        /**
+
+        As far as I can tell, what is happening here is that $(document).ready() is getting called before the websocket has a chance to open, so we do $.getJSON
+        It is possible that AJAX is broken.
+        Possibly an HTTP issue. :(
+
+        **/
 	  }
 	  else{
 		  console.log( "error" );
