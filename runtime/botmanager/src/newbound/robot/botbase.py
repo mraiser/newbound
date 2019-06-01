@@ -101,10 +101,18 @@ class BotBase(BotUtil):
         out = b.handleCommandRequest(method, headers, params, cmd, parser, request)
         l = -1
 
-        return self.transformResult(out, l, cmd)
+        return self.transformResult(out, l, cmd, params)
 
-    def transformResult(self, out, l, cmd):
+    def transformResult(self, out, l, cmd, params):
         # FIXME add file, stream, number
+
+        p1 = ''
+        p2 = ''
+
+        if 'callback' in params:
+            p1 = params['callback']+'('
+            p2 = ')'
+
         t = type(out).__name__
         if t == 'str':
             d = {
@@ -112,12 +120,12 @@ class BotBase(BotUtil):
                 "msg": out
             }
             cmd += ".json"
-            out = json.dumps(d)
+            out = p1+json.dumps(d)+p2
             l = len(out)
             out = out.encode()
         elif t == 'dict':
             cmd += ".json"
-            out = json.dumps(out)
+            out = p1+json.dumps(out)+p2
             l = len(out)
             out = out.encode()
         elif t == 'list':
@@ -126,7 +134,7 @@ class BotBase(BotUtil):
                 "list": out
             }
             cmd += ".json"
-            out = json.dumps(d)
+            out = p1+json.dumps(d)+p2
             l = len(out)
             out = out.encode()
         return out, l, cmd
