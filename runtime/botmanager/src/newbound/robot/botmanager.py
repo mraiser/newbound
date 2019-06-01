@@ -3,6 +3,8 @@ import sys
 import json
 import copy
 import traceback
+
+from ..crypto.supersimplecipher import SuperSimpleCipher
 from .botbase import BotBase
 from .loadpython import loadpython
 
@@ -22,6 +24,7 @@ class BotManager(BotBase):
         super().init(root)
         # FIXME - add discovery
         # FIXME - add timers
+        self.keys = None
         self.bots = {}
         home = self.getParentFile(self.root)
         bots = ['securitybot', 'peerbot', 'metabot']
@@ -353,6 +356,18 @@ class BotManager(BotBase):
         home = os.path.join(home, 'data')
         home = os.path.join(home, db)
         return home
+
+    def getKeys(self, db):
+        ssca = self.keys.get(db, None)
+        if ssca is None:
+            with open(os.path.join(self.getDB(db), "meta.json")) as f:
+                jo = json.load(f.read())
+            ssca = []
+            if "crypt" in jo:
+                writekey = bytes.fromhex(jo["crypt"])
+                ssca.append(SuperSimpleCipher(writekey))
+                ssca.append(SuperSimpleCipher(writekey))
+        return ssca
 
     def getAsset(self, db, filename):
         home = self.getDB(db)
