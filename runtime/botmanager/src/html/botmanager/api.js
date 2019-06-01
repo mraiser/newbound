@@ -434,6 +434,7 @@ function json(cmd, vars, cb) {
   //    console.log(result); 
 	  if (cb) cb(result); 
 	}).fail(function(x) {
+	  console.log('This should not happen');
 	  if (cb && x.status && x.status == 200) cb(x); // FIXME - WTF?
 	  else{
 		  console.log( "error" );
