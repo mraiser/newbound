@@ -336,13 +336,17 @@ function startWebSocket(){
 	if (ii != -1) url = url.substring(0,ii);
 	url = 'ws'+url;
 	var connection = new WebSocket(url, ['newbound']);
+	document.nbws_connecting = true;
+	console.log("Opening websocket");
 	
 	connection.onopen = function(){
 		SOCK = connection;
+		document.nbws_connecting = false;
 	};
 	
 	connection.onerror = function(error){
 		SOCK = null;
+		document.nbws_connecting = false;
 		console.log('Websocket error:');
 		console.log(error);
 		
@@ -352,6 +356,7 @@ function startWebSocket(){
 	
 	connection.onclose = function(error){
 		SOCK = null;
+		document.nbws_connecting = false;
 		console.log('Websocket close:');
 		console.log(error);
 		
@@ -361,6 +366,8 @@ function startWebSocket(){
 	
 	connection.onmessage = function(e){
 //	  debugger;
+//      console.log("INCOMING WEBSOCKET MESSAGE: ");
+//      console.log(e);
 	  var o = JSON.parse(e.data);
 	  var pid = o.pid;
 	  var div = o.guid ? $('#'+o.guid)[0] : null;
@@ -427,37 +434,46 @@ function json(cmd, vars, cb) {
 	SOCK.send("cmd "+JSON.stringify(wrap));
   }
   else {
-	if (vars) vars = '&'+vars; 
-	else vars = ''; 
-	vars = '?callback=?' + '&sessionid=' + sessionid + vars; 
-	$.getJSON(cmd+vars, function(result) { 
-  //    console.log(result); 
-	  if (cb) cb(result); 
-	}).fail(function(x,y) {
-	  //debugger;
-	  console.log('This should not happen');
-	  console.log(x);
-	  console.log(y);
-	  if (cb && x.status && x.status == 200) {
-        t = x.responseText;
-        x = JSON.parse(t);
-        cb(x); // FIXME - WTF?
+    if (document.nbws_connecting){
+      console.log('Waiting for websocket to connect...');
+      setTimeout(function(){
+        json(cmd, vars, cb);
+      }, 10);
+    }
+    else {
+        if (vars) vars = '&'+vars;
+        else vars = '';
+        vars = '?callback=?' + '&sessionid=' + sessionid + vars;
+        $.getJSON(cmd+vars, function(result) {
+          debugger;
+          // FIXME - Never gets here on python
+          if (cb) cb(result);
+        }).fail(function(x,y) {
+          //debugger;
+          console.log('This should not happen');
+          console.log(x);
+          console.log(y);
+          if (cb && x.status && x.status == 200) {
+            t = x.responseText;
+            x = JSON.parse(t);
+            cb(x); // FIXME - WTF?
 
-        /**
+            /**
 
-        As far as I can tell, what is happening here is that $(document).ready() is getting called before the websocket has a chance to open, so we do $.getJSON
-        It is possible that AJAX is broken.
-        Possibly an HTTP issue. :(
+            It is possible that AJAX is broken.
+            Possibly an HTTP issue. :(
+            parsererror
 
-        **/
-	  }
-	  else{
-		  console.log( "error" );
-		  console.log( x );
-		  var result = { status: 'err', msg: x.responseText };
-		  if (cb) cb(result); 
-	  }
-	});  
+            **/
+          }
+          else{
+              console.log( "error" );
+              console.log( x );
+              var result = { status: 'err', msg: x.responseText };
+              if (cb) cb(result);
+          }
+        });
+      }
   }
 }
 
@@ -506,4 +522,4 @@ function parseDate(date){
 	return a0+' '+a1;
 }
 
-if (typeof NEWBOUND_AJAX == 'undefined') try{ startWebSocket(); } catch (x) {}
+//if (typeof NEWBOUND_AJAX == 'undefined') try{ startWebSocket(); } catch (x) {}
