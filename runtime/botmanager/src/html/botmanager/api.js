@@ -445,7 +445,7 @@ function json(cmd, vars, cb) {
         else vars = '';
         vars = '?callback=?' + '&sessionid=' + sessionid + vars;
         $.getJSON(cmd+vars, function(result) {
-          debugger;
+          //debugger;
           // FIXME - Never gets here on python
           if (cb) cb(result);
         }).fail(function(x,y) {
