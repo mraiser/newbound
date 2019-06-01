@@ -381,8 +381,9 @@ class BotManager(BotBase):
 
     def getDataFile(self, db, id, keys):
         f = self.getDB(db)
-        # FIXME - add encryption
         name = id
+        if keys:
+            name = keys[1].encrypt(bytes(id)).hex()
         f = self.getSubDir(f, name, 4, 4)
         f = os.path.join(f, name)
         return f
