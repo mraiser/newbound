@@ -160,16 +160,19 @@ class Peer(BotUtil):
         cmd = o['cmd']
         params = o['params']
         b = self.p2p.container.getBot(bot)
-        sb = self.p2p.container.getBot('securitybot')
-        user = sb.getUser(self.id, True)  # FIXME - Affected by allow anonymous connections setting
-        ses = sb.getSession(self.id, True)  # FIXME - needs double-blind session like HTTP
-        ses['username'] = self.id
-        ses['peer'] = self
-        ses['displayname'] = self.name
-        ses['user'] = user
-        ses['emailusername'] = self.id  # FIXME - Should not have email bot functionality here
-        ses['emailuser'] = user
         try:
+            if b is None:
+                raise Exception('App not available: '+bot)
+
+            sb = self.p2p.container.getBot('securitybot')
+            user = sb.getUser(self.id, True)  # FIXME - Affected by allow anonymous connections setting
+            ses = sb.getSession(self.id, True)  # FIXME - needs double-blind session like HTTP
+            ses['username'] = self.id
+            ses['peer'] = self
+            ses['displayname'] = self.name
+            ses['user'] = user
+            ses['emailusername'] = self.id  # FIXME - Should not have email bot functionality here
+            ses['emailuser'] = user
             sb.validateRequest(b, cmd, params)
             r = b.handleCommand(cmd, params)
             print(json.dumps(r))
@@ -180,10 +183,9 @@ class Peer(BotUtil):
                 r = o
             self.p2p.respond(self, mid, r)
         except Exception as e:
-            self.printStackTrace(e)
+            print('Error executing command ('+bot+'/'+cmd+'): '+str(e))
             r = {
                 'status': 'err',
-                #'msg': 'Error executing command ('+bot+'/'+cmd+'): '+str(e)
                 'msg': str(e)
             }
             self.p2p.respond(self, mid, r)
