@@ -143,7 +143,7 @@ class BotManager(BotBase):
 
     def execute(self, db, id, args, params):
         # FIXME - support other languages
-        src = self.handleRead(params)["data"];
+        src = self.handleRead(params)["data"]
         #print(src)
         p = None
         t = 'JSONObject'
@@ -187,7 +187,7 @@ class BotManager(BotBase):
         n = len(p)
         i = 0
         while i<n:
-            if not invoke == '': invoke += ', ';
+            if not invoke == '': invoke += ', '
             o = p[i]
             name = o['name']
             invoke += name
@@ -239,6 +239,7 @@ class BotManager(BotBase):
         self.mkdirs(f)
         f = os.path.join(f, id+'.py')
         return f
+
     def handleNewDB(self, params):
         db = params['db']
         sessionid = params['sessionid']
@@ -338,13 +339,13 @@ class BotManager(BotBase):
         if 'readers' in params: readers = json.loads(params['readers'])
         if 'writers' in params: writers = json.loads(params['writers'])
 
-        return self.setData(db, id, data, readers, writers, sessionid);
+        return self.setData(db, id, data, readers, writers, sessionid)
 
     def setData(self, db, id, data, readers, writers, sessionid=None):
         # FIXME - get name if logged in
         sessionlocation = ''
         username = 'xxx' #session['username']
-        if sessionid == None:
+        if sessionid is None:
             sessionid = ''
             username = 'system'
         else:
@@ -368,8 +369,8 @@ class BotManager(BotBase):
             "addr": sessionlocation,
             "time": self.currentTimeMillis()
         }
-        if (readers != None): d["readers"] = readers
-        if (writers != None): d["writers"] = writers
+        if readers is not None: d["readers"] = readers
+        if writers is not None: d["writers"] = writers
 
         ba = json.dumps(d)
         if keys:
@@ -673,4 +674,3 @@ class BotManager(BotBase):
             "desc":"Save the given command."
         }
     }
-		
