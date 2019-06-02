@@ -180,6 +180,9 @@ class MetaBot(BotBase):
         if 'botclass' in p: jo['class'] = p['botclass']
         else: jo['class'] = "newbound.robot.published."+id.lower()+"."+id
 
+        if 'pybotclass' in p: jo['pyclass'] = p['pybotclass']
+        else: jo['class'] = "newbound.robot.published."+id.lower()+"."+id
+
         if 'version' in p: jo['version'] = p['version']
         else: jo['version'] = "0"
 
