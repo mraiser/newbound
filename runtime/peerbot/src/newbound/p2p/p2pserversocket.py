@@ -105,6 +105,7 @@ class P2PServerSocket(object):
             try:
                 sock = self.incoming.get(True, 5)
                 psock = P2PSocket(self.p2p.service, self.uuid, self.port, sock)
+                return psock
             except:
                 pass
 
@@ -113,3 +114,7 @@ class P2PServerSocket(object):
 
     def getAddress(self):
         return self.tcp.getAddress()
+
+    def getRelay(self, target, relay):
+        return self.relay.addRelay(target, relay)
+

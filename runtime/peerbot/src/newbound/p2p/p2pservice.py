@@ -52,6 +52,9 @@ class P2PService(Service):
                 return self.allsocks[uuid][0]
         return None
 
+    def getRelay(self, target, relay):
+        return self.serversocket.getRelay(target, relay)
+
     def maintenance(self):
         # FIXME
         pass

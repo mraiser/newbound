@@ -12,6 +12,9 @@ class TCPSocket(object):
     def isConnected(self):
         return self.connected
 
+    def isClosed(self):
+        return not self.connected
+
     def readall(self, num):
         n = 0
         ba = b''

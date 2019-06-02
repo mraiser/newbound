@@ -141,9 +141,10 @@ class Peer(BotUtil):
             s = msg[8:].decode()
             o = json.loads(s)
             print('RESPONSE ['+str(mid)+'] got '+s)
+
             def cb():
                 c2 = c.cb(o)
-                if not c2 == None:
+                if c2 is not None:
                     self.sendCommandAsync(c2)
             self.p2p.addJob(cb)
 

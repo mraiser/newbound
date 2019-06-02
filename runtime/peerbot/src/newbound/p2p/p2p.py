@@ -108,8 +108,8 @@ class P2P(BotUtil):
         sock = self.service.any(uuid, 'RelaySocket')
         return not sock == None
 
-    def available(self, uuid):
-        sock = self.service.any(uuid)
+    def available(self, uuid, typ=None):
+        sock = self.service.any(uuid, typ)
         return not sock == None
 
     def respond(self, p, mid, jo):

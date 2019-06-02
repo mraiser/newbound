@@ -12,6 +12,5 @@ class RELAYED(BotUtil):
         llen = len(ba)-40
         ba2 = self.int_to_bytes(code) + self.int_to_bytes(llen) + ba[40:]
         sock = data['p2psocket']
-        p2p = sock.service.p2p
-        sock = p2p.getRelay(target, relay)
+        sock = self.service.getRelay(target, relay)
         sock.incoming(ba2)

@@ -1,5 +1,6 @@
 import os
 from queue import Queue
+from .relaysocket import RelaySocket
 
 class RelayServerSocket(object):
     def __init__(self, p2p):
@@ -12,8 +13,9 @@ class RelayServerSocket(object):
         if not uuid in self.socks: self.socks[uuid] = {}
         hash = self.socks[uuid]
         if not relay in hash or hash[relay].isClosed():
-            hash[relay] = RelaySocket(relay, uuid)
-            self.incoming = hash[relay]
+            sock = self.p2p.service.any(relay, 'TCPSocket')
+            hash[relay] = RelaySocket(relay, uuid, sock)
+            self.incoming.put(hash[relay])
         return hash[relay]
 
     def removeRelay(self, uuid, relay):

@@ -20,3 +20,6 @@ class P2PSocket(object):
 
     def readall(self, num):
         return self.sock.readall(num)
+
+    def isClosed(self):
+        return self.sock.isClosed()
