@@ -31,7 +31,14 @@ class P2PServerSocket(object):
 
     def maintenance(self):
         self.p2p.service.maintenance()
-        for thread in threading.enumerate(): print('THREAD: '+thread.name)
+
+        if self.mod % 6 == 0:
+            print('----------------------------------------- THREADS -----------------------------------------')
+            for thread in threading.enumerate():
+                if not thread.name == 'No work':
+                    print(thread.name)
+            print('----------------------------------------- THREADS -----------------------------------------')
+
         self.mod += 1
         tcppeers = []
         uuids = ''
