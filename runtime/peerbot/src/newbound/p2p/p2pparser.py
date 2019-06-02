@@ -16,7 +16,8 @@ class P2PParser(BotUtil):
             self.remoteport = self.int_from_bytes(ba[36:])
         #self.peer = self.p2p.getPeer(self.remoteid, True)
         elif typ == 'RelaySocket':
-            yyy
+            self.remoteid = sock.sock.uuid
+            self.remoteport = -1
         else:
             print('FIXME - UNDEFINED')
 

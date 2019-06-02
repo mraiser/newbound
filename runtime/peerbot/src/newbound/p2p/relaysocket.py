@@ -12,3 +12,9 @@ class RelaySocket(object):
 
     def isClosed(self):
         return self.sock.isClosed()
+
+    def readall(self, n):
+        return self.sock.readall(n)
+
+    def sendall(self, ba):
+        return self.sock.sendall(ba)

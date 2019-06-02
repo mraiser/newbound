@@ -7,6 +7,7 @@ from queue import Queue
 from newbound.net.tcp.tcpserversocket import TCPServerSocket
 from .relayserversocket import RelayServerSocket
 from .p2pcommand import P2PCommand
+from .p2psocket import P2PSocket
 
 class P2PServerSocket(object):
     def __init__(self, p2p, uuid, port):
@@ -106,7 +107,7 @@ class P2PServerSocket(object):
                 sock = self.incoming.get(True, 5)
                 psock = P2PSocket(self.p2p.service, self.uuid, self.port, sock)
                 return psock
-            except:
+            except Exception as e:
                 pass
 
     def getPort(self):

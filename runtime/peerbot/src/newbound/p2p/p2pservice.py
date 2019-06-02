@@ -12,6 +12,8 @@ from newbound.p2p.protocol.pubkey import PUBKEY
 from newbound.p2p.protocol.sendreadkey import SEND_READKEY
 from newbound.p2p.protocol.readkey import READKEY
 from newbound.p2p.protocol.keepalive import KEEPALIVE
+from .p2pparser import P2PParser
+
 import newbound.p2p.codes as Codes
 
 class P2PService(Service):
