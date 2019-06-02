@@ -20,6 +20,8 @@ class HTTPParser(BotUtil):
         if oneline == None:
             return None
 
+        print(oneline)
+
         sa = oneline.split(' ')
         method = sa[0].upper()
         cmd = sa[1]
