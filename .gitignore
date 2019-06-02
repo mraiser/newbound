@@ -16,6 +16,7 @@ runtime/peerbot/botd.properties
 runtime/securitybot/botd.properties
 runtime/securitybot/rules/
 runtime/securitybot/users/
+data/runtime
 
 # Distribution / packaging
 .Python
