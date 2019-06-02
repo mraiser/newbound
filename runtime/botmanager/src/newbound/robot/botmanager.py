@@ -305,12 +305,21 @@ class BotManager(BotBase):
         return self.getData(db, id)
 
     def getData(self, db, id):
-        # Fixme add encryption
-        f = self.getDataFile(db, id, None)
+
+        keys = self.getKeys(db)
+        f = self.getDataFile(db, id, keys)
         if not os.path.exists(f): raise Exception("No such record "+db+"/"+id)
-        d = json.loads(self.readFile(f).decode())
-        d['status'] = 'ok'
-        return d
+
+        with open(f, "rb") as f:
+            ba = f.read().decode()
+        if not keys:
+            jo = json.loads(ba)
+        else:
+            jo = keys[0].decrypt(ba)
+        # d = json.loads(self.readFile(f).decode())
+        # d['status'] = 'ok'
+        # return d
+        return jo
 
     def handleWrite(self, params):
         db = params['db']
