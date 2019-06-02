@@ -260,9 +260,22 @@ class BotManager(BotBase):
         if 'readers' in params: meta['readers'] = json.loads(params['readers'])
         if 'writers' in params: meta['writers'] = json.loads(params['writers'])
 
-        #FIXME - add encryption
+        writekey = None
+        encryption = params.get("encryption", None)
+        if encryption is None or encryption == "AES":
+            writekey = SuperSimpleCipher.getSeed()
+            crypt = writekey.hex()
+            meta["crypt"] = crypt
 
         self.writeFile(f2, json.dumps(meta).encode())
+
+        ssca = []
+        if writekey is not None:
+            ssca.append(SuperSimpleCipher(writekey))
+            ssca.append(SuperSimpleCipher(writekey))
+        self.keys[db] = ssca
+
+        self.fireEvent("newdb", meta)
 
         return "OK"
 
@@ -272,8 +285,14 @@ class BotManager(BotBase):
         sessionid = params['sessionid']
         if not self.checkAuth(db, id, sessionid, True):
             raise Exception("UNAUTHORIZED")
-        # Fixme add encryption
-        f = self.getDataFile(db, id, None)
+
+        keys = self.getKeys(db)
+        f = self.getDataFile(db, id, keys)
+        name = id
+        if keys:
+            name = keys[1].encrypt(bytes(id)).hex()
+        f = self.getSubDir(f, name, 4, 4)
+        f = os.path.join(f, name)
         if not os.path.exists(f): raise Exception("No such record "+db+"/"+id)
         os.remove(f)
         return self.newResponse()
