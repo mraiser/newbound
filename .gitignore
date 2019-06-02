@@ -11,6 +11,7 @@ bin/
 generated/
 # for mixed in Java files
 *.class
+runtime/botmanager/botd.properties
 runtime/metabot/botd.properties
 runtime/peerbot/botd.properties
 runtime/securitybot/botd.properties
