@@ -303,7 +303,9 @@ class BotManager(BotBase):
         id = params['id']
         if 'sessionid' not in params or not self.checkAuth(db, id, params['sessionid'], False):
             raise Exception("UNAUTHORIZED")
-        return self.getData(db, id)
+        jo = self.getData(db, id)
+        jo['status'] = 'ok'
+        return jo
 
     def getData(self, db, id):
 
@@ -317,9 +319,6 @@ class BotManager(BotBase):
             jo = json.loads(ba)
         else:
             jo = keys[0].decrypt(ba)
-        # d = json.loads(self.readFile(f).decode())
-        # d['status'] = 'ok'
-        # return d
         return jo
 
     def handleWrite(self, params):
