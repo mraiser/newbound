@@ -351,10 +351,14 @@ class BotManager(BotBase):
             session = self.getSession(sessionid)
             sessionlocation = session['userlocation']
 
-
-        # Fixme add encryption
-        f = self.getDataFile(db, id, None)
+        keys = self.getKeys(db)
+        f = self.getDataFile(db, id, keys)
+        name = id
+        if keys:
+            name = keys[1].encrypt(bytes(id)).hex()
+        f = self.getSubDir(f, name, 4, 4)
         self.mkdirs(self.getParentFile(f))
+        f = os.path.join(f, name)
 
         d = {
             "id": id,
@@ -367,8 +371,11 @@ class BotManager(BotBase):
         if (readers != None): d["readers"] = readers
         if (writers != None): d["writers"] = writers
 
-        # FIXME - add encryption
-        self.writeFile(f, json.dumps(d).encode())
+        ba = json.dumps(d)
+        if keys:
+            ba = keys[1].encrypt(ba).hex()
+
+        self.writeFile(f, ba)
 
         d['db'] = db
         self.fireEvent("write", d)
