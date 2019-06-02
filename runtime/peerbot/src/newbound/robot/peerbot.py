@@ -58,16 +58,17 @@ class PeerBot(BotBase):
         try:
             f = os.path.join(self.root, 'broker.txt')
             p = self.load_properties(f)
-            for uuid in p:
-                try:
-                    peer = self.P2P.getPeer(uuid, True)
-                    sa = p[uuid].split(':')
-                    addr = sa[0]
-                    port = int(sa[1])
-                    self.P2P.initiateTCPConnection(peer, addr, port)
-                except Exception as e:
-                    print('Error checking on broker: '+uuid+' / '+str(e))
-                #traceback.print_exc(file=sys.stdout)
+            if not p == None:
+                for uuid in p:
+                    try:
+                        peer = self.P2P.getPeer(uuid, True)
+                        sa = p[uuid].split(':')
+                        addr = sa[0]
+                        port = int(sa[1])
+                        self.P2P.initiateTCPConnection(peer, addr, port)
+                    except Exception as e:
+                        print('Error checking on broker: '+uuid+' / '+str(e))
+                        #traceback.print_exc(file=sys.stdout)
         except Exception as e:
             print('Error checking on the brokers: '+str(e))
             traceback.print_exc(file=sys.stdout)
