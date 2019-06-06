@@ -24,7 +24,7 @@ class BotManager(BotBase):
         super().init(root)
         # FIXME - add discovery
         # FIXME - add timers
-        self.keys = None
+        self.keys = {}
         self.bots = {}
         home = self.getParentFile(self.root)
         bots = ['securitybot', 'peerbot', 'metabot']
