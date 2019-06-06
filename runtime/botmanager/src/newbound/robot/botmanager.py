@@ -291,7 +291,7 @@ class BotManager(BotBase):
         f = self.getDataFile(db, id, keys)
         name = id
         if keys:
-            name = keys[1].encrypt(bytes(id)).hex()
+            name = keys[1].encrypt(bytes(id, 'utf-8')).hex()
         f = self.getSubDir(f, name, 4, 4)
         f = os.path.join(f, name)
         if not os.path.exists(f): raise Exception("No such record "+db+"/"+id)
@@ -318,7 +318,7 @@ class BotManager(BotBase):
         if not keys:
             jo = json.loads(ba)
         else:
-            jo = keys[0].decrypt(ba)
+            jo = json.loads(keys[0].decrypt(ba))
         return jo
 
     def handleWrite(self, params):
@@ -351,13 +351,13 @@ class BotManager(BotBase):
             session = self.getSession(sessionid)
             sessionlocation = session['userlocation']
 
+        f = self.getDB(db)
         keys = self.getKeys(db)
-        f = self.getDataFile(db, id, keys)
         name = id
         if keys:
-            name = keys[1].encrypt(bytes(id)).hex()
+            name = keys[1].encrypt(bytes(id, 'utf-8')).hex()
         f = self.getSubDir(f, name, 4, 4)
-        self.mkdirs(self.getParentFile(f))
+        self.mkdirs(f)
         f = os.path.join(f, name)
 
         d = {
@@ -371,9 +371,9 @@ class BotManager(BotBase):
         if readers is not None: d["readers"] = readers
         if writers is not None: d["writers"] = writers
 
-        ba = json.dumps(d)
+        ba = bytes(json.dumps(d), 'utf-8')
         if keys:
-            ba = keys[1].encrypt(ba).hex()
+            ba = keys[1].encrypt(ba)
 
         self.writeFile(f, ba)
 
@@ -396,7 +396,7 @@ class BotManager(BotBase):
         ssca = self.keys.get(db, None)
         if ssca is None:
             with open(os.path.join(self.getDB(db), "meta.json")) as f:
-                jo = json.load(f.read())
+                jo = json.loads(f.read())
             ssca = []
             if "crypt" in jo:
                 writekey = bytes.fromhex(jo["crypt"])
@@ -418,7 +418,7 @@ class BotManager(BotBase):
         f = self.getDB(db)
         name = id
         if keys:
-            name = keys[1].encrypt(bytes(id)).hex()
+            name = keys[1].encrypt(bytes(id, 'utf-8')).hex()
         f = self.getSubDir(f, name, 4, 4)
         f = os.path.join(f, name)
         return f
