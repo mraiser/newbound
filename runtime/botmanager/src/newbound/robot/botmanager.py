@@ -3,6 +3,8 @@ import sys
 import json
 import copy
 import traceback
+
+from ..crypto.supersimplecipher import SuperSimpleCipher
 from .botbase import BotBase
 from .loadpython import loadpython
 
@@ -22,6 +24,7 @@ class BotManager(BotBase):
         super().init(root)
         # FIXME - add discovery
         # FIXME - add timers
+        self.keys = {}
         self.bots = {}
         home = self.getParentFile(self.root)
         bots = ['securitybot', 'peerbot', 'metabot']
@@ -140,7 +143,7 @@ class BotManager(BotBase):
 
     def execute(self, db, id, args, params):
         # FIXME - support other languages
-        src = self.handleRead(params)["data"];
+        src = self.handleRead(params)["data"]
         #print(src)
         p = None
         t = 'JSONObject'
@@ -184,7 +187,7 @@ class BotManager(BotBase):
         n = len(p)
         i = 0
         while i<n:
-            if not invoke == '': invoke += ', ';
+            if not invoke == '': invoke += ', '
             o = p[i]
             name = o['name']
             invoke += name
@@ -236,6 +239,7 @@ class BotManager(BotBase):
         self.mkdirs(f)
         f = os.path.join(f, id+'.py')
         return f
+
     def handleNewDB(self, params):
         db = params['db']
         sessionid = params['sessionid']
@@ -257,9 +261,22 @@ class BotManager(BotBase):
         if 'readers' in params: meta['readers'] = json.loads(params['readers'])
         if 'writers' in params: meta['writers'] = json.loads(params['writers'])
 
-        #FIXME - add encryption
+        writekey = None
+        encryption = params.get("encryption", None)
+        if encryption is None or encryption == "AES":
+            writekey = SuperSimpleCipher.getSeed()
+            crypt = writekey.hex()
+            meta["crypt"] = crypt
 
         self.writeFile(f2, json.dumps(meta).encode())
+
+        ssca = []
+        if writekey is not None:
+            ssca.append(SuperSimpleCipher(writekey))
+            ssca.append(SuperSimpleCipher(writekey))
+        self.keys[db] = ssca
+
+        self.fireEvent("newdb", meta)
 
         return "OK"
 
@@ -269,8 +286,14 @@ class BotManager(BotBase):
         sessionid = params['sessionid']
         if not self.checkAuth(db, id, sessionid, True):
             raise Exception("UNAUTHORIZED")
-        # Fixme add encryption
-        f = self.getDataFile(db, id, None)
+
+        keys = self.getKeys(db)
+        f = self.getDataFile(db, id, keys)
+        name = id
+        if keys:
+            name = keys[1].encrypt(bytes(id, 'utf-8')).hex()
+        f = self.getSubDir(f, name, 4, 4)
+        f = os.path.join(f, name)
         if not os.path.exists(f): raise Exception("No such record "+db+"/"+id)
         os.remove(f)
         return self.newResponse()
@@ -280,15 +303,23 @@ class BotManager(BotBase):
         id = params['id']
         if 'sessionid' not in params or not self.checkAuth(db, id, params['sessionid'], False):
             raise Exception("UNAUTHORIZED")
-        return self.getData(db, id)
+        jo = self.getData(db, id)
+        jo['status'] = 'ok'
+        return jo
 
     def getData(self, db, id):
-        # Fixme add encryption
-        f = self.getDataFile(db, id, None)
+
+        keys = self.getKeys(db)
+        f = self.getDataFile(db, id, keys)
         if not os.path.exists(f): raise Exception("No such record "+db+"/"+id)
-        d = json.loads(self.readFile(f).decode())
-        d['status'] = 'ok'
-        return d
+
+        with open(f, "rb") as f:
+            ba = f.read().decode()
+        if not keys:
+            jo = json.loads(ba)
+        else:
+            jo = json.loads(keys[0].decrypt(ba))
+        return jo
 
     def handleWrite(self, params):
         db = params['db']
@@ -307,23 +338,27 @@ class BotManager(BotBase):
         if 'readers' in params: readers = json.loads(params['readers'])
         if 'writers' in params: writers = json.loads(params['writers'])
 
-        return self.setData(db, id, data, readers, writers, sessionid);
+        return self.setData(db, id, data, readers, writers, sessionid)
 
     def setData(self, db, id, data, readers, writers, sessionid=None):
         # FIXME - get name if logged in
         sessionlocation = ''
         username = 'xxx' #session['username']
-        if sessionid == None:
+        if sessionid is None:
             sessionid = ''
             username = 'system'
         else:
             session = self.getSession(sessionid)
             sessionlocation = session['userlocation']
 
-
-        # Fixme add encryption
-        f = self.getDataFile(db, id, None)
-        self.mkdirs(self.getParentFile(f))
+        f = self.getDB(db)
+        keys = self.getKeys(db)
+        name = id
+        if keys:
+            name = keys[1].encrypt(bytes(id, 'utf-8')).hex()
+        f = self.getSubDir(f, name, 4, 4)
+        self.mkdirs(f)
+        f = os.path.join(f, name)
 
         d = {
             "id": id,
@@ -333,11 +368,14 @@ class BotManager(BotBase):
             "addr": sessionlocation,
             "time": self.currentTimeMillis()
         }
-        if (readers != None): d["readers"] = readers
-        if (writers != None): d["writers"] = writers
+        if readers is not None: d["readers"] = readers
+        if writers is not None: d["writers"] = writers
 
-        # FIXME - add encryption
-        self.writeFile(f, json.dumps(d).encode())
+        ba = bytes(json.dumps(d), 'utf-8')
+        if keys:
+            ba = keys[1].encrypt(ba)
+
+        self.writeFile(f, ba)
 
         d['db'] = db
         self.fireEvent("write", d)
@@ -354,6 +392,18 @@ class BotManager(BotBase):
         home = os.path.join(home, db)
         return home
 
+    def getKeys(self, db):
+        ssca = self.keys.get(db, None)
+        if ssca is None:
+            with open(os.path.join(self.getDB(db), "meta.json")) as f:
+                jo = json.loads(f.read())
+            ssca = []
+            if "crypt" in jo:
+                writekey = bytes.fromhex(jo["crypt"])
+                ssca.append(SuperSimpleCipher(writekey))
+                ssca.append(SuperSimpleCipher(writekey))
+        return ssca
+
     def getAsset(self, db, filename):
         home = self.getDB(db)
         home = os.path.join(home, '_ASSETS')
@@ -366,8 +416,9 @@ class BotManager(BotBase):
 
     def getDataFile(self, db, id, keys):
         f = self.getDB(db)
-        # FIXME - add encryption
         name = id
+        if keys:
+            name = keys[1].encrypt(bytes(id, 'utf-8')).hex()
         f = self.getSubDir(f, name, 4, 4)
         f = os.path.join(f, name)
         return f
@@ -622,4 +673,3 @@ class BotManager(BotBase):
             "desc":"Save the given command."
         }
     }
-		
