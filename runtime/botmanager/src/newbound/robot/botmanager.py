@@ -65,7 +65,27 @@ class BotManager(BotBase):
         if cmd == 'listbots': return self.handleListBots(params)
         if cmd.startswith('asset/'): return self.handleAsset(cmd[6:], params)
         if cmd == 'convertdb': return self.handleConvertDB(params)
+        if cmd == 'discover': return self.handleDiscover(params)
+        if cmd == 'restart': return self.handleRestart(params)
+        if cmd == 'shutdown': return self.handleShutdown(params)
+        if cmd == 'savejava': return self.handleSaveJava(params)
+        if cmd == 'timer': return self.handleTimer(params)
         raise Exception('Unknown command: '+cmd)
+
+    def handleTimer(self, params):
+        raise Exception("Implement me!")  # FIXME - implement
+
+    def handleSaveJava(self, params):
+        raise Exception("Implement me!")  # FIXME - implement
+
+    def handleShutdown(self, params):
+        raise Exception("Implement me!")  # FIXME - implement
+
+    def handleRestart(self, params):
+        raise Exception("Implement me!")  # FIXME - implement
+
+    def handleDiscover(self, params):
+        raise Exception("Implement me!")  # FIXME - implement
 
     def handleConvertDB(self, params):
         raise Exception("Implement me!")  # FIXME - implement
