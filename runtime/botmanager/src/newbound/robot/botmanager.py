@@ -64,7 +64,11 @@ class BotManager(BotBase):
         if cmd == 'getsettings': return self.handleGetSettings(params)
         if cmd == 'listbots': return self.handleListBots(params)
         if cmd.startswith('asset/'): return self.handleAsset(cmd[6:], params)
+        if cmd == 'convertdb': return self.handleConvertDB(params)
         raise Exception('Unknown command: '+cmd)
+
+    def handleConvertDB(self, params):
+        raise Exception("Implement me!")  # FIXME - implement
 
     def handleAsset(self, filename, params):
         i = filename.index('/')
