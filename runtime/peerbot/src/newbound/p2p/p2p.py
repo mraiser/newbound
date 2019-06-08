@@ -156,13 +156,15 @@ class P2P(BotUtil):
     def fireEvent(self, event, data):
         self.container.fireEvent(event, data)
 
-    def strength(self, peer):
-        #FIXME - calculate strength
+    def strength(self, p):
+        id = p.id
+        if self.isTCP(id): return 3
+        # if self.isUDP(id): return 2
+        if self.isRelay(id): return 1
         return 0
 
     def relays(self, uuid):
-        #FIXME - add relays from relayserversocket
-        return []
+        return self.service.serversocket.relays(uuid)
 
     def getPeer(self, uuid, create=False):
         return self.peers.getPeer(uuid, create)

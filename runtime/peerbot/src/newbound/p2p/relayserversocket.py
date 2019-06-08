@@ -12,6 +12,14 @@ class RelayServerSocket(object):
         self.running = True
         self._lock = threading.Lock()
 
+    def relays(self, uuid):
+        listt = []
+        if uuid in self.socks:
+            hashh = self.socks[uuid]
+            for relay in hashh:
+                listt.append(relay)
+        return listt
+
     def addRelay(self, uuid, relay):
         print("adding RELAY to "+uuid+" via "+relay)
         with self._lock:

@@ -130,3 +130,5 @@ class P2PServerSocket(object):
     def removeRelay(self, target, relay):
         return self.relay.removeRelay(target, relay)
 
+    def relays(self, uuid):
+        return self.relay.relays(uuid)
