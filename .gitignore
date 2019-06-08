@@ -15,6 +15,7 @@ runtime/botmanager/botd.properties
 runtime/metabot/botd.properties
 runtime/peerbot/botd.properties
 runtime/peerbot/broker.txt
+runtime/peerbot/peers/
 runtime/securitybot/botd.properties
 runtime/securitybot/rules/
 runtime/securitybot/users/
