@@ -39,9 +39,14 @@ class P2PParser(BotUtil):
         cb.execute(data)
 
     def parse(self):
+        b = type(self.sock.sock).__name__ == 'RelaySocket'
+        if b:
+            pass
+
         code = self.int_from_bytes(self.sock.readall(4))
         llen = self.int_from_bytes(self.sock.readall(4))
-        if llen<0 or llen>50000: print('Probably bad data '+str(llen)+' bytes')
+        if llen<0 or llen>50000:
+            print('Probably bad data '+str(llen)+' bytes')
         ba = self.sock.readall(llen)
         if not len(ba) == llen:
             print('ERROR: Unexpected data length parsing p2p request')
@@ -54,12 +59,12 @@ class P2PParser(BotUtil):
     def send(self, response):
         b = type(self.sock.sock).__name__ == 'RelaySocket'
         ba = b''
-        if b: ba += self.sock.sock.targetid.encode()
+        if b: ba += self.sock.sock.uuid.encode()
         ba += self.int_to_bytes(response.code)
         if not b: ba += self.int_to_bytes(len(response.data))
         ba += response.data
         self.sock.sendall(ba)
-        print('sent: '+ba.hex())
+        #print('sent: '+ba.hex())
 
     def close(self):
         self.service.allsocks[self.remoteid].remove(self.sock)

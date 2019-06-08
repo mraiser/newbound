@@ -31,25 +31,28 @@ class Service(BotUtil):
         if p.init(self, s):
             self.listen(s, p)
 
-    def listen(self, s, p):
-        def socketloop():
-            while (self.running and s.isConnected()):
-                try:
-                    r = p.parse()
-                    if r == None:
-                        s.close()
-                    else:
-                        try:
-                            cmd = r.getCommand()
-                            self.execute(cmd, r, p)
-                        except Exception as e:
-                            print("Unexpected error parsing "+self.name+" command "+str(e))
-                            traceback.print_exc(file=sys.stdout)
-                except Exception as e:
-                    print("Unexpected error parsing "+self.name+" command "+str(e))
-                    traceback.print_exc(file=sys.stdout)
+    def socketloop(self, s, p):
+        while (self.running and s.isConnected()):
+            try:
+                r = p.parse()
+                if r == None:
                     s.close()
-        self.container.addJob(socketloop, "Socket "+self.name)
+                else:
+                    try:
+                        cmd = r.getCommand()
+                        self.execute(cmd, r, p)
+                    except Exception as e:
+                        print("Unexpected error parsing " + self.name + " command " + str(e))
+                        traceback.print_exc(file=sys.stdout)
+            except Exception as e:
+                print("Unexpected error parsing " + self.name + " command " + str(e))
+                traceback.print_exc(file=sys.stdout)
+                s.close()
+
+    def listen(self, s, p):
+        def cb():
+            self.socketloop(s, p)
+        self.container.addJob(cb, "Socket "+self.name)
 
     def on(self, cmd, callback):
         self.callbacks[cmd] = callback

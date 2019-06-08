@@ -546,7 +546,7 @@ class PeerBot(BotBase):
         jo['data'] = d
         for uuid in self.P2P.peers.peers:
             d[uuid] = self.P2P.peers.peers[uuid].toDict()
-            print(self.P2P.isTCP(uuid))
+            #print(self.P2P.isTCP(uuid))
         return jo
 
     def hasPeer(self, id):

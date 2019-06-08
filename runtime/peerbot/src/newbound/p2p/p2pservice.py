@@ -60,3 +60,11 @@ class P2PService(Service):
     def maintenance(self):
         # FIXME
         pass
+
+    def socketloop(self, s, p):
+        super().socketloop(s, p)
+        self.container.addNumThreads(-1)
+
+    def listen(self, s, p):
+       self.container.addNumThreads(1)
+       super().listen(s, p)

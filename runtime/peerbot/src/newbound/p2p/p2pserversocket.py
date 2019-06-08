@@ -31,50 +31,58 @@ class P2PServerSocket(object):
         p2p.addPeriodicTask(self.maintenance, 5000, 'P2P SERVER SOCKET MAINTENANCE')
 
     def maintenance(self):
-        self.p2p.service.maintenance()
+        try:
+            self.p2p.service.maintenance()
 
-        if self.mod % 6 == 0:
-            print('----------------------------------------- THREADS -----------------------------------------')
-            for thread in threading.enumerate():
-                if not thread.name == 'No work':
-                    print(thread.name)
-            print('----------------------------------------- THREADS -----------------------------------------')
+            if self.mod % 6 == 0:
+                print('----------------------------------------- THREADS -----------------------------------------')
+                for thread in threading.enumerate():
+                    if not thread.name == 'No work':
+                        print(thread.name)
+                print('----------------------------------------- THREADS -----------------------------------------')
 
-        self.mod += 1
-        tcppeers = []
-        uuids = ''
-        for uuid in self.p2p.peers.peers:
-            try:
-                p = self.p2p.peers.peers[uuid]
-                if self.p2p.isRelay(p): p.setConnected(True)
-                if self.p2p.isTCP(p): tcppeers.append(uuid)
-                else:
-                    if not uuids == '': uuids += ' '
-                    uuids += uuid
-                if p.isConnected():
-                    if p.lastcontact > 30000 or p.name == 'UNKNOWN' or p.port == -1:
-                        params={}
-                        def cb(result):
-                            name = result['name']
-                            localip = result['localip']
-                            addr = result['addr']
-                            port = int(result['port'])
-                            if not name == p.name: p.setName(name)
-                            if p.port == -1: p.setPort(port)
-                            p.addSocketAddress(localip, port)
-                            p.addSocketAddress(addr, port)
-                            print('Heartbeat '+p.name+'/'+p.id)
-                        cmd = P2PCommand("peerbot", "getpeerinfo", params, cb)
-                        self.p2p.sendCommand(p, cmd)
-                else:
-                    if p.keepalive: p.connect()
-            except Exception as e:
-                print('error in maintenance loop for '+uuid+': '+str(e))
-                traceback.print_exc(file=sys.stdout)
-        if self.mod % 6 == 0:
-            h = { 'uuids': uuids }
-            for relay in tcppeers:
-                self.checkpeers(relay, h)
+            self.mod += 1
+            tcppeers = []
+            uuids = ''
+            for uuid in self.p2p.peers.peers:
+                try:
+                    p = self.p2p.peers.peers[uuid]
+                    if self.p2p.isRelay(p): p.setConnected(True)
+                    if self.p2p.isTCP(p): tcppeers.append(uuid)
+                    else:
+                        if not uuids == '': uuids += ' '
+                        uuids += uuid
+                    if p.isConnected():
+                        if p.lastcontact > 30000 or p.name == 'UNKNOWN' or p.port == -1:
+                            params={}
+                            cmd = P2PCommand("peerbot", "getpeerinfo", params, self.updatePeer)
+                            self.p2p.sendCommand(p, cmd)
+                    else:
+                        if p.keepalive: p.connect()
+                except Exception as e:
+                    print('error in maintenance loop for '+uuid+': '+str(e))
+                    traceback.print_exc(file=sys.stdout)
+            if self.mod % 6 == 0:
+                h = { 'uuids': uuids }
+                for relay in tcppeers:
+                    self.checkpeers(relay, h)
+
+        except Exception as e:
+            print('error in maintenance loop for ' + uuid + ': ' + str(e))
+            traceback.print_exc(file=sys.stdout)
+
+    def updatePeer(self, result):
+        id = result['id']
+        p = self.p2p.getPeer(id)
+        name = result['name']
+        localip = result['localip']
+        addr = result['addr']
+        port = int(result['port'])
+        if not name == p.name: p.setName(name)
+        if p.port == -1: p.setPort(port)
+        p.addSocketAddress(localip, port)
+        p.addSocketAddress(addr, port)
+        print('Heartbeat ' + p.name + '/' + p.id)
 
     def checkPeers(self, relay, h):
         def cb(result):
@@ -118,4 +126,7 @@ class P2PServerSocket(object):
 
     def getRelay(self, target, relay):
         return self.relay.addRelay(target, relay)
+
+    def removeRelay(self, target, relay):
+        return self.relay.removeRelay(target, relay)
 

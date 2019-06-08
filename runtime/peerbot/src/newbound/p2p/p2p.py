@@ -76,24 +76,24 @@ class P2P(BotUtil):
             list = peer.addresses[0:]
             while len(list)>0:
                 sa = list.pop(0)
-                itcpa(peer, sa[0], sa[1])
+                self.itcpa(peer, sa[0], sa[1])
 
-    def itcpa(peer, addr, port):
+    def itcpa(self, peer, addr, port):
         def cb():
-            initiateTCPConnection(peer, addr, port)
+            self.initiateTCPConnection(peer, addr, port)
         self.addJob(cb, 'Initiating TCP connection to '+peer.name+' ('+peer.id+') at '+addr+':'+str(port))
 
     def connect(self, uuid, addr = None, port = -1):
         p = self.getPeer(uuid, True)
         if not addr == None:
             p.addSocketAddress(addr, port, True)
-        if isTCP(uuid):
+        if self.isTCP(uuid):
             p.tcp = True
             p.setConnected(True)
         else:
-            initiateTCPConnection(p)
+            self.initiateTCPConnection(p)
             #if isUDP(uuid): p.setConnected(True)
-            if isRelay(uuid): p.setConnected(True)
+            if self.isRelay(uuid): p.setConnected(True)
         return p
 
     def isTCP(self, uuid):

@@ -9,4 +9,4 @@ class NORELAY(object):
         print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         print(' REMOVING RELAY '+relay+' from '+target)
         print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-        sock.service.p2p.removeRelay(target, relay)
+        sock.service.serversocket.removeRelay(target, relay)

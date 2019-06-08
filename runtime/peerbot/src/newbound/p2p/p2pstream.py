@@ -1,5 +1,6 @@
 #nee p2pconnection
 
+
 class P2PStream(object):
     def __init__(self, peer, id=-1):
         self.peer = peer

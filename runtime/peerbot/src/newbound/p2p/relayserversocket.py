@@ -1,6 +1,8 @@
 import os
 from queue import Queue
+import threading
 from .relaysocket import RelaySocket
+
 
 class RelayServerSocket(object):
     def __init__(self, p2p):
@@ -8,23 +10,28 @@ class RelayServerSocket(object):
         self.socks = {}
         self.incoming = Queue()
         self.running = True
+        self._lock = threading.Lock()
 
     def addRelay(self, uuid, relay):
-        if not uuid in self.socks: self.socks[uuid] = {}
-        hash = self.socks[uuid]
-        if not relay in hash or hash[relay].isClosed():
-            sock = self.p2p.service.any(relay, 'TCPSocket')
-            hash[relay] = RelaySocket(relay, uuid, sock)
-            self.incoming.put(hash[relay])
-        return hash[relay]
+        print("adding RELAY to "+uuid+" via "+relay)
+        with self._lock:
+            if not uuid in self.socks: self.socks[uuid] = {}
+            hash = self.socks[uuid]
+            if not relay in hash or hash[relay].isClosed():
+                sock = self.p2p.service.any(relay, 'TCPSocket')
+                hash[relay] = RelaySocket(relay, uuid, sock)
+                self.incoming.put(hash[relay])
+            return hash[relay]
 
     def removeRelay(self, uuid, relay):
-        if uuid in self.socks:
-            hash = self.socks[uuid]
-            if relay in hash:
-                sock = hash[relay]
-                delattr(hash, relay)
-                sock.close()
+        print("removing RELAY to "+uuid+" via "+relay)
+        with self._lock:
+            if uuid in self.socks:
+                hash = self.socks[uuid]
+                if relay in hash:
+                    sock = hash[relay]
+                    hash.pop(relay)
+                    sock.close()
 
     def accept(self):
         while self.running:
@@ -34,14 +41,14 @@ class RelayServerSocket(object):
                 pass
 
     def close(self):
-        self.running = False
-        for uuid in self.socks:
-            hash = self.socks[uuid]
-            for relay in hash:
-                sock = hash[relay]
-                delattr(hash, relay)
-                sock.close()
-
+        with self._lock:
+            self.running = False
+            for uuid in self.socks:
+                hash = self.socks[uuid]
+                for relay in hash:
+                    sock = hash[relay]
+                    delattr(hash, relay)
+                    sock.close()
 
     def getPort(self):
         return -1
