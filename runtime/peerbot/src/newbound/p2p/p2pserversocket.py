@@ -9,6 +9,7 @@ from .relayserversocket import RelayServerSocket
 from .p2pcommand import P2PCommand
 from .p2psocket import P2PSocket
 
+
 class P2PServerSocket(object):
     def __init__(self, p2p, uuid, port):
         self.p2p = p2p
@@ -23,10 +24,10 @@ class P2PServerSocket(object):
 
         self.tcp = TCPServerSocket(port)
         self.port = self.tcp.getPort()
-        p2p.addJob(self.listenTCP, "P2P TCP listen on port "+str(self.port))
+        p2p.addJob(self.listen_tcp, "P2P TCP listen on port " + str(self.port))
 
         self.relay = RelayServerSocket(p2p)
-        p2p.addJob(self.listenRelay, "P2P relay listen")
+        p2p.addJob(self.listen_relay, "P2P relay listen")
 
         p2p.addPeriodicTask(self.maintenance, 5000, 'P2P SERVER SOCKET MAINTENANCE')
 
@@ -47,44 +48,52 @@ class P2PServerSocket(object):
             for uuid in self.p2p.peers.peers:
                 try:
                     p = self.p2p.peers.peers[uuid]
-                    if self.p2p.isRelay(p): p.setConnected(True)
-                    if self.p2p.isTCP(p): tcppeers.append(uuid)
+                    if self.p2p.isRelay(p):
+                        p.setConnected(True)
+                    if self.p2p.isTCP(p):
+                        tcppeers.append(uuid)
                     else:
-                        if not uuids == '': uuids += ' '
+                        if not uuids == '':
+                            uuids += ' '
                         uuids += uuid
                     if p.isConnected():
                         if p.lastcontact > 30000 or p.name == 'UNKNOWN' or p.port == -1:
-                            params={}
-                            cmd = P2PCommand("peerbot", "getpeerinfo", params, self.updatePeer)
+                            params = {}
+                            cmd = P2PCommand("peerbot", "getpeerinfo", params, self.updatepeer)
                             self.p2p.sendCommand(p, cmd)
                     else:
-                        if p.keepalive: p.connect()
+                        if p.keepalive:
+                            p.connect()
                 except Exception as e:
                     print('error in maintenance loop for '+uuid+': '+str(e))
                     traceback.print_exc(file=sys.stdout)
             if self.mod % 6 == 0:
-                h = { 'uuids': uuids }
+                h = {
+                    'uuids': uuids
+                }
                 for relay in tcppeers:
                     self.checkpeers(relay, h)
 
         except Exception as e:
-            print('error in maintenance loop for ' + uuid + ': ' + str(e))
+            print('error in maintenance loop: ' + str(e))
             traceback.print_exc(file=sys.stdout)
 
-    def updatePeer(self, result):
-        id = result['id']
-        p = self.p2p.getPeer(id)
+    def updatepeer(self, result):
+        idd = result['id']
+        p = self.p2p.getPeer(idd)
         name = result['name']
         localip = result['localip']
         addr = result['addr']
         port = int(result['port'])
-        if not name == p.name: p.setName(name)
-        if p.port == -1: p.setPort(port)
+        if not name == p.name:
+            p.setName(name)
+        if p.port == -1:
+            p.setPort(port)
         p.addSocketAddress(localip, port)
         p.addSocketAddress(addr, port)
         print('Heartbeat ' + p.name + '/' + p.id)
 
-    def checkPeers(self, relay, h):
+    def checkpeers(self, relay, h):
         def cb(result):
             print('FIXME p2pss73')
             print(json.dumps(result))
@@ -96,14 +105,14 @@ class P2PServerSocket(object):
             print('error checking peers with '+relay+': '+str(e))
             traceback.print_exc(file=sys.stdout)
 
-    def listenTCP(self):
+    def listen_tcp(self):
         self.listen(self.tcp)
 
-    def listenRelay(self):
+    def listen_relay(self):
         self.listen(self.relay)
 
     def listen(self, ss):
-        #self.p2p.addNumThreads(1)
+        # self.p2p.addNumThreads(1)
         while self.running:
             sock = ss.accept()
             self.incoming.put(sock)
