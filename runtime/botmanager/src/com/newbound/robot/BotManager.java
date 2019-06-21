@@ -1297,6 +1297,9 @@ public class BotManager extends BotBase
 
 	public boolean setData(String db, String id, JSONObject data, JSONArray readers, JSONArray writers) throws Exception
 	{
+		if (id.equals("hxkkwn163c19554d5s15d"))
+			System.out.println("WAIT...");
+
 		File f = getDB(db);
 		SuperSimpleCipher[] keys = getKeys(db);
 		String name = keys.length == 0 ? id : toHexString(keys[1].encrypt(id.getBytes()));
@@ -1519,9 +1522,11 @@ public class BotManager extends BotBase
 		writeFile(f, java.getBytes());
 		
 		JSONObject data = new JSONObject();
-		data.put("type", "java");
+		try  { data = getData(db, id).getJSONObject("data"); } catch (Exception x) {}
+//		data.put("type", "java");
 		data.put("id", id);
-		data.put("cmd", cmd);
+//		data.put("cmd", cmd);
+		data.put("java", cmd);
 		setData(db, id, data, readers == null ? null : new JSONArray(readers), writers == null ? null : new JSONArray(writers));
 		data.put("status", "ok");
 		return data;
@@ -1595,9 +1600,11 @@ public class BotManager extends BotBase
 		writeFile(f, code.getBytes());
 		
 		JSONObject data = new JSONObject();
-		data.put("type", "python");
+		try  { data = getData(db, id).getJSONObject("data"); } catch (Exception x) {}
+//		data.put("type", "python");
 		data.put("id", id);
-		data.put("cmd", cmd);
+//		data.put("cmd", cmd);
+		data.put("python", cmd);
 		setData(db, id, data, readers == null ? null : new JSONArray(readers), writers == null ? null : new JSONArray(writers));
 		data.put("status", "ok");
 		return data;
