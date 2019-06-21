@@ -817,7 +817,7 @@ public abstract class MetaBot extends BotBase
 		}
 		catch (Exception xx) { xx.printStackTrace(); }
 	}
-
+/*
 	private String buildpyapi(String db, String id, JSONObject jo) throws Exception
 	{
 		BotBase b = BotBase.getBot("botmanager");
@@ -865,7 +865,7 @@ public abstract class MetaBot extends BotBase
 		
 		return py;
 	}
-	
+*/
 	private String buildjsapi(String db, String id, JSONObject jo) throws Exception
 	{
 		//System.out.println("Building js api for "+db+":"+id);
@@ -932,7 +932,7 @@ public abstract class MetaBot extends BotBase
 			
 			f = new File(f, id+".js");
 			writeFile(f, buildjsapi(lib, id, ctl).getBytes());
-			
+/*
 			f = new File(bm.getRootDir().getParentFile().getParentFile(), "python");
 			deleteDir(new File(f, lib));
 			f = new File(f, "newbound");
@@ -947,6 +947,7 @@ public abstract class MetaBot extends BotBase
 			String s = buildpyapi(lib, id, ctl);
 //			s = s.replace('\r', '\n');
 			writeFile(f, s.getBytes());
+ */
 		}
 		
 		return "OK";
