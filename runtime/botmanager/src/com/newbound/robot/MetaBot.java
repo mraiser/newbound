@@ -67,7 +67,7 @@ public abstract class MetaBot extends BotBase
 			x.printStackTrace();
 		}
 		
-		recompile();
+//		recompile();
 
 		if (tempdir != null) deleteDir(tempdir);
 	}
