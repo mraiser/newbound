@@ -426,6 +426,7 @@ class BotManager(BotBase):
                 writekey = bytes.fromhex(jo["crypt"])
                 ssca.append(SuperSimpleCipher(writekey))
                 ssca.append(SuperSimpleCipher(writekey))
+            self.keys[db] = ssca
         return ssca
 
     def getAsset(self, db, filename):
