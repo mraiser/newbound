@@ -12,6 +12,7 @@ generated/
 # for mixed in Java files
 *.class
 runtime/botmanager/botd.properties
+runtime/botmanager/timer/
 runtime/metabot/botd.properties
 runtime/peerbot/botd.properties
 runtime/peerbot/broker.txt
