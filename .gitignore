@@ -18,6 +18,7 @@ runtime/peerbot/botd.properties
 runtime/peerbot/broker.txt
 runtime/peerbot/peers/
 runtime/securitybot/botd.properties
+runtime/securitybot/session.properties
 runtime/securitybot/rules/
 runtime/securitybot/users/
 data/runtime
