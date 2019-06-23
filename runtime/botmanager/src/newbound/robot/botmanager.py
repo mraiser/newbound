@@ -8,6 +8,10 @@ from ..crypto.supersimplecipher import SuperSimpleCipher
 from .botbase import BotBase
 from .loadpython import loadpython
 
+_a = "_ASSETS"
+_h = "_APPS.hash"
+
+
 class BotManager(BotBase):
     def getServiceName(self):
         return 'botmanager'
@@ -88,7 +92,96 @@ class BotManager(BotBase):
         raise Exception("Implement me!")  # FIXME - implement
 
     def handleConvertDB(self, params):
-        raise Exception("Implement me!")  # FIXME - implement
+
+        db = params["db"]
+        f = self.getDB(db)
+        if not os.path.exists(f):
+            raise Exception("No such database: {}".format(db))
+
+        sessionid = params["sessionid"]
+        session = self.getSession(sessionid)
+        # FIXME - must be logged in
+        username = 'xxx' # session.get("username")
+
+        mf = os.path.join(f, "meta.json")
+        meta = {}
+        if os.path.exists(mf):
+            with open(mf, "rb") as f:
+                meta = json.loads(f.read())
+
+        meta["id"] = db
+        meta["username"] = username
+        if "readers" in params: meta["readers"] = params["readers"]
+        if "writers" in params: meta["writers"] = params["writers"]
+
+        encryption = params.get("encryption", None)
+        if encryption is None:
+            self.writeFile(mf, bytes(json.dumps(meta), 'utf-8'))
+            return "OK"
+
+        writekey = None
+        if encryption is None or encryption == "AES":
+            writekey = SuperSimpleCipher.getSeed()
+            crypt = writekey.hex()
+            meta["crypt"] = crypt
+        else:
+            del meta["crypt"]
+
+        ssca = []
+        if writekey is not None:
+            ssca.append(SuperSimpleCipher(writekey))
+            ssca.append(SuperSimpleCipher(writekey))
+
+        f2 = self.getTempFile(self.uniqueSessionID())
+        self.mkdirs(f2)
+        self.writeFile(os.path.join(f2, "meta.json"), bytes(json.dumps(meta), 'utf-8'))
+
+        f3 = os.path.join(f, _a)
+        if os.path.exists(f3):
+            self.copyFolder(f3, os.path.join(f2, _a))
+
+        self.convertdb(f, f2, self.getKeys(db), ssca)
+
+        f4 = os.path.join(os.path.dirname(os.path.dirname(f)), "converted")
+        self.mkdirs(f4)
+        f4 = os.path.join(f4, os.path.basename(f2))
+        os.rename(f, f4)
+        os.rename(f2, f)
+
+        self.keys[db] = ssca
+
+        return "Old version moved to: {}".format(f4)
+
+    def convertdb(self, f, dest, keys1, keys2):
+        excluded = (_a, _h, "meta.json", "version.txt")
+        sa = [s for s in os.listdir(f) if s not in excluded]
+        for s in sa:
+            f3 = os.path.join(f, s)
+            if os.path.isdir(f3):
+                self.convertdb(f3, dest, keys1, keys2)
+            else:
+                self.convertfile(f3, dest, keys1, keys2)
+
+    def convertfile(self, f3, dest, keys1, keys2):
+
+        idx = os.path.basename(f3)
+        name = idx
+        if keys1:
+            name = keys1[0].decrypt(bytes.fromhex(idx))
+        if keys2:
+            name = keys2[1].encrypt(bytes(name, 'utf-8')).hex()
+
+        f4 = self.getSubDir(dest, name, 4, 4)
+        self.mkdirs(f4)
+        f4 = os.path.join(f4, name)
+
+        ba = self.readFile(f3)
+        if keys1:
+            ba = keys1[0].decrypt(ba)
+        if keys2:
+            ba = keys2[1].encrypt(ba)
+
+        self.writeFile(f4, ba)
 
     def handleAsset(self, filename, params):
         i = filename.index('/')
