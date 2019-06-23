@@ -46,19 +46,18 @@ public abstract class MetaBot extends BotBase
 		else
 */ 
 			addNumThreads(1); // Everybody gets one
-		
+
 		File tempdir = newTempFile();
 		
 		JSONObject jo = app(getServiceName());
 		JSONArray libraries = jo.getJSONArray("libraries");
-		
 		int i = libraries.length();
 		while (i-->0) try
 		{
 			String lib = libraries.getString(i);
 			JSONObject DATA = getData(lib, "tasklists").getJSONObject("data");
 			
-			rebuildLibrary(lib);
+			//rebuildLibrary(lib);
 			startTimers(lib);
 			
 		}
@@ -66,10 +65,11 @@ public abstract class MetaBot extends BotBase
 		{
 			x.printStackTrace();
 		}
-		
+
 //		recompile();
 
 		if (tempdir != null) deleteDir(tempdir);
+
 	}
 
 	public void compileAll() throws Exception
