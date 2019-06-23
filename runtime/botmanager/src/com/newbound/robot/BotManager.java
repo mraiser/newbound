@@ -1297,9 +1297,6 @@ public class BotManager extends BotBase
 
 	public boolean setData(String db, String id, JSONObject data, JSONArray readers, JSONArray writers) throws Exception
 	{
-		if (id.equals("hxkkwn163c19554d5s15d"))
-			System.out.println("WAIT...");
-
 		File f = getDB(db);
 		SuperSimpleCipher[] keys = getKeys(db);
 		String name = keys.length == 0 ? id : toHexString(keys[1].encrypt(id.getBytes()));
