@@ -2,6 +2,10 @@
 <head>
 		<title>SecurityBot</title>
 
+		<script type="text/javascript">
+			NEWBOUND_AJAX=true;
+		</script>
+
         <link rel='stylesheet' href='../botmanager/themes/font.css'>
         <link rel="stylesheet" href="../botmanager/themes/newbound.min.css" />
         <link rel="stylesheet" href="../botmanager/themes/jquery.mobile.icons.min.css" />
@@ -862,9 +866,7 @@ function resetApps(){
 	});
 }
 
-$('#botcontrols').on("pageshow", function(){
-	setTimeout(initbot, 100);
-});
+$(document).ready(initbot);
 
 		</script>
 		
