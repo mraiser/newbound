@@ -57,7 +57,7 @@ public abstract class MetaBot extends BotBase
 			String lib = libraries.getString(i);
 			JSONObject DATA = getData(lib, "tasklists").getJSONObject("data");
 			
-			//rebuildLibrary(lib);
+			rebuildLibrary(lib);
 			startTimers(lib);
 			
 		}
@@ -971,7 +971,7 @@ public abstract class MetaBot extends BotBase
 
 		JSONArray controls = getData(lib, "controls").getJSONObject("data").getJSONArray("list");
 		int j = controls.length();
-		while (j-->0)
+		while (j-->0) try
 		{
 			JSONObject ctlptr = controls.getJSONObject(j);
 			String id = ctlptr.getString("id");
@@ -997,40 +997,33 @@ public abstract class MetaBot extends BotBase
 				int k = cmds.length();
 				while (k-->0)
 				{
-					final JSONObject cmd = cmds.getJSONObject(k);
-//					Runnable r = new Runnable() 
-//					{
-//						public void run() 
-//						{
-							try
-							{
-								String lang = cmd.has("lang") ? cmd.getString("lang") : "java";
-								
-								if (lang.equals("python"))
-									System.out.println("PYTHON");
-								
-								String codeid = cmd.getString(lang);
-								
-								JSONObject meta = getData(lib, codeid).getJSONObject("data");
-								String code = meta.getString(lang);
-								String groups = meta.has("groups") ? meta.getString("groups") : null;
-								if (groups != null && !groups.startsWith("[")) 
-								{
-									JSONArray ja = new JSONArray();
-									ja.put(groups);
-									groups = ja.toString();
-								}
-								String imports = meta.has("import") ? meta.getString("import") : null;
-								String returntype = meta.has("returntype") ? meta.getString("returntype") : null;
-								
-								JSONArray params = meta.getJSONArray("params");
-								
-								bm.handleSaveCode(lang, lib, cmd.getString("id"), codeid, code, params.toString(), imports, returntype, groups, null, "");
+					JSONObject cmd = cmds.getJSONObject(k);
+					String[] langs = {"java", "python", "js"};
+					int i = langs.length;
+					while (i-->0) try
+					{
+						String lang = langs[i];
+
+						if (cmd.has(lang)) {
+							String codeid = cmd.getString(lang);
+
+							JSONObject meta = getData(lib, codeid).getJSONObject("data");
+							String code = meta.getString(lang);
+							String groups = meta.has("groups") ? meta.getString("groups") : null;
+							if (groups != null && !groups.startsWith("[")) {
+								JSONArray ja = new JSONArray();
+								ja.put(groups);
+								groups = ja.toString();
 							}
-							catch (Exception xx) { xx.printStackTrace(); } 
-//						}
-//					};
-//					addJob(r);
+							String imports = meta.has("import") ? meta.getString("import") : null;
+							String returntype = meta.has("returntype") ? meta.getString("returntype") : null;
+
+							JSONArray params = meta.getJSONArray("params");
+
+							bm.handleSaveCode(lang, lib, cmd.getString("id"), codeid, code, params.toString(), imports, returntype, groups, null, "");
+						}
+					}
+					catch (Exception xx) { xx.printStackTrace(); }
 				}
 			}
 /*
@@ -1047,6 +1040,8 @@ public abstract class MetaBot extends BotBase
 			}
 */
 	    }
+		catch (Exception x) { x.printStackTrace(); }
+
 		writeFile(vfile, version.getBytes());
 	}
 	

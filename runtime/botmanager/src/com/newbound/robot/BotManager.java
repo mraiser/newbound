@@ -1520,11 +1520,13 @@ public class BotManager extends BotBase
 		
 		JSONObject data = new JSONObject();
 		try  { data = getData(db, id).getJSONObject("data"); } catch (Exception x) {}
+		int hash = data.toString().hashCode();
 //		data.put("type", "java");
 		data.put("id", id);
 //		data.put("cmd", cmd);
 		data.put("java", cmd);
-		setData(db, id, data, readers == null ? null : new JSONArray(readers), writers == null ? null : new JSONArray(writers));
+		if (data.toString().hashCode() != hash)
+			setData(db, id, data, readers == null ? null : new JSONArray(readers), writers == null ? null : new JSONArray(writers));
 		data.put("status", "ok");
 		return data;
 	}
@@ -1534,7 +1536,7 @@ public class BotManager extends BotBase
 		JSONObject jo;
 		if (java != null) jo = handleSaveJava(db, id, cmd, java, params, imports, returntype, readers, writers, sessionidx);
 		else if (python != null) jo = handleSavePython(db, id, cmd, python, params, imports, returntype, readers, writers, sessionidx);
-		else if (js != null) jo = handleSaveJavascript(db, id, js, params, imports, returntype, readers, writers, sessionidx);
+		else if (js != null) jo = handleSaveJavascript(db, id, cmd, js, params, imports, returntype, readers, writers, sessionidx);
 		else throw new Exception("No readable code");
 		
 		if (java != null) new Code(jo, db).precompile();
@@ -1543,7 +1545,7 @@ public class BotManager extends BotBase
 		return jo;
 	}
 	
-	private JSONObject handleSaveJavascript(String db, String id, String java, String params, String imports,
+	private JSONObject handleSaveJavascript(String db, String id, String cmd, String code, String params, String imports,
 			String returntype, String readers, String writers, String sessionidx) {
 		// TODO Auto-generated method stub
 		return null;
@@ -1598,11 +1600,13 @@ public class BotManager extends BotBase
 		
 		JSONObject data = new JSONObject();
 		try  { data = getData(db, id).getJSONObject("data"); } catch (Exception x) {}
+		int hash = data.toString().hashCode();
 //		data.put("type", "python");
 		data.put("id", id);
 //		data.put("cmd", cmd);
 		data.put("python", cmd);
-		setData(db, id, data, readers == null ? null : new JSONArray(readers), writers == null ? null : new JSONArray(writers));
+		if (data.toString().hashCode() != hash)
+			setData(db, id, data, readers == null ? null : new JSONArray(readers), writers == null ? null : new JSONArray(writers));
 		data.put("status", "ok");
 		return data;
 	}
@@ -1792,6 +1796,7 @@ public class BotManager extends BotBase
 	{
 		if (lang.equals("java")) return handleSaveJava(db, id, cmd, code, params, imports, returntype, readers, writers, sessionidx);
 		else if (lang.equals("python")) return handleSavePython(db, id, cmd, code, params, imports, returntype, readers, writers, sessionidx);
+		else if (lang.equals("js")) return handleSaveJavascript(db, id, cmd, code, params, imports, returntype, readers, writers, sessionidx);
 		throw new Exception("Unknown Language: "+lang);
 	}
 
