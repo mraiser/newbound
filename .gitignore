@@ -9,8 +9,11 @@ __pycache__/
 # Newbound files
 bin/
 generated/
+
 # for mixed in Java files
 *.class
+
+# runtime data and local properties
 runtime/botmanager/botd.properties
 runtime/botmanager/timer/
 runtime/metabot/botd.properties
@@ -23,6 +26,12 @@ runtime/securitybot/session.properties
 runtime/securitybot/rules/
 runtime/securitybot/users/
 data/runtime
+
+# Non-core libraries
+data/bme680
+data/ds18b20
+data/mcp3008
+data/raspberrypi
 
 # Distribution / packaging
 .Python
