@@ -5,6 +5,7 @@ from email.utils import formatdate
 import mimetypes
 import random
 import uuid
+import shutil
 import socket
 import sys
 import traceback
@@ -127,6 +128,13 @@ class BotUtil(object):
                 out += enc[:1]
                 enc = enc[1:]
         return out + enc
+
+    def copyFolder(self, d1, d2, replace=True):
+        self.copyFile(d1, d2, replace)
+                                                 
+    def copyFile(self, f1, f2, replace=True):
+        if replace or not os.path.exists(f2):
+            shutil.copy(f1, f2)
 
     def get_class(self, kls):
         parts = kls.split('.')
