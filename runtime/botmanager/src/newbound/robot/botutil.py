@@ -91,6 +91,15 @@ class BotUtil(object):
     def mkdirs(self, f):
         if not os.path.exists(f): os.makedirs(f)
 
+    def getTempFile(self, tempfilename):
+
+        tempfile = os.path.join(self.getParentFile(self.getParentFile(self.getRootDir())), "tmp")
+        # tempfile = os.path.join(BotBase.master.getRootDir().getParentFile().getParentFile(), "tmp")
+        tempfile = os.path.join(tempfile, "mime")
+        self.mkdirs(tempfile)
+        tempfile = os.path.join(tempfile, tempfilename)
+        return tempfile
+
     def getSubDir(self, dir, name, chars, levels):
         s = name
         l = chars * levels
