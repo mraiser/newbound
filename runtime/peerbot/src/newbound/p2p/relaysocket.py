@@ -1,5 +1,5 @@
-from queue import Queue
 from newbound.p2p.p2presponse import P2PResponse
+from newbound.util.inputbuffer import InputBuffer
 import newbound.p2p.codes as Codes
 
 class RelaySocket(object):
@@ -7,13 +7,12 @@ class RelaySocket(object):
         self.relay = relay
         self.uuid = uuid
         self.sock = sock
-        self.queue = Queue()
-        self.buf = b''
+        self.buff = InputBuffer()
 
     def incoming(self, ba):
         if self.sock is None:
             raise Exception("Incoming data on closed relay to "+self.uuid+" via "+self.relay)
-        self.queue.put(ba)
+        self.buff.incoming(ba)
 
     def isConnected(self):
         if self.sock is None:
@@ -26,16 +25,7 @@ class RelaySocket(object):
         return self.sock.isClosed()
 
     def readall(self, n):
-        l = len(self.buf)
-        if l >= n:
-            ba = self.buf[:n]
-            self.buf = self.buf[n:]
-            return ba
-        else:
-            ba = self.buf
-            self.buf = self.queue.get()
-            ba += self.readall(n-l)
-            return ba
+        return self.buff.readall(n)
 
     def sendall(self, ba):
         if self.sock is None:

@@ -1,5 +1,6 @@
 import os
 import json
+from .p2pstream import P2PStream
 from newbound.robot.botbase import BotUtil
 from newbound.crypto.supersimplecipher import SuperSimpleCipher
 from newbound.util.atomicint import AtomicInteger
@@ -29,6 +30,7 @@ class Peer(BotUtil):
         self.lastcontact = 0
         self.nextsendcommand = AtomicInteger(0)
         self.commands = {}
+        self.streams = {}
 
         if 'pubkey' in p: self.pub = bytes.fromhex(p['pubkey'])
         if 'readkey' in p: self.readkey = SuperSimpleCipher(bytes.fromhex(p['readkey']))
@@ -190,3 +192,20 @@ class Peer(BotUtil):
                 'msg': str(e)
             }
             self.p2p.respond(self, mid, r)
+
+    def newStream(self):
+        con = P2PStream(self)
+        con.connect()
+        return con
+
+    def getStream(self, id):
+        if id in self.streams:
+            return self.streams[id]
+        return None
+
+    def accept(self, stream):
+        stream.connect()
+
+    def remove(self, streamid):
+        if streamid in self.streams:
+            self.streams[streamid].close()

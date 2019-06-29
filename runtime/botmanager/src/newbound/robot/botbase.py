@@ -164,6 +164,8 @@ class BotBase(BotUtil):
                 'msg': str(e)
             }
             if 'includeerrinfo' in params: o['errinfo'] = traceback.format_exc()
+            elif 'suppresstraceback' not in params:
+                traceback.print_exc(file=sys.stdout)
             return o
 
     def sendCommandAsync(self, peer, bot, cmd, params, cb):

@@ -5,6 +5,7 @@ import traceback
 from newbound.robot.botbase import BotBase
 from newbound.crypto.supersimplecipher import SuperSimpleCipher
 from newbound.p2p.p2p import P2P
+from newbound.p2p.p2pstream import P2PStream
 from newbound.p2p.p2pcommand import P2PCommand
 
 class PeerBot(BotBase):
@@ -357,6 +358,7 @@ class PeerBot(BotBase):
         oscon = params['request_socket']
         iscon = p.newStream()
 
+        # FIXME - TypeError: Object of type 'TCPSocket' is not JSON serializable
         o = json.dumps(params)
         params = {
             'url': cmd,
