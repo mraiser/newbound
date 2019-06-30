@@ -3,6 +3,7 @@ import json
 import hashlib
 import base64
 from newbound.net.service.service import Service
+from newbound.net.service.surrendersocketexception import SurrenderSocketException
 from newbound.net.service.http.httpparser import HTTPParser
 from newbound.net.service.http.httpresponse import HTTPResponse
 from newbound.net.tcp.tcpserversocket import TCPServerSocket
@@ -64,28 +65,29 @@ class HTTPService(Service):
                 if 'CONNECTION' in headers: ka = headers['CONNECTION']
 
                 response = self.handleCommand(request.method, headers, params, cmd, parser, request)
-                if response != None:
-                    response.keepalive = response.len != -1 and ka != None and ka == 'keep-alive'
-                    parser.send(response)
-                    if not response.keepalive: parser.close()
+                if response is None:
+                    raise SurrenderSocketException()
+                response.keepalive = response.len != -1 and ka != None and ka == 'keep-alive'
+                parser.send(response)
+                if not response.keepalive: parser.close()
 
-                    log['millis'] = self.currentTimeMillis() - now
-                    # FIXME - make sure all of these are set in all scenarios
-                    if 'nn-request-type' in headers:
-                        log['request-type'] = headers['nn-request-type']
-                    if 'nn-response-type' in headers:
-                        log['response-type'] = headers['nn-response-type']
-                    if 'nn-extension' in headers:
-                        log['extension'] = headers['nn-extension']
-                    if 'nn-sessionid' in headers:
-                        log['response-sessionid'] = headers['nn-sessionid']
-                    if 'nn-username' in headers:
-                        log['user'] = headers['nn-username']
-                    if 'nn-groups' in headers:
-                        log['groups'] = headers['nn-groups']
-                    if 'nn-userlocation' in headers:
-                        log['userlocation'] = headers['nn-userlocation']
-                    self.container.fireEvent("HTTP_END", log)
+                log['millis'] = self.currentTimeMillis() - now
+                # FIXME - make sure all of these are set in all scenarios
+                if 'nn-request-type' in headers:
+                    log['request-type'] = headers['nn-request-type']
+                if 'nn-response-type' in headers:
+                    log['response-type'] = headers['nn-response-type']
+                if 'nn-extension' in headers:
+                    log['extension'] = headers['nn-extension']
+                if 'nn-sessionid' in headers:
+                    log['response-sessionid'] = headers['nn-sessionid']
+                if 'nn-username' in headers:
+                    log['user'] = headers['nn-username']
+                if 'nn-groups' in headers:
+                    log['groups'] = headers['nn-groups']
+                if 'nn-userlocation' in headers:
+                    log['userlocation'] = headers['nn-userlocation']
+                self.container.fireEvent("HTTP_END", log)
 
     def handleCommand(self, method, headers, params, cmd, parser, request):
         #print('Handling http command: '+cmd)
@@ -106,7 +108,8 @@ class HTTPService(Service):
             elif self.container.handles(cmd):
                 try:
                     out, l, name = self.container.handle(method, headers, params, cmd, parser, request)
-                    if out == None: raise NotImplementedError('No result was produced executing the command')
+                    if out == None:
+                        return None
                     return self.handleContent(out, params, l, name, headers, 0)
                 except Exception as e:
                     self.printStackTrace(e)

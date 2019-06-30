@@ -1,4 +1,6 @@
 import os
+import traceback
+import sys
 from newbound.net.service.service import Service
 from newbound.p2p.protocol.relay import RELAY
 from newbound.p2p.protocol.relayed import RELAYED
@@ -62,9 +64,10 @@ class P2PService(Service):
         pass
 
     def socketloop(self, s, p):
-        super().socketloop(s, p)
-        self.container.addNumThreads(-1)
+        self.container.addNumThreads(2)
+        try:
+            super().socketloop(s, p)
+        except Exception as e:
+            traceback.print_exc(file=sys.stdout)
+        self.container.addNumThreads(-2)
 
-    def listen(self, s, p):
-       self.container.addNumThreads(1)
-       super().listen(s, p)

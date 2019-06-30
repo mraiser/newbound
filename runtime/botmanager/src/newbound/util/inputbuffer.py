@@ -10,6 +10,7 @@ class InputBuffer(object):
         self.queue.put(ba)
 
     def readall(self, n):
+        # FIXME - probably should time out eventually
         llen = len(self.buf)
         if llen >= n:
             ba = self.buf[:n]

@@ -1,6 +1,7 @@
 import traceback
 import sys
 from newbound.robot.botutil import BotUtil
+from .surrendersocketexception import SurrenderSocketException
 
 class Service(BotUtil):
 
@@ -41,6 +42,8 @@ class Service(BotUtil):
                     try:
                         cmd = r.getCommand()
                         self.execute(cmd, r, p)
+                    except SurrenderSocketException:
+                        break
                     except Exception as e:
                         print("Unexpected error parsing " + self.name + " command " + str(e))
                         traceback.print_exc(file=sys.stdout)

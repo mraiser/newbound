@@ -2,11 +2,14 @@ import os
 import json
 import sys
 import traceback
+import copy
 from newbound.robot.botbase import BotBase
 from newbound.crypto.supersimplecipher import SuperSimpleCipher
 from newbound.p2p.p2p import P2P
 from newbound.p2p.p2pstream import P2PStream
 from newbound.p2p.p2pcommand import P2PCommand
+from newbound.net.service.http.httprequest import HTTPRequest
+from newbound.net.service.http.httpresponse import HTTPResponse
 
 class PeerBot(BotBase):
     def getServiceName(self):
@@ -359,11 +362,14 @@ class PeerBot(BotBase):
         iscon = p.newStream()
 
         # FIXME - TypeError: Object of type 'TCPSocket' is not JSON serializable
-        o = json.dumps(params)
+
+        d = copy.copy(params)
+        d.pop('request_socket')
+        o = json.dumps(d)
         params = {
             'url': cmd,
-            'peer': self.P2P.getLocalID(),
-            'stream': con.id,
+            'peer': self.getLocalID(),
+            'stream': iscon.id,
             'params': o
         }
         def cb(o):
