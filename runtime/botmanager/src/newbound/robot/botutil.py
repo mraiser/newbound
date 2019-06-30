@@ -134,7 +134,10 @@ class BotUtil(object):
     
     def copyFile(self, f1, f2, replace=True):
         if replace or not os.path.exists(f2):
-            shutil.copy(f1, f2)
+            if os.path.exists(f2):
+                os.remove(f2)
+            # copytree will create the dst directory
+            shutil.copytree(f1, f2)
 
     def get_class(self, kls):
         parts = kls.split('.')
