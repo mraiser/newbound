@@ -5,6 +5,7 @@ from email.utils import formatdate
 import mimetypes
 import random
 import uuid
+import shutil
 import socket
 import sys
 import traceback
@@ -91,6 +92,15 @@ class BotUtil(object):
     def mkdirs(self, f):
         if not os.path.exists(f): os.makedirs(f)
 
+    def getTempFile(self, tempfilename):
+
+        tempfile = os.path.join(self.getParentFile(self.getParentFile(self.getRootDir())), "tmp")
+        # tempfile = os.path.join(BotBase.master.getRootDir().getParentFile().getParentFile(), "tmp")
+        tempfile = os.path.join(tempfile, "mime")
+        self.mkdirs(tempfile)
+        tempfile = os.path.join(tempfile, tempfilename)
+        return tempfile
+
     def getSubDir(self, dir, name, chars, levels):
         s = name
         l = chars * levels
@@ -118,6 +128,16 @@ class BotUtil(object):
                 out += enc[:1]
                 enc = enc[1:]
         return out + enc
+
+    def copyFolder(self, d1, d2, replace=True):
+        self.copyFile(d1, d2, replace)
+    
+    def copyFile(self, f1, f2, replace=True):
+        if replace or not os.path.exists(f2):
+            if os.path.exists(f2):
+                os.remove(f2)
+            # copytree will create the dst directory
+            shutil.copytree(f1, f2)
 
     def get_class(self, kls):
         parts = kls.split('.')
