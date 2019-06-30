@@ -106,8 +106,8 @@ class BotManager(BotBase):
         mf = os.path.join(f, "meta.json")
         meta = {}
         if os.path.exists(mf):
-            with open(mf, "rb") as f:
-                meta = json.loads(f.read())
+            with open(mf, "rb") as metafile:
+                meta = json.loads(metafile.read())
 
         meta["id"] = db
         meta["username"] = username
@@ -167,7 +167,7 @@ class BotManager(BotBase):
         idx = os.path.basename(f3)
         name = idx
         if keys1:
-            name = keys1[0].decrypt(bytes.fromhex(idx))
+            name = keys1[0].decrypt(bytes.fromhex(idx)).decode()
         if keys2:
             name = keys2[1].encrypt(bytes(name, 'utf-8')).hex()
 
