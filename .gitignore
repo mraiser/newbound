@@ -27,6 +27,9 @@ runtime/securitybot/rules/
 runtime/securitybot/users/
 data/runtime
 
+# IntelliJ
+out/
+
 # Non-core libraries
 data/bme680
 data/ds18b20
