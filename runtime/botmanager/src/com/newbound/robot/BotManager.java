@@ -110,6 +110,7 @@ public class BotManager extends BotBase
 			PROPERTIES.setProperty("bots", bots);
 			PROPERTIES.setProperty("defaultbot", SYS.defaultBot());
 //			PROPERTIES.setProperty("defaultbot", "botmanager");
+			saveSettings();
 		}
 //		if (bots.indexOf("FileBot") == -1) bots += ",com.newbound.robot.FileBot";
 		
