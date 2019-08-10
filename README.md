@@ -13,7 +13,7 @@ functionality with our easy to use
 
 [Documentation](https://www.newbound.io/documentation/index.html)
 
-[Website](https://wwwnewbound.io)
+[Website](https://www.newbound.io)
 
 [Newbound](https://www.newbound.com/site/index.html)
 
