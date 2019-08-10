@@ -4,7 +4,7 @@ The Newbound software is an HTML5 app framework for connecting devices
 like computers, smartphones, tablets and devices on the Internet of 
 Things (IoT) directly and securely with one another. The software 
 includes a local web service and a set of default apps that provide the 
-core functionality, including P2P communication, security/encryption, 
+core functionality, including P2P communication, security, encryption, 
 data storage, file transfer, port-forwarding, app publishing and much 
 more. Makers and developers can easily incorporate the Newbound software 
 into their own apps and "smart-things" to extend their creation's 
