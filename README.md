@@ -11,6 +11,12 @@ into their own apps and "smart-things" to extend their creation's
 functionality with our easy to use 
 [API](https://www.newbound.io/documentation/reference.html).
 
+[Documentation](https://www.newbound.io/documentation/index.html)
+
+[Website](https://wwwnewbound.io)
+
+[Newbound](https://www.newbound.com/site/index.html)
+
 ### Python Early Access
 
 **NOTE:** *Not all features are available, and editing apps in Python 
