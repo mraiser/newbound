@@ -365,16 +365,17 @@ class PeerBot(BotBase):
 
         d = copy.copy(params)
         d.pop('request_socket')
-        o = json.dumps(d)
+        # o = json.dumps(d)
         params = {
             'url': cmd,
             'peer': self.getLocalID(),
             'stream': iscon.id,
-            'params': o
+            'params': d  # o
         }
+
         def cb(o):
             if not o['status'] == 'ok':
-                print('FIXME') # FIXME
+                print('FIXME: '+json.dumps(o))  # FIXME
             else:
                 len1 = int(o['msg'])
                 m = self.getMIMEType(cmd)
@@ -392,7 +393,6 @@ class PeerBot(BotBase):
 
         self.sendCommandAsync(peer, 'peerbot', 'local', params, cb)
 
-        #FIXME - implement handling of None response means release custody of socket
         return None
 
     def handleDisconnect(self, params):
