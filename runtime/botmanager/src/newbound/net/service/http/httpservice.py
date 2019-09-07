@@ -143,7 +143,8 @@ class HTTPService(Service):
         if len != -1: s = "\r\nContent-Length: "+str(len)
         if range[0] != -1: s += "\r\nContent-Range: bytes "+str(range[0])+"-"+str(range[1])+"/"+str(olen)
         if expires != -1: s += "\r\nExpires: "+self.toHTTPDate(expires)
-        else: print('FIXME') #s += "\r\nExpires: 0"
+        else:
+            print('FIXME') #s += "\r\nExpires: 0"
         mimeType = self.getMIMEType(name)
         if mimeType == None: mimeType = 'text/plain'
         #print('MIME TYPE: '+mimeType)
