@@ -431,7 +431,7 @@ class BotManager(BotBase):
         if not os.path.exists(f): raise Exception("No such record "+db+"/"+id)
 
         with open(f, "rb") as f:
-            ba = f.read().decode()
+            ba = f.read() #.decode()
         if not keys:
             jo = json.loads(ba)
         else:
