@@ -28,13 +28,14 @@ class MetaBot(BotBase):
         return 0
 
     def jsapi(self, db, id, ctl):
-        #print('Rebuilding Javascript API for '+db+':'+id+' ('+ctl['name']+')')
+        print('Rebuilding Javascript API for '+db+':'+id+' ('+ctl['name']+')')
         b = self.master
         newhtml = ''
         if 'cmd' in ctl:
             for cmd in ctl['cmd']:
                 name = cmd["name"]
-                cmd = self.getData(db, cmd['id'])['data']
+                cmdid2 = cmd['id']
+                cmd = self.getData(db, cmdid2)['data']
                 newhtml += "function send_"+name+"(";
                 lang = 'java'
                 cmdid = None
@@ -70,7 +71,7 @@ class MetaBot(BotBase):
                     newhtml += "  var args = " + args + ";\n"
                     newhtml += "  var xxxprefix = xxxxxpeer ? '../peerbot/remote/'+xxxxxpeer+'/' : '../';\n"
                     newhtml += "  args = encodeURIComponent(JSON.stringify(args));\n";
-                    newhtml += "  json(xxxprefix+'botmanager/execute', '"+"db="+urllib.parse.quote(db)+"&id="+urllib.parse.quote(cmd["id"])+"&args='+args, function(result){\n    xxxxxcb(result);\n  });\n"
+                    newhtml += "  json(xxxprefix+'botmanager/execute', '"+"db="+urllib.parse.quote(db)+"&id="+urllib.parse.quote(cmdid2)+"&args='+args, function(result){\n    xxxxxcb(result);\n  });\n"
                 newhtml += "}\n"
         return newhtml
 
