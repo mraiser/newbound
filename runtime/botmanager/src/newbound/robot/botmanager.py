@@ -318,7 +318,9 @@ class BotManager(BotBase):
         self.writeFile(f, code.encode())
 
     def handleCompile(self, params):
-        return self.handleSavePython(params)
+        if 'python' in params:
+            return self.handleSavePython(params)
+        return self.handleSaveJava(params)
 
     def handleSavePython(self, params):
         db = params['db']
@@ -337,13 +339,13 @@ class BotManager(BotBase):
 
         self.writePythonFile(db, id, p, imports, python)
 
-        d = {
-            'type': 'python',
-            'id': id,
-            'cmd': cmd,
-            'params': p,
-            'status': 'ok'
-        }
+        d = self.getData(db, id)['data']
+        d['lang'] = 'python'
+        d['python'] = cmd
+        d['params'] = p
+        self.setData(db, id, d, readers, writers)
+
+        d['status'] = 'ok'
 
         return d
 

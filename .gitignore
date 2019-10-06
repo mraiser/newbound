@@ -26,6 +26,7 @@ runtime/securitybot/session.properties
 runtime/securitybot/rules/
 runtime/securitybot/users/
 data/runtime
+converted
 
 # IntelliJ
 out/
@@ -35,6 +36,7 @@ data/bme680
 data/ds18b20
 data/mcp3008
 data/raspberrypi
+data/chuckme
 
 # Distribution / packaging
 .Python
