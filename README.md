@@ -15,7 +15,7 @@ functionality with our easy to use
 
 [Website](https://www.newbound.io)
 
-[Newbound](https://www.newbound.com/site/index.html)
+[Newbound, Inc.](https://www.newbound.com/site/index.html)
 
 ### Python Early Access
 
