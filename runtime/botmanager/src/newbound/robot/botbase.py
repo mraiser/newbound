@@ -1,6 +1,7 @@
 import os
 import sys
 import platform
+import time
 import webbrowser
 import json
 import math
@@ -25,8 +26,28 @@ class BotBase(BotUtil):
         self.threadhandler.addNumThreads(10)
         self.http = HTTPService(self, self.getPortNum())
         if launchbrowser: webbrowser.open('http://localhost:'+str(self.getPortNum())+'/'+self.getServiceName()+'/'+self.getIndexFileName())
-        #FIXME - add session timeout checking
+
+        self.sessionChecker()
         print('Startup complete.')
+
+    def sessionChecker(self):
+        print('Session checking starting up')
+        while self.running:
+            try:
+                time.sleep(self.sessioncheckinterval/1000)
+
+                # Find expired sessions
+                now = self.currentTimeMillis()
+                doomed = [sid for sid in self.sessions.keys()
+                          if self.sessions[sid].expire < now]
+
+                # Delete expired sessions
+                for sid in doomed:
+                    print(f"Session expired: {sid}")
+                    del self.sessions[sid]
+
+            except Exception(e):
+                traceback.print_exc(file=sys.stdout)
 
     def init(self, root, master=None):
         print('Initializing '+self.getServiceName()+'...')
