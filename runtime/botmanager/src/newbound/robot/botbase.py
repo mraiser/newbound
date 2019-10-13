@@ -48,6 +48,7 @@ class BotBase(BotUtil):
 
             except Exception(e):
                 traceback.print_exc(file=sys.stdout)
+        print("Session checking stopped")
 
     def init(self, root, master=None):
         print('Initializing '+self.getServiceName()+'...')
