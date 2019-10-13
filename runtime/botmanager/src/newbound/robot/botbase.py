@@ -54,7 +54,7 @@ class BotBase(BotUtil):
         self.root = root;
         self.websockets = []
 
-        if master == None:
+        if master is None:
             self.master = self
         else:
             self.master = master
@@ -110,7 +110,7 @@ class BotBase(BotUtil):
         bot = cmd[:i]
         cmd = cmd[i+1:]
         b = self.getBot(bot)
-        if b == None: return False
+        if b is None: return False
         return b.hasCommand(cmd)
 
     def handle(self, method, headers, params, cmd, parser, request):
@@ -433,7 +433,7 @@ class BotBase(BotUtil):
                 bot = path[:i]
                 cmd = path[i+1:]
             b = self.getBot(bot)
-            if not b == None:
+            if b is not None:
                 botroot = b.getRootDir()
                 home = os.path.join(botroot, 'html')
                 f = os.path.join(home, cmd)
