@@ -51,7 +51,7 @@ class BotBase(BotUtil):
 
     def init(self, root, master=None):
         print('Initializing '+self.getServiceName()+'...')
-        self.root = root;
+        self.root = root
         self.websockets = []
 
         if master is None:
@@ -64,9 +64,9 @@ class BotBase(BotUtil):
         self.threadhandler = ThreadHandler(self.getServiceName())
         self.threadhandler.init()
 
-        f = os.path.join(root, 'app.properties');
+        f = os.path.join(root, 'app.properties')
         if os.path.exists(f):
-            self.appproperties = self.load_properties(f);
+            self.appproperties = self.load_properties(f)
         else:
             claz = type(self).__module__+'.'+type(self).__name__
             self.appproperties = {
@@ -78,15 +78,15 @@ class BotBase(BotUtil):
                 "price": "0.00",
                 "version": "1"
             }
-            self.save_properties(self.appproperties,f);
+            self.save_properties(self.appproperties,f)
 
-        f = os.path.join(root, 'botd.properties');
+        f = os.path.join(root, 'botd.properties')
         if os.path.exists(f):
-            self.properties = self.load_properties(f);
+            self.properties = self.load_properties(f)
         else:
             self.properties = {}
 
-        dirty = False;
+        dirty = False
         if 'machineid' not in self.properties:
             self.properties['machineid'] = platform.node()
             dirty = True
@@ -94,7 +94,7 @@ class BotBase(BotUtil):
             self.properties['portnum'] = self.getDefaultPortNum()
             dirty = True
         if dirty:
-            self.save_properties(self.properties,f);
+            self.save_properties(self.properties,f)
 
     def initializationComplete(self):
         self.threadhandler.addNumThreads(5)
@@ -211,9 +211,9 @@ class BotBase(BotUtil):
             if len(ia) == 0: break
             i = ia[0]
             fin = (pow7 & i) != 0
-            rsv1 = (int(math.pow(2, 6)) & i) != 0;
-            rsv2 = (int(math.pow(2, 5)) & i) != 0;
-            rsv3 = (int(math.pow(2, 4)) & i) != 0;
+            rsv1 = (int(math.pow(2, 6)) & i) != 0
+            rsv2 = (int(math.pow(2, 5)) & i) != 0
+            rsv3 = (int(math.pow(2, 4)) & i) != 0
 
             if rsv1 or rsv2 or rsv3:
                 self.websocketFail(sock)
@@ -457,8 +457,8 @@ class BotBase(BotUtil):
         return "index.html"
 
     def saveSettings(self):
-        f = os.path.join(self.root, 'botd.properties');
-        self.save_properties(self.properties,f);
+        f = os.path.join(self.root, 'botd.properties')
+        self.save_properties(self.properties,f)
 
     def getData(self, db, id):
         return self.master.getData(db, id)
