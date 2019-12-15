@@ -17,6 +17,7 @@ generated/
 runtime/botmanager/botd.properties
 runtime/botmanager/timer/
 runtime/metabot/botd.properties
+runtime/metabot/libraries/
 runtime/peerbot/botd.properties
 runtime/peerbot/broker.txt
 runtime/peerbot/peers/
@@ -27,16 +28,39 @@ runtime/securitybot/rules/
 runtime/securitybot/users/
 data/runtime
 converted
+tmp/mime
 
 # IntelliJ
 out/
 
 # Non-core libraries
+data/blog
 data/bme680
+data/commerce
 data/ds18b20
+data/homeslide
 data/mcp3008
+data/newboundio
+data/newboundpowerstrip
+data/ninjasmoke
+data/portforwarding
+data/site
+data/site_services
 data/raspberrypi
 data/chuckme
+
+#non-core apps
+runtime/blog
+runtime/commerce
+runtime/ds18b20
+runtime/newboundpowerstrip
+runtime/ninjasmoke
+runtime/portforwarding
+runtime/protocol
+runtime/raspberrypi
+runtime/services
+runtime/site
+runtime/toolbar
 
 # Distribution / packaging
 .Python

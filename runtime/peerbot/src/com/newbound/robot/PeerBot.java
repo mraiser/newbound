@@ -1348,6 +1348,16 @@ public class PeerBot extends MetaBot
 			PROPERTIES.remove("peers");
 			saveSettings();
 		}
+
+		try
+		{
+			JSONArray l = getData("runtime", "peerbot_mypeers").getJSONObject("data").getJSONArray("list");
+			int i = l.length();
+			while (i-->0)
+				try { mP2PManager.getPeer(l.getString(i)); }
+				catch (Exception x) { x.printStackTrace(); }
+		}
+		catch (Exception x) { x.printStackTrace(); }
 		
 		addPeriodicTask(new PeriodicTask(5000, true, "check brokers") 
 		{

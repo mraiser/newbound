@@ -54,6 +54,8 @@ class PeerBot(BotBase):
             self.properties['udpport'] = str(pp)
             self.saveSettings()
 
+        # FIXME -- Load runtime/peerbot_mypeers
+
     def initializationComplete(self):
         super().initializationComplete()
         self.addPeriodicTask(self.check_brokers, 5000, "Check Brokers")

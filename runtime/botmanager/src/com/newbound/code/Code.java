@@ -89,9 +89,10 @@ public class Code
 	public JSONObject execute(JSONObject args) throws Exception
 	{
 			if (DEBUG) System.out.println("Evaluating code: "+CODE);
-			
-			String type = !CODE.has("type") ? "flow" : CODE.getString("type");
-			
+
+			//String type = !CODE.has("type") ? "flow" : CODE.getString("type");
+			String type = CODE.has("type") ? CODE.getString("type") : CODE.has("java") ?"java" : CODE.has("python") ? "python" : "flow";
+
 			if (type.equals("java"))
 			{
 				JSONTransform jt = precompile();
