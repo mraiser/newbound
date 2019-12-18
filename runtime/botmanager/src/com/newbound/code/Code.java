@@ -91,7 +91,7 @@ public class Code
 			if (DEBUG) System.out.println("Evaluating code: "+CODE);
 
 			//String type = !CODE.has("type") ? "flow" : CODE.getString("type");
-			String type = CODE.has("type") ? CODE.getString("type") : CODE.has("java") ?"java" : CODE.has("python") ? "python" : "flow";
+			String type = CODE.has("type") ? CODE.getString("type") : CODE.has("lang") ? CODE.getString("lang") :CODE.has("java") ?"java" : CODE.has("python") ? "python" : "flow";
 
 			if (type.equals("java"))
 			{
@@ -108,7 +108,8 @@ public class Code
 			if (type.equals("python"))
 			{
 				String py = CODE.getString("id");
-				JSONObject cmd = BotBase.getBot("botmanager").getData(LIB, CODE.getString("cmd")).getJSONObject("data");
+				String pyid = CODE.has("python") ? CODE.getString("python") : CODE.getString("cmd");
+				JSONObject cmd = BotBase.getBot("botmanager").getData(LIB, pyid).getJSONObject("data");
 				return evalCommandLine(PYTHON, cmd, args, new File(getRoot(py), py+".py"));
 			}
 			

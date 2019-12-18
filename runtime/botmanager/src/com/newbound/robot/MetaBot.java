@@ -1272,6 +1272,12 @@ public abstract class MetaBot extends BotBase
 			{
 				JSONObject cmd = cmds.getJSONObject(k);
 				String cid = cmd.getString("id");
+
+				try {
+					cmd = getData(lib, cid).getJSONObject("data");
+				}
+				catch (Exception x) { x.printStackTrace(); }
+
 				publishData(lib, cid, tmpdir);
 				
 				String lang = cmd.has("lang") ? cmd.getString("lang") : "java";

@@ -1602,9 +1602,9 @@ public class BotManager extends BotBase
 		JSONObject data = new JSONObject();
 		try  { data = getData(db, id).getJSONObject("data"); } catch (Exception x) {}
 		int hash = data.toString().hashCode();
-//		data.put("type", "python");
+		data.put("lang", "python");
 		data.put("id", id);
-//		data.put("cmd", cmd);
+		data.put("cmd", cmd);
 		data.put("python", cmd);
 		if (data.toString().hashCode() != hash)
 			setData(db, id, data, readers == null ? null : new JSONArray(readers), writers == null ? null : new JSONArray(writers));
