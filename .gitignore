@@ -182,3 +182,5 @@ dmypy.json
 # PyCharm project
 .idea/
 
+# Mac ignores
+.DS_Store
