@@ -664,13 +664,19 @@ System.out.println("Loading Properties: "+f.getCanonicalPath());
 		if (mMasterBot == this) throw new Exception("Database not configured");
 		else return mMasterBot.setData(db, id, data, readers, writers);
 	}
-	
+
+	public boolean hasData(String db, String id) throws Exception
+	{
+		if (mMasterBot == this) throw new Exception("Database not configured");
+		else return mMasterBot.hasData(db, id);
+	}
+
 	public JSONObject getData(String db, String id) throws Exception
 	{
 		if (mMasterBot == this) throw new Exception("Database not configured");
 		else return mMasterBot.getData(db, id);
 	}
-	
+
 	public JSONArray searchData(String db, JSONTransform t, JSONObject params, String sessionid) throws Exception
 	{
 		if (mMasterBot == this) throw new Exception("Database not configured");

@@ -1377,7 +1377,7 @@ public class PeerBot extends MetaBot
 			saveSettings();
 		}
 
-		try
+		if (hasData("runtime", "peerbot_mypeers")) try
 		{
 			JSONArray l = getData("runtime", "peerbot_mypeers").getJSONObject("data").getJSONArray("list");
 			int i = l.length();

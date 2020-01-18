@@ -1316,21 +1316,28 @@ public class BotManager extends BotBase
 		writeFile(f, keys.length == 0 ? jo.toString().getBytes() : keys[1].encrypt(jo.toString().getBytes()));
 		return true;
 	}
-	
+
+	public boolean hasData(String db, String id) throws Exception
+	{
+		SuperSimpleCipher[] keys = getKeys(db);
+		File f = getDataFile(db, id, keys);
+		return f.exists();
+	}
+
 	public JSONObject getData(String db, String id) throws Exception
 	{
-	  SuperSimpleCipher[] keys = getKeys(db);
-	  File f = getDataFile(db, id, keys);
-	  
-	  if (!f.exists()) 
-		  throw new Exception("No such record "+db+"/"+id);
-	  
-	  byte[] ba = readFile(f);
-	  JSONObject jo = new JSONObject(new String(keys.length == 0 ? ba : keys[0].decrypt(ba)));
-	  
-	  return jo;
+		SuperSimpleCipher[] keys = getKeys(db);
+		File f = getDataFile(db, id, keys);
+
+		if (!f.exists())
+			throw new Exception("No such record "+db+"/"+id);
+
+		byte[] ba = readFile(f);
+		JSONObject jo = new JSONObject(new String(keys.length == 0 ? ba : keys[0].decrypt(ba)));
+
+		return jo;
 	}
-	
+
 	protected File getDataFile(String db, String id, SuperSimpleCipher[] keys) throws Exception
 	{
 		File f = getDB(db);
