@@ -953,7 +953,7 @@ public abstract class MetaBot extends BotBase
 		return "OK";
 	}
 
-	private void rebuildLibrary(final String lib) throws Exception
+	public void rebuildLibrary(final String lib) throws Exception
 	{
 		System.out.println("METABOT evaluating library "+lib);
 

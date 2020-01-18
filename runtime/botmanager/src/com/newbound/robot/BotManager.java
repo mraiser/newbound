@@ -157,7 +157,9 @@ public class BotManager extends BotBase
 				}
 			}
 		}
-		
+
+		rebuildLibrary("botmanager");
+
 		try
 		{
 			Callback cb = new Callback() 
@@ -187,7 +189,7 @@ public class BotManager extends BotBase
 			Code.PYTHON = s;
 		}
 		catch (Exception x) { x.printStackTrace(); }
-		
+
 		RUNNING = true;
 	}
 

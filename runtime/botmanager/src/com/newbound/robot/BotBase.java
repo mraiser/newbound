@@ -665,6 +665,12 @@ System.out.println("Loading Properties: "+f.getCanonicalPath());
 		else return mMasterBot.setData(db, id, data, readers, writers);
 	}
 
+	public void rebuildLibrary(String lib) throws Exception
+	{
+		BotBase bb = getBot("metabot");
+		bb.rebuildLibrary(lib);
+	}
+
 	public boolean hasData(String db, String id) throws Exception
 	{
 		if (mMasterBot == this) throw new Exception("Database not configured");
@@ -1345,7 +1351,7 @@ System.out.println("Loading Properties: "+f.getCanonicalPath());
 		storeProperties(p, f);
 	}
 
-	public static BotBase getBot(String bot) 
+	public static BotBase getBot(String bot)
 	{
 		if (mMasterBot.getServiceName().equals(bot)) return mMasterBot;
 		return (BotBase)mBots.get(bot);
