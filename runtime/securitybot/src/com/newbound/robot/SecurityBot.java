@@ -537,7 +537,7 @@ public class SecurityBot extends BotBase
 			fos.close();
 			
 		}
-		
+
 		Runnable r = new Runnable() 
 		{
 			public void run() 
@@ -816,8 +816,6 @@ public class SecurityBot extends BotBase
 		}
 		
 		if (s != null) updateSessionTimeout(s);
-
-		rebuildLibrary("securitybot");
 	}
 
 	private File getRulesFolder(String bot, String cmd) 

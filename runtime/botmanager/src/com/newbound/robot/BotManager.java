@@ -159,6 +159,7 @@ public class BotManager extends BotBase
 		}
 
 		rebuildLibrary("botmanager");
+		rebuildLibrary("securitybot");
 
 		try
 		{
