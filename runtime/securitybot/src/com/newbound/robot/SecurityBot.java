@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.Vector;
 
+import com.newbound.net.service.http.Exception404;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -809,6 +810,8 @@ public class SecurityBot extends BotBase
 			String s2 = bot.getServiceName()+" cmd="+cmd+" user="+user.getProperty("displayname")+" groups=";
 			try { s2 += new JSONArray(groups); } catch (Exception x2) { s2 += x2.getMessage(); }
 			try { s2 += " params="+new JSONObject(params); } catch (Exception x2) { s2 += x2.getMessage(); }
+
+			if (!bot.getCommands().has(cmd)) throw new Exception404(cmd+" not found");
 			throw new Exception("UNAUTHORIZED: bot="+s2);
 		}
 		

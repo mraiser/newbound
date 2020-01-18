@@ -105,6 +105,7 @@ public class PeerBot extends MetaBot
 		if (cmd.equals("setpubkey")) return handleSetPubKey(params);
 		if (cmd.equals("setreadkey")) return handleSetReadKey(params);
 		if (cmd.equals("brokers")) return handleBrokers(params);
+		if (cmd.equals("localaddresses")) return handleLocalAddresses(params);
 		throw new Exception("Unknown command: "+cmd);
 	}
 
@@ -277,6 +278,10 @@ public class PeerBot extends MetaBot
 			cmd.put("desc", "Get/set the list of connection brokers");
 			cmd.put("parameters", new JSONArray("[\"brokers\"]"));
 			commands.put("brokers", cmd);
+
+			cmd = new JSONObject();
+			cmd.put("desc", "Get the list of local IP addresses");
+			commands.put("localaddresses", cmd);
 		}
 		catch (Exception x) { x.printStackTrace(); }
 /*
@@ -298,6 +303,29 @@ public class PeerBot extends MetaBot
 		return sa;
 	}
 */
+
+	private JSONObject handleLocalAddresses(Hashtable params) throws Exception
+	{
+		JSONArray ll = new JSONArray();
+		JSONArray sl = new JSONArray();
+		Enumeration<NetworkInterface> n = NetworkInterface.getNetworkInterfaces();
+		for (; n.hasMoreElements();)
+		{
+			NetworkInterface e = n.nextElement();
+			Enumeration<InetAddress> a = e.getInetAddresses();
+			for (; a.hasMoreElements();)
+			{
+				InetAddress addr = a.nextElement();
+				if (addr.isLinkLocalAddress()) ll.put(addr.getHostAddress());
+				if (addr.isSiteLocalAddress()) sl.put(addr.getHostAddress());
+			}
+		}
+		JSONObject jo = newResponse();
+		jo.put("link", ll);
+		jo.put("site", sl);
+
+		return jo;
+	}
 
 	private Object handleBrokers(Hashtable params) throws Exception
 	{

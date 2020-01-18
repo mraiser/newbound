@@ -48,6 +48,7 @@ data/site
 data/site_services
 data/raspberrypi
 data/chuckme
+data/blogdata
 
 #non-core apps
 runtime/blog
@@ -61,6 +62,7 @@ runtime/raspberrypi
 runtime/services
 runtime/site
 runtime/toolbar
+runtime/mcp3008
 
 # Distribution / packaging
 .Python
