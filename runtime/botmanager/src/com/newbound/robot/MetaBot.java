@@ -1776,12 +1776,14 @@ public abstract class MetaBot extends BotBase
 				
 				if (JAVA.has("desc"))
 					cmd.put("desc", JAVA.getString("desc"));
-	
-				JSONArray params1 = JAVA.getJSONArray("params");
+
 				JSONArray params2 = new JSONArray();
-				int n = params1.length();
-				int j;
-				for (j=0;j<n;j++) params2.put(params1.getJSONObject(j).getString("name")); 
+				if (JAVA.has("params")) {
+					JSONArray params1 = JAVA.getJSONArray("params");
+					int n = params1.length();
+					int j;
+					for (j = 0; j < n; j++) params2.put(params1.getJSONObject(j).getString("name"));
+				}
 				cmd.put("parameters", params2);
 	
 			}	
