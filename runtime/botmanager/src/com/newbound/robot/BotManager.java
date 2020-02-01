@@ -1152,12 +1152,13 @@ public class BotManager extends BotBase
 		if (gs != null && !gs.equals(""))
 		{
 		  i = sa.length;
-		  int j = ows.length();
 		  while (i-->0)
 		  {
+		  	int j = ows.length();
 			while (j-->0)
 			{
-			  isok = ows.get(j).equals(sa[i]);
+			  String perm = (String)ows.get(j);
+			  isok = perm.equals(sa[i]) || perm.equals("anonymous");
 			  if (isok) break;
 			}
 			if (isok) break;
@@ -1528,16 +1529,34 @@ public class BotManager extends BotBase
 		    + "}";
 		  
 		writeFile(f, java.getBytes());
-		
+
+		JSONObject meta = new JSONObject();
 		JSONObject data = new JSONObject();
-		try  { data = getData(db, id).getJSONObject("data"); } catch (Exception x) {}
+		try
+		{
+			meta = getData(db, id);
+			data = meta.getJSONObject("data");
+		}
+		catch (Exception x) {}
 		int hash = data.toString().hashCode();
 //		data.put("type", "java");
 		data.put("id", id);
 //		data.put("cmd", cmd);
 		data.put("java", cmd);
-		if (data.toString().hashCode() != hash)
-			setData(db, id, data, readers == null ? null : new JSONArray(readers), writers == null ? null : new JSONArray(writers));
+
+		JSONArray rs = readers == null ? null : new JSONArray(readers);
+
+		boolean dowrite = true;
+/*
+		boolean dowrite = data.toString().hashCode() != hash;
+		if (!dowrite && meta.has("readers"))
+		{
+			if (rs == null) dowrite = true;
+			else if
+		}
+*/
+		if (dowrite)
+			setData(db, id, data, rs, writers == null ? null : new JSONArray(writers));
 		data.put("status", "ok");
 		return data;
 	}
