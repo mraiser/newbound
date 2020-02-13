@@ -54,7 +54,12 @@ class PeerBot(BotBase):
             self.properties['udpport'] = str(pp)
             self.saveSettings()
 
-        # FIXME -- Load runtime/peerbot_mypeers
+        try:
+            peer_list = json.loads(self.getData("runtime", "peerbot_mypeers"))["data"]
+            for s in peer_list.reversed():
+                self.P2P.getPeer(s)
+        except Exception as e:
+            self.printStackTrace(e)
 
     def initializationComplete(self):
         super().initializationComplete()
