@@ -10,10 +10,10 @@ class P2PParser(BotUtil):
         typ = type(sock.sock).__name__
         if typ == 'TCPSocket':
             sock.sendall(sock.localid.encode())
-            sock.sendall(self.bytes_to_int(self.sock.sock.getRemotePort()))
+            sock.sendall(self.int_to_bytes(self.sock.sock.getRemotePort()))
             ba = sock.readall(40)
             self.remoteid = ba[0:36].decode()
-            self.remoteport = self.int_from_bytes(ba[36:])
+            self.remoteport = self.bytes_to_int(ba[36:])
         #self.peer = self.p2p.getPeer(self.remoteid, True)
         elif typ == 'RelaySocket':
             self.remoteid = sock.sock.uuid
@@ -43,8 +43,8 @@ class P2PParser(BotUtil):
         if b:
             pass
 
-        code = self.int_from_bytes(self.sock.readall(4))
-        llen = self.int_from_bytes(self.sock.readall(4))
+        code = self.bytes_to_int(self.sock.readall(4))
+        llen = self.bytes_to_int(self.sock.readall(4))
         if llen<0 or llen>50000:
             print('Probably bad data '+str(llen)+' bytes')
         ba = self.sock.readall(llen)
@@ -60,8 +60,8 @@ class P2PParser(BotUtil):
         b = type(self.sock.sock).__name__ == 'RelaySocket'
         ba = b''
         if b: ba += self.sock.sock.uuid.encode()
-        ba += self.bytes_to_int(response.code)
-        if not b: ba += self.bytes_to_int(len(response.data))
+        ba += self.int_to_bytes(response.code)
+        if not b: ba += self.int_to_bytes(len(response.data))
         ba += response.data
         self.sock.sendall(ba)
         #print('sent: '+ba.hex())
