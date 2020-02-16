@@ -10,7 +10,7 @@ class P2PParser(BotUtil):
         typ = type(sock.sock).__name__
         if typ == 'TCPSocket':
             sock.sendall(sock.localid.encode())
-            sock.sendall(self.bytes_to_int(self.sock.sock.getRemotePort()))
+            sock.sendall(self.int_to_bytes(self.sock.sock.getRemotePort()))
             ba = sock.readall(40)
             self.remoteid = ba[0:36].decode()
             self.remoteport = self.int_from_bytes(ba[36:])
@@ -60,8 +60,8 @@ class P2PParser(BotUtil):
         b = type(self.sock.sock).__name__ == 'RelaySocket'
         ba = b''
         if b: ba += self.sock.sock.uuid.encode()
-        ba += self.bytes_to_int(response.code)
-        if not b: ba += self.bytes_to_int(len(response.data))
+        ba += self.int_to_bytes(response.code)
+        if not b: ba += self.int_to_bytes(len(response.data))
         ba += response.data
         self.sock.sendall(ba)
         #print('sent: '+ba.hex())
