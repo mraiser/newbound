@@ -485,6 +485,7 @@ public class PeerBot extends MetaBot
 		JSONObject o = new JSONObject(s);
 		o.put("name", getMachineID());
 		o.put("allowanon", mP2PManager.getAllowAnon());
+		o.put("localaddresses", getLocalAddresses());
 		return o;
 	}
 
@@ -1248,6 +1249,11 @@ public class PeerBot extends MetaBot
 	{
 		try { mP2PManager.stop(); } catch (Exception x) { x.printStackTrace(); }
 		return super.handleShutdown(params);
+	}
+
+	public JSONObject getLocalAddresses() throws Exception
+	{
+		return handleLocalAddresses(new Hashtable());
 	}
 
 	public static String getLocalAddressx() throws IOException

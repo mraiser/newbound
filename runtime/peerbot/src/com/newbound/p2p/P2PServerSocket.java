@@ -162,6 +162,17 @@ public class P2PServerSocket implements ServerSocket
 	
 									p.addSocketAddress(new InetSocketAddress(localip, port));
 									p.addSocketAddress(new InetSocketAddress(addr, port));
+
+									if (result.has("localaddresses"))
+									{
+										JSONObject jo = result.getJSONObject("localaddresses");
+										JSONArray ja = jo.getJSONArray("link");
+										int i = ja.length();
+										while (i-->0) p.addSocketAddress(new InetSocketAddress(ja.getString(i), port));
+										ja = jo.getJSONArray("site");
+										i = ja.length();
+										while (i-->0) p.addSocketAddress(new InetSocketAddress(ja.getString(i), port));
+									}
 								}
 								catch (Exception x) { x.printStackTrace(); }
 								
