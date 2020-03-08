@@ -176,10 +176,6 @@ class BotUtil(object):
     def int_to_bytes(self, x):
         return x.to_bytes(4, 'big')
 
-    # FIXME - replaced by bytes_to_int
-    def int_from_bytes(self, xbytes):
-        return int.from_bytes(xbytes, 'big')
-
     def bytes_to_int(self, xbytes):
         return int.from_bytes(xbytes, 'big')
 

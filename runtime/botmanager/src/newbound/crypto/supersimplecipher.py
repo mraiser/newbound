@@ -41,7 +41,7 @@ class SuperSimpleCipher:
         b = int(NEWBOUND_L / 8)
         x = 0
         while x < 1 or x > pMinus2 or x.bit_length() != NEWBOUND_L:
-            x = int_from_bytes(os.urandom(b))
+            x = bytes_to_int(os.urandom(b))
         y = pow(NEWBOUND_G, x, NEWBOUND_P)
         #print(y)
         pub = PUBKEY(int_to_bytes(y), False);
@@ -59,7 +59,7 @@ def int_to_bytes(x):
     numb = x.bit_length()//8 + 1
     return x.to_bytes(numb, 'big')
 
-def int_from_bytes(xbytes):
+def bytes_to_int(xbytes):
     return int.from_bytes(xbytes, 'big')
 
 class KEYPAIR:
@@ -90,7 +90,7 @@ class KEYPAIR:
 class PRVKEY:
     def __init__(self, ba, encoded=True):
         if not encoded:
-            self.KEY = int_from_bytes(ba);
+            self.KEY = bytes_to_int(ba);
             self.P = NEWBOUND_P
             self.G = NEWBOUND_G
             self.L = NEWBOUND_L
@@ -99,7 +99,7 @@ class PRVKEY:
             if val.tag != 48: raise Exception("Invalid key format")
 
             v = DER(val.data)
-            parsedVersion = int_from_bytes(v.data);
+            parsedVersion = bytes_to_int(v.data);
             if parsedVersion != 0: raise Exception("version mismatch");
 
             algid = DER(v.rest)
@@ -129,10 +129,10 @@ class PRVKEY:
             if l.tag != 2: raise Exception ("Expected integer length")
             if len(l.rest) != 0: raise Exception("Extra parameter data")
 
-            self.KEY = int_from_bytes(key.data);
-            self.P = int_from_bytes(p.data);
-            self.G = int_from_bytes(g.data);
-            self.L = int_from_bytes(l.data);
+            self.KEY = bytes_to_int(key.data);
+            self.P = bytes_to_int(p.data);
+            self.G = bytes_to_int(g.data);
+            self.L = bytes_to_int(l.data);
 
     def get_encoded(self):
         p = DER(int_to_bytes(self.P), 2)
@@ -155,7 +155,7 @@ class PRVKEY:
 class PUBKEY:
     def __init__(self, ba, encoded=True):
         if not encoded:
-            self.KEY = int_from_bytes(ba);
+            self.KEY = bytes_to_int(ba);
             self.P = NEWBOUND_P
             self.G = NEWBOUND_G
             self.L = NEWBOUND_L
@@ -192,10 +192,10 @@ class PUBKEY:
             if l.tag != 2: raise Exception ("Expected integer length")
             if len(l.rest) != 0: raise Exception("Extra parameter data")
 
-            self.KEY = int_from_bytes(key.data);
-            self.P = int_from_bytes(p.data);
-            self.G = int_from_bytes(g.data);
-            self.L = int_from_bytes(l.data);
+            self.KEY = bytes_to_int(key.data);
+            self.P = bytes_to_int(p.data);
+            self.G = bytes_to_int(g.data);
+            self.L = bytes_to_int(l.data);
 
     def get_encoded(self):
         p = DER(int_to_bytes(self.P), 2)
