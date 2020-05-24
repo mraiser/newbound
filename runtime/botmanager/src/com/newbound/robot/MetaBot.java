@@ -881,11 +881,12 @@ public abstract class MetaBot extends BotBase
 
 		JSONArray cmds = jo.has("cmd") ? jo.getJSONArray("cmd") : null;
 		int i,j;
-		if (cmds != null) for (i=0;i<cmds.length();i++)
+		if (cmds != null) for (i=0;i<cmds.length();i++) try
 		{
 		  JSONObject cmd = cmds.getJSONObject(i);
 		  String lang = cmd.has("lang") ? cmd.getString("lang") : "java";
 		  String cmdid = cmd.getString(lang);
+		  System.out.println("lang: "+lang+" / src: "+cmdid+" / "+"cmd: "+cmd.getString("id"));
 		  JSONObject data = b.getData(db, cmdid).getJSONObject("data");
 //		  System.out.println(data);
 		  JSONArray params = data.has("params") ? data.getJSONArray("params") : new JSONArray();
@@ -914,7 +915,8 @@ public abstract class MetaBot extends BotBase
 		  newhtml += "  json(xxxprefix+'botmanager/execute', '"+"db="+java.net.URLEncoder.encode(db, "UTF-8")+"&id="+java.net.URLEncoder.encode(cmd.getString("id"), "UTF-8")+"&args='+args, function(result){\n    xxxxxcb(result);\n  });\n";
 		  newhtml += "}\n";
 		}
-		    
+		catch (Exception x) { x.printStackTrace(); }
+
 		return newhtml;
 	}
 	
@@ -965,7 +967,11 @@ public abstract class MetaBot extends BotBase
 		File vfile = new File(libdir, "version.txt");
 		if (vfile.exists()) try
 		{
-			if (new String(readFile(vfile)).equals(version)) return;
+			System.out.println("Version file exists: "+vfile.getCanonicalPath());
+			if (new String(readFile(vfile)).equals(version)) {
+				System.out.println("Versions match: "+version);
+				return;
+			}
 		}
 		catch (Exception x) { x.printStackTrace(); }
 
