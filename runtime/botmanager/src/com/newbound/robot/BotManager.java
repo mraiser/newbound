@@ -40,7 +40,7 @@ import com.newbound.util.NoDotFilter;
 public class BotManager extends BotBase 
 {
 	private DiscoveryService DISCOVERY = null;
-	private Hashtable<String, JSONObject> mEvents = new Hashtable<>();
+	private Hashtable<String, JSONObject> mEvents = new Hashtable();
 //	protected ThreadHandler mThreadHandler = null;
 	protected Timer mTimer = new Timer();
 	protected String mSystemSessionID = null;
