@@ -56,10 +56,10 @@ public abstract class MetaBot extends BotBase
 		{
 			String lib = libraries.getString(i);
 			JSONObject DATA = getData(lib, "tasklists").getJSONObject("data");
-			
+			// FIXME - libraries can be included in multiple apps. The following should not be executed multiple times.
 			rebuildLibrary(lib);
+			startEvents(lib);
 			startTimers(lib);
-			
 		}
 		catch (Exception x)
 		{
@@ -1051,7 +1051,36 @@ public abstract class MetaBot extends BotBase
 
 		writeFile(vfile, version.getBytes());
 	}
-	
+
+	private void startEvents(final String lib) throws Exception
+	{
+		System.out.println("METABOT starting events for library "+lib);
+		JSONArray controls = getData(lib, "controls").getJSONObject("data").getJSONArray("list");
+		int j = controls.length();
+		while (j-->0)
+		{
+			JSONObject ctlptr = controls.getJSONObject(j);
+			String id = ctlptr.getString("id");
+			JSONObject ctl = getData(lib, id).getJSONObject("data");
+
+			if (ctl.has("event"))
+			{
+				JSONArray events = ctl.getJSONArray("event");
+				int k = events.length();
+				while (k-->0) try
+				{
+					JSONObject t = events.getJSONObject(k);
+					id = t.getString("id");
+
+					t = getData(lib, id).getJSONObject("data");
+					System.out.println("STARTING EVENT "+t);
+					((BotManager)mMasterBot).handleEvent(id, "set", t.toString());
+				}
+				catch (Exception xx) { xx.printStackTrace(); }
+			}
+		}
+	}
+
 	private void startTimers(final String lib) throws Exception
 	{
 		System.out.println("METABOT starting timers for library "+lib);

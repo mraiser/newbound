@@ -1377,7 +1377,7 @@ System.out.println("Loading Properties: "+f.getCanonicalPath());
 
 	public String[] getEventNames() 
 	{ 
-		String s = PROPERTIES.getProperty("events");
+		String s = APPPROPERTIES.getProperty("events");
 		if (s == null || s.length() == 0) return new String[0];
 		
 		return s.split(",");

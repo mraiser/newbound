@@ -40,6 +40,7 @@ import com.newbound.util.NoDotFilter;
 public class BotManager extends BotBase 
 {
 	private DiscoveryService DISCOVERY = null;
+	private Hashtable<String, JSONObject> mEvents = new Hashtable<>();
 //	protected ThreadHandler mThreadHandler = null;
 	protected Timer mTimer = new Timer();
 	protected String mSystemSessionID = null;
@@ -267,6 +268,8 @@ public class BotManager extends BotBase
 			return handleCompile(db, id, cmd2, java, python, js, (String)params.get("params"), (String)params.get("import"), (String)params.get("returntype"), (String)params.get("readers"), (String)params.get("writers"), (String)params.get("sessionid"));
 		}
 		if (cmd.equals("timer") || cmd.startsWith("timer/")) return handleTimer((String)params.get("id"), (String)params.get("mode"), (String)params.get("params"));
+		if (cmd.equals("event") || cmd.startsWith("event/")) return handleEvent((String)params.get("id"), (String)params.get("mode"), (String)params.get("params"));
+		if (cmd.equals("events") || cmd.startsWith("events/")) return handleEvents((String)params.get("id"));
 		if (cmd.equals("primitives") || cmd.startsWith("primitives/")) return handlePrimitives();
 		if (cmd.equals("discover") || cmd.startsWith("discover/")) return handleDiscover();
 		
@@ -361,6 +364,16 @@ public class BotManager extends BotBase
 		commands.put("timer", cmd);
 		cmd.put("desc", "Administer timer rules. Supported modes are 'get', 'set' and 'kill'.");
 		cmd.put("parameters", new JSONArray("[\"id\",\"mode\",\"params\"]"));
+
+		cmd = new JSONObject();
+		commands.put("event", cmd);
+		cmd.put("desc", "Administer event rules. Supported modes are 'get', 'set' and 'kill'.");
+		cmd.put("parameters", new JSONArray("[\"id\",\"mode\",\"params\"]"));
+
+		cmd = new JSONObject();
+		commands.put("events", cmd);
+		cmd.put("desc", "List the events that a given app generates.");
+		cmd.put("parameters", new JSONArray("[\"id\"]"));
 
 		cmd = new JSONObject();
 		commands.put("primitives", cmd);
@@ -1372,7 +1385,74 @@ public class BotManager extends BotBase
 	  
 	  return newResponse();
 	}
-	
+
+	public JSONObject handleEvents(String id) throws Exception
+	{
+		BotBase bb = getBot(id);
+		String[] sa = bb.getEventNames();
+		JSONObject jo = newResponse();
+		jo.put("list",new JSONArray(sa));
+		return jo;
+	}
+
+	public JSONObject handleEvent(String id, String mode, String params) throws Exception
+	{
+		if (mode.equals("set")) {
+			JSONObject jo = (JSONObject)mEvents.get(id);
+			if (jo != null)
+			{
+				String bot = jo.getString("bot");
+				String event = jo.getString("event");
+				Callback cb = (Callback)jo.get("cb");
+				getBot(bot).removeEventListener(event, cb);
+			}
+			jo = new JSONObject(params);
+			String bot = jo.getString("bot");
+			String event = jo.getString("event");
+			String cmddb = jo.getString("cmddb");
+			String cmd = jo.getString("cmd");
+
+			JSONObject jo2 = BotBase.getBot("botmanager").getData(cmddb, cmd).getJSONObject("data");
+			final Code code = new Code(jo2, cmddb);
+			Callback cb = new Callback() {
+				@Override
+				public void execute(JSONObject data) {
+					try
+					{
+						code.execute(data);
+					}
+					catch (Exception x) { x.printStackTrace(); }
+				}
+			};
+
+			jo.put("cb", cb);
+			mEvents.put(id, jo);
+			getBot(bot).addEventListener(event, cb);
+			return newResponse();
+		}
+		if (mode.equals("list"))
+		{
+			JSONObject jo = newResponse();
+			jo.put("data", new JSONObject(mEvents));
+			return jo;
+		}
+		if (mode.equals("get"))
+		{
+			JSONObject jo = mEvents.get(id);
+			return jo;
+		}
+		if (mode.equals("kill"))
+		{
+			JSONObject jo = (JSONObject)mEvents.remove(id);
+			String bot = jo.getString("bot");
+			String event = jo.getString("event");
+			Callback cb = (Callback)jo.get("cb");
+			getBot(bot).removeEventListener(event, cb);
+			return newResponse();
+		}
+		throw new Exception("Unsupported mode: "+mode);
+	}
+
 	public JSONObject handleTimer(String id, String mode, String params) throws Exception
 	{
 		File f = new File(getRootDir(), "timer");

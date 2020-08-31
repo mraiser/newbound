@@ -34,13 +34,12 @@ public class Code
 {
 	private static final boolean DEBUG = false;
 	private static File ROOT = null;
-	
+	public static JSONObject PRIMS = new JSONObject();
 	public static String PYTHON = "python3"; //"/Library/Frameworks/Python.framework/Versions/3.6/bin/python3";
 	
-	JSONObject CODE;
-	String LIB;
-	public static JSONObject PRIMS = new JSONObject();
-	
+	public JSONObject CODE;
+	public String LIB;
+
 	static
 	{
 		try {
