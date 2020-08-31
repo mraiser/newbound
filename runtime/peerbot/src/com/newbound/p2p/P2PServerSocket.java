@@ -143,7 +143,7 @@ public class P2PServerSocket implements ServerSocket
 				
 					if (p.keepAlive() && !p.isConnected()) P2P.connect(uuid);
 	
-					if (p.isConnected() && p.lastContact() > 30000)
+					if (p.isTCP() && p.isConnected() && p.lastContact() > 30000)
 						p.sendCommandAsync("peerbot", "getpeerinfo", new Hashtable<String, String>(), new P2PCallback() {
 							
 							@Override
@@ -211,8 +211,11 @@ public class P2PServerSocket implements ServerSocket
 						if (o instanceof JSONObject)
 						{
 							JSONObject p = (JSONObject)o;
-							if (p.has("tcp") && p.getBoolean("tcp"))
-								RELAY.addRelay(p.getString("uuid"), relay);
+							if (p.has("tcp") && p.getBoolean("tcp")) {
+								String peerid = p.getString("uuid");
+								RELAY.addRelay(peerid, relay);
+								P2P.getPeer(peerid).updateLastContact();
+							}
 							else if (p.has("uuid"))
 								RELAY.removeRelay(p.getString("uuid"), relay);
 							else

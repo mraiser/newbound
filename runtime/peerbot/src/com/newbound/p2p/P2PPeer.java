@@ -739,6 +739,10 @@ public class P2PPeer
 		return mLastContact;
 	}
 
+	public void updateLastContact() {
+		mLastContact = System.currentTimeMillis();
+	}
+
 	public void setPort(int port) 
 	{
 		int old = mPort;

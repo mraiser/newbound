@@ -1445,7 +1445,7 @@ public class BotManager extends BotBase
 		if (returntype == null) returntype = "JSONObject";
 		if (imports == null) imports = "import org.json.*;\rimport com.newbound.robot.*;\rimport com.newbound.robot.published.*;\rimport com.newbound.util.*;\r";
 		else imports = imports.replace('\n', '\r');
-		
+
 		int n = p.length();
 		int i;
 		String top = "";
@@ -1523,6 +1523,7 @@ public class BotManager extends BotBase
 		    + top
 		    + java.replace('\n', '\r')
 		    + "\r}"
+				// FIXME: id is the command id, not the control id.
 		    + "public JSONObject call(String cmd, JSONObject params) throws Exception\r{\rreturn call(\""+id+"\", cmd, params);\r}\r"
 		    + "public JSONObject call(String ctl, String cmd, JSONObject params) throws Exception\r{\rreturn call(\""+db+"\", ctl, cmd, params);\r}\r"
 		    + "public JSONObject call(String db, String ctl, String cmd, JSONObject params) throws Exception\r{\rreturn ((com.newbound.robot.MetaBot)BotBase.getBot(\"metabot\")).call(db, ctl, cmd, params);\r}\r"

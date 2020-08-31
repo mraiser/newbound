@@ -871,6 +871,7 @@ public abstract class MetaBot extends BotBase
 		//System.out.println("Building js api for "+db+":"+id);
 
 		BotBase b = BotBase.getBot("botmanager");
+		
 		String newhtml = "";
 		
 //		System.out.println("**************************************************************************************************");
@@ -1070,6 +1071,7 @@ public abstract class MetaBot extends BotBase
 				{
 					JSONObject t = timers.getJSONObject(k);
 					id = t.getString("id");
+
 					t = getData(lib, id).getJSONObject("data");
 					if (t.has("params"))
 					{
@@ -1171,6 +1173,7 @@ public abstract class MetaBot extends BotBase
 		tmpdir.mkdirs();
 
 		publishData(lib, "tasklists", tmpdir);
+		if (hasData(lib, "threejs_modellist")) publishData(lib, "threejs_modellist", tmpdir);
 		JSONArray controls = publishData(lib, "controls", tmpdir).getJSONArray("list");
 		
 		int n = controls.length();
