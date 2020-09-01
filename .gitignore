@@ -36,6 +36,7 @@ runtime/securitybot/users/
 data/runtime
 converted
 tmp/mime
+html
 
 # IntelliJ
 out/
@@ -56,6 +57,12 @@ data/site_services
 data/raspberrypi
 data/chuckme
 data/blogdata
+data/filebot
+data/feedbot
+data/blockchain
+data/blockchainmmo
+data/emailbot
+data/proxybot
 
 #non-core apps
 runtime/blog
@@ -70,6 +77,11 @@ runtime/services
 runtime/site
 runtime/toolbar
 runtime/mcp3008
+runtime/filebot
+runtime/feedbot
+runtime/vpn
+runtime/emailbot
+runtime/blockchain
 
 # Distribution / packaging
 .Python
