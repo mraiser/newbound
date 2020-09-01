@@ -1439,11 +1439,13 @@ public class BotManager extends BotBase
 		if (mode.equals("get"))
 		{
 			JSONObject jo = mEvents.get(id);
+			if (jo == null) throw new Exception("No such event: "+id);
 			return jo;
 		}
 		if (mode.equals("kill"))
 		{
 			JSONObject jo = (JSONObject)mEvents.remove(id);
+			if (jo == null) throw new Exception("No such event: "+id);
 			String bot = jo.getString("bot");
 			String event = jo.getString("event");
 			Callback cb = (Callback)jo.get("cb");
