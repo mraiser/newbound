@@ -10,10 +10,11 @@ import socket
 import sys
 import traceback
 
+
 class BotUtil(object):
 
-    sep='='
-    comment_char='#'
+    sep = '='
+    comment_char = '#'
     nextid = 0
     hexchars = "0123456789abcdef"
     nonhexchars = "ghijklmnopqrstuvwxyz"
@@ -61,7 +62,7 @@ class BotUtil(object):
         return sid
 
     def lettersAndNumbersOnly(self, s):
-        o = '';
+        o = ''
         for c in s:
             if c in self.hexchars or c in self.nonhexchars:
                 o += c
@@ -106,7 +107,7 @@ class BotUtil(object):
         l = chars * levels
         while len(s) < l: s += '_'
         i = 0
-        while (i<levels):
+        while i < levels:
             n = i*chars
             i += 1
             dir = os.path.join(dir, s[n:n+chars])
@@ -124,7 +125,7 @@ class BotUtil(object):
                 hex = bytes.fromhex(enc[1:3]).decode('utf8')
                 out += hex
                 enc = enc[3:]
-            except:
+            except Exception:
                 out += enc[:1]
                 enc = enc[1:]
         return out + enc
@@ -167,7 +168,7 @@ class BotUtil(object):
         try:
             s.connect(('10.255.255.255', 1))
             IP = s.getsockname()[0]
-        except:
+        except Exception:
             IP = '127.0.0.1'
         finally:
             s.close()
@@ -187,4 +188,3 @@ class BotUtil(object):
 
     def printStackTrace(self, e):
         traceback.print_exc(file=sys.stdout)
-
