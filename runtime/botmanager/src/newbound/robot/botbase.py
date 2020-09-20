@@ -62,7 +62,7 @@ class BotBase(BotUtil):
                         password = p["password"]
                         user = fname[0: fname.rfind(".")]
                         h = {"user": user, "pass": password}
-                        jo = b.handleLogin(user, password, None)
+                        jo = b.handleLogin(user, password, sid)
 
                         sid = jo["sessionid"]
 
