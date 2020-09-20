@@ -10,6 +10,7 @@ from .botutil import BotUtil
 from newbound.thread.threadhandler import ThreadHandler
 from newbound.net.service.http.httpservice import HTTPService
 
+
 class BotBase(BotUtil):
 
     sessiontimeout = 900000 # 15 minutes
@@ -79,7 +80,7 @@ class BotBase(BotUtil):
                 "price": "0.00",
                 "version": "1"
             }
-            self.save_properties(self.appproperties,f)
+            self.save_properties(self.appproperties, f)
 
         f = os.path.join(root, 'botd.properties')
         if os.path.exists(f):
@@ -95,7 +96,7 @@ class BotBase(BotUtil):
             self.properties['portnum'] = self.getDefaultPortNum()
             dirty = True
         if dirty:
-            self.save_properties(self.properties,f)
+            self.save_properties(self.properties, f)
 
     def initializationComplete(self):
         self.threadhandler.addNumThreads(5)
@@ -106,7 +107,7 @@ class BotBase(BotUtil):
 
     def handles(self, cmd):
         while cmd.startswith('/'): cmd = cmd[1:]
-        if not '/' in cmd: return False
+        if '/' not in cmd: return False
         i = cmd.index('/')
         bot = cmd[:i]
         cmd = cmd[i+1:]
@@ -207,7 +208,7 @@ class BotBase(BotUtil):
         self.websockets.append(sock)
         pow7 = int(math.pow(2, 7))
         baos = b''
-        while (sock.isConnected()):
+        while sock.isConnected():
             ia = sock.read(1)
             if len(ia) == 0: break
             i = ia[0]
@@ -247,14 +248,14 @@ class BotBase(BotUtil):
                         mmax = min(4096, l-off)
                         buffer = bytearray(sock.read(mmax))
                         n = len(buffer)
-                        if (n == 0): break
+                        if n == 0: break
                         i = n
-                        while i>0:
+                        while i > 0:
                             i -= 1
                             buffer[i] = buffer[i] ^ maskkey[i % 4]
                         off += n
                         baos += bytes(buffer)
-                    if off<l:
+                    if off < l:
                         self.websocketFail(sock)
                         break
 
@@ -291,7 +292,7 @@ class BotBase(BotUtil):
                 pid = jo['pid']
                 params = jo['params']
 
-                if peer != None:
+                if peer is not None:
                     def cb(jo2):
                         jo2['pid'] = pid
                         self.sendWebSocketMessageText(sock, json.dumps(jo2))
@@ -459,7 +460,7 @@ class BotBase(BotUtil):
 
     def saveSettings(self):
         f = os.path.join(self.root, 'botd.properties')
-        self.save_properties(self.properties,f)
+        self.save_properties(self.properties, f)
 
     def getData(self, db, id):
         return self.master.getData(db, id)
