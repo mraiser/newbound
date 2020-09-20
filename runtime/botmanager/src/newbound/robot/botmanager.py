@@ -100,8 +100,7 @@ class BotManager(BotBase):
 
         sessionid = params["sessionid"]
         session = self.getSession(sessionid)
-        # FIXME - must be logged in
-        username = 'xxx' # session.get("username")
+        username = session.get("username")
 
         mf = os.path.join(f, "meta.json")
         meta = {}
@@ -363,8 +362,7 @@ class BotManager(BotBase):
         db = params['db']
         sessionid = params['sessionid']
         session = self.getSession(sessionid)
-        # FIXME - must be logged in
-        username = 'xxx' #session['username']
+        username = session['username']
 
         f = self.getDB(db)
         f2 = os.path.join(f, 'meta.json')
@@ -460,15 +458,15 @@ class BotManager(BotBase):
         return self.setData(db, id, data, readers, writers, sessionid)
 
     def setData(self, db, id, data, readers, writers, sessionid=None):
-        # FIXME - get name if logged in
+
         sessionlocation = ''
-        username = 'xxx' #session['username']
         if sessionid is None:
             sessionid = ''
             username = 'system'
         else:
             session = self.getSession(sessionid)
             sessionlocation = session['userlocation']
+            username = session['username']
 
         f = self.getDB(db)
         keys = self.getKeys(db)
