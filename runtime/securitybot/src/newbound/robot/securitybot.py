@@ -440,7 +440,7 @@ class SecurityBot(BotBase):
             properties = self.load_properties(f)
         else:
             properties = {}
-        properties["sessionid"] = user
+        properties[params.get("sessionid")] = user
         self.save_properties(properties, f)
 
         sid = params.get("sessionid")
