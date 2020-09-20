@@ -26,10 +26,67 @@ class BotBase(BotUtil):
 
         self.threadhandler.addNumThreads(10)
         self.http = HTTPService(self, self.getPortNum())
-        if launchbrowser: webbrowser.open('http://localhost:'+str(self.getPortNum())+'/'+self.getServiceName()+'/'+self.getIndexFileName())
+        if launchbrowser:
+            self.launchBrowser()
 
         self.sessionChecker()
         print('Startup complete.')
+
+    def launchBrowser(self):
+
+        b = self.getBot("securitybot")
+
+        s = ""
+        sid = self.properties.get("defaultsession")
+        if sid is not None:
+            f = os.path.join(self.root, "session.properties")
+            p = self.load_properties(f)
+            user = p["sid"]
+            f = os.path.join(self.root, "users", "{}.properties", format(user))
+            if os.path.exists(f):
+                p = self.load_properties(f)
+                groups = ",{},".format(p["groups"])
+                if ",admin," not in groups:
+                    sid = None
+            else:
+                sid = None
+
+        if sid is None:
+            if b is not None:
+                f = os.path.join(self.root, "users")
+                for fname in [f for f in os.listdir(f) if not f.startswith(".")]:
+                    path = os.path.join(f, fname)
+                    p = self.load_properties(path)
+                    groups = ",{},".format(p["groups"])
+                    if ",admin," in groups:
+                        password = p["password"]
+                        user = fname[0: fname.rfind(".")]
+                        h = {"user": user, "pass": password}
+                        jo = b.handleLogin(user, password, None)
+
+                        sid = jo["sessionid"]
+
+                        self.properties["defaultsession"] = sid
+                        self.saveSettings()
+
+                        h["sessionid"] = sid
+                        b.handleRememberSession("remembersession", h)
+
+                        s = "?sessionid={}".format(sid)
+
+        else:
+            s = "?sessionid={}".format(sid)
+
+        dbn = self.properties.get("defaultbot")
+        if dbn is None:
+            dbn = self.getServiceName()
+        b = self.getBot(dbn)
+        if b is None:
+            b = self
+
+        uri = "http://localhost:{}/{}/{}{}".format(
+            self.getPortNum(), dbn, b.getIndexFileName(), s)
+        webbrowser.open(uri)
 
     def sessionChecker(self):
         print('Session checking starting up')
@@ -40,14 +97,14 @@ class BotBase(BotUtil):
                 # Find expired sessions
                 now = self.currentTimeMillis()
                 doomed = [sid for sid in self.sessions.keys()
-                          if self.sessions[sid].expire < now]
+                          if self.sessions[sid]["expire"] < now]
 
                 # Delete expired sessions
                 for sid in doomed:
                     print(f"Session expired: {sid}")
                     del self.sessions[sid]
 
-            except Exception(e):
+            except Exception:
                 traceback.print_exc(file=sys.stdout)
         print("Session checking stopped")
 
@@ -179,6 +236,11 @@ class BotBase(BotUtil):
 
     def handleCommandRequest(self, method, headers, params, cmd, parser, request):
         try:
+            if cmd == "login":
+                return self.handleLogin(params.get("user"), params.get("pass"), params.get("sessionid"))
+            elif cmd == "remembersession":
+                return self.handleRememberSession(cmd, params)
+
             self.validateRequest(self, cmd, params)
             return self.handleCommand(cmd, params)
         except Exception as e:
@@ -190,6 +252,18 @@ class BotBase(BotUtil):
             elif 'suppresstraceback' not in params:
                 traceback.print_exc(file=sys.stdout)
             return o
+
+    def handleRememberSession(self, cmd, params):
+
+        b = self.getBot("securitybot")
+        if b is None:
+            sid = params["sessionid"]
+            self.properties[sid] = self.getAdminPassword()
+            self.saveSettings()
+        else:
+            b.handleRememberSession(cmd, params)
+
+        return {"status": "ok", "msg": "OK"}
 
     def sendCommandAsync(self, peer, bot, cmd, params, cb):
         b = self.getBot('peerbot')
@@ -397,6 +471,29 @@ class BotBase(BotUtil):
         #print('EVENT: '+eventname+str(data))
         x = 1
 
+    def handleLogin(self, user, password, sid):
+
+        b = self.getBot("securitybot")
+        if b is None:
+            if user is None or password is None:
+                raise Exception("Username and password is required")
+
+            pwd = self.getAdminPassword()
+            if user == "admin" and password == pwd:
+                if sid is None:
+                    sid = self.uniqueSessionID()
+                    self.sessions["sid"] = {}
+
+                    return {
+                        "status": "ok",
+                        "msg": "You are now logged in, sessionid: {}".format(sid),
+                        "sessionid": sid
+                    }
+
+            raise Exception("Invalid login attempt")
+
+        return b.handleLogin(user, password, sid)
+
     def getSession(self, sid, create=False):
         expire = self.currentTimeMillis() + self.sessiontimeout
         if sid in self.sessions:
@@ -405,13 +502,18 @@ class BotBase(BotUtil):
             return s
         else:
             if create:
-                s = {
-                    "expire": expire
-                }
+                s = {"expire": expire}
                 self.sessions[sid] = s
                 return s
             else:
                 return None
+
+    def getAdminPassword(self):
+
+        password = self.properties.getProperty("password")
+        if password is None:
+            password = "admin"
+        return password
 
     def getSessionByUsername(self, username):
         for sid in self.sessions:

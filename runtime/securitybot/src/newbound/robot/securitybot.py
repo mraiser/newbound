@@ -45,6 +45,14 @@ class SecurityBot(BotBase):
             self.setDefaults()
         super().initializationComplete()
 
+    # def getSession(self, params):
+    #
+    #     sid = params.get("sessionid")
+    #     print("Lookup session: {}".format(sid))
+    #     if sid is not None:
+    #         return self.sessions.get(sid)
+    #     return None
+
     def validateRequest(self, bot, cmd, params):
         if 'sessionid' not in params:
             params['sessionid'] = self.uniqueSessionID()
@@ -136,27 +144,36 @@ class SecurityBot(BotBase):
         if cmd == 'login': return self.handleLogin(params)
         raise Exception('Unknown command: '+cmd)
 
-    def handleLogin(self, params):
-        username = params['user']
-        user = self.getUser(username, False)
-        if user == None:
+    def handleLogin(self, username, password, sid):
+
+        if username is None or password is None:
             raise Exception("Invalid login attempt")
-        if 'password' in user and user['password'] == params['pass']:
-            sid = params['sessionid']
-            ses = self.getSession(sid)
-            ses['username'] = username
-            ses['user'] = user
-            ses['emailusername'] = username
-            ses['emailuser'] = user
+
+        user = self.getUser(username, False)
+        if user is None:
+            raise Exception("Invalid login attempt")
+
+        s = user["password"]
+        if s is not None and s == password:
+            if sid is None:
+                sid = self.uniqueSessionID()
+
+            ses = self.getSession(sid, True)
+            ses["username"] = username
+            ses["user"] = user
+            ses["emailusername"] = username
+            ses["emailuser"] = user
+
             o = {
                 "user": username,
                 "sessionid": sid
             }
-            self.fireEvent('login', o)
-            o['status'] = 'ok'
-            o['msg'] = 'You are now logged in'
+            self.fireEvent("login", o)
+            o["status"] = "ok"
+            o["msg"] = "You are now logged in, sessionid: {}".format(sid)
             return o
-        self.fireEvent('loginfail', params)
+
+        self.fireEvent('loginfail', o)
         raise Exception("Invalid login attempt")
 
     def handleCurrentUser(self, params):
@@ -413,6 +430,25 @@ class SecurityBot(BotBase):
     def saveUser(self, id, u):
         f = self.getUserFile(id)
         self.save_properties(u, f)
+
+    def handleRememberSession(self, cmd, params):
+
+        session = self.getSession(params["sessionid"])
+        user = session.get("username")
+        f = os.path.join(self.root, "session.properties")
+        if os.path.exists(f):
+            properties = self.load_properties(f)
+        else:
+            properties = {}
+        properties["sessionid"] = user
+        self.save_properties(properties, f)
+
+        sid = params.get("sessionid")
+        return {
+            "status": "ok",
+            "msg": "You are now logged in, sessionid: {}".format(sid),
+            "sessionid": sid
+        }
 
     commands = {
         "newuser":{
