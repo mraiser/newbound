@@ -68,7 +68,7 @@ class SecurityBot(BotBase):
             user = s['user']
             username = s['username']
         else:
-            f = os.path.join(self.root, 'session.properties')
+            f = os.path.join(self.getRootDir(), 'session.properties')
             if os.path.exists(f):
                 p = self.load_properties(f)
                 if sid in p:
@@ -435,7 +435,7 @@ class SecurityBot(BotBase):
 
         session = self.getSession(params["sessionid"])
         user = session.get("username")
-        f = os.path.join(self.root, "session.properties")
+        f = os.path.join(self.getRootDir(), "session.properties")
         if os.path.exists(f):
             properties = self.load_properties(f)
         else:

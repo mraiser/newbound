@@ -39,10 +39,10 @@ class BotBase(BotUtil):
         s = ""
         sid = self.properties.get("defaultsession")
         if sid is not None:
-            f = os.path.join(self.root, "session.properties")
+            f = os.path.join(b.getRootDir(), "session.properties")
             p = self.load_properties(f)
-            user = p["sid"]
-            f = os.path.join(self.root, "users", "{}.properties", format(user))
+            user = p[sid]
+            f = os.path.join(b.getRootDir(), "users", "{}.properties".format(user))
             if os.path.exists(f):
                 p = self.load_properties(f)
                 groups = ",{},".format(p["groups"])
@@ -53,7 +53,7 @@ class BotBase(BotUtil):
 
         if sid is None:
             if b is not None:
-                f = os.path.join(self.root, "users")
+                f = os.path.join(b.getRootDir(), "users")
                 for fname in [f for f in os.listdir(f) if not f.startswith(".")]:
                     path = os.path.join(f, fname)
                     p = self.load_properties(path)
