@@ -482,7 +482,7 @@ class BotBase(BotUtil):
             if user == "admin" and password == pwd:
                 if sid is None:
                     sid = self.uniqueSessionID()
-                    self.sessions["sid"] = {}
+                    self.sessions[sid] = {}
 
                     return {
                         "status": "ok",
