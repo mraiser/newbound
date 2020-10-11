@@ -3,15 +3,16 @@ import json
 import shutil
 from .botbase import BotBase
 
+
 class SecurityBot(BotBase):
 
     def init(self, root, master):
         super().init(root, master)
         b = False
-        if not 'requirepassword' in self.properties:
+        if 'requirepassword' not in self.properties:
             self.properties['requirepassword'] = "true"
             b = True
-        if not 'syncapps' in self.properties:
+        if 'syncapps' not in self.properties:
             self.properties['syncapps'] = "true"
             b = True
         if b: self.saveSettings()
@@ -44,6 +45,14 @@ class SecurityBot(BotBase):
             self.setDefaults()
         super().initializationComplete()
 
+    # def getSession(self, params):
+    #
+    #     sid = params.get("sessionid")
+    #     print("Lookup session: {}".format(sid))
+    #     if sid is not None:
+    #         return self.sessions.get(sid)
+    #     return None
+
     def validateRequest(self, bot, cmd, params):
         if 'sessionid' not in params:
             params['sessionid'] = self.uniqueSessionID()
@@ -59,13 +68,13 @@ class SecurityBot(BotBase):
             user = s['user']
             username = s['username']
         else:
-            f = os.path.join(self.root, 'session.properties')
+            f = os.path.join(self.getRootDir(), 'session.properties')
             if os.path.exists(f):
                 p = self.load_properties(f)
                 if sid in p:
                     username = p[sid]
                     user = self.getUser(username)
-        if (user == None):
+        if user is None:
             username = 'anonymous'
             user = {
                 'groups': 'anonymous',
@@ -75,7 +84,7 @@ class SecurityBot(BotBase):
 
         s['username'] = username
         s['user'] = user
-        if not 'emailusername' in user:
+        if 'emailusername' not in user:
             s['emailusername'] = username
             s['emailuser'] = user
 
@@ -135,27 +144,36 @@ class SecurityBot(BotBase):
         if cmd == 'login': return self.handleLogin(params)
         raise Exception('Unknown command: '+cmd)
 
-    def handleLogin(self, params):
-        username = params['user']
-        user = self.getUser(username, False)
-        if user == None:
+    def handleLogin(self, username, password, sid):
+
+        if username is None or password is None:
             raise Exception("Invalid login attempt")
-        if 'password' in user and user['password'] == params['pass']:
-            sid = params['sessionid']
-            ses = self.getSession(sid)
-            ses['username'] = username
-            ses['user'] = user
-            ses['emailusername'] = username
-            ses['emailuser'] = user
+
+        user = self.getUser(username, False)
+        if user is None:
+            raise Exception("Invalid login attempt")
+
+        s = user["password"]
+        if s is not None and s == password:
+            if sid is None:
+                sid = self.uniqueSessionID()
+
+            ses = self.getSession(sid, True)
+            ses["username"] = username
+            ses["user"] = user
+            ses["emailusername"] = username
+            ses["emailuser"] = user
+
             o = {
                 "user": username,
                 "sessionid": sid
             }
-            self.fireEvent('login', o)
-            o['status'] = 'ok'
-            o['msg'] = 'You are now logged in'
+            self.fireEvent("login", o)
+            o["status"] = "ok"
+            o["msg"] = "You are now logged in, sessionid: {}".format(sid)
             return o
-        self.fireEvent('loginfail', params)
+
+        self.fireEvent('loginfail', o)
         raise Exception("Invalid login attempt")
 
     def handleCurrentUser(self, params):
@@ -226,7 +244,7 @@ class SecurityBot(BotBase):
             o['groups'] = params['groups']
         self.save_properties(p, f)
         ses = self.getSessionByUsername(username)
-        if ses != None: ses['user'] = p
+        if ses is not None: ses['user'] = p
         if not b: self.fireEvent('newuser', o)
         self.fireEvent('userupdate', o)
         o['status'] = 'ok'
@@ -238,7 +256,7 @@ class SecurityBot(BotBase):
         for u in o:
             gs = u['groups']
             for g in gs:
-                if not g in groups:
+                if g not in groups:
                     groups.append(g)
         o = self.handleListApps(params)['data']
         for id in o:
@@ -247,11 +265,11 @@ class SecurityBot(BotBase):
                 cmd = app['commands'][cid]
                 if 'include' in cmd:
                     for g in cmd['include']:
-                        if not g in groups:
+                        if g not in groups:
                             groups.append(g)
                 if 'exclude' in cmd:
                     for g in cmd['exclude']:
-                        if not g in groups:
+                        if g not in groups:
                             groups.append(g)
         o = self.newResponse()
         o['data'] = groups
@@ -352,7 +370,7 @@ class SecurityBot(BotBase):
             else:
                 grouptype = []
                 app[val] = grouptype
-            if not key in grouptype:
+            if key not in grouptype:
                 grouptype.append(key)
 
 
@@ -383,17 +401,17 @@ class SecurityBot(BotBase):
     def createUser(self, id, name=None, groups=None):
         u = self.getUser(id, False)
         b = False
-        if u == None:
+        if u is None:
             u = {}
             b = True
-        if not 'displayname' in u or (name != None and name != u['displayname']):
-            if name == None: name = id
+        if 'displayname' not in u or (name is not None and name != u['displayname']):
+            if name is None: name = id
             u['displayname'] = name
             b = True
-        if not 'password' in u:
+        if 'password' not in u:
             u['password'] = self.uniqueSessionID()
             b = True
-        if groups != None:
+        if groups is not None:
             u['groups'] = groups
             b = True
         if b: self.saveUser(id, u)
@@ -412,6 +430,25 @@ class SecurityBot(BotBase):
     def saveUser(self, id, u):
         f = self.getUserFile(id)
         self.save_properties(u, f)
+
+    def handleRememberSession(self, cmd, params):
+
+        session = self.getSession(params["sessionid"])
+        user = session.get("username")
+        f = os.path.join(self.getRootDir(), "session.properties")
+        if os.path.exists(f):
+            properties = self.load_properties(f)
+        else:
+            properties = {}
+        properties[params.get("sessionid")] = user
+        self.save_properties(properties, f)
+
+        sid = params.get("sessionid")
+        return {
+            "status": "ok",
+            "msg": "You are now logged in, sessionid: {}".format(sid),
+            "sessionid": sid
+        }
 
     commands = {
         "newuser":{
