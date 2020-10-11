@@ -60,7 +60,7 @@
     "extend": "^3.0.0",
     "html-loader": "^0.4.4",
     "jsdoc-to-markdown": "^3.0.2",
-    "node-sass": "^3.10.0",
+    "node-sass": "^4.14.1",
     "replace-between": "0.0.8",
     "sass-loader": "^4.0.2",
     "webpack": "1.14.x"
