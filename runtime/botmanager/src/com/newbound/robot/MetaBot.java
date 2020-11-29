@@ -1728,6 +1728,7 @@ public abstract class MetaBot extends BotBase
 //		JSONObject src = getData(db, id).getJSONObject("data");
 		JSONObject src = bm.handleRead(db, id, sid).getJSONObject("data"); 
 		Code code = new Code(src, db);
+/*
 		JSONObject args = new JSONObject();
 		Iterator<String> i = params.keys();
 		String s;
@@ -1739,6 +1740,9 @@ public abstract class MetaBot extends BotBase
 		catch (Exception x) { x.printStackTrace(); }
 
 		JSONObject jo = code.execute(args);
+ */
+		params.put("sessionid", sid);
+		JSONObject jo = code.execute(params);
 		return jo;
 	}
 	

@@ -1738,6 +1738,7 @@ public class BotManager extends BotBase
 
 	public Object handleExecute(String db, String id, JSONObject args, String sessionid) throws Exception
 	{
+		args.put("sessionid", sessionid);
 		JSONObject src = handleRead(db, id, sessionid).getJSONObject("data");
 		Code code = new Code(src, db);
 		JSONObject jo = code.execute(args);
