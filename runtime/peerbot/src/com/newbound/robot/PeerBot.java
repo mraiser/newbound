@@ -1002,7 +1002,7 @@ public class PeerBot extends MetaBot
 		return o;
 	}
 
-	private String getUploadedFile(String sid, String fu) throws Exception
+	public String getUploadedFile(String sid, String fu) throws Exception
 	{
 		Hashtable p = new Hashtable();
 		p.put("id", fu);

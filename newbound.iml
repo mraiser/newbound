@@ -6,11 +6,20 @@
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/runtime/raspberrypi/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/runtime/emailbot/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/discord/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/filebot/src" isTestSource="false" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="botmanager" />
     <orderEntry type="module" module-name="peerbot" />
     <orderEntry type="module" module-name="securitybot" />
+    <orderEntry type="library" name="discord4j-core-3.1.2" level="project" />
+    <orderEntry type="library" name="discord4j-gateway-3.1.2" level="project" />
+    <orderEntry type="library" name="kafka-clients-2.0.0" level="project" />
+    <orderEntry type="library" name="discord4j-common-3.1.2" level="project" />
+    <orderEntry type="library" name="discord4j-rest-3.1.2" level="project" />
+    <orderEntry type="library" name="Servicer-1.0.3" level="project" />
+    <orderEntry type="library" name="stores-api-3.1.5" level="project" />
   </component>
 </module>

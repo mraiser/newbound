@@ -1864,8 +1864,14 @@ public abstract class MetaBot extends BotBase
 		if (id == null) throw new Exception404("UNKNOWN COMMAND: "+cmd);
 
 		BotManager bm = (BotManager)mMasterBot;
-		JSONObject src = bm.getData(db, id).getJSONObject("data"); 
-		src = bm.getData(db, src.getString("cmd")).getJSONObject("data");
+		JSONObject src = bm.getData(db, id).getJSONObject("data");
+		System.out.println(src);
+		String cid = null;
+		if (src.has("lang")) cid = src.getString(src.getString("lang"));
+		else if (src.has("type")) cid = src.getString(src.getString("type"));
+		else if (src.has("cmd")) cid = src.getString("cmd");
+		else if (src.has("java")) cid = src.getString("java");
+		src = bm.getData(db, cid).getJSONObject("data");
 		return src.getJSONArray("params");
 	}
 

@@ -207,3 +207,6 @@ dmypy.json
 
 # Mac ignores
 .DS_Store
+/runtime/discord/
+/data/discord/
+/data/test/
