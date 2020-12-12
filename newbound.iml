@@ -21,5 +21,6 @@
     <orderEntry type="library" name="discord4j-rest-3.1.2" level="project" />
     <orderEntry type="library" name="Servicer-1.0.3" level="project" />
     <orderEntry type="library" name="stores-api-3.1.5" level="project" />
+    <orderEntry type="library" name="jackson-datatype-jdk8-2.11.2" level="project" />
   </component>
 </module>

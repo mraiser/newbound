@@ -1143,7 +1143,13 @@ public class PeerBot extends MetaBot
 		return peer.sendCommand(bot, cmd, params);
 	}
 
-	public void sendCommandAsync(String id, String bot, String cmd, Hashtable params, P2PCallback cb) throws Exception 
+	public JSONObject sendCommand(String id, String bot, String cmd, Hashtable params, long millis) throws Exception
+	{
+		P2PPeer peer = mP2PManager.getPeer(id);
+		return peer.sendCommand(bot, cmd, params, millis);
+	}
+
+	public void sendCommandAsync(String id, String bot, String cmd, Hashtable params, P2PCallback cb) throws Exception
 	{
 		P2PPeer peer = mP2PManager.getPeer(id);
 		peer.sendCommandAsync(bot, cmd, params, cb);

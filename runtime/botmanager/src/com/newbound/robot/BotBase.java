@@ -327,14 +327,20 @@ System.out.println("Loading Properties: "+f.getCanonicalPath());
 		BotBase b = getBot(bot);
 		return b.handleCommand(cmd, params);
 	}
-	
-	public JSONObject sendCommand(String id, String bot, String cmd, Hashtable params) throws Exception 
+
+	public JSONObject sendCommand(String id, String bot, String cmd, Hashtable params) throws Exception
 	{
 		BotBase b = getBot("peerbot");
 		return b.sendCommand(id, bot, cmd, params);
 	}
-	
-	public void sendCommandAsync(String id, String bot, String cmd, Hashtable params, P2PCallback cb) throws Exception 
+
+	public JSONObject sendCommand(String id, String bot, String cmd, Hashtable params, long millis) throws Exception
+	{
+		BotBase b = getBot("peerbot");
+		return b.sendCommand(id, bot, cmd, params, millis);
+	}
+
+	public void sendCommandAsync(String id, String bot, String cmd, Hashtable params, P2PCallback cb) throws Exception
 	{
 		PeerBot b = PeerBot.getPeerBot();
 		b.sendCommandAsync(id, bot, cmd, params, cb);

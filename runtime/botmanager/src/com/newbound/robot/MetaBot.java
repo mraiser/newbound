@@ -1745,7 +1745,7 @@ public abstract class MetaBot extends BotBase
 		JSONObject jo = code.execute(params);
 		return jo;
 	}
-	
+
 	public JSONObject call(String peer, String db, String ctl, String cmd, JSONObject params) throws Exception
 	{
 		Hashtable args = new Hashtable();
@@ -1753,8 +1753,19 @@ public abstract class MetaBot extends BotBase
 		args.put("name", ctl);
 		args.put("cmd", cmd);
 		args.put("args", params);
-		
+
 		return sendCommand(peer, "metabot", "call", args);
+	}
+
+	public JSONObject call(String peer, String db, String ctl, String cmd, JSONObject params, long millis) throws Exception
+	{
+		Hashtable args = new Hashtable();
+		args.put("db", db);
+		args.put("name", ctl);
+		args.put("cmd", cmd);
+		args.put("args", params);
+
+		return sendCommand(peer, "metabot", "call", args, millis);
 	}
 
 	public String getIndexFileName()
