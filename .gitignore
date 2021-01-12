@@ -64,6 +64,8 @@ data/blockchainmmo
 data/emailbot
 data/proxybot
 data/nebula
+data/commerce
+data/raiser
 
 #non-core apps
 runtime/blog
@@ -84,6 +86,9 @@ runtime/vpn
 runtime/emailbot
 runtime/blockchain
 runtime/nebula
+runtime/footer
+runtime/raise
+runtime/commerce
 
 # Distribution / packaging
 .Python
