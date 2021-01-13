@@ -970,7 +970,7 @@ public class BotManager extends BotBase
 	public JSONObject handleWrite(String db, String data, String id, String readers, String writers, String sessionid, String sessionlocation) throws Exception
 	{
 		if (id == null) id = uniqueSessionID();
-		
+
 		if (!checkAuth(db, id, sessionid, true)) throw new Exception("UNAUTHORIZED");
 		
 		JSONArray rs = readers == null ? new JSONArray() : new JSONArray(readers);
@@ -1613,33 +1613,27 @@ public class BotManager extends BotBase
 		  
 		writeFile(f, java.getBytes());
 
+		boolean dowrite = false;
 		JSONObject meta = new JSONObject();
 		JSONObject data = new JSONObject();
 		try
 		{
 			meta = getData(db, id);
 			data = meta.getJSONObject("data");
+			if (!data.getString("id").equals(id) || !data.getString("java").equals(cmd) || !data.getString("type").equals("java"))
+				throw new Exception("SAVEME");
 		}
-		catch (Exception x) {}
-		int hash = data.toString().hashCode();
-//		data.put("type", "java");
-		data.put("id", id);
-//		data.put("cmd", cmd);
-		data.put("java", cmd);
-
-		JSONArray rs = readers == null ? null : new JSONArray(readers);
-
-		boolean dowrite = true;
-/*
-		boolean dowrite = data.toString().hashCode() != hash;
-		if (!dowrite && meta.has("readers"))
-		{
-			if (rs == null) dowrite = true;
-			else if
+		catch (Exception x) {
+			data.put("type", "java");
+			data.put("id", id);
+			data.put("java", cmd);
+			dowrite = true;
 		}
-*/
-		if (dowrite)
+
+		if (dowrite) {
+			JSONArray rs = readers == null ? null : new JSONArray(readers);
 			setData(db, id, data, rs, writers == null ? null : new JSONArray(writers));
+		}
 		data.put("status", "ok");
 		return data;
 	}
