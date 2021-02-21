@@ -248,6 +248,12 @@ public class P2PManager implements Container
 	{
 		System.out.println(ID+" Sending stream data "+streamid+" of length "+data.length+" to "+p.getID());
 
+		P2PConnection s = p.getStream(streamid);
+		if (s == null)
+			throw new IOException("No such stream: "+streamid);
+		else if (!s.isConnected())
+			throw new IOException("Stream closed: "+streamid);
+
 		byte[] ba = new byte[data.length+8];
 		System.arraycopy(BotUtil.longToBytes(streamid), 0, ba, 0, 8);
 		System.arraycopy(data, 0, ba, 8, data.length);
