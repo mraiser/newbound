@@ -463,6 +463,10 @@ public class MIMEHeader extends BotUtil
 		mMimeTypes.setProperty(".zoo", "application/octet-stream");
 		mMimeTypes.setProperty(".zsh", "text/x-script.zsh");
 		mMimeTypes.setProperty(".wsdl", "application/xml");
+		mMimeTypes.setProperty(".flv", "video/x-flv");
+		mMimeTypes.setProperty(".wmv", "video/x-ms-wmv");
+		mMimeTypes.setProperty(".264", "video/mp4");
+		mMimeTypes.setProperty(".vdi", "application/x-virtualbox-vdi");
 	}
 
     protected Hashtable mHeaders = new Hashtable();
