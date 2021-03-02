@@ -64,7 +64,7 @@ public class HashMask
 
     public BitSet evaluate(BitSet bs, File f) throws IOException
     {
-        String lasttwochars = "";
+        String remainder = "";
         FileReader fr = new FileReader(f);
         while (true)
         {
@@ -72,18 +72,18 @@ public class HashMask
             int n = fr.read(cbuf);
             if (n == -1) break;
 
-            String s = lasttwochars + new String(cbuf, 0, n);
+            String s = remainder + new String(cbuf, 0, n);
             int len = s.length();
-            if (len>2)
+            if (len>sequencelength-1)
             {
                 evaluate(bs, s);
-                lasttwochars = s.substring(len-2);
+                remainder = s.substring(len-(sequencelength-1));
             }
             else
             {
-                lasttwochars += s;
+                remainder += s;
                 // FIXME
-                System.out.println("WARNING last two characters could be dropped. This shouldn't happen but it does.");
+                System.out.println("WARNING last "+sequencelength+" characters could be dropped. This shouldn't happen but it does.");
             }
         }
         fr.close();
