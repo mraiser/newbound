@@ -1,6 +1,6 @@
 package com.newbound.util;
 
-import com.newbound.net.service.http.HTTPService;
+import com.newbound.net.mime.MIMEHeader;
 import com.newbound.robot.BotUtil;
 
 import java.io.File;
@@ -83,7 +83,7 @@ public class DirectoryIndex
         }
         else
         {
-            String type = HTTPService.getMIMEType(f.getName());
+            String type = MIMEHeader.lookupMimeType(f.getName());
             if (INDEXCONTENT && f.length()<MAXFILESIZE && (type == null || (!type.startsWith("audio") && !type.startsWith("video") && !type.startsWith("image") && !type.startsWith("application"))))
             {
                 try
@@ -172,6 +172,7 @@ public class DirectoryIndex
                             break;
                         }
                     }
+                    //if (m != n) System.out.println("False positive: "+f);
                     scanner.close();
                 }
             }
