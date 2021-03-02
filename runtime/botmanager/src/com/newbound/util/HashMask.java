@@ -110,23 +110,23 @@ public class HashMask
     {
         int n = s.length();
         if (n<sequencelength) throw new ArrayIndexOutOfBoundsException("Query string must be "+sequencelength+" or more characters long");
+
         n -= (sequencelength-1);
         s = s.toLowerCase();
         for (int i=0; i<n; i++)
-            // FIXME - use sequencelength
-            set(bs, s.charAt(i), s.charAt(i+1), s.charAt(i+2));
+            set(bs, s.substring(i, i+sequencelength).getBytes());
     }
 
-    // FIXME - use sequencelength
-    // FIXME -- ignores chars above 255
-    private void set(BitSet bs, char a, char b, char c)
+    private void set(BitSet bs, byte[] ba)
     {
-        if (a>255) a = 0;
-        if (b>255) b = 0;
-        if (c>255) c = 0;
-
-        int val = (okChars[a] * numchars * numchars) + (okChars[b] * numchars) + (okChars[c]);
-        //System.out.println(val);
+        int val = 0;
+        for (int i=0; i<sequencelength; i++)
+        {
+            byte b = ba[i];
+            // FIXME -- ignores chars above 255
+            if (b>255) b = 0;
+            val += okChars[b] * (Math.pow(numchars, sequencelength-1-i));
+        }
         bs.set(val);
     }
 
