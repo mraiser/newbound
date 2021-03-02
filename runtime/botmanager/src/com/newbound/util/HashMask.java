@@ -109,6 +109,7 @@ public class HashMask
     public void set(BitSet bs, String s)
     {
         int n = s.length();
+        // FIXME - use sequencelength
         if (n<3) throw new ArrayIndexOutOfBoundsException("Query string must be 3 or more characters long");
         n -= 2;
         s = s.toLowerCase();

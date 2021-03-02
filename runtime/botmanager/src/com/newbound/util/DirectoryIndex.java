@@ -124,6 +124,7 @@ public class DirectoryIndex
         {
             if (isdir)
             {
+                // FIXME - Should probably do literal scan not hashmask
                 bs2 = new HashMask(okChars, sequencelength, compression).evaluate(f.getName());
                 bs1.and(bs2);
                 if (bs.equals(bs1))
@@ -138,6 +139,7 @@ public class DirectoryIndex
             }
             else
             {
+                // FIXME - We also need to evaluate the file name?
                 Scanner scanner = new Scanner(f);
                 String[] sa = query.split(" ");
                 int n = sa.length;
@@ -146,6 +148,7 @@ public class DirectoryIndex
                 for (int i=0; i<n; i++) hits.put(sa[i], false);
                 while (scanner.hasNextLine())
                 {
+                    // FIXME - How long is a line?
                     String line = scanner.nextLine();
                     for (int i=0; i<n; i++)
                     {
