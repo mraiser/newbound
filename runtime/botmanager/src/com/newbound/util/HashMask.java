@@ -122,7 +122,7 @@ public class HashMask
         int val = 0;
         for (int i=0; i<sequencelength; i++)
         {
-            byte b = ba[i];
+            char b = (char)ba[i];
             // FIXME -- ignores chars above 255
             if (b>255) b = 0;
             val += okChars[b] * (Math.pow(numchars, sequencelength-1-i));
@@ -132,7 +132,6 @@ public class HashMask
 
     public static void main(String[] args)
     {
-
         String s = "abracadabra abracadabra aaa";
         BitSet bs = new HashMask("abcdefghijklmnopqrstuvwxyz0123456789.-_", (short)3, 1d).evaluate(s);
         System.out.println(bs);

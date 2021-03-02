@@ -193,7 +193,7 @@ public class DirectoryIndex
                 indexcontent,
                 50 * 1024 * 1024);
 
-        //di.index();
+        di.index();
 
         FileVisitor v = new SimpleFileVisitor()
         {
