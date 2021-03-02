@@ -109,17 +109,18 @@ public class HashMask
     public void set(BitSet bs, String s)
     {
         int n = s.length();
-        // FIXME - use sequencelength
-        if (n<3) throw new ArrayIndexOutOfBoundsException("Query string must be 3 or more characters long");
-        n -= 2;
+        if (n<sequencelength) throw new ArrayIndexOutOfBoundsException("Query string must be "+sequencelength+" or more characters long");
+        n -= (sequencelength-1);
         s = s.toLowerCase();
         for (int i=0; i<n; i++)
+            // FIXME - use sequencelength
             set(bs, s.charAt(i), s.charAt(i+1), s.charAt(i+2));
     }
 
+    // FIXME - use sequencelength
+    // FIXME -- ignores chars above 255
     private void set(BitSet bs, char a, char b, char c)
     {
-        // FIXME -- ignores chars above 255
         if (a>255) a = 0;
         if (b>255) b = 0;
         if (c>255) c = 0;
