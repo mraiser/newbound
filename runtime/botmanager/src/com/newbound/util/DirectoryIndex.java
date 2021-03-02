@@ -139,38 +139,45 @@ public class DirectoryIndex
             }
             else
             {
-                // FIXME - Check searchcontent
-                // FIXME - We also need to evaluate the file name?
-                Scanner scanner = new Scanner(f);
-                String[] sa = query.split(" ");
-                int n = sa.length;
-                int count = 0;
-                Hashtable<String, Boolean> hits = new Hashtable();
-                for (int i=0; i<n; i++) hits.put(sa[i], false);
-                while (scanner.hasNextLine())
+                if (!searchcontent || !w.exists())
+                    // FIXME - Should probably do literal scan not hashmask
+                    v.visitFile(f, null);
+                else
                 {
-                    // FIXME - How long is a line?
-                    String line = scanner.nextLine();
-                    for (int i=0; i<n; i++)
+                    // FIXME - Should probably do literal scan not hashmask
+                    bs2 = new HashMask(okChars, sequencelength, compression).evaluate(f.getName());
+                    bs1.and(bs2);
+                    if (bs.equals(bs1))
+                        v.visitFile(f, null);
+                    else
                     {
-                        if (line.contains(sa[i]))
-                        {
-                            boolean b = hits.get(sa[i]);
-                            if (!b)
-                            {
-                                hits.put(sa[i], true);
-                                count++;
-                                // FIXME - same word twice in query string will never succeed.
-                                if (count == sa.length)
-                                {
-                                    v.visitFile(f, null);
-                                    break;
+                        Scanner scanner = new Scanner(f);
+                        String[] sa = query.split(" ");
+                        int n = sa.length;
+                        int count = 0;
+                        Hashtable<String, Boolean> hits = new Hashtable();
+                        for (int i = 0; i < n; i++) hits.put(sa[i], false);
+                        while (scanner.hasNextLine()) {
+                            // FIXME - How long is a line?
+                            String line = scanner.nextLine();
+                            for (int i = 0; i < n; i++) {
+                                if (line.contains(sa[i])) {
+                                    boolean b = hits.get(sa[i]);
+                                    if (!b) {
+                                        hits.put(sa[i], true);
+                                        count++;
+                                        // FIXME - same word twice in query string will never succeed.
+                                        if (count == sa.length) {
+                                            v.visitFile(f, null);
+                                            break;
+                                        }
+                                    }
                                 }
                             }
                         }
+                        scanner.close();
                     }
                 }
-                scanner.close();
             }
         }
     }
@@ -201,6 +208,6 @@ public class DirectoryIndex
                 return null;
             }
         };
-        di.search("assetdownload", v, searchcontent);
+        di.search("cameraHoles", v, searchcontent);
     }
 }
