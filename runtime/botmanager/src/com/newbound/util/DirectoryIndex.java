@@ -112,71 +112,67 @@ public class DirectoryIndex
 
     private void search(File f, File w, String query, BitSet bs, FileVisitor v, boolean searchcontent) throws Exception
     {
+        // Check name for match
         boolean isdir = f.isDirectory();
-        BitSet bs1 = (BitSet) bs.clone();
-        byte[] ba = isdir ? BotUtil.readFile(new File(w, DIRNAME))
-                : w.exists() && searchcontent ? BotUtil.readFile(w)
-                : new HashMask(okChars, sequencelength, compression).evaluate(f.getName()).toByteArray();
-
-        BitSet bs2 = BitSet.valueOf(ba);
-        bs1.and(bs2);
-        if (bs.equals(bs1))
+        String fname = f.getName().toLowerCase();
+        String[] sa = query.toLowerCase().split(" ");
+        int n = sa.length;
+        int m = 0;
+        for (int i=0; i<n; i++) if (fname.contains(sa[i])) m++;
+        if (n == m)
         {
-            if (isdir)
-            {
-                // FIXME - Should probably do literal scan not hashmask
-                bs2 = new HashMask(okChars, sequencelength, compression).evaluate(f.getName());
-                bs1.and(bs2);
-                if (bs.equals(bs1))
-                    v.visitFile(f, null);
+            v.visitFile(f, null);
+            if (!isdir) return;
+        }
 
-                String[] list = f.list(filter);
-                int n = list.length;
-                for (int i=0; i<n; i++)
-                {
-                    search(new File(f, list[i]), new File(w, list[i]), query, bs, v, searchcontent);
-                }
-            }
-            else
+        // Check index in workdir
+        if (isdir || (searchcontent && w.exists()))
+        {
+            BitSet bs1 = (BitSet) bs.clone();
+            byte[] ba = isdir ? BotUtil.readFile(new File(w, DIRNAME)) : BotUtil.readFile(w);
+            BitSet bs2 = BitSet.valueOf(ba);
+            bs1.and(bs2);
+            if (bs.equals(bs1))
             {
-                if (!searchcontent || !w.exists())
-                    // FIXME - Should probably do literal scan not hashmask
-                    v.visitFile(f, null);
+                if (isdir)
+                {
+                    String[] list = f.list(filter);
+                    n = list.length;
+                    for (int i = 0; i < n; i++)
+                        search(new File(f, list[i]), new File(w, list[i]), query, bs, v, searchcontent);
+                }
                 else
                 {
-                    // FIXME - Should probably do literal scan not hashmask
-                    bs2 = new HashMask(okChars, sequencelength, compression).evaluate(f.getName());
-                    bs1.and(bs2);
-                    if (bs.equals(bs1))
-                        v.visitFile(f, null);
-                    else
+                    Scanner scanner = new Scanner(f);
+                    Hashtable<String, Boolean> hits = new Hashtable();
+                    for (int i = 0; i < n; i++) hits.put(sa[i], false);
+                    n = hits.size();
+                    m = 0;
+                    while (scanner.hasNextLine())
                     {
-                        Scanner scanner = new Scanner(f);
-                        String[] sa = query.split(" ");
-                        int n = sa.length;
-                        int count = 0;
-                        Hashtable<String, Boolean> hits = new Hashtable();
-                        for (int i = 0; i < n; i++) hits.put(sa[i], false);
-                        while (scanner.hasNextLine()) {
-                            // FIXME - How long is a line?
-                            String line = scanner.nextLine();
-                            for (int i = 0; i < n; i++) {
-                                if (line.contains(sa[i])) {
-                                    boolean b = hits.get(sa[i]);
-                                    if (!b) {
-                                        hits.put(sa[i], true);
-                                        count++;
-                                        // FIXME - same word twice in query string will never succeed.
-                                        if (count == sa.length) {
-                                            v.visitFile(f, null);
-                                            break;
-                                        }
-                                    }
+                        // FIXME - How long is a line?
+                        String line = scanner.nextLine();
+                        for (int i = 0; i < n; i++)
+                        {
+                            if (line.contains(sa[i]))
+                            {
+                                boolean b = hits.get(sa[i]);
+                                if (!b)
+                                {
+                                    hits.put(sa[i], true);
+                                    m++;
+                                    if (m == n) break;
                                 }
                             }
                         }
-                        scanner.close();
+
+                        if (m == n)
+                        {
+                            v.visitFile(f, null);
+                            break;
+                        }
                     }
+                    scanner.close();
                 }
             }
         }
@@ -208,6 +204,6 @@ public class DirectoryIndex
                 return null;
             }
         };
-        di.search("cameraHoles", v, searchcontent);
+        di.search("camera_frame_v5", v, searchcontent);
     }
 }
