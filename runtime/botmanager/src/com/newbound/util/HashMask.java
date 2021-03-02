@@ -74,7 +74,7 @@ public class HashMask
 
             String s = remainder + new String(cbuf, 0, n);
             int len = s.length();
-            if (len>sequencelength-1)
+            if (len>=sequencelength)
             {
                 evaluate(bs, s);
                 remainder = s.substring(len-(sequencelength-1));
