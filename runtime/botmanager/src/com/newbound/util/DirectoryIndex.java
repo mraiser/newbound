@@ -139,6 +139,7 @@ public class DirectoryIndex
             }
             else
             {
+                // FIXME - Check searchcontent
                 // FIXME - We also need to evaluate the file name?
                 Scanner scanner = new Scanner(f);
                 String[] sa = query.split(" ");
