@@ -4,6 +4,7 @@ import com.newbound.net.mime.MIMEHeader;
 import com.newbound.robot.BotUtil;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -41,13 +42,13 @@ public class DirectoryIndex
         MAXFILESIZE = maxfilelength == -1 ? Integer.MAX_VALUE : maxfilelength;
     }
 
-    public void index() throws IOException
+    public void index(boolean rebuild) throws Exception
     {
-        BotUtil.deleteDir(workdir);
+        if (rebuild) BotUtil.deleteDir(workdir);
         index(dir);
     }
 
-    public void index(File f) throws IOException
+    public void index(File f) throws Exception
     {
         File f2 = getWorkFile(f);
         index(f, f2);
@@ -62,8 +63,12 @@ public class DirectoryIndex
         return new File(workdir, s1.substring(s2.length()));
     }
 
-    private BitSet index(File f, File w) throws IOException
+    private BitSet index(File f, File w) throws Exception
     {
+        boolean isdir = f.isDirectory();
+        if (!isdir && w.lastModified()>f.lastModified())
+            return BitSet.valueOf(BotUtil.readFile(w));
+
         String name = f.getName();
         HashMask mask = new HashMask(okChars, sequencelength, compression);
         BitSet bs = mask.evaluate(name);
@@ -71,7 +76,7 @@ public class DirectoryIndex
         File parent = w.getParentFile();
         parent.mkdirs();
 
-        if (f.isDirectory())
+        if (isdir)
         {
             //System.out.println("indexing folder "+f.getCanonicalPath()+" as "+w.getCanonicalPath());
             w.mkdirs();
@@ -92,9 +97,12 @@ public class DirectoryIndex
                     mask.evaluate(bs, f);
                     BotUtil.writeFile(w, bs.toByteArray());
                 }
+                catch (FileNotFoundException x)
+                {
+                    // IGNORE - Sometimes temp files disappear between list and scan
+                }
                 catch (Exception x)
                 {
-                    // FIXME - should we do something here? Sometimes temp files disappear between list and scan (FileNotFoundException)
                     x.printStackTrace();
                 }
             }
@@ -105,9 +113,16 @@ public class DirectoryIndex
         return bs;
     }
 
-    public void search(String query, FileVisitor v, boolean searchcontent) throws Exception
+    public void search(String query, FileVisitor v, boolean searchcontent, boolean reindex) throws Exception
     {
+        if (reindex) index(dir);
         search (dir, workdir, query, new HashMask(okChars, sequencelength, compression).evaluate(query), v, searchcontent);
+    }
+
+    public void search(File subdir, String query, FileVisitor v, boolean searchcontent, boolean reindex) throws Exception
+    {
+        if (reindex) index(subdir);
+        search (subdir, getWorkFile(subdir), query, new HashMask(okChars, sequencelength, compression).evaluate(query), v, searchcontent);
     }
 
     private void search(File f, File w, String query, BitSet bs, FileVisitor v, boolean searchcontent) throws Exception
@@ -194,7 +209,7 @@ public class DirectoryIndex
                 indexcontent,
                 50 * 1024 * 1024);
 
-        di.index();
+        //di.index(false);
 
         FileVisitor v = new SimpleFileVisitor()
         {
@@ -205,6 +220,6 @@ public class DirectoryIndex
                 return null;
             }
         };
-        di.search("camera_frame_v5", v, searchcontent);
+        di.search("camera_frame_v5", v, searchcontent, false);
     }
 }
