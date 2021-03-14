@@ -171,7 +171,7 @@ public class P2PPeer
 //		if (v == null) mIncoming.put(mid, v = new Vector());
 //		v.addElement(msg);
 		
-		System.out.println("STREAM["+mid+"] got "+n+" bytes");
+		System.out.println("STREAM["+mid+"/"+mID+"] got "+n+" bytes");
 		
 //		flushIncoming(mid);
 		
@@ -207,8 +207,8 @@ public class P2PPeer
 			if (c.mP2PCallback != null) try
 			{
 				String s = new String(msg, 8, msg.length-8);
-				System.out.println("RESPONSE["+mid+"] got "+s);
-				
+				System.out.println("RESPONSE["+mid+"/"+mID+"] got "+s);
+
 				final JSONObject o = new JSONObject(s);
 				Runnable r = new Runnable() 
 				{
@@ -237,7 +237,7 @@ public class P2PPeer
 		long mid = BotUtil.bytesToLong(msg, 0);
 		String s = new String(msg, 8, msg.length-8);
 		
-		System.out.println("COMMAND["+mid+"] got "+s);
+		System.out.println("COMMAND["+mid+"/"+mID+"] got "+s);
 		
 		JSONObject o = new JSONObject(s);
 	
