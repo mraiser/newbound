@@ -201,7 +201,7 @@ public class BotManager extends BotBase
 		
 		DISCOVERY = new DiscoveryService(this);
 		
-		addPeriodicTask(new PeriodicTask(10000, true, "periodic discovery") 
+		addPeriodicTask(new PeriodicTask(60000, true, "periodic discovery")
 		{
 			public void run() 
 			{
@@ -1828,7 +1828,8 @@ public class BotManager extends BotBase
 			 
 			        try
 			        {
-			          String id = download("http://"+addr+":"+5773+"/peerbot/getpeerinfo");
+			        	// FIXME - Port should be sent in discovery service
+			          String id = download("http://"+addr+":"+5773+"/peerbot/getpeerinfo?sessionid=discovery_"+getLocalID());
 			          JSONObject o2 = new JSONObject(id);
 			          jo.put("peerinfo", o2);
 			          jo.put("port", 5773);
