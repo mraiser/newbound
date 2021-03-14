@@ -133,7 +133,11 @@ public class P2PServerSocket implements ServerSocket
 				{
 					final P2PPeer p = P2P.getPeer(uuid);
 					
-					if (p.isRelay()) p.setConnected(true);
+					if (p.isRelay())
+					{
+						p.setConnected(true);
+						p.updateLastContact();
+					}
 					
 //					if (p.isConnected() && System.currentTimeMillis() - p.lastContact() > 35000) p.disconnect();
 //					else 
@@ -193,55 +197,76 @@ public class P2PServerSocket implements ServerSocket
 		}
 	}
 
-
+	private static Hashtable<String, Long> checking = new Hashtable();
 	private void checkPeers(final Enumeration<String> e, final Hashtable h) 
 	{
 		if (e.hasMoreElements())
 		{
 			final String relay = e.nextElement();
-			
-			P2PCallback cb = new P2PCallback() 
+			if (checking.get(relay) != null)
 			{
-				public P2PCommand execute(JSONObject result) 
+				System.out.println("Still checking relay "+relay+" after "+(System.currentTimeMillis()-checking.get(relay))+" ms");
+			}
+			else
+			{
+				checking.put(relay, System.currentTimeMillis());
+				P2PCallback cb = new P2PCallback()
 				{
-					Iterator<String> i = result.keys();
-					while (i.hasNext()) try
+					public P2PCommand execute(JSONObject result)
 					{
-						Object o = result.get(i.next());
-						if (o instanceof JSONObject)
+						checking.remove(relay);
+						Iterator<String> i = result.keys();
+						while (i.hasNext()) try
 						{
-							JSONObject p = (JSONObject)o;
-							if (p.has("tcp") && p.getBoolean("tcp")) {
-								String peerid = p.getString("uuid");
-								RELAY.addRelay(peerid, relay);
-								P2P.getPeer(peerid).updateLastContact();
-							}
-							else if (p.has("uuid"))
-								RELAY.removeRelay(p.getString("uuid"), relay);
-							else
-								System.out.println("Unexpected response: "+p);
-							if (p.has("addresses"))
+							Object o = result.get(i.next());
+							if (o instanceof JSONObject)
 							{
-								String[] addr = p.getString("addresses").split(",");
-								int port = p.getInt("port");
-								if (port != -1)
+								JSONObject p = (JSONObject) o;
+								if (p.has("tcp") && p.getBoolean("tcp"))
 								{
-									int j = addr.length;
-									while (j-->0) P2P.addInetSocketAddress(p.getString("uuid"), new InetSocketAddress(addr[j], port));
+									String peerid = p.getString("uuid");
+									RELAY.addRelay(peerid, relay);
+									P2P.getPeer(peerid).updateLastContact();
+								}
+								else if (p.has("uuid"))
+									RELAY.removeRelay(p.getString("uuid"), relay);
+								else
+									System.out.println("Unexpected response: " + p);
+								if (p.has("addresses"))
+								{
+									String[] addr = p.getString("addresses").split(",");
+									int port = p.getInt("port");
+									if (port != -1)
+									{
+										int j = addr.length;
+										while (j-- > 0)
+											P2P.addInetSocketAddress(p.getString("uuid"), new InetSocketAddress(addr[j], port));
+									}
 								}
 							}
 						}
+						catch (Exception x)
+						{
+							x.printStackTrace();
+						}
+
+						checkPeers(e, h);
+
+						return null;
 					}
-					catch (Exception x) { x.printStackTrace(); }
-					
-					checkPeers(e, h);
+				};
 
-					return null;
+				P2PCommand cmd = new P2PCommand("peerbot", "lookup", h, cb);
+				try
+				{
+					P2P.sendCommand(P2P.getPeer(relay), cmd);
 				}
-			};
-
-			P2PCommand cmd = new P2PCommand("peerbot", "lookup", h, cb);
-			try { P2P.sendCommand(P2P.getPeer(relay), cmd); } catch (Exception x) { x.printStackTrace(); }
+				catch (Exception x)
+				{
+					checking.remove(relay);
+					x.printStackTrace();
+				}
+			}
 		}
 	}
 

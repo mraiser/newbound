@@ -54,6 +54,8 @@ public class DirectoryIndex
         index(f, f2);
     }
 
+    // FIXME - Handle symlinks (don't follow)
+    // FIXME - Handle workdir inside of search dir (don't index/search)
     private File getWorkFile(File f) throws IOException
     {
         String s1 = f.getCanonicalPath();
