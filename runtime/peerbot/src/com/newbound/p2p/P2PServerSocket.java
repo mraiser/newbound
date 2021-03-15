@@ -231,7 +231,7 @@ public class P2PServerSocket implements ServerSocket
 								else if (p.has("uuid"))
 									RELAY.removeRelay(p.getString("uuid"), relay);
 								else
-									System.out.println("Unexpected response: " + p);
+									System.out.println("Unexpected response from "+relay+": " + p);
 								if (p.has("addresses"))
 								{
 									String[] addr = p.getString("addresses").split(",");

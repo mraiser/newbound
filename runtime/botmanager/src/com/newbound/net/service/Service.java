@@ -73,15 +73,16 @@ public class Service
 					Request jo2 = (Request)p.parse();
 					Object cmd = jo2.getCommand();
 					execute(cmd, jo2, p);
-				} 
-				catch (ReleaseSocketException x)
-				{
-					release = true;
-					break;
 				}
 				catch (SocketTimeoutException x)
 				{
-					System.err.println(NAME+" REQUEST TIMEOUT: "+x.getMessage());
+					// IGNORE - No data != dead connection
+					//System.err.println(NAME+" REQUEST TIMEOUT: "+x.getMessage());
+					//break;
+				}
+				catch (ReleaseSocketException x)
+				{
+					release = true;
 					break;
 				}
 				catch (SocketException x)

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.SocketAddress;
+import java.net.SocketTimeoutException;
 import java.util.Vector;
 
 import com.newbound.net.service.Socket;
@@ -55,7 +56,7 @@ public class RelaySocket implements Socket {
 			synchronized (MUTEX)
 			{
 				if (!waitForData()) 
-					return -1;
+					throw new SocketTimeoutException("Relay socket timeout on read");
 				
 				int i = CURRENT[OFFSET++];
 				if (OFFSET == CURRENT.length) CURRENT = null;
