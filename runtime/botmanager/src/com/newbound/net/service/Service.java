@@ -50,9 +50,10 @@ public class Service
 					final Socket s = ss.accept();
 					Parser p = (Parser)(parser.newInstance());
 					if (p.init(me, s)) listen(s, p);
-				} 
+				}
+				catch (SocketTimeoutException x) { /** IGNORE **/ }
 				catch (Exception x) { x.printStackTrace(); }
-				
+
 				System.out.println("Service "+name+" stopped.");
 			}
 		}, "SERVICE "+name+" listening on "+SS.getLocalSocketAddress());
@@ -87,7 +88,7 @@ public class Service
 				}
 				catch (SocketException x)
 				{
-					System.err.println(NAME+" REQUEST SOCKET ERROR: "+x.getMessage());
+					//System.err.println(NAME+" REQUEST SOCKET ERROR: "+x.getMessage());
 					break;
 				}
 				catch (SocketClosedException x)

@@ -12,6 +12,7 @@ import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
 
+import com.newbound.robot.Callback;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -63,6 +64,11 @@ public class P2PManager implements Container
 	{
 		P2P = new P2PService(this, ID, new P2PServerSocket(this, ID, PORT), "P2P Service", P2PParser.class);
 		PORT = P2P.getLocalPort();
+	}
+
+	public void addEventListener(String event, Callback cb)
+	{
+		mBot.addEventListener(event, cb);
 	}
 
 	public void stop() throws IOException 

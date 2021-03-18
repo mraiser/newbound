@@ -10,6 +10,7 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.Vector;
 
+import com.newbound.robot.Callback;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -63,6 +64,13 @@ public class P2PServerSocket implements ServerSocket
 				try { maintenance(); } catch (Exception x) { x.printStackTrace(); }
 			}
 		}, 5000, "P2P SERVER SOCKET MAINTENANCE");
+
+		p2p.addEventListener("disconnect", new Callback() {
+			@Override
+			public void execute(JSONObject data) {
+				checking.remove(data.getString("id"));
+			}
+		});
 	}
 
 	private void listen(final ServerSocket SS) 
@@ -205,7 +213,13 @@ public class P2PServerSocket implements ServerSocket
 			final String relay = e.nextElement();
 			if (checking.get(relay) != null)
 			{
-				System.out.println("Still checking relay "+relay+" after "+(System.currentTimeMillis()-checking.get(relay))+" ms");
+				long dur = System.currentTimeMillis()-checking.get(relay);
+				if (dur<60000)
+					System.out.println("Still checking relay "+relay+" after "+dur+" ms");
+				else try {
+					P2P.disconnect(relay);
+				}
+				catch (Exception x) { x.printStackTrace(); }
 			}
 			else
 			{

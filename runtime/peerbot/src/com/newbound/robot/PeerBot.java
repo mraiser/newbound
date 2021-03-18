@@ -552,8 +552,12 @@ public class PeerBot extends MetaBot
 		if (id != null && id.length() == 36) try
 		{
 			P2PPeer p = mP2PManager.isLoaded(id) ? mP2PManager.getPeer(id) : null;
-			if (p == null) throw new Exception("Do not know "+id);
-			
+			if (p == null)
+			{
+				String msg = "Do not know " + id;
+				throw new Exception(msg);
+			}
+
 			String addresses = "";
 			for (int i=0;i<p.mKnownAddresses.size();i++) 
 			{
@@ -575,7 +579,11 @@ public class PeerBot extends MetaBot
 
 			return o;
 		}
-		catch (Exception x) { }
+		catch (Exception x)
+		{
+			results.put("status", "err");
+			results.put("msg", "ERROR: "+x.getMessage());
+		}
 		
 		else			
 		{
@@ -587,7 +595,9 @@ public class PeerBot extends MetaBot
 				if (mP2PManager.hasPeer(id))
 				{
 					params.put("uuid", id);
-					results.put(id, handleLookUp(params));
+					JSONObject peerdata = (JSONObject)handleLookUp(params);
+					if (peerdata.getString("status").equals("ok"))
+						results.put(id, peerdata);
 				}
 			}
 			catch (Exception x) { x.printStackTrace(); }
