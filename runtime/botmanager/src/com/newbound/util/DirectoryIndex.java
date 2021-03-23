@@ -103,10 +103,10 @@ public class DirectoryIndex
                 {
                     // IGNORE - Sometimes temp files disappear between list and scan
                 }
-                catch (Exception x)
-                {
-                    x.printStackTrace();
-                }
+                //catch (Exception x)
+                //{
+                //    x.printStackTrace();
+                //}
             }
             //else
             //    System.out.println("Skipping file " + f + " of type "+type);
