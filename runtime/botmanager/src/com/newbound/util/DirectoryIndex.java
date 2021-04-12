@@ -68,7 +68,7 @@ public class DirectoryIndex
     private BitSet index(File f, File w) throws Exception
     {
         boolean isdir = f.isDirectory();
-        if (!isdir && w.lastModified()>f.lastModified())
+        if (!isdir && w.exists() && w.lastModified()>f.lastModified())
             return BitSet.valueOf(BotUtil.readFile(w));
 
         String name = f.getName();
