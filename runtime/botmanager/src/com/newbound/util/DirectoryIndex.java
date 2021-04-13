@@ -9,9 +9,11 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
+import java.nio.file.Files;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.BitSet;
+import java.util.Date;
 import java.util.Hashtable;
 import java.util.Scanner;
 
@@ -42,20 +44,20 @@ public class DirectoryIndex
         MAXFILESIZE = maxfilelength == -1 ? Integer.MAX_VALUE : maxfilelength;
     }
 
-    public void index(boolean rebuild) throws Exception
+    public boolean index(boolean rebuild) throws Exception
     {
         if (rebuild) BotUtil.deleteDir(workdir);
-        index(dir);
+        return index(dir);
     }
 
-    public void index(File f) throws Exception
+    public boolean index(File f) throws Exception
     {
         File f2 = getWorkFile(f);
-        index(f, f2);
+        return index(f, f2, new BitSet());
     }
 
-    // FIXME - Handle symlinks (don't follow)
     // FIXME - Handle workdir inside of search dir (don't index/search)
+    // FIXME - Handle deleted files (detect, delete workfile)
     private File getWorkFile(File f) throws IOException
     {
         String s1 = f.getCanonicalPath();
@@ -65,15 +67,25 @@ public class DirectoryIndex
         return new File(workdir, s1.substring(s2.length()));
     }
 
-    private BitSet index(File f, File w) throws Exception
+    private boolean index(File f, File w, BitSet bs2) throws Exception
     {
+        if (Files.isSymbolicLink(f.toPath())) return false;
+
+        File dw = new File(w, DIRNAME);
         boolean isdir = f.isDirectory();
-        if (!isdir && w.exists() && w.lastModified()>f.lastModified())
-            return BitSet.valueOf(BotUtil.readFile(w));
+        boolean exists = w.exists();
+        boolean changed = exists ? (isdir ? dw.lastModified() : w.lastModified())<f.lastModified() : true;
+        if (!isdir && exists && !changed)
+        {
+            bs2.or(BitSet.valueOf(BotUtil.readFile(w)));
+            return false;
+        }
+//        else if (isdir && changed)
+//            System.out.println(new Date(f.lastModified())+" / "+new Date(w.lastModified())+" / "+f.getCanonicalPath());
 
         String name = f.getName();
         HashMask mask = new HashMask(okChars, sequencelength, compression);
-        BitSet bs = mask.evaluate(name);
+        BitSet bs3 = mask.evaluate(name);
 
         File parent = w.getParentFile();
         parent.mkdirs();
@@ -84,9 +96,12 @@ public class DirectoryIndex
             w.mkdirs();
             String[] list = f.list(filter);
             int i = list.length;
-            while (i-->0) bs.or(index(new File(f, list[i]), new File(w, list[i])));
-            w = new File(w, DIRNAME);
-            BotUtil.writeFile(w, bs.toByteArray());
+            while (i-->0) changed = index(new File(f, list[i]), new File(w, list[i]), bs3) || changed;
+
+            if (changed)
+            {
+                BotUtil.writeFile(dw, bs3.toByteArray());
+            }
         }
         else
         {
@@ -95,24 +110,23 @@ public class DirectoryIndex
             {
                 try
                 {
-                    //System.out.println("indexing file " + f + " of type " + type);
-                    mask.evaluate(bs, f);
-                    BotUtil.writeFile(w, bs.toByteArray());
+                    mask.evaluate(bs3, f);
+                    BotUtil.writeFile(w, bs3.toByteArray());
+                    changed = true;
                 }
                 catch (FileNotFoundException x)
                 {
                     // IGNORE - Sometimes temp files disappear between list and scan
                 }
-                //catch (Exception x)
-                //{
-                //    x.printStackTrace();
-                //}
             }
-            //else
-            //    System.out.println("Skipping file " + f + " of type "+type);
+            else changed = false;
         }
 
-        return bs;
+//        if (changed)
+//            System.out.println("Changed: "+f.getCanonicalPath());
+
+        bs2.or(bs3);
+        return changed;
     }
 
     public void search(String query, FileVisitor v, boolean searchcontent, boolean reindex) throws Exception
@@ -143,10 +157,11 @@ public class DirectoryIndex
         }
 
         // Check index in workdir
-        if (isdir || (searchcontent && w.exists()))
+        File dw = new File(w, DIRNAME);
+        if ((isdir && dw.exists()) || (searchcontent && w.exists()))
         {
             BitSet bs1 = (BitSet) bs.clone();
-            byte[] ba = isdir ? BotUtil.readFile(new File(w, DIRNAME)) : BotUtil.readFile(w);
+            byte[] ba = BotUtil.readFile(isdir ? dw : w);
             BitSet bs2 = BitSet.valueOf(ba);
             bs1.and(bs2);
             if (bs.equals(bs1))
@@ -211,7 +226,7 @@ public class DirectoryIndex
                 indexcontent,
                 50 * 1024 * 1024);
 
-        //di.index(false);
+        di.index(false);
 
         FileVisitor v = new SimpleFileVisitor()
         {
@@ -222,6 +237,6 @@ public class DirectoryIndex
                 return null;
             }
         };
-        di.search("camera_frame_v5", v, searchcontent, false);
+        di.search("camera_frame_v5_top", v, searchcontent, false);
     }
 }
