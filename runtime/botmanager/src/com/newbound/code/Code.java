@@ -83,6 +83,13 @@ public class Code
 	{
 		CODE = code;
 		LIB = lib;
+
+		//FIXME - Total hack
+		try {
+			if (CODE.has("type") && CODE.get("type").equals("flow") && CODE.has("flow"))
+				CODE = BotBase.getBot("botmanager").getData(LIB, CODE.getString("flow")).getJSONObject("data").getJSONObject("flow");
+		}
+		catch (Exception x) { x.printStackTrace(); }
 	}
 
 	public JSONObject execute(JSONObject args) throws Exception
@@ -358,7 +365,7 @@ public class Code
 			Code c = new Code(code, LIB);
 			out = c.execute(in);
 		}
-		else if (type.equals("peer"))
+		else if (type.equals("command"))
 		{
 			PeerBot pb = PeerBot.getPeerBot();
 			String bot = cmd.getString("btype");

@@ -979,7 +979,7 @@ System.out.println("Loading Properties: "+f.getCanonicalPath());
 						jo2 = new JSONObject();
 						try {
 							jo2.put("status", "err");
-							jo2.put("msg", "" + x.getMessage());
+							jo2.put("msg", x.getClass().getName()+": " + x.getMessage());
 						}
 						catch (Exception xx) { xx.printStackTrace(); }
 					}

@@ -885,7 +885,10 @@ public abstract class MetaBot extends BotBase
 		if (cmds != null) for (i=0;i<cmds.length();i++) try
 		{
 		  JSONObject cmd = cmds.getJSONObject(i);
-		  String lang = cmd.has("lang") ? cmd.getString("lang") : "java";
+		  String x = cmd.getString("id");
+		  cmd = getData(db, x).getJSONObject("data");
+		  cmd.put("id", x); // FIXME - hack
+		  String lang = cmd.has("type") ? cmd.getString("type") : cmd.has("lang") ? cmd.getString("lang") : "java";
 		  String cmdid = cmd.getString(lang);
 		  System.out.println("lang: "+lang+" / src: "+cmdid+" / "+"cmd: "+cmd.getString("id"));
 		  JSONObject data = b.getData(db, cmdid).getJSONObject("data");

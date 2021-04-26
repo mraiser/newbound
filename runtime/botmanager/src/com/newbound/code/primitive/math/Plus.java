@@ -17,23 +17,23 @@ public class Plus extends Primitive
 	public JSONObject execute(JSONObject in) 
 	{
 		JSONObject out = new JSONObject();
-		try
-		{
+//		try
+//		{
 			Object a = in.get("a");
 			Object b = in.get("b");
 			Object c = add(a,b);
 			if (c == null) throw new RuntimeException("Cannot add types "+a.getClass().getName()+ " and "+b.getClass().getName());
 			out.put("c", c);
-		}
-		catch (Exception x) { x.printStackTrace(); }
+//		}
+//		catch (Exception x) { x.printStackTrace(); }
 
 		return out;
 	}
 
 	private Object add(Object a, Object b) 
 	{
-		a = toNumber(a);
-		b = toNumber(b);
+//		a = toNumber(a);
+//		b = toNumber(b);
 		if (a instanceof Number && b instanceof Number) return addNumber((Number)a, (Number)b);
 		if (a instanceof String || b instanceof String) return ""+a+b;
 		

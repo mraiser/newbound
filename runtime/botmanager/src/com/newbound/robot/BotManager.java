@@ -265,7 +265,8 @@ public class BotManager extends BotBase
 			String java = (String)params.get("java");
 			String python = (String)params.get("python");
 			String js = (String)params.get("js");
-			return handleCompile(db, id, cmd2, java, python, js, (String)params.get("params"), (String)params.get("import"), (String)params.get("returntype"), (String)params.get("readers"), (String)params.get("writers"), (String)params.get("sessionid"));
+			String flow = (String)params.get("flow");
+			return handleCompile(db, id, cmd2, java, python, js, flow, (String)params.get("params"), (String)params.get("import"), (String)params.get("returntype"), (String)params.get("readers"), (String)params.get("writers"), (String)params.get("sessionid"));
 		}
 		if (cmd.equals("timer") || cmd.startsWith("timer/")) return handleTimer((String)params.get("id"), (String)params.get("mode"), (String)params.get("params"));
 		if (cmd.equals("event") || cmd.startsWith("event/")) return handleEvent((String)params.get("id"), (String)params.get("mode"), (String)params.get("params"));
@@ -1638,12 +1639,13 @@ public class BotManager extends BotBase
 		return data;
 	}
 	
-	public JSONObject handleCompile(String db, String id, String cmd, String java, String python, String js, String params, String imports, String returntype, String readers, String writers, String sessionidx) throws Exception
+	public JSONObject handleCompile(String db, String id, String cmd, String java, String python, String js, String flow, String params, String imports, String returntype, String readers, String writers, String sessionidx) throws Exception
 	{
 		JSONObject jo;
 		if (java != null) jo = handleSaveJava(db, id, cmd, java, params, imports, returntype, readers, writers, sessionidx);
 		else if (python != null) jo = handleSavePython(db, id, cmd, python, params, imports, returntype, readers, writers, sessionidx);
 		else if (js != null) jo = handleSaveJavascript(db, id, cmd, js, params, imports, returntype, readers, writers, sessionidx);
+		else if (flow != null) jo = handleSaveFlow(db, id, cmd, flow, params, imports, returntype, readers, writers, sessionidx);
 		else throw new Exception("No readable code");
 		
 		if (java != null) new Code(jo, db).precompile();
@@ -1651,14 +1653,17 @@ public class BotManager extends BotBase
 		
 		return jo;
 	}
-	
-	private JSONObject handleSaveJavascript(String db, String id, String cmd, String code, String params, String imports,
-			String returntype, String readers, String writers, String sessionidx) {
+
+	private JSONObject handleSaveFlow(String db, String id, String cmd, String code, String params, String imports, String returntype, String readers, String writers, String sessionidx) {
+		return newResponse();
+	}
+
+	private JSONObject handleSaveJavascript(String db, String id, String cmd, String code, String params, String imports, String returntype, String readers, String writers, String sessionidx) {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	private JSONObject handleSavePython(String db, String id, String cmd, String python, String params, String imports, String returntype, String readers, String writers, String sessionidx) throws Exception 
+	private JSONObject handleSavePython(String db, String id, String cmd, String python, String params, String imports, String returntype, String readers, String writers, String sessionidx) throws Exception
 	{
 		JSONArray p = new JSONArray(params == null ? "[]" : params);
 		

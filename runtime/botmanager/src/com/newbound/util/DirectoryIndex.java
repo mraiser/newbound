@@ -215,16 +215,27 @@ public class DirectoryIndex
     {
         boolean indexcontent = true;
         boolean searchcontent = true;
+        String charset = "abcdefghijklmnopqrstuvwxyz0123456789.-_";
+        int maxfilelength = 5 * 1024 * 1024;
+
+        if (args.length<2)
+        {
+            System.out.println("USAGE: java com.newbound.util.DirectoryIndex /path/to/sourcedir /path/to/workdir");
+            System.exit(0);
+        }
+
+        String src = args[0];
+        String wrk = args[1];
 
         DirectoryIndex di = new DirectoryIndex(
-                new File("/home/mraiser/"),
-                new File("/var/lib/newbound/directoryindex"),
+                new File(src),
+                new File(wrk),
                 new NoDotFilter(),
-                "abcdefghijklmnopqrstuvwxyz0123456789.-_",
+                charset,
                 (short)3,
                 1,
                 indexcontent,
-                50 * 1024 * 1024);
+                maxfilelength);
 
         di.index(false);
 
