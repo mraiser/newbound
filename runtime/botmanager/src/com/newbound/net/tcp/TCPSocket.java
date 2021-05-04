@@ -3,6 +3,7 @@ package com.newbound.net.tcp;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -19,9 +20,14 @@ public class TCPSocket implements Socket
 		S.setKeepAlive(true);
 	}
 
-	public TCPSocket(String dataSocketAddr, int dataSocketPort) throws IOException 
+	public TCPSocket(String dataSocketAddr, int dataSocketPort) throws IOException
 	{
 		this(new java.net.Socket(dataSocketAddr, dataSocketPort));
+	}
+
+	public TCPSocket(String dataSocketAddr, int dataSocketPort, int timeout) throws IOException {
+		this(new java.net.Socket());
+		S.connect(new InetSocketAddress(dataSocketAddr, dataSocketPort), timeout);
 	}
 
 	@Override
