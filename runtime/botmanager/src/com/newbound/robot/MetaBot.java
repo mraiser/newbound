@@ -1718,8 +1718,6 @@ public abstract class MetaBot extends BotBase
 	
 	public JSONObject call(String db, String ctl, String cmd, JSONObject params) throws Exception
 	{
-//		return new JavaCommand(db, ctl, cmd).execute(params);
-
 		String id = lookupCmdID(db, ctl, cmd);
 		if (id == null) throw new Exception404("UNKNOWN COMMAND: "+cmd);
 
@@ -1727,23 +1725,8 @@ public abstract class MetaBot extends BotBase
 		String sid = params.has("sessionid") ? params.getString("sessionid") : uniqueSessionID();
 		bm.getSession(sid, true);
 		
-// FIXME: why are we shallow copying a JSONObject instead of just passing it?
-//		JSONObject src = getData(db, id).getJSONObject("data");
-		JSONObject src = bm.handleRead(db, id, sid).getJSONObject("data"); 
+		JSONObject src = bm.handleRead(db, id, sid).getJSONObject("data");
 		Code code = new Code(src, db);
-/*
-		JSONObject args = new JSONObject();
-		Iterator<String> i = params.keys();
-		String s;
-		while (i.hasNext()) try
-		{
-			s = i.next();
-			args.put(s, params.get(s));
-		}
-		catch (Exception x) { x.printStackTrace(); }
-
-		JSONObject jo = code.execute(args);
- */
 		params.put("sessionid", sid);
 		JSONObject jo = code.execute(params);
 		return jo;
@@ -1803,6 +1786,7 @@ public abstract class MetaBot extends BotBase
 			{
 				JSONObject jo = ja.getJSONObject(i);
 				if (jo.getString("name").equals(cmd)) return jo.getString("id");
+				if (jo.getString("id").equals(cmd)) return jo.getString("id");
 			}
 		}
 		catch (Exception x) {}
