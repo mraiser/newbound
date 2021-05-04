@@ -141,7 +141,12 @@ public class P2PManager implements Container
 	{
 		P2PPeer p = getPeer(id);
 		
-		if (isTCP(id)) p.setConnected(true);
+		if (isTCP(id))
+		{
+			p.setConnected(true);
+			P2PSocket sock = P2PParser.any(id, TCPSocket.class);
+			addConfirmedAddress(id, (InetSocketAddress) sock.getRemoteSocketAddress());
+		}
 		else initiateTCPConnection(p);
 
 		if (isUDP(id) || isRelay(id)) p.setConnected(true);

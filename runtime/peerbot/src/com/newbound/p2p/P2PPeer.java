@@ -2,6 +2,7 @@ package com.newbound.p2p;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -9,6 +10,7 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.Vector;
 
+import com.newbound.net.tcp.TCPSocket;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -222,7 +224,7 @@ public class P2PPeer
 						catch (Exception x) { x.printStackTrace(); }
 					}
 				};
-				PeerBot.getPeerBot().addJob(r, "P2P Callback");
+				mP2PManager.addJob(r, "P2P Callback");
 			}
 			catch (Exception x) { x.printStackTrace(); }
 			
@@ -426,7 +428,22 @@ public class P2PPeer
 		{
 			mSeenAddresses.addElement(isa);
 
-			mKnownAddresses.addElement(isa);
+			TCPSocket sock = new TCPSocket(isa.getHostString(), isa.getPort(), 1000);
+			sock.setSoTimeout(100);
+			InputStream is = sock.getInputStream();
+			byte[] ba = new byte[36];
+			int n = is.read(ba);
+			if (n == 36)
+			{
+				String id = new String(ba);
+				if (mID.equals(id))
+				{
+					mKnownAddresses.addElement(isa);
+					store(new Properties());
+				}
+
+			}
+
 //			try { mP2PManager.savePeer(this); } catch (Exception x) { x.printStackTrace(); }
 //			try { mP2PManager.fireEvent("update", new JSONObject(this.toString())); } catch (Exception x) { x.printStackTrace(); }
 
@@ -447,7 +464,7 @@ public class P2PPeer
 			}
 */			
 		}
-		catch (Exception x) { System.out.println("Unable to reach "+mName+" at "+isa); }
+		catch (Exception x) { System.out.println("Unable to reach "+mName+" at "+isa+" ("+x.getMessage()+")"); }
 	}
 
 	public void addConfirmedAddress(InetSocketAddress isa) 
@@ -639,11 +656,11 @@ public class P2PPeer
 		{
 			try 
 			{
-				if (bb) 
-					PeerBot.getPeerBot().fireEvent("disconnect", new JSONObject(toString())); 
+				if (bb)
+					mP2PManager.fireEvent("disconnect", new JSONObject(toString()));
 				else {
 					mLastContact = System.currentTimeMillis();
-					PeerBot.getPeerBot().fireEvent("connect", new JSONObject(toString()));
+					mP2PManager.fireEvent("connect", new JSONObject(toString()));
 				}
 			} 
 			catch (Exception x) { x.printStackTrace(); } 
