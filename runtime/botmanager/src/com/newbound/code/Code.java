@@ -3,11 +3,13 @@ package com.newbound.code;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.Vector;
 
+import com.newbound.robot.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -23,12 +25,8 @@ import com.newbound.code.primitive.object.Get;
 import com.newbound.code.primitive.object.Insert;
 import com.newbound.code.primitive.object.Put;
 import com.newbound.code.primitive.object.Remove;
-import com.newbound.robot.BotBase;
-import com.newbound.robot.BotUtil;
-import com.newbound.robot.JSONTransform;
 //import com.newbound.robot.Primitive;
-import com.newbound.robot.PeerBot;
-import com.newbound.robot.SYS;
+
 
 public class Code 
 {
@@ -359,35 +357,48 @@ public class Code
 		
 		String type = cmd.getString("type");
 		if (type.equals("primitive")) out = ((Primitive)PRIMS.get(cmd.getString("name"))).execute(in); 
-		else if (type.equals("code"))
+		else if (type.equals("local"))
 		{
-			JSONObject code = cmd.getJSONObject("code");
+			JSONObject code = cmd.getJSONObject("localdata");
 			Code c = new Code(code, LIB);
 			out = c.execute(in);
 		}
 		else if (type.equals("command"))
 		{
 			PeerBot pb = PeerBot.getPeerBot();
-			String bot = cmd.getString("btype");
-			String name = cmd.getString("name");
-			JSONObject jo = in; //cmd.getJSONObject("args");
-			Hashtable params = new Hashtable();
+			String[] sa = cmd.getString("cmd").split(":");
+			String lib = sa[0];
+			String ctl = sa[1];
+			String cmdname = sa[2];
+			JSONObject jo = in;
+			JSONObject params = new JSONObject(); // FIXME - why not just pass "in" or shallow copy it?
 			Iterator<String> list = jo.keys();
 			while (list.hasNext())
 			{
 				String k = list.next();
 				params.put(k, jo.get(k));
 			}
-			
+
+			// FIXME - add remote command support
 			if (false) //(cmd.has("uuid"))
 			{
-				String id = cmd.getString("uuid");
-				out = pb.sendCommand(id, bot, name, params);
+				//String id = cmd.getString("uuid");
+				//out = pb.sendCommand(id, bot, name, params);
 			}
 			else 
 			{
+				String key = cmd.getJSONObject("out").keys().next().toString();
 				out = new JSONObject();
-				out.put("result", pb.sendCommand(bot, name, params));
+				JSONObject src = BotBase.getBot("botmanager").getData(lib, cmdname).getJSONObject("data");
+				Code code = new Code(src, lib);
+				JSONObject val = code.execute(params);
+				if (val.has("data"))
+				{
+					Object o = val.get("data");
+//					if (o instanceof File || o instanceof InputStream || o instanceof String)
+						out.put(key, o);
+				}
+				else out.put(key, val);
 			}
 		}
 		else if (type.equals("constant"))
