@@ -24,8 +24,8 @@ public class P2PPeer
 {
 	private static final int MAXMTU = 2048; // 512;
 
-	private static long mNextPeerID = 1;
-	private static Hashtable<Long, P2PPeer> mPeers = new Hashtable();
+//	private static long mNextPeerID = 1;
+//	private static Hashtable<Long, P2PPeer> mPeers = new Hashtable();
 	
 	private String mID;
 	private String mName;
@@ -43,8 +43,8 @@ public class P2PPeer
 	
 	protected P2PManager mP2PManager = null;
 
-	protected long mLocal = mNextPeerID++;
-	protected long mRemote = -1;
+//	protected long mLocal = mNextPeerID++;
+//	protected long mRemote = -1;
 	protected int MTU = MAXMTU;
 	
 //	private Vector<String> mRelays = new Vector();
@@ -55,6 +55,7 @@ public class P2PPeer
 
 	private long mLastContact;
 //	protected long mLastSend;
+	private Properties OPROP;
 
 	public boolean closing = false;
 	
@@ -68,7 +69,8 @@ public class P2PPeer
 	public P2PPeer(P2PManager pm, String uuid, Properties p) throws IOException
 	{
 		super();
-		mPeers.put(mLocal, this);
+		OPROP = (Properties) p.clone();
+//		mPeers.put(mLocal, this);
 		
 		mID = uuid;
 		mName = p.getProperty("name");
@@ -120,10 +122,10 @@ public class P2PPeer
 		}
 	}
 	
-	public static P2PPeer get(long id)
-	{
-		return mPeers.get(id);
-	}
+//	public static P2PPeer get(long id)
+//	{
+//		return mPeers.get(id);
+//	}
 	
 	public void store(Properties p) 
 	{
@@ -416,6 +418,16 @@ public class P2PPeer
 		catch (Exception x) { x.printStackTrace(); }
 	}
 
+	public boolean hasChanged(Properties p)
+	{
+		return !OPROP.equals(p);
+	}
+
+	public void updateSaved(Properties p)
+	{
+		OPROP = (Properties) p.clone();
+	}
+
 	public void addSocketAddress(InetSocketAddress isa) throws Exception 
 	{
 //		mP2PManager.sendUDP(isa, Codes.PING, mID.getBytes());
@@ -439,32 +451,17 @@ public class P2PPeer
 				if (mID.equals(id))
 				{
 					mKnownAddresses.addElement(isa);
-					store(new Properties());
+					mP2PManager.savePeer(this);
+					try { mP2PManager.fireEvent("update", new JSONObject(this.toString())); } catch (Exception x) { x.printStackTrace(); }
+					return;
 				}
 
 			}
-
-//			try { mP2PManager.savePeer(this); } catch (Exception x) { x.printStackTrace(); }
-//			try { mP2PManager.fireEvent("update", new JSONObject(this.toString())); } catch (Exception x) { x.printStackTrace(); }
-
-//			mP2PManager.sendPing(isa);
-/*			
-			if (!isTCP())
-			{
-				final P2PPeer me = this;
-				Runnable r = new Runnable() 
-				{
-					public void run() 
-					{
-						try { mP2PManager.initiateTCPConnection(me, isa); }
-						catch (Exception x) { System.out.println("TCP Unable to reach "+mName+" at "+isa); }
-					}
-				};
-				mP2PManager.addJob(r, "Initiate TCP with "+mName+" at "+isa);
-			}
-*/			
 		}
 		catch (Exception x) { System.out.println("Unable to reach "+mName+" at "+isa+" ("+x.getMessage()+")"); }
+
+		mKnownAddresses.removeElement(isa);
+		try { mP2PManager.savePeer(this); } catch (Exception x) { x.printStackTrace(); }
 	}
 
 	public void addConfirmedAddress(InetSocketAddress isa) 
@@ -472,8 +469,8 @@ public class P2PPeer
 		if (mKnownAddresses.indexOf(isa) == -1) 
 		{
 			mKnownAddresses.addElement(isa);
-//			try { mP2PManager.savePeer(this); } catch (Exception x) { x.printStackTrace(); }
-//			try { mP2PManager.fireEvent("update", new JSONObject(this.toString())); } catch (Exception x) { x.printStackTrace(); }
+			try { mP2PManager.savePeer(this); } catch (Exception x) { x.printStackTrace(); }
+			try { mP2PManager.fireEvent("update", new JSONObject(this.toString())); } catch (Exception x) { x.printStackTrace(); }
 		}
 		
 //		if (!isTCP())
@@ -540,7 +537,7 @@ public class P2PPeer
 			return mWriteKey.encrypt(ba, off, len);
 		}
 	}
-
+/*
 	public long getLocalID() 
 	{
 		return mLocal;
@@ -555,7 +552,7 @@ public class P2PPeer
 	{
 		mRemote = peer;
 	}
-
+*/
 	public String toString()
 	{
 		InetSocketAddress local = getLocalSocketAddress(); // FIXME - We want the peer's address not our own
@@ -569,8 +566,8 @@ public class P2PPeer
 		try { jo.put("port",  getPort()); } catch (Exception x) { x.printStackTrace(); }
 		try { jo.put("keepalive",  mKeepAlive); } catch (Exception x) { x.printStackTrace(); }
 		try { jo.put("localip",  localip); } catch (Exception x) { x.printStackTrace(); }
-		try { jo.put("localid",  mLocal); } catch (Exception x) { x.printStackTrace(); }
-		try { jo.put("remoteid",  mRemote); } catch (Exception x) { x.printStackTrace(); }
+//		try { jo.put("localid",  mLocal); } catch (Exception x) { x.printStackTrace(); }
+//		try { jo.put("remoteid",  mRemote); } catch (Exception x) { x.printStackTrace(); }
 		try { jo.put("lastcontact",  mLastContact); } catch (Exception x) { x.printStackTrace(); }
 
 		try { jo.put("addresses",  buildAddressList()); } catch (Exception x) { x.printStackTrace(); }

@@ -214,12 +214,12 @@ public class P2PServerSocket implements ServerSocket
 			if (checking.get(relay) != null)
 			{
 				long dur = System.currentTimeMillis()-checking.get(relay);
-				if (dur<60000)
+//				if (dur<60000)
 					System.out.println("Still checking relay "+relay+" after "+dur+" ms");
-				else try {
-					P2P.disconnect(relay);
-				}
-				catch (Exception x) { x.printStackTrace(); }
+//				else try {
+//					P2P.disconnect(relay);
+//				}
+//				catch (Exception x) { x.printStackTrace(); }
 			}
 			else
 			{

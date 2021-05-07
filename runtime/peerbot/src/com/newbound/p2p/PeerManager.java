@@ -41,8 +41,13 @@ public class PeerManager extends BotUtil
 			f.getParentFile().mkdirs();
 			Properties p = new Properties();
 			peer.store(p);
-			storeProperties(p, f);
-			System.out.println("Saved peer "+peer.getName()+"/"+peer.getID());
+			if (peer.hasChanged(p))
+			{
+				storeProperties(p, f);
+				peer.updateSaved(p);
+				System.out.println("Saved peer " + peer.getName() + "/" + peer.getID());
+			}
+//			System.out.println("Unchanged peer " + peer.getName() + "/" + peer.getID());
 		}
 	}
 	

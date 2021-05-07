@@ -117,6 +117,8 @@ public class BotManager extends BotBase
 		
 		if (bots != null && bots.trim().length() > 0)
 		{
+			File errorfile = new File(getRootDir(), "error.log");
+			errorfile.delete();
 			String botclass = null; 
 			while (bots.length()>0)
 			{
@@ -148,7 +150,7 @@ public class BotManager extends BotBase
 				catch (Exception x) 
 				{ 
 					x.printStackTrace(); 
-					FileWriter fw = new FileWriter(new File(getRootDir(), "error.log"), true);
+					FileWriter fw = new FileWriter(errorfile, true);
 					PrintWriter pw = new PrintWriter(fw);
 					x.printStackTrace(pw);
 					pw.flush();

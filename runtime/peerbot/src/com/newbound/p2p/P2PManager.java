@@ -145,7 +145,7 @@ public class P2PManager implements Container
 		{
 			p.setConnected(true);
 			P2PSocket sock = P2PParser.any(id, TCPSocket.class);
-			addConfirmedAddress(id, (InetSocketAddress) sock.getRemoteSocketAddress());
+			addConfirmedAddress(id, new InetSocketAddress(((InetSocketAddress) sock.getRemoteSocketAddress()).getHostString(), p.getPort()));
 		}
 		else initiateTCPConnection(p);
 

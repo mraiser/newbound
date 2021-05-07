@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
@@ -63,6 +64,9 @@ public class P2PParser implements Parser
 			byte[] buf = baos.toByteArray();
 			REMOTEID = new String(buf, 0, 36);
 			REMOTEPORT = BotUtil.bytesToInt(buf, 36);
+
+			PS.getPeer(REMOTEID).setPort(REMOTEPORT);
+			PS.addConfirmedAddress(REMOTEID, new InetSocketAddress(((InetSocketAddress)SOCK.SOCK.getRemoteSocketAddress()).getHostString(), REMOTEPORT));
 		}
 		else if (SOCK.SOCK instanceof RelaySocket)
 		{

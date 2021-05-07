@@ -30,7 +30,7 @@ public class PONG implements Callback
 			String uuid2 = new String(ba, 0, 36);
 
 			P2PSocket sock = (P2PSocket)data.get("p2psocket");
-			InetSocketAddress isa = (InetSocketAddress)sock.getRemoteSocketAddress();
+			InetSocketAddress isa = new InetSocketAddress(((InetSocketAddress)sock.getRemoteSocketAddress()).getHostString(), P2P.getPeer(uuid2).getPort());
 			
 			System.out.println("PONG: "+uuid+"/"+uuid2+"/"+isa);
 
