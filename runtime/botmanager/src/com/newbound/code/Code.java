@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.Vector;
@@ -338,21 +339,70 @@ public class Code
 		return null;
 	}
 
-	private void evaluate(JSONObject cmd) throws Exception
-	{
+	private void evaluate(JSONObject cmd) throws Exception {
 		JSONObject in = new JSONObject();
 		JSONObject in2 = cmd.getJSONObject("in");
 		Iterator keys = in2.keys();
-		while (keys.hasNext())
-		{
-			String name = (String)keys.next();
+		ArrayList list_in = new ArrayList();
+		while (keys.hasNext()) {
+			String name = (String) keys.next();
 			JSONObject in3 = in2.getJSONObject(name);
 			if (in3.has("val")) in.put(name, in3.get("val"));
-			if (DEBUG) System.out.println(in3.has("val") ? "HAS "+name : "MISSING: "+name+"("+in3+")");
+			if (in3.has("mode") && in3.getString("mode").equals("list")) list_in.add(name);
+			if (DEBUG) System.out.println(in3.has("val") ? "HAS " + name : "MISSING: " + name + "(" + in3 + ")");
 		}
-		if (DEBUG) System.out.println("in: "+in);
-		if (DEBUG) System.out.println("in2: "+in2);
+		if (DEBUG) System.out.println("in: " + in);
+		if (DEBUG) System.out.println("in2: " + in2);
 
+		JSONObject out2 = cmd.getJSONObject("out");
+		keys = out2.keys();
+		ArrayList list_out = new ArrayList();
+		while (keys.hasNext()) {
+			String name = (String) keys.next();
+			JSONObject out3 = out2.getJSONObject(name);
+			if (out3.has("mode") && out3.getString("mode").equals("list")) list_out.add(name);
+		}
+
+		int n = list_in.size();
+		if (n == 0) evaluateCase(cmd, in);
+		else
+		{
+			JSONObject out3 = new JSONObject();
+			for (int i=0; i< list_out.size(); i++) out3.put((String)list_out.get(i), new JSONArray());
+			int count = in.getJSONArray((String)list_in.get(0)).length();
+			for (int i=0; i<n; i++) count = Math.min(count, in.getJSONArray((String)list_in.get(i)).length());
+			for (int i=0; i<count; i++) {
+				JSONObject in3 = new JSONObject();
+				Iterator<String> list = in.keys();
+				while (list.hasNext())
+				{
+					String k = list.next();
+					if (!list_in.contains(k)) in3.put(k, in.get(k));
+					else {
+						JSONArray ja = (JSONArray) in.get(k);
+						in3.put(k, ja.get(i));
+					}
+				}
+
+				evaluateCase(cmd, in3);
+
+				JSONObject out = cmd.getJSONObject("out");
+				list = out2.keys();
+				while (list.hasNext())
+				{
+					String k = list.next();
+					if (!list_out.contains(k)) out3.put(k, out.get(k));
+					else {
+						out3.getJSONArray(k).put(out.get(k));
+					}
+				}
+			}
+			cmd.put("out", out3);
+		}
+	}
+
+	private void evaluateCase(JSONObject cmd, JSONObject in) throws Exception
+	{
 		JSONObject out;
 		
 		String type = cmd.getString("type");
@@ -371,7 +421,7 @@ public class Code
 			String ctl = sa[1];
 			String cmdname = sa[2];
 			JSONObject jo = in;
-			JSONObject params = new JSONObject(); // FIXME - why not just pass "in" or shallow copy it?
+			JSONObject params = new JSONObject();
 			Iterator<String> list = jo.keys();
 			while (list.hasNext())
 			{
