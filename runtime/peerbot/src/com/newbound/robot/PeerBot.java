@@ -1476,7 +1476,11 @@ public class PeerBot extends MetaBot
 						}
 					}					
 				}
-				catch (Exception x) { x.printStackTrace(); }
+				catch (Exception x)
+				{
+					System.out.println("Error connecting to broker at "+oneline);
+					x.printStackTrace();
+				}
 				r.close();
 			}
 		}

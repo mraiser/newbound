@@ -436,35 +436,64 @@ public class P2PPeer
 	
 	public void confirmSocketAddress(final InetSocketAddress isa) 
 	{
-		if (mSeenAddresses.indexOf(isa) == -1) try
+		if (mSeenAddresses.indexOf(isa) == -1 && mKnownAddresses.indexOf(isa) == -1)
 		{
 			mSeenAddresses.addElement(isa);
-
-			TCPSocket sock = new TCPSocket(isa.getHostString(), isa.getPort(), 1000);
-			sock.setSoTimeout(100);
-			InputStream is = sock.getInputStream();
-			byte[] ba = new byte[36];
-			int n = is.read(ba);
-			if (n == 36)
+			final P2PPeer me = this;
+			mP2PManager.addJob(new Runnable()
 			{
-				String id = new String(ba);
-				if (mID.equals(id))
+				@Override
+				public void run()
 				{
-					mKnownAddresses.addElement(isa);
-					mP2PManager.savePeer(this);
-					try { mP2PManager.fireEvent("update", new JSONObject(this.toString())); } catch (Exception x) { x.printStackTrace(); }
-					return;
+					try
+					{
+						TCPSocket sock = new TCPSocket(isa.getHostString(), isa.getPort(), 5000);
+						sock.setSoTimeout(5000);
+						InputStream is = sock.getInputStream();
+						byte[] ba = new byte[36];
+						int n = is.read(ba);
+						if (n == 36)
+						{
+							String id = new String(ba);
+							if (mID.equals(id)) {
+								addConfirmedAddress(isa);
+								mP2PManager.savePeer(me);
+								try
+								{
+									mP2PManager.fireEvent("update", new JSONObject(me.toString()));
+								}
+								catch (Exception x)
+								{
+									x.printStackTrace();
+								}
+								return;
+							}
+							else
+								System.out.println("Mismatched ID checking " + mName + " at " + isa + " (" + id + ")");
+						}
+						else
+							System.out.println("Unexpected response checking " + mName + " at " + isa + " (" + new String(ba) + ")");
+					}
+					catch (Exception x)
+					{
+						System.out.println("Unable to reach " + mName + " at " + isa + " (" + x.getMessage() + ")");
+					}
+
+					mKnownAddresses.removeElement(isa);
+					try
+					{
+						mP2PManager.savePeer(me);
+					}
+					catch (Exception x)
+					{
+						x.printStackTrace();
+					}
 				}
-
-			}
+			}, "Check IP Address ("+isa+") for "+mName);
 		}
-		catch (Exception x) { System.out.println("Unable to reach "+mName+" at "+isa+" ("+x.getMessage()+")"); }
-
-		mKnownAddresses.removeElement(isa);
-		try { mP2PManager.savePeer(this); } catch (Exception x) { x.printStackTrace(); }
 	}
 
-	public void addConfirmedAddress(InetSocketAddress isa) 
+	public synchronized void addConfirmedAddress(InetSocketAddress isa)
 	{
 		if (mKnownAddresses.indexOf(isa) == -1) 
 		{
