@@ -1,14 +1,10 @@
 package com.newbound.code;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.InputStream;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.Iterator;
-import java.util.Vector;
 
 import com.newbound.robot.*;
 import org.json.JSONArray;
@@ -33,6 +29,8 @@ public class Code
 {
 	private static final boolean DEBUG = false;
 	private static File ROOT = null;
+	private boolean FINISHFLAG = false;
+
 	public static JSONObject PRIMS = new JSONObject();
 	public static String PYTHON = "python3"; //"/Library/Frameworks/Python.framework/Versions/3.6/bin/python3";
 	
@@ -124,141 +122,144 @@ public class Code
 			JSONObject out = new JSONObject();
 			CODE.put("out", out);
 			
-			JSONArray cmds = CODE.getJSONArray("cmds");
-			JSONArray cons = CODE.getJSONArray("cons");
-			
-			int n = cons.length();
-			int n2 = cmds.length();
-			
-			for (i=0;i<n2;i++) 
+			FINISHFLAG = false;
+			JSONObject currentcase = CODE;
+			while (true) try
 			{
-				JSONObject cmd = cmds.getJSONObject(i);
-				if (DEBUG) System.out.println("pre-processing cmd "+i+": "+cmd);
-				if (!cmd.has("done") || !cmd.getBoolean("done"))
+				JSONArray cmds = currentcase.getJSONArray("cmds");
+				JSONArray cons = currentcase.getJSONArray("cons");
+
+				int n = cons.length();
+				int n2 = cmds.length();
+
+				for (i=0;i<n2;i++)
 				{
-					JSONObject in = cmd.getJSONObject("in");
-					Iterator<String> it = in.keys();
-					if (DEBUG) System.out.println(it.hasNext() ? "Analyzing inputs" : "No inputs, evaluating cmd");
-					if (!it.hasNext()) evaluate(cmd);
-					else 
+					JSONObject cmd = cmds.getJSONObject(i);
+					if (DEBUG) System.out.println("pre-processing cmd "+i+": "+cmd);
+					if (!cmd.has("done") || !cmd.getBoolean("done"))
 					{
-						boolean b = true;
-						
-						while (it.hasNext())
-						{
-							String key = it.next();
-							in.getJSONObject(key).put("done", false);
-							JSONObject con = lookupConnection(i, key, "in");
-							if (con == null) 
-								in.getJSONObject(key).put("done", true);
-							else b = false; //b && (in.has("done") && in.getBoolean("done"));
-						}
-						
-						if (DEBUG) System.out.println(b ? "No connections to any inputs, evaluating cmd" : "Command requires input to evaluate");
-						if (b) evaluate(cmd);
-					}
-				}
-			}
-			
-			while (!done)
-			{
-				if (DEBUG) System.out.println("Evaluating connections...");
-				boolean c = true;
-				
-				for (i=0;i<n;i++)
-				{
-					JSONObject con = cons.getJSONObject(i);
-					if (DEBUG) System.out.println("Evaluating connection "+i+": "+con);
-					if (!con.has("done") || !con.getBoolean("done"))
-					{
-						c = false;
-						JSONArray ja = con.getJSONArray("src");
-						int src = ja.getInt(0);
-						String srcname = ja.getString(1);
-						ja = con.getJSONArray("dest");
-						int dest = ja.getInt(0);
-						String destname = ja.getString(1);
-									
-						boolean b = false;
-						Object val = null;
-						if (src == -1) 
-						{
-							val = args.has(srcname) ? args.get(srcname) : null;
-							b = true;
-							if (DEBUG) System.out.println("Value from input bar node "+srcname+" is "+val);
-						}
+						JSONObject in = cmd.getJSONObject("in");
+						Iterator<String> it = in.keys();
+						if (DEBUG) System.out.println(it.hasNext() ? "Analyzing inputs" : "No inputs, evaluating cmd");
+						if (!it.hasNext()) evaluate(cmd);
 						else
 						{
-							JSONObject cmd = cmds.getJSONObject(src);
-							if (cmd.has("done") && cmd.getBoolean("done"))
+							boolean b = true;
+
+							while (it.hasNext())
 							{
-								JSONObject vals = cmd.getJSONObject("out");
-								val = vals.has(srcname) ? vals.get(srcname) : null;
+								String key = it.next();
+								in.getJSONObject(key).put("done", false);
+								JSONObject con = lookupConnection(i, key, "in");
+								if (con == null)
+									in.getJSONObject(key).put("done", true);
+								else b = false; //b && (in.has("done") && in.getBoolean("done"));
+							}
+
+							if (DEBUG) System.out.println(b ? "No connections to any inputs, evaluating cmd" : "Command requires input to evaluate");
+							if (b) evaluate(cmd);
+						}
+					}
+				}
+
+				while (!done) {
+					if (DEBUG) System.out.println("Evaluating connections...");
+					boolean c = true;
+
+					for (i = 0; i < n; i++) {
+						JSONObject con = cons.getJSONObject(i);
+						if (DEBUG) System.out.println("Evaluating connection " + i + ": " + con);
+						if (!con.has("done") || !con.getBoolean("done")) {
+							c = false;
+							JSONArray ja = con.getJSONArray("src");
+							int src = ja.getInt(0);
+							String srcname = ja.getString(1);
+							ja = con.getJSONArray("dest");
+							int dest = ja.getInt(0);
+							String destname = ja.getString(1);
+
+							boolean b = false;
+							Object val = null;
+							if (src == -1) {
+								val = args.has(srcname) ? args.get(srcname) : null;
 								b = true;
-								if (DEBUG) System.out.println("Value from command "+src+" output node "+srcname+" is "+val);
+								if (DEBUG) System.out.println("Value from input bar node " + srcname + " is " + val);
+							} else {
+								JSONObject cmd = cmds.getJSONObject(src);
+								if (cmd.has("done") && cmd.getBoolean("done")) {
+									JSONObject vals = cmd.getJSONObject("out");
+									val = vals.has(srcname) ? vals.get(srcname) : null;
+									b = true;
+									if (DEBUG)
+										System.out.println("Value from command " + src + " output node " + srcname + " is " + val);
+								} else if (DEBUG)
+									System.out.println("Value from command " + src + " output node " + srcname + " is not ready yet");
 							}
-							else if (DEBUG) System.out.println("Value from command "+src+" output node "+srcname+" is not ready yet");
-						}
-						
-						if (b)
-						{
-							if (DEBUG) System.out.println("Connection "+i+" is done");
-							con.put("done",  true);
-							if (dest == -2)
-							{
-								if (val != null) out.put(destname, val);
-								if (DEBUG) System.out.println("Value "+val+" passed to output node "+destname);
-							}
-							else
-							{
-								JSONObject cmd = cmds.getJSONObject(dest);
-								if (cmd.getString("type").equals("undefined")) 
-								{
-									cmd.put("done", true);
-									if (DEBUG) System.out.println("Marking undefined command as done");
-								}
-								else
-								{
-									JSONObject ins = cmd.getJSONObject("in");
-									JSONObject var = ins.getJSONObject(destname);
-									if (val != null) var.put("val", val);
-									var.put("done",  true);
-									
-									Iterator it = ins.keys();
-									while (it.hasNext() && b)
-									{
-										JSONObject in = ins.getJSONObject((String)it.next());
-										b = b && in.has("done") && in.getBoolean("done");
+
+							if (b) {
+								if (DEBUG) System.out.println("Connection " + i + " is done");
+								con.put("done", true);
+								if (dest == -2) {
+									if (val != null) out.put(destname, val);
+									if (DEBUG)
+										System.out.println("Value " + val + " passed to output node " + destname);
+								} else {
+									JSONObject cmd = cmds.getJSONObject(dest);
+									if (cmd.getString("type").equals("undefined")) {
+										cmd.put("done", true);
+										if (DEBUG) System.out.println("Marking undefined command as done");
+									} else {
+										JSONObject ins = cmd.getJSONObject("in");
+										JSONObject var = ins.getJSONObject(destname);
+										if (val != null) var.put("val", val);
+										var.put("done", true);
+
+										Iterator it = ins.keys();
+										while (it.hasNext() && b) {
+											JSONObject in = ins.getJSONObject((String) it.next());
+											b = b && in.has("done") && in.getBoolean("done");
+										}
+
+										if (DEBUG)
+											System.out.println(b ? "All inputs to dest cmd done, evaluating" : "Not all inputs to cmd done yet");
+										if (b)
+											evaluate(cmd);
 									}
-									
-									if (DEBUG) System.out.println(b ? "All inputs to dest cmd done, evaluating" : "Not all inputs to cmd done yet");
-									if (b)
-										evaluate(cmd);
 								}
-							}		
-						}
+							}
+						} else if (DEBUG) System.out.println("Connection " + i + " is done");
+
 					}
-					else if (DEBUG) System.out.println("Connection "+i+" is done");
 
-				}
+					if (DEBUG)
+						System.out.println(c ? "All connections had already fired. We must be done" : "One or more connections fired. Check all the commands");
 
-				if (DEBUG) System.out.println(c ? "All connections had already fired. We must be done" : "One or more connections fired. Check all the commands");
-
-				if (c) done = true;
-/*
-				else
-				{
-					boolean b = true;
-					for (i=0;i<n2;i++)
+					if (c) done = true;
+	/*
+					else
 					{
-						JSONObject cmd = cmds.getJSONObject(i);
-						if (!cmd.has("done") || !cmd.getBoolean("done")) { b = false; break; }
+						boolean b = true;
+						for (i=0;i<n2;i++)
+						{
+							JSONObject cmd = cmds.getJSONObject(i);
+							if (!cmd.has("done") || !cmd.getBoolean("done")) { b = false; break; }
+						}
+						done = b;
+						if (DEBUG) System.out.println(done ? "Done!" : "Not done yet, keep trying!");
 					}
-					done = b;
-					if (DEBUG) System.out.println(done ? "Done!" : "Not done yet, keep trying!");
+	*/
 				}
-*/			
+				break;
 			}
+			catch (NextCaseException x)
+			{
+				currentcase = currentcase.getJSONObject("nextcase");
+			}
+			catch (TerminateCaseException x)
+			{
+				break;
+			}
+
 			return out;
 	}
 	
@@ -364,18 +365,16 @@ public class Code
 		}
 
 		int n = list_in.size();
-		if (n == 0) evaluateCase(cmd, in);
-		else
-		{
+		if (n == 0) evaluateOperation(cmd, in);
+		else {
 			JSONObject out3 = new JSONObject();
-			for (int i=0; i< list_out.size(); i++) out3.put((String)list_out.get(i), new JSONArray());
-			int count = in.getJSONArray((String)list_in.get(0)).length();
-			for (int i=0; i<n; i++) count = Math.min(count, in.getJSONArray((String)list_in.get(i)).length());
-			for (int i=0; i<count; i++) {
+			for (int i = 0; i < list_out.size(); i++) out3.put((String) list_out.get(i), new JSONArray());
+			int count = in.getJSONArray((String) list_in.get(0)).length();
+			for (int i = 0; i < n; i++) count = Math.min(count, in.getJSONArray((String) list_in.get(i)).length());
+			for (int i = 0; i < count; i++) {
 				JSONObject in3 = new JSONObject();
 				Iterator<String> list = in.keys();
-				while (list.hasNext())
-				{
+				while (list.hasNext()) {
 					String k = list.next();
 					if (!list_in.contains(k)) in3.put(k, in.get(k));
 					else {
@@ -384,12 +383,11 @@ public class Code
 					}
 				}
 
-				evaluateCase(cmd, in3);
+				evaluateOperation(cmd, in3);
 
 				JSONObject out = cmd.getJSONObject("out");
 				list = out2.keys();
-				while (list.hasNext())
-				{
+				while (list.hasNext()) {
 					String k = list.next();
 					if (!list_out.contains(k)) out3.put(k, out.get(k));
 					else {
@@ -401,77 +399,139 @@ public class Code
 		}
 	}
 
-	private void evaluateCase(JSONObject cmd, JSONObject in) throws Exception
+	private void evaluateOperation(JSONObject cmd, JSONObject in) throws Exception
 	{
-		JSONObject out;
-		
+		JSONObject out = null;
 		String type = cmd.getString("type");
-		if (type.equals("primitive")) out = ((Primitive)PRIMS.get(cmd.getString("name"))).execute(in); 
-		else if (type.equals("local"))
-		{
-			JSONObject code = cmd.getJSONObject("localdata");
-			Code c = new Code(code, LIB);
-			out = c.execute(in);
-		}
-		else if (type.equals("command"))
-		{
-			PeerBot pb = PeerBot.getPeerBot();
-			String[] sa = cmd.getString("cmd").split(":");
-			String lib = sa[0];
-			String ctl = sa[1];
-			String cmdname = sa[2];
-			JSONObject jo = in;
-			JSONObject params = new JSONObject();
-			Iterator<String> list = jo.keys();
-			while (list.hasNext())
-			{
-				String k = list.next();
-				params.put(k, jo.get(k));
-			}
 
-			// FIXME - add remote command support
-			if (false) //(cmd.has("uuid"))
+		boolean b = false;
+		try {
+			if (type.equals("primitive")) out = ((Primitive) PRIMS.get(cmd.getString("name"))).execute(in);
+			else if (type.equals("local"))
 			{
-				//String id = cmd.getString("uuid");
-				//out = pb.sendCommand(id, bot, name, params);
+				JSONObject code = cmd.getJSONObject("localdata");
+				Code c = new Code(code, LIB);
+				out = c.execute(in);
 			}
-			else 
-			{
-				String key = cmd.getJSONObject("out").keys().next().toString();
-				out = new JSONObject();
-				JSONObject src = BotBase.getBot("botmanager").getData(lib, cmdname).getJSONObject("data");
-				Code code = new Code(src, lib);
-				JSONObject val = code.execute(params);
-				if (val.has("data"))
-				{
-					Object o = val.get("data");
-//					if (o instanceof File || o instanceof InputStream || o instanceof String)
-						out.put(key, o);
+			else if (type.equals("command")) {
+				PeerBot pb = PeerBot.getPeerBot();
+				String[] sa = cmd.getString("cmd").split(":");
+				String lib = sa[0];
+				String ctl = sa[1];
+				String cmdname = sa[2];
+				JSONObject jo = in;
+				JSONObject params = new JSONObject();
+				Iterator<String> list = jo.keys();
+				while (list.hasNext()) {
+					String k = list.next();
+					params.put(k, jo.get(k));
 				}
-				else out.put(key, val);
+
+				// FIXME - add remote command support
+				if (false) //(cmd.has("uuid"))
+				{
+					//String id = cmd.getString("uuid");
+					//out = pb.sendCommand(id, bot, name, params);
+				} else {
+					String key = cmd.getJSONObject("out").keys().next().toString();
+					out = new JSONObject();
+					JSONObject src = BotBase.getBot("botmanager").getData(lib, cmdname).getJSONObject("data");
+					Code code = new Code(src, lib);
+					JSONObject val = code.execute(params);
+					if (val.has("data")) {
+						Object o = val.get("data");
+						//					if (o instanceof File || o instanceof InputStream || o instanceof String)
+						out.put(key, o);
+					} else out.put(key, val);
+				}
 			}
-		}
-		else if (type.equals("constant"))
-		{
-			out = cmd.getJSONObject("out");
-			Iterator<String> i = out.keys();
-			while (i.hasNext()) 
+			else if (type.equals("constant")) {
+				out = cmd.getJSONObject("out");
+				Iterator<String> i = out.keys();
+				while (i.hasNext()) {
+					String key = i.next();
+					Object val = cmd.get("name");
+					String ctype = cmd.getString("ctype");
+					if (ctype.equals("int")) val = Integer.parseInt("" + val);
+					else if (ctype.equals("decimal")) val = Double.parseDouble("" + val);
+					else if (ctype.equals("boolean")) val = Boolean.parseBoolean("" + val);
+					else if (ctype.equals("object")) val = new JSONObject("" + val);
+					else if (ctype.equals("array")) val = new JSONArray("" + val);
+					out.put(key, val);
+				}
+			}
+			else if (type.equals("match"))
 			{
-				String key = i.next();
-				Object val = cmd.get("name");
+				Object a = in.get((String) in.keys().next());
 				String ctype = cmd.getString("ctype");
-				if (ctype.equals("int")) val = Integer.parseInt(""+val);
-				else if (ctype.equals("decimal")) val = Double.parseDouble(""+val);
-				else if (ctype.equals("boolean")) val = Boolean.parseBoolean(""+val);
-				else if (ctype.equals("object")) val = new JSONObject(""+val);
-				else if (ctype.equals("array")) val = new JSONArray(""+val);
-				out.put(key, val);
+				Object val1 = forceType(ctype, a);
+				Object val2 = forceType(ctype, cmd.get("name"));
+				b = val1.equals(val2);
+				out = new JSONObject();
 			}
+			else out = new JSONObject();
+
+			if (!type.equals("match")) b = true;
 		}
-		else out = new JSONObject();
-		
-		cmd.put("out", out);
-		cmd.put("done",  true);
+		catch (FailException x)
+		{
+			b = false;
+			out = new JSONObject();
+		}
+		finally
+		{
+			if (!type.equals("constant") && cmd.has("condition")) {
+				JSONObject condition = cmd.getJSONObject("condition");
+				evaluateConditional(condition, b);
+			}
+			cmd.put("out", out);
+			cmd.put("done", true);
+		}
+	}
+
+	private void evaluateConditional(JSONObject condition, boolean m) throws Exception
+	{
+		String rule = condition.getString("rule");
+		boolean b = condition.getBoolean("value");
+		if (b == m)
+		{
+			if (rule.equals("next")) throw new NextCaseException();
+			if (rule.equals("terminate")) throw new TerminateCaseException();
+			if (rule.equals("fail")) throw new FailException();
+			if (rule.equals("finish")) FINISHFLAG = true;
+		}
+	}
+
+	private Object forceType(String atype, Object val) throws Exception
+	{
+		if (atype.equals("int"))
+		{
+			if (val instanceof Number) return (Integer)val;
+			return Integer.parseInt(val.toString());
+		}
+		if (atype.equals("decimal"))
+		{
+			if (val instanceof Number) return (Double)val;
+			return Double.parseDouble(val.toString());
+		}
+		if (atype.equals("boolean"))
+		{
+			if (val instanceof Boolean) return (Boolean)val;
+			return Boolean.parseBoolean(val.toString());
+		}
+		if (atype.equals("string")) return val.toString();
+		if (atype.equals("object"))
+		{
+			if (val instanceof JSONObject) return (JSONObject)val;
+			return new JSONObject(val.toString());
+		}
+		if (atype.equals("array"))
+		{
+			if (val instanceof JSONArray) return (JSONArray)val;
+			return new JSONArray(val.toString());
+		}
+
+		throw new Exception("Unknown type: "+atype);
 	}
 
 	public static void main(String[] args) 
