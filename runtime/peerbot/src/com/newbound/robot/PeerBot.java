@@ -1382,22 +1382,36 @@ public class PeerBot extends MetaBot
 		mP2PManager = new P2PManager(this, PROPERTIES.getProperty("uuid"),Integer.parseInt(p), getPrivateKey(), getPublicKey());
 		mP2PManager.setAllowAnon(aa.equals("true"));
 
-		mP2PManager.start();
-		
-		if (p.equals("0") || p.equals("-1")) 
-		{
-			int pp = mP2PManager.getLocalPort();
-			PROPERTIES.setProperty("udpport", ""+pp);
-			saveSettings();
-		}
-
-//		initPeers(new File(getRootDir(), "peers"));
 		s = PROPERTIES.getProperty("peers");
 		if (s != null)
 		{
 			PROPERTIES.remove("peers");
 			saveSettings();
 		}
+
+		addJob(new Runnable() {
+			@Override
+			public void run() {
+				while (!mMasterBot.RUNNING)
+				{
+					try { Thread.sleep(100); } catch (Exception x) { x.printStackTrace(); }
+				}
+				try { postInit(); } catch (Exception x) { x.printStackTrace(); }
+			}
+		});
+	}
+
+	private void postInit() throws Exception {
+		mP2PManager.start();
+
+//		if (p.equals("0") || p.equals("-1"))
+//		{
+//			int pp = mP2PManager.getLocalPort();
+//			PROPERTIES.setProperty("udpport", ""+pp);
+//			saveSettings();
+//		}
+
+//		initPeers(new File(getRootDir(), "peers"));
 
 		if (hasData("runtime", "peerbot_mypeers")) try
 		{
@@ -1408,47 +1422,16 @@ public class PeerBot extends MetaBot
 				catch (Exception x) { x.printStackTrace(); }
 		}
 		catch (Exception x) { x.printStackTrace(); }
-		
-		addPeriodicTask(new PeriodicTask(5000, true, "check brokers") 
+
+		addPeriodicTask(new PeriodicTask(5000, true, "check brokers")
 		{
 			@Override
-			public void run() 
+			public void run()
 			{
 				checkBrokers();
-//				Iterator<P2PPeer> i = getConnections();
-//				while (i.hasNext()) try
-//				{
-//					final P2PPeer p = i.next();
-/*					
-					if (p.isConnected()) 
-					{
-						p.sendCommandAsync("peerbot", "getpeerinfo", new Hashtable(), new P2PCallback() 
-						{
-							public P2PCommand execute(JSONObject result) 
-							{
-								try {
-									p.setName(result.getString("name"));
-									
-									int port = result.getInt("port");
-									if (port != -1)
-									{
-										p.addSocketAddress(new InetSocketAddress(result.getString("addr"), port));
-										p.addSocketAddress(new InetSocketAddress(result.getString("localip"), port));
-									}
-								}
-								catch (Exception x) { x.printStackTrace(); }
-
-								return null;
-							}
-						});
-					}
-					else connect(p.getID(), p.getAddress(), p.getPort());
-*/
-//					if (!p.isConnected()) connect(p.getID(), p.getAddress(), p.getPort());
-//				}
-//				catch (Exception x) { x.printStackTrace(); }
 			}
 		});
+
 	}
 	
 	private void checkBrokers() 

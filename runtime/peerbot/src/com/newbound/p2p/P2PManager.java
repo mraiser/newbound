@@ -431,6 +431,11 @@ public class P2PManager implements Container
 	{
 		getPeer(uuid).addConfirmedAddress(isa);
 	}
+
+	public void confirmSocketAddress(P2PPeer peer, InetSocketAddress isa)
+	{
+		P2P.confirmSocketAddress(peer, isa);
+	}
 /*
 	public void sendPing(InetSocketAddress isa) throws Exception
 	{

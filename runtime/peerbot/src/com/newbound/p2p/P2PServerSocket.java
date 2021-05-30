@@ -1,6 +1,7 @@
 package com.newbound.p2p;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -10,6 +11,7 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.Vector;
 
+import com.newbound.net.tcp.TCPSocket;
 import com.newbound.robot.Callback;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -31,8 +33,9 @@ public class P2PServerSocket implements ServerSocket
 	TCPServerSocket TCP;
 //	UDPServerSocket UDP;
 	RelayServerSocket RELAY;
-	
+
 	Vector<P2PSocket> INCOMING = new Vector();
+	Vector CHECKING = new Vector();
 	Object MUTEX = new Object();
 	
 	String UUID;
@@ -133,68 +136,104 @@ public class P2PServerSocket implements ServerSocket
 			Vector<String> brokers = new Vector();
 			String UUIDS = "";
 			int i = ja.length();
-			while (i-->0) try
-			{
+			while (i-- > 0) try {
 				final String uuid = ja.getString(i);
-				UUIDS += UUIDS.equals("") ? uuid : " "+uuid;
-				if (P2P.isLoaded(uuid))
-				{
+				UUIDS += UUIDS.equals("") ? uuid : " " + uuid;
+				if (P2P.isLoaded(uuid)) {
 					final P2PPeer p = P2P.getPeer(uuid);
-					
-					if (p.isRelay())
-					{
+
+					if (p.isRelay()) {
 						p.setConnected(true);
 						p.updateLastContact();
 					}
-					
+
 //					if (p.isConnected() && System.currentTimeMillis() - p.lastContact() > 35000) p.disconnect();
 //					else 
-						if (p.isTCP()) {
-							brokers.addElement(uuid);
-						}
-				
+					if (p.isTCP()) {
+						brokers.addElement(uuid);
+					}
+
 					if (p.keepAlive() && !p.isConnected()) P2P.connect(uuid);
-	
+
 					if (p.isTCP() && p.isConnected() && p.lastContact() > 30000)
 						p.sendCommandAsync("peerbot", "getpeerinfo", new Hashtable<String, String>(), new P2PCallback() {
-							
+
 							@Override
-							public P2PCommand execute(JSONObject result) 
-							{
-								System.out.println("Heartbeat "+p.getName()+"/"+p.getID()+" "+result);
-	
-								try
-								{
+							public P2PCommand execute(JSONObject result) {
+								System.out.println("Heartbeat " + p.getName() + "/" + p.getID() + " " + result);
+
+								try {
 									String name = result.getString("name");
 									String localip = result.getString("localip");
 									String addr = result.getString("addr");
 									int port = result.getInt("port");
-	
+
 									if (!name.equals(p.getName())) p.setName(name);
-	
+
 									p.addSocketAddress(new InetSocketAddress(localip, port));
 									p.addSocketAddress(new InetSocketAddress(addr, port));
 
-									if (result.has("localaddresses"))
-									{
+									if (result.has("localaddresses")) {
 										JSONObject jo = result.getJSONObject("localaddresses");
 										JSONArray ja = jo.getJSONArray("link");
 										int i = ja.length();
-										while (i-->0) p.addSocketAddress(new InetSocketAddress(ja.getString(i), port));
+										while (i-- > 0)
+											p.addSocketAddress(new InetSocketAddress(ja.getString(i), port));
 										ja = jo.getJSONArray("site");
 										i = ja.length();
-										while (i-->0) p.addSocketAddress(new InetSocketAddress(ja.getString(i), port));
+										while (i-- > 0)
+											p.addSocketAddress(new InetSocketAddress(ja.getString(i), port));
 									}
+								} catch (Exception x) {
+									x.printStackTrace();
 								}
-								catch (Exception x) { x.printStackTrace(); }
-								
+
 								return null;
 							}
 						});
 				}
+			} catch (Exception x) {
+				x.printStackTrace();
 			}
-			catch (Exception x) { x.printStackTrace(); }
-	
+
+			if (CHECKING.size()>0)
+			{
+				Object[] oa = (Object[]) CHECKING.remove(0);
+				P2PPeer me = (P2PPeer) oa[0];
+				InetSocketAddress isa = (InetSocketAddress) oa[1];
+				try {
+					TCPSocket sock = new TCPSocket(isa.getHostString(), isa.getPort(), 5000);
+					sock.setSoTimeout(5000);
+					InputStream is = sock.getInputStream();
+					byte[] ba = new byte[36];
+					int n = is.read(ba);
+					if (n == 36) {
+						String id = new String(ba);
+						if (me.getID().equals(id)) {
+							me.addConfirmedAddress(isa);
+							P2P.savePeer(me);
+							try {
+								P2P.fireEvent("update", new JSONObject(me.toString()));
+							} catch (Exception x) {
+								x.printStackTrace();
+							}
+							return;
+						} else
+							System.out.println("Mismatched ID checking " + me.getName() + " at " + isa + " (" + id + ")");
+					} else
+						System.out.println("Unexpected response checking " + me.getName() + " at " + isa + " (" + new String(ba) + ")");
+				} catch (Exception x) {
+					System.out.println("Unable to reach " + me.getName() + " at " + isa + " (" + x.getMessage() + ")");
+				}
+
+				me.mKnownAddresses.removeElement(isa);
+				try {
+					P2P.savePeer(me);
+				} catch (Exception x) {
+					x.printStackTrace();
+				}
+			}
+
 			if (!UUIDS.equals("") && mod % 6 == 0)
 			{
 				Hashtable h = new Hashtable();

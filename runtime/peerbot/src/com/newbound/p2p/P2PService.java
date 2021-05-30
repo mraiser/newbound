@@ -238,6 +238,11 @@ public class P2PService extends Service
 		P2P.addConfirmedAddress(uuid, isa);
 	}
 
+    public void confirmSocketAddress(P2PPeer peer, InetSocketAddress isa)
+	{
+		((P2PServerSocket)SS).CHECKING.addElement(new Object[] { peer, isa });
+    }
+
 /*
 	public void sendPing(InetSocketAddress isa) throws Exception
 	{
