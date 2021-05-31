@@ -132,65 +132,70 @@ public class P2PServerSocket implements ServerSocket
 
 //		if (false)
 		{
-			JSONArray ja = P2P.knownPeers();
+			JSONArray ja = P2P.myPeers();
+			Iterator it = P2P.connected();
+			while (it.hasNext()) ja.put(((P2PPeer) it.next()).getID());
+
 			Vector<String> brokers = new Vector();
 			String UUIDS = "";
 			int i = ja.length();
 			while (i-- > 0) try {
 				final String uuid = ja.getString(i);
-				UUIDS += UUIDS.equals("") ? uuid : " " + uuid;
-				if (P2P.isLoaded(uuid)) {
-					final P2PPeer p = P2P.getPeer(uuid);
+				if (UUIDS.indexOf(uuid) == -1) {
+					UUIDS += UUIDS.equals("") ? uuid : " " + uuid;
+					if (P2P.isLoaded(uuid)) {
+						final P2PPeer p = P2P.getPeer(uuid);
 
-					if (p.isRelay()) {
-						p.setConnected(true);
-						p.updateLastContact();
-					}
+						if (p.isRelay()) {
+							p.setConnected(true);
+							p.updateLastContact();
+						}
 
-//					if (p.isConnected() && System.currentTimeMillis() - p.lastContact() > 35000) p.disconnect();
-//					else 
-					if (p.isTCP()) {
-						brokers.addElement(uuid);
-					}
+						//					if (p.isConnected() && System.currentTimeMillis() - p.lastContact() > 35000) p.disconnect();
+						//					else
+						if (p.isTCP() && brokers.indexOf(uuid) == -1) {
+							brokers.addElement(uuid);
+						}
 
-					if (p.keepAlive() && !p.isConnected()) P2P.connect(uuid);
+						if (p.keepAlive() && !p.isConnected()) P2P.connect(uuid);
 
-					if (p.isTCP() && p.isConnected() && p.lastContact() > 30000)
-						p.sendCommandAsync("peerbot", "getpeerinfo", new Hashtable<String, String>(), new P2PCallback() {
+						if (p.isTCP() && p.isConnected() && p.lastContact() > 30000)
+							p.sendCommandAsync("peerbot", "getpeerinfo", new Hashtable<String, String>(), new P2PCallback() {
 
-							@Override
-							public P2PCommand execute(JSONObject result) {
-								System.out.println("Heartbeat " + p.getName() + "/" + p.getID() + " " + result);
+								@Override
+								public P2PCommand execute(JSONObject result) {
+									System.out.println("Heartbeat " + p.getName() + "/" + p.getID() + " " + result);
 
-								try {
-									String name = result.getString("name");
-									String localip = result.getString("localip");
-									String addr = result.getString("addr");
-									int port = result.getInt("port");
+									try {
+										String name = result.getString("name");
+										String localip = result.getString("localip");
+										String addr = result.getString("addr");
+										int port = result.getInt("port");
 
-									if (!name.equals(p.getName())) p.setName(name);
+										if (!name.equals(p.getName())) p.setName(name);
 
-									p.addSocketAddress(new InetSocketAddress(localip, port));
-									p.addSocketAddress(new InetSocketAddress(addr, port));
+										p.addSocketAddress(new InetSocketAddress(localip, port));
+										p.addSocketAddress(new InetSocketAddress(addr, port));
 
-									if (result.has("localaddresses")) {
-										JSONObject jo = result.getJSONObject("localaddresses");
-										JSONArray ja = jo.getJSONArray("link");
-										int i = ja.length();
-										while (i-- > 0)
-											p.addSocketAddress(new InetSocketAddress(ja.getString(i), port));
-										ja = jo.getJSONArray("site");
-										i = ja.length();
-										while (i-- > 0)
-											p.addSocketAddress(new InetSocketAddress(ja.getString(i), port));
+										if (result.has("localaddresses")) {
+											JSONObject jo = result.getJSONObject("localaddresses");
+											JSONArray ja = jo.getJSONArray("link");
+											int i = ja.length();
+											while (i-- > 0)
+												p.addSocketAddress(new InetSocketAddress(ja.getString(i), port));
+											ja = jo.getJSONArray("site");
+											i = ja.length();
+											while (i-- > 0)
+												p.addSocketAddress(new InetSocketAddress(ja.getString(i), port));
+										}
+									} catch (Exception x) {
+										x.printStackTrace();
 									}
-								} catch (Exception x) {
-									x.printStackTrace();
-								}
 
-								return null;
-							}
-						});
+									return null;
+								}
+							});
+					}
 				}
 			} catch (Exception x) {
 				x.printStackTrace();
@@ -199,36 +204,38 @@ public class P2PServerSocket implements ServerSocket
 			if (CHECKING.size()>0)
 			{
 				Object[] oa = (Object[]) CHECKING.remove(0);
-				P2PPeer me = (P2PPeer) oa[0];
+				P2PPeer peer = (P2PPeer) oa[0];
 				InetSocketAddress isa = (InetSocketAddress) oa[1];
 				try {
-					TCPSocket sock = new TCPSocket(isa.getHostString(), isa.getPort(), 5000);
-					sock.setSoTimeout(5000);
-					InputStream is = sock.getInputStream();
-					byte[] ba = new byte[36];
-					int n = is.read(ba);
-					if (n == 36) {
-						String id = new String(ba);
-						if (me.getID().equals(id)) {
-							me.addConfirmedAddress(isa);
-							P2P.savePeer(me);
-							try {
-								P2P.fireEvent("update", new JSONObject(me.toString()));
-							} catch (Exception x) {
-								x.printStackTrace();
-							}
-							return;
+					if (!peer.isTCP()) P2P.initiateTCPConnection(peer, isa);
+					else {
+						TCPSocket sock = new TCPSocket(isa.getHostString(), isa.getPort(), 5000);
+						sock.setSoTimeout(5000);
+						InputStream is = sock.getInputStream();
+						byte[] ba = new byte[36];
+						int n = is.read(ba);
+						if (n == 36) {
+							String id = new String(ba);
+							if (peer.getID().equals(id)) {
+								peer.addConfirmedAddress(isa);
+								try {
+									P2P.fireEvent("update", new JSONObject(peer.toString()));
+								} catch (Exception x) {
+									x.printStackTrace();
+								}
+								return;
+							} else
+								System.out.println("Mismatched ID checking " + peer.getName() + " at " + isa + " (" + id + ")");
 						} else
-							System.out.println("Mismatched ID checking " + me.getName() + " at " + isa + " (" + id + ")");
-					} else
-						System.out.println("Unexpected response checking " + me.getName() + " at " + isa + " (" + new String(ba) + ")");
+							System.out.println("Unexpected response checking " + peer.getName() + " at " + isa + " (" + new String(ba) + ")");
+					}
 				} catch (Exception x) {
-					System.out.println("Unable to reach " + me.getName() + " at " + isa + " (" + x.getMessage() + ")");
+					System.out.println("Unable to reach " + peer.getName() + " at " + isa + " (" + x.getMessage() + ")");
 				}
 
-				me.mKnownAddresses.removeElement(isa);
+				peer.mKnownAddresses.removeElement(isa);
 				try {
-					P2P.savePeer(me);
+					P2P.savePeer(peer);
 				} catch (Exception x) {
 					x.printStackTrace();
 				}
@@ -253,12 +260,12 @@ public class P2PServerSocket implements ServerSocket
 			if (checking.get(relay) != null)
 			{
 				long dur = System.currentTimeMillis()-checking.get(relay);
-//				if (dur<60000)
+				if (dur<120000)
 					System.out.println("Still checking relay "+relay+" after "+dur+" ms");
-//				else try {
-//					P2P.disconnect(relay);
-//				}
-//				catch (Exception x) { x.printStackTrace(); }
+				else try {
+					P2P.disconnect(relay);
+				}
+				catch (Exception x) { x.printStackTrace(); }
 			}
 			else
 			{

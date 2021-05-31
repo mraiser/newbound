@@ -7,6 +7,8 @@ import java.util.Hashtable;
 import java.util.Map;
 import java.util.Vector;
 
+import com.newbound.robot.BotManager;
+import com.newbound.robot.SYS;
 import com.newbound.util.*;
 
 /**
@@ -144,6 +146,8 @@ public class ThreadHandler
 				{
 					public void run()
 					{
+						while (!SYS.RUNNING) try { Thread.sleep(100); } catch (Exception x) {}
+
 						while (getWorkQueue().mRunning)
 						{
 							int num = 0;

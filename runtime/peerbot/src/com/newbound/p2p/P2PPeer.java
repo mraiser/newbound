@@ -49,7 +49,7 @@ public class P2PPeer
 	
 //	private Vector<String> mRelays = new Vector();
 	public Vector<InetSocketAddress> mKnownAddresses = new Vector();
-	public Vector<InetSocketAddress> mSeenAddresses = new Vector();
+	public Hashtable<InetSocketAddress, Long> mSeenAddresses = new Hashtable<>();
 	
 	public String code = null;
 
@@ -436,10 +436,14 @@ public class P2PPeer
 	
 	public void confirmSocketAddress(InetSocketAddress isa)
 	{
-		if (mSeenAddresses.indexOf(isa) == -1 && mKnownAddresses.indexOf(isa) == -1)
+		if (mKnownAddresses.indexOf(isa) == -1)
 		{
-			mSeenAddresses.addElement(isa);
-			mP2PManager.confirmSocketAddress(this, isa);
+			Long l = mSeenAddresses.get(isa);
+			long now = System.currentTimeMillis();
+			if (l == null || now - l > 300000) {
+				mSeenAddresses.put(isa, now);
+				mP2PManager.confirmSocketAddress(this, isa);
+			}
 		}
 	}
 

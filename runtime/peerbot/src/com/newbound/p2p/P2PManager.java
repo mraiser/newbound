@@ -154,7 +154,7 @@ public class P2PManager implements Container
 		return p;
 	}
 
-	Hashtable<InetSocketAddress, Long> DNC = new Hashtable();
+	Hashtable<InetSocketAddress, Long> DNC = new Hashtable(); // FIXME - Probably not needed and just breaking stuff. Merge with known/seen addresses
 	protected void initiateTCPConnection(final P2PPeer p) 
 	{
 		Enumeration<InetSocketAddress> e = p.getknownSocketAddresses().elements();
@@ -163,24 +163,20 @@ public class P2PManager implements Container
 			final InetSocketAddress isa = e.nextElement();
 			Long l = DNC.get(isa);
 			long now = System.currentTimeMillis();
-			DNC.put(isa,  now);
-			if (l == null || now - l > 30000)
-			mBot.addJob(new Runnable() 
-			{
-				@Override
-				public void run() 
-				{
-					try
-					{
-						initiateTCPConnection(p, isa);
+			if (l == null || now - l > 30000) {
+				DNC.put(isa,  now);
+				mBot.addJob(new Runnable() {
+					@Override
+					public void run() {
+						try {
+							initiateTCPConnection(p, isa);
+						} catch (Exception x) {
+							p.removeSocketAddress(isa);
+							System.out.println("unable to establish TCP connection with " + p.getID() + " at " + isa);
+						}
 					}
-					catch (Exception x) 
-					{
-						p.removeSocketAddress(isa);
-						System.out.println("unable to establish TCP connection with "+p.getID()+" at "+isa);
-					}
-				}
-			}, "Initiate TCP connection with "+p.getID());
+				}, "Initiate TCP connection with " + p.getID());
+			}
 		}
 	}
 
@@ -410,16 +406,15 @@ public class P2PManager implements Container
 */
 	public void initiateTCPConnection(P2PPeer p, InetSocketAddress isa) throws Exception 
 	{
-		Socket sock = new Socket(isa.getHostString(), isa.getPort());
-		sock.setSoTimeout(5000);
-		TCPSocket tsock = new TCPSocket(sock);
+		TCPSocket tsock = new TCPSocket(isa.getHostString(), isa.getPort(), 5000);
+		tsock.setSoTimeout(5000);
 		P2PSocket psock = new P2PSocket(P2P, ID, PORT, tsock);
 		
 		P2PParser parse = new P2PParser();
 		if (parse.init(P2P, psock))
 		{	
 			p.setConnected(true);
-			sock.setSoTimeout(60000);
+			tsock.setSoTimeout(60000);
 			P2P.listen(psock, parse);
 			
 //			p.mKnownAddresses.clear();
@@ -435,6 +430,11 @@ public class P2PManager implements Container
 	public void confirmSocketAddress(P2PPeer peer, InetSocketAddress isa)
 	{
 		P2P.confirmSocketAddress(peer, isa);
+	}
+
+	public JSONArray myPeers()
+	{
+		return mBot.myPeers();
 	}
 /*
 	public void sendPing(InetSocketAddress isa) throws Exception

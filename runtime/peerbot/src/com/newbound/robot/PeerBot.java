@@ -190,7 +190,7 @@ public class PeerBot extends MetaBot
 			commands.put("websocket", cmd);
 
 			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
+			cmd.put("groups", "trusted");
 			cmd.put("desc", "List all of the devices the local device knows how to connect to.");
 			commands.put("connections", cmd);
 
@@ -1740,5 +1740,14 @@ public class PeerBot extends MetaBot
 	public static boolean hasPeer(String id) 
 	{
 		return mP2PManager.hasPeer(id);
+	}
+
+	public JSONArray myPeers()
+	{
+		try
+		{
+			return getData("runtime", "peerbot_mypeers").getJSONObject("data").getJSONArray("list");
+		}
+		catch (Exception x) { return new JSONArray(); }
 	}
 }
