@@ -146,14 +146,14 @@ public class P2PServerSocket implements ServerSocket
 					if (P2P.isLoaded(uuid)) {
 						final P2PPeer p = P2P.getPeer(uuid);
 
-						if (p.isRelay()) {
+						if (p.isRelay()) { // FIXME - pretending the connection is good doesn't mean the connection is good.
 							p.setConnected(true);
 							p.updateLastContact();
 						}
 
 						//					if (p.isConnected() && System.currentTimeMillis() - p.lastContact() > 35000) p.disconnect();
 						//					else
-						if (p.isTCP() && brokers.indexOf(uuid) == -1) {
+						if (p.isTCP() && !brokers.contains(uuid)) {
 							brokers.addElement(uuid);
 						}
 

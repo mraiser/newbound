@@ -154,7 +154,7 @@ public class P2PManager implements Container
 		return p;
 	}
 
-	Hashtable<InetSocketAddress, Long> DNC = new Hashtable(); // FIXME - Probably not needed and just breaking stuff. Merge with known/seen addresses
+	Hashtable<InetSocketAddress, Long> DNC = new Hashtable(); // FIXME - Probably not needed and just breaking stuff. Merge with known/seen addresses. Used by connect(p)
 	protected void initiateTCPConnection(final P2PPeer p) 
 	{
 		Enumeration<InetSocketAddress> e = p.getknownSocketAddresses().elements();
