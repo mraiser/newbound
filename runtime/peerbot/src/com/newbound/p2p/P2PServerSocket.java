@@ -66,7 +66,7 @@ public class P2PServerSocket implements ServerSocket
 			{
 				try { maintenance(); } catch (Exception x) { x.printStackTrace(); }
 			}
-		}, 5000, "P2P SERVER SOCKET MAINTENANCE");
+		}, 20000, "P2P SERVER SOCKET MAINTENANCE");
 
 		p2p.addEventListener("disconnect", new Callback() {
 			@Override
@@ -111,12 +111,12 @@ public class P2PServerSocket implements ServerSocket
 		}
 	}
 	
-	int mod = 0;
+	//int mod = -2;
 	
 	protected void maintenance() throws Exception
 	{
 		P2PParser.maintenance();
-		mod++;
+		//mod++;
 		if (true) //(mod++ % 10 == 0)
 		{
 			Iterator<Thread> it = Thread.getAllStackTraces().keySet().iterator();
@@ -132,9 +132,9 @@ public class P2PServerSocket implements ServerSocket
 
 //		if (false)
 		{
-			JSONArray ja = P2P.myPeers();
-			Iterator it = P2P.connected();
-			while (it.hasNext()) ja.put(((P2PPeer) it.next()).getID());
+			JSONArray ja = new JSONArray(); //P2P.myPeers();
+			Enumeration<String> it = PeerManager.loaded(); //P2P.connected();
+			while (it.hasMoreElements()) ja.put(it.nextElement());
 
 			Vector<String> brokers = new Vector();
 			String UUIDS = "";
@@ -143,13 +143,14 @@ public class P2PServerSocket implements ServerSocket
 				final String uuid = ja.getString(i);
 				if (UUIDS.indexOf(uuid) == -1) {
 					UUIDS += UUIDS.equals("") ? uuid : " " + uuid;
-					if (P2P.isLoaded(uuid)) {
+					//if (P2P.isLoaded(uuid))
+					{
 						final P2PPeer p = P2P.getPeer(uuid);
 
-						if (p.isRelay()) { // FIXME - pretending the connection is good doesn't mean the connection is good.
-							p.setConnected(true);
-							p.updateLastContact();
-						}
+						//if (p.isRelay()) { // FIXME - pretending the connection is good doesn't mean the connection is good.
+						//	p.setConnected(true);
+						//	p.updateLastContact();
+						//}
 
 						//					if (p.isConnected() && System.currentTimeMillis() - p.lastContact() > 35000) p.disconnect();
 						//					else
@@ -159,7 +160,7 @@ public class P2PServerSocket implements ServerSocket
 
 						if (p.keepAlive() && !p.isConnected()) P2P.connect(uuid);
 
-						if (p.isTCP() && p.isConnected() && p.lastContact() > 30000)
+						if (p.isConnected() && p.lastContact() > 30000)
 							p.sendCommandAsync("peerbot", "getpeerinfo", new Hashtable<String, String>(), new P2PCallback() {
 
 								@Override
@@ -241,7 +242,7 @@ public class P2PServerSocket implements ServerSocket
 				}
 			}
 
-			if (!UUIDS.equals("") && mod % 6 == 0)
+			if (!UUIDS.equals("")) // && mod % 6 == 0)
 			{
 				Hashtable h = new Hashtable();
 				h.put("uuids", UUIDS);

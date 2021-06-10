@@ -47,7 +47,7 @@ public class P2PConnection implements Socket
 	{
 		super();
 		
-		System.out.println("STREAM["+id+"] BEGIN");
+//		System.out.println("STREAM["+id+"] BEGIN");
 
 		mID = id;
 		mPeer = peer;
@@ -228,7 +228,7 @@ public class P2PConnection implements Socket
 	
 	public void connect() throws Exception
 	{
-		System.out.println("STREAM["+mID+"] CONNECTING");
+//		System.out.println("STREAM["+mID+"] CONNECTING");
 		mConnecting = true;
 
 		Hashtable<String, String> params = new Hashtable();
@@ -251,12 +251,12 @@ public class P2PConnection implements Socket
 		mConnected = true;
 		mPeer.mStreams.put(mID, this);
 		
-		System.out.println("STREAM["+mID+"] CONNECTED");
+//		System.out.println("STREAM["+mID+"] CONNECTED");
 	}
 	
 	public void disconnect()
 	{
-		System.out.println("STREAM["+mID+"] DISCONNECTING");
+//		System.out.println("STREAM["+mID+"] DISCONNECTING");
 
 //		try { mPeer.flushIncoming(mID); } catch (Exception x) { x.printStackTrace(); }
 		// FIXME - closing is not what you think. See STREAM_DIED
@@ -281,7 +281,7 @@ public class P2PConnection implements Socket
 		mClosed = true;
 		mPeer.mStreams.remove(mID);
 		
-		System.out.println("STREAM["+mID+"] DISCONNECTED");
+//		System.out.println("STREAM["+mID+"] DISCONNECTED");
 	}
 	
 	public OutputStream getOutputStream()

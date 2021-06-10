@@ -3,10 +3,7 @@ package com.newbound.p2p;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.Hashtable;
-import java.util.Iterator;
-import java.util.Properties;
-import java.util.Vector;
+import java.util.*;
 
 import org.json.JSONObject;
 
@@ -150,5 +147,10 @@ public class PeerManager extends BotUtil
 	{
 		P2PPeer p = PEERS.get(id);
 		return p != null;
+	}
+
+	public static Enumeration<String> loaded()
+	{
+		return PEERS.keys();
 	}
 }
