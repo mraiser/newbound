@@ -1,6 +1,6 @@
 /**
  * dat-gui JavaScript Controller Library
- * http://code.google.com/p/dat-gui
+ * https://github.com/dataarts/dat.gui
  *
  * Copyright 2011 Data Arts Team, Google Creative Lab
  *
@@ -41,7 +41,7 @@ const DEFAULT_DEFAULT_PRESET_NAME = 'Default';
 
 const SUPPORTS_LOCAL_STORAGE = (function() {
   try {
-    return 'localStorage' in window && window.localStorage !== null;
+    return !!window.localStorage;
   } catch (e) {
     return false;
   }
@@ -80,10 +80,11 @@ const hideableGuis = [];
  * @param {String} [params.name] The name of this GUI.
  * @param {Object} [params.load] JSON object representing the saved state of
  * this GUI.
- * @param {Boolean} [params.auto=true]
  * @param {dat.gui.GUI} [params.parent] The GUI I'm nested in.
- * @param {Boolean} [params.closed] If true, starts closed
- * @param {Boolean} [params.closeOnTop] If true, close/open button shows on top of the GUI
+ * @param {Boolean} [params.autoPlace=true]
+ * @param {Boolean} [params.hideable=true] If true, GUI is shown/hidden by <kbd>h</kbd> keypress.
+ * @param {Boolean} [params.closed=false] If true, starts closed
+ * @param {Boolean} [params.closeOnTop=false] If true, close/open button shows on top of the GUI
  */
 const GUI = function(pars) {
   const _this = this;
@@ -167,7 +168,7 @@ const GUI = function(pars) {
   if (params.autoPlace && common.isUndefined(params.scrollable)) {
     params.scrollable = true;
   }
-//    params.scrollable = common.isUndefined(params.parent) && params.scrollable === true;
+  //    params.scrollable = common.isUndefined(params.parent) && params.scrollable === true;
 
   // Not part of params because I don't want people passing this in via
   // constructor. Should be a 'remembered' value.
@@ -176,6 +177,7 @@ const GUI = function(pars) {
     localStorage.getItem(getLocalStorageHash(this, 'isLocal')) === 'true';
 
   let saveToLocalStorage;
+  let titleRow;
 
   Object.defineProperties(this,
     /** @lends GUI.prototype */
@@ -266,8 +268,8 @@ const GUI = function(pars) {
         set: function(v) {
           // TODO Check for collisions among sibling folders
           params.name = v;
-          if (titleRowName) {
-            titleRowName.innerHTML = params.name;
+          if (titleRow) {
+            titleRow.innerHTML = params.name;
           }
         }
       },
@@ -334,7 +336,7 @@ const GUI = function(pars) {
 
   // Are we a root level GUI?
   if (common.isUndefined(params.parent)) {
-    params.closed = false;
+    this.closed = params.closed || false;
 
     dom.addClass(this.domElement, GUI.CLASS_MAIN);
     dom.makeSelectable(this.domElement, false);
@@ -375,7 +377,7 @@ const GUI = function(pars) {
     const titleRowName = document.createTextNode(params.name);
     dom.addClass(titleRowName, 'controller-name');
 
-    const titleRow = addRow(_this, titleRowName);
+    titleRow = addRow(_this, titleRowName);
 
     const onClickTitle = function(e) {
       e.preventDefault();
@@ -570,20 +572,30 @@ common.extend(
     },
 
     /**
-     * Removes the GUI from the document and unbinds all event listeners.
+     * Removes the root GUI from the document and unbinds all event listeners.
+     * For subfolders, use `gui.removeFolder(folder)` instead.
      * @instance
      */
     destroy: function() {
+      if (this.parent) {
+        throw new Error(
+          'Only the root GUI should be removed with .destroy(). ' +
+          'For subfolders, use gui.removeFolder(folder) instead.'
+        );
+      }
+
       if (this.autoPlace) {
         autoPlaceContainer.removeChild(this.domElement);
       }
 
-      dom.unbind(window, 'keydown', GUI._keydownHandler, false);
-      dom.unbind(window, 'resize', this.__resizeHandler);
+      const _this = this;
+      common.each(this.__folders, function(subfolder) {
+        _this.removeFolder(subfolder);
+      });
 
-      if (this.saveToLocalStorageIfPossible) {
-        dom.unbind(window, 'unload', this.saveToLocalStorageIfPossible);
-      }
+      dom.unbind(window, 'keydown', GUI._keydownHandler, false);
+
+      removeListeners(this);
     },
 
     /**
@@ -645,7 +657,14 @@ common.extend(
         delete this.load.folders[folder.name];
       }
 
+      removeListeners(folder);
+
       const _this = this;
+
+      common.each(folder.__folders, function(subfolder) {
+        folder.removeFolder(subfolder);
+      });
+
       common.defer(function() {
         _this.onResize();
       });
@@ -663,6 +682,20 @@ common.extend(
      */
     close: function() {
       this.closed = true;
+    },
+
+    /**
+    * Hides the GUI.
+    */
+    hide: function() {
+      this.domElement.style.display = 'none';
+    },
+
+    /**
+    * Shows the GUI.
+    */
+    show: function() {
+      this.domElement.style.display = '';
     },
 
 
@@ -868,10 +901,17 @@ function addRow(gui, newDom, liBefore) {
   return li;
 }
 
+function removeListeners(gui) {
+  dom.unbind(window, 'resize', gui.__resizeHandler);
+
+  if (gui.saveToLocalStorageIfPossible) {
+    dom.unbind(window, 'unload', gui.saveToLocalStorageIfPossible);
+  }
+}
+
 function markPresetModified(gui, modified) {
   const opt = gui.__preset_select[gui.__preset_select.selectedIndex];
 
-  // console.log('mark', modified, opt);
   if (modified) {
     opt.innerHTML = opt.value + '*';
   } else {
@@ -954,7 +994,7 @@ function augmentController(gui, li, controller) {
     const box = new NumberControllerBox(controller.object, controller.property,
       { min: controller.__min, max: controller.__max, step: controller.__step });
 
-    common.each(['updateDisplay', 'onChange', 'onFinishChange', 'step'], function(method) {
+    common.each(['updateDisplay', 'onChange', 'onFinishChange', 'step', 'min', 'max'], function(method) {
       const pc = controller[method];
       const pb = box[method];
       controller[method] = box[method] = function() {
@@ -984,7 +1024,8 @@ function augmentController(gui, li, controller) {
           {
             before: controller.__li.nextElementSibling,
             factoryArgs: [controller.__min, controller.__max, controller.__step]
-          });
+          }
+        );
 
         newController.name(oldName);
         if (wasListening) newController.listen();

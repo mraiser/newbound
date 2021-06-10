@@ -1,6 +1,6 @@
 /**
  * dat-gui JavaScript Controller Library
- * http://code.google.com/p/dat-gui
+ * https://github.com/dataarts/dat.gui
  *
  * Copyright 2011 Data Arts Team, Google Creative Lab
  *
@@ -149,7 +149,7 @@ const Common = {
   },
 
   isFunction: function(obj) {
-    return Object.prototype.toString.call(obj) === '[object Function]';
+    return obj instanceof Function;
   }
 
 };

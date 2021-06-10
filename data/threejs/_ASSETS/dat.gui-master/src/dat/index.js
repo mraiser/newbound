@@ -1,6 +1,6 @@
 /**
  * dat-gui JavaScript Controller Library
- * http://code.google.com/p/dat-gui
+ * https://github.com/dataarts/dat.gui
  *
  * Copyright 2011 Data Arts Team, Google Creative Lab
  *
@@ -25,35 +25,37 @@ import NumberControllerSlider from './controllers/NumberControllerSlider';
 import FunctionController from './controllers/FunctionController';
 import ColorController from './controllers/ColorController';
 
-import dom from './dom/dom';
-import GUI from './gui/GUI';
+import domImport from './dom/dom';
+import GUIImport from './gui/GUI';
+
+export const color = {
+  Color: Color,
+  math: math,
+  interpret: interpret
+};
+
+export const controllers = {
+  Controller: Controller,
+  BooleanController: BooleanController,
+  OptionController: OptionController,
+  StringController: StringController,
+  NumberController: NumberController,
+  NumberControllerBox: NumberControllerBox,
+  NumberControllerSlider: NumberControllerSlider,
+  FunctionController: FunctionController,
+  ColorController: ColorController
+};
+
+export const dom = { dom: domImport };
+
+export const gui = { GUI: GUIImport };
+
+export const GUI = GUIImport;
 
 export default {
-  color: {
-    Color: Color,
-    math: math,
-    interpret: interpret
-  },
-
-  controllers: {
-    Controller: Controller,
-    BooleanController: BooleanController,
-    OptionController: OptionController,
-    StringController: StringController,
-    NumberController: NumberController,
-    NumberControllerBox: NumberControllerBox,
-    NumberControllerSlider: NumberControllerSlider,
-    FunctionController: FunctionController,
-    ColorController: ColorController
-  },
-
-  dom: {
-    dom: dom
-  },
-
-  gui: {
-    GUI: GUI
-  },
-
-  GUI: GUI
+  color,
+  controllers,
+  dom,
+  gui,
+  GUI
 };

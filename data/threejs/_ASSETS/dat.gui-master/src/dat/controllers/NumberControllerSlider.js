@@ -1,6 +1,6 @@
 /**
  * dat-gui JavaScript Controller Library
- * http://code.google.com/p/dat-gui
+ * https://github.com/dataarts/dat.gui
  *
  * Copyright 2011 Data Arts Team, Google Creative Lab
  *
@@ -44,6 +44,7 @@ class NumberControllerSlider extends NumberController {
     this.__foreground = document.createElement('div');
 
     dom.bind(this.__background, 'mousedown', onMouseDown);
+    dom.bind(this.__background, 'touchstart', onTouchStart);
 
     dom.addClass(this.__background, 'slider');
     dom.addClass(this.__foreground, 'slider-fg');
@@ -72,6 +73,30 @@ class NumberControllerSlider extends NumberController {
     function onMouseUp() {
       dom.unbind(window, 'mousemove', onMouseDrag);
       dom.unbind(window, 'mouseup', onMouseUp);
+      if (_this.__onFinishChange) {
+        _this.__onFinishChange.call(_this, _this.getValue());
+      }
+    }
+
+    function onTouchStart(e) {
+      if (e.touches.length !== 1) { return; }
+      dom.bind(window, 'touchmove', onTouchMove);
+      dom.bind(window, 'touchend', onTouchEnd);
+      onTouchMove(e);
+    }
+
+    function onTouchMove(e) {
+      const clientX = e.touches[0].clientX;
+      const bgRect = _this.__background.getBoundingClientRect();
+
+      _this.setValue(
+        map(clientX, bgRect.left, bgRect.right, _this.__min, _this.__max)
+      );
+    }
+
+    function onTouchEnd() {
+      dom.unbind(window, 'touchmove', onTouchMove);
+      dom.unbind(window, 'touchend', onTouchEnd);
       if (_this.__onFinishChange) {
         _this.__onFinishChange.call(_this, _this.getValue());
       }

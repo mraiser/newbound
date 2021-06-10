@@ -1,6 +1,6 @@
 /**
  * dat-gui JavaScript Controller Library
- * http://code.google.com/p/dat-gui
+ * https://github.com/dataarts/dat.gui
  *
  * Copyright 2011 Data Arts Team, Google Creative Lab
  *
@@ -104,8 +104,7 @@ Color.recalculateHSV = function(color) {
     {
       s: result.s,
       v: result.v
-    }
-  );
+    });
 
   if (!common.isNaN(result.h)) {
     color.__state.h = result.h;
@@ -136,8 +135,9 @@ Object.defineProperty(Color.prototype, 'a', {
 
 Object.defineProperty(Color.prototype, 'hex', {
   get: function() {
-    if (!this.__state.space !== 'HEX') {
+    if (this.__state.space !== 'HEX') {
       this.__state.hex = math.rgb_to_hex(this.r, this.g, this.b);
+      this.__state.space = 'HEX';
     }
 
     return this.__state.hex;

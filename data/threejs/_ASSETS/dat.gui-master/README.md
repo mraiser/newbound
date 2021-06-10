@@ -1,8 +1,7 @@
 # dat.GUI
 A lightweight graphical user interface for changing variables in JavaScript. 
 
-Get started with dat.GUI by reading the [tutorial](http://workshop.chromeexperiments.com/examples/gui)
-or the [API documentation](API.md).
+Get started with dat.GUI by reading the [API documentation](API.md).
 
 
 
@@ -10,8 +9,24 @@ or the [API documentation](API.md).
 The easiest way to use dat.GUI in your code is by using the built source at `build/dat.gui.min.js`. These built JavaScript files bundle all the necessary dependencies to run dat.GUI.
 
 In your `head` tag, include the following code:
-```
+```html
 <script type="text/javascript" src="dat.gui.min.js"></script>
+```
+
+## Installing from npm
+
+```bash
+$ npm install --save dat.gui
+```
+
+```js
+// CommonJS:
+const dat = require('dat.gui');
+
+// ES6:
+import * as dat from 'dat.gui';
+
+const gui = new dat.GUI();
 ```
 
 ## Directory Contents
@@ -19,8 +34,7 @@ In your `head` tag, include the following code:
 ```
 ├── build - Compiled source code.
 ├── src - Source files.
-├── tests - Tests.
-└── webpack - Webpack config files.
+└── tests - Tests.
 ```
 
 ## Building your own dat.GUI
@@ -46,7 +60,7 @@ View the [Change Log](CHANGELOG.md)
 
 ## Thanks
 The following libraries / open-source projects were used in the development of dat.GUI:
- * [webpack](https://webpack.github.io/)
+ * [Rollup](https://rollupjs.org)
  * [Sass](http://sass-lang.com/)
- * [node.js](http://nodejs.org/)
+ * [Node.js](http://nodejs.org/)
  * [QUnit](https://github.com/jquery/qunit) / [jquery](http://jquery.com/)
