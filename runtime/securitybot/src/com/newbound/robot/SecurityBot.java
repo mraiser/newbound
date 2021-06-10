@@ -733,7 +733,7 @@ public class SecurityBot extends BotBase
 		if (x != -1) cmd = cmd.substring(0,x);
 
 		if (cmd.equals("botmanager"))
-			System.out.println("FIXME");
+			System.out.println("FIXME2");
 		
 		Properties user = null;
 		String username = null;
