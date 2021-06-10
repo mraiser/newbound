@@ -358,20 +358,30 @@ public class Code
 		JSONObject out2 = cmd.getJSONObject("out");
 		keys = out2.keys();
 		ArrayList list_out = new ArrayList();
+		ArrayList loop_out = new ArrayList();
 		while (keys.hasNext()) {
 			String name = (String) keys.next();
 			JSONObject out3 = out2.getJSONObject(name);
-			if (out3.has("mode") && out3.getString("mode").equals("list")) list_out.add(name);
+			if (out3.has("mode")) {
+				String mode = out3.getString("mode");
+				if (mode.equals("list")) list_out.add(name);
+				else if (mode.equals("loop")) loop_out.add(name);
+			}
 		}
 
 		int n = list_in.size();
-		if (n == 0) evaluateOperation(cmd, in);
+		if (n == 0 && loop_out.size() == 0) evaluateOperation(cmd, in);
 		else {
 			JSONObject out3 = new JSONObject();
 			for (int i = 0; i < list_out.size(); i++) out3.put((String) list_out.get(i), new JSONArray());
-			int count = in.getJSONArray((String) list_in.get(0)).length();
-			for (int i = 0; i < n; i++) count = Math.min(count, in.getJSONArray((String) list_in.get(i)).length());
-			for (int i = 0; i < count; i++) {
+			int count = 0;
+			if (n>0) {
+				count = in.getJSONArray((String) list_in.get(0)).length();
+				for (int i = 0; i < n; i++) count = Math.min(count, in.getJSONArray((String) list_in.get(i)).length());
+			}
+
+			int i = 0;
+			while (true) {
 				JSONObject in3 = new JSONObject();
 				Iterator<String> list = in.keys();
 				while (list.hasNext()) {
@@ -389,14 +399,53 @@ public class Code
 				list = out2.keys();
 				while (list.hasNext()) {
 					String k = list.next();
-					if (!list_out.contains(k)) out3.put(k, out.get(k));
-					else {
-						out3.getJSONArray(k).put(out.get(k));
+					if (out.has(k)) {
+						Object val = out.get(k);
+						if (list_out.contains(k)) {
+							out3.getJSONArray(k).put(val);
+						} else {
+							out3.put(k, val);
+							if (loop_out.contains(k)) {
+								String newk = out2.getJSONObject(k).getString("loop");
+								in.put(newk, val);
+							}
+						}
 					}
+				}
+				if (cmd.getBoolean("FINISHED")) break;
+				if (n>0) {
+					i++;
+					if (i == count) break;
 				}
 			}
 			cmd.put("out", out3);
 		}
+	}
+
+	private JSONObject deepCopy(JSONObject c){
+		JSONObject o = new JSONObject();
+		Iterator<String> i = c.keys();
+		while (i.hasNext()){
+			String key = i.next();
+			Object val = c.get(key);
+			if (val instanceof JSONObject) val = deepCopy((JSONObject)val);
+			else if (val instanceof JSONArray) val = deepCopy((JSONArray)val);
+			o.put(key, val);
+		}
+		return o;
+	}
+
+	private JSONArray deepCopy(JSONArray c) {
+		JSONArray a = new JSONArray();
+		int n = c.length();
+		for (int i=0; i<n; i++){
+			Object val = c.get(i);
+			if (val instanceof JSONObject) val = deepCopy((JSONObject)val);
+			else if (val instanceof JSONArray) val = deepCopy((JSONArray)val);
+			a.put(val);
+		}
+
+		return a;
 	}
 
 	private void evaluateOperation(JSONObject cmd, JSONObject in) throws Exception
@@ -410,8 +459,10 @@ public class Code
 			else if (type.equals("local"))
 			{
 				JSONObject code = cmd.getJSONObject("localdata");
+				code = deepCopy(code); // Fixme - evaluating a local shouldn't break it for reuse.
 				Code c = new Code(code, LIB);
 				out = c.execute(in);
+				cmd.put("FINISHED", c.FINISHFLAG);
 			}
 			else if (type.equals("command")) {
 				PeerBot pb = PeerBot.getPeerBot();
