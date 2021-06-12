@@ -1,6 +1,7 @@
 package com.newbound.robot;
 
-import java.io.ByteArrayInputStream;
+// https://datatracker.ietf.org/doc/html/rfc6455
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -28,7 +29,6 @@ import com.newbound.crypto.SuperSimpleCipher;
 import com.newbound.net.service.App;
 import com.newbound.net.service.Container;
 import com.newbound.net.service.Socket;
-import com.newbound.net.service.http.Exception404;
 import com.newbound.net.service.http.HTTPService;
 import com.newbound.net.service.http.WebSocket;
 import com.newbound.p2p.P2PCallback;
@@ -791,6 +791,7 @@ System.out.println("Loading Properties: "+f.getCanonicalPath());
 					System.out.println("Opening websocket connection");
 					int pow7 = (int)Math.pow(2, 7);
 					ByteArrayOutputStream baos = new ByteArrayOutputStream();
+					int lastopcode = 0;
 			
 					System.out.println("WEBSOCKET CONNECTED: "+sock.isConnected());
 					InputStream is = sock.getInputStream();
@@ -823,7 +824,7 @@ System.out.println("Loading Properties: "+f.getCanonicalPath());
 									}
 									else if (len == 127)
 									{
-										len = (is.read() & 0x000000FF) << 56;
+										len = (is.read() & 0x0000007F) << 56;
 										len += (is.read() & 0x000000FF) << 48;
 										len += (is.read() & 0x000000FF) << 40;
 										len += (is.read() & 0x000000FF) << 32;
@@ -834,28 +835,43 @@ System.out.println("Loading Properties: "+f.getCanonicalPath());
 									}
 									
 									int[] maskkey = new int[4];
-									maskkey[0] = is.read();
-									maskkey[1] = is.read();
-									maskkey[2] = is.read();
-									maskkey[3] = is.read();
-			
+									if (mask) {
+										maskkey[0] = is.read();
+										maskkey[1] = is.read();
+										maskkey[2] = is.read();
+										maskkey[3] = is.read();
+									}
+
 									int max = (int)Math.min(4096, len);
 									byte[] buffer = new byte[max];
 									long off = 0;
 									while (off < len) 
 									{	
-										i = is.read(buffer);
-										off += i;
+										i = is.read(buffer, 0, (int)Math.min(4096, len-off));
 										int n = i;
-										while (i-->0) buffer[i] = (byte)(buffer[i] ^ maskkey[i % 4]);
+										if (mask) while (i-->0) buffer[i] = (byte)(buffer[i] ^ maskkey[((int)off+i) % 4]);
 										baos.write(buffer, 0, n);
+										off += n;
+										/*
+										System.out.println("-----------------------------------------------------------");
+										System.out.println("OPCODE: "+opcode);
+										System.out.println("LEN/OFF: "+len+"/"+off);
+										System.out.println("FIN: "+fin);
+										System.out.println("MASK: "+mask+" ["+maskkey[0]+", "+maskkey[1]+", "+maskkey[2]+", "+maskkey[3]+"]");
+										System.out.println("-----------------------------------------------------------");
+										String s = "";
+										for (i=0; i<n; i++) s += (char)buffer[i];
+										System.out.println(s);
+										System.out.println("-----------------------------------------------------------");
+										 */
 									}
-									
+
 									if (opcode == 0)
 									{
 										// continuation frame
 										System.out.println("continuation frame");
 									}
+									else if (opcode == 1 || opcode == 2) lastopcode = opcode;
 									else if (opcode == 8)
 									{
 										// connection close
@@ -872,6 +888,8 @@ System.out.println("Loading Properties: "+f.getCanonicalPath());
 										// pong
 										System.out.println("pong");
 									}
+									else
+										System.out.println("UNEXPECTED OPCODE: "+opcode);
 			
 									if (fin) try
 									{
@@ -879,7 +897,10 @@ System.out.println("Loading Properties: "+f.getCanonicalPath());
 										baos.close();
 										byte[] msg = baos.toByteArray();
 										baos = new ByteArrayOutputStream();
-										
+
+										if (opcode == 0)
+											opcode = lastopcode;
+
 										if (opcode == 1)
 										{
 											// text frame
