@@ -149,7 +149,7 @@ public class Code
 							while (it.hasNext())
 							{
 								String key = it.next();
-								in.getJSONObject(key).put("done", false);
+								in.getJSONObject(key).put("done", false); // FIXME - why does this work? It breaks JS interpreter
 								JSONObject con = lookupConnection(i, key, "in");
 								if (con == null)
 									in.getJSONObject(key).put("done", true);
@@ -235,19 +235,6 @@ public class Code
 						System.out.println(c ? "All connections had already fired. We must be done" : "One or more connections fired. Check all the commands");
 
 					if (c) done = true;
-	/*
-					else
-					{
-						boolean b = true;
-						for (i=0;i<n2;i++)
-						{
-							JSONObject cmd = cmds.getJSONObject(i);
-							if (!cmd.has("done") || !cmd.getBoolean("done")) { b = false; break; }
-						}
-						done = b;
-						if (DEBUG) System.out.println(done ? "Done!" : "Not done yet, keep trying!");
-					}
-	*/
 				}
 				break;
 			}
@@ -395,11 +382,11 @@ public class Code
 
 				evaluateOperation(cmd, in3);
 
-				JSONObject out = cmd.getJSONObject("out");
+				JSONObject out = cmd.getJSONObject("out"); // FIXME - aren't out & out2 the same?
 				list = out2.keys();
 				while (list.hasNext()) {
 					String k = list.next();
-					if (out.has(k)) {
+					if (out.has(k)) { // FIXME - JS version outputs an undefined if no out[k]
 						Object val = out.get(k);
 						if (list_out.contains(k)) {
 							out3.getJSONArray(k).put(val);
