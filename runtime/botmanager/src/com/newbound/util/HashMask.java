@@ -15,21 +15,6 @@ public class HashMask
     private int numbits;
     private short numbytes;
 
-    //public HashMask()
-    //{
-    //    this(1d);
-    //}
-
-    //public HashMask(double compress)
-    //{
-    //    this( (short) 3, compress);
-    //}
-
-    //public HashMask(short len, double compress)
-    //{
-    //    this("abcdefghijklmnopqrstuvwxyz0123456789.-_", len, compress);
-    //}
-
     public HashMask(String chars, short len, double compress) {
         sequencelength = len;
         compression = compress;
@@ -133,7 +118,7 @@ public class HashMask
     public static void main(String[] args)
     {
         String s = "abracadabra abracadabra aaa";
-        BitSet bs = new HashMask("abcdefghijklmnopqrstuvwxyz0123456789.-_", (short)3, 1d).evaluate(s);
+        BitSet bs = new HashMask("abcdefghijklmnopqrstuvwxyz0123456789.-_", (short)3, 3d).evaluate(s);
         System.out.println(bs);
         System.out.println(bs.toByteArray().length);
     }

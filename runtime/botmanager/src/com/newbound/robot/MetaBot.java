@@ -886,6 +886,8 @@ public abstract class MetaBot extends BotBase
 		{
 		  JSONObject cmd = cmds.getJSONObject(i);
 		  String x = cmd.getString("id");
+		  String y = cmd.getString("name");
+
 		  cmd = getData(db, x).getJSONObject("data");
 		  cmd.put("id", x); // FIXME - hack
 		  String lang = cmd.has("type") ? cmd.getString("type") : cmd.has("lang") ? cmd.getString("lang") : "java";
@@ -894,6 +896,12 @@ public abstract class MetaBot extends BotBase
 		  JSONObject data = b.getData(db, cmdid).getJSONObject("data");
 //		  System.out.println(data);
 		  JSONArray params = data.has("params") ? data.getJSONArray("params") : new JSONArray();
+
+		  if (!cmd.has("name")) {  // FIXME - hack
+			  cmd.put("name", y);
+			  //setData(db, x, readers, writers);
+		  }
+
 		  newhtml += "function send_"+cmd.getString("name")+"(";
 		  String args = "{";
 		  int n = 0;
