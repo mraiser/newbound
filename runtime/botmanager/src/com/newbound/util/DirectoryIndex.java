@@ -84,7 +84,7 @@ public class DirectoryIndex
 //            System.out.println(new Date(f.lastModified())+" / "+new Date(w.lastModified())+" / "+f.getCanonicalPath());
 
         String name = f.getName();
-        HashMask mask = new HashMask(okChars, sequencelength, compression);
+        FileHashMask mask = new FileHashMask(okChars, sequencelength, compression);
         BitSet bs3 = mask.evaluate(name);
 
         File parent = w.getParentFile();
@@ -132,13 +132,13 @@ public class DirectoryIndex
     public void search(String query, FileVisitor v, boolean searchcontent, boolean reindex) throws Exception
     {
         if (reindex) index(dir);
-        search (dir, workdir, query, new HashMask(okChars, sequencelength, compression).evaluate(query), v, searchcontent);
+        search (dir, workdir, query, new FileHashMask(okChars, sequencelength, compression).evaluate(query), v, searchcontent);
     }
 
     public void search(File subdir, String query, FileVisitor v, boolean searchcontent, boolean reindex) throws Exception
     {
         if (reindex) index(subdir);
-        search (subdir, getWorkFile(subdir), query, new HashMask(okChars, sequencelength, compression).evaluate(query), v, searchcontent);
+        search (subdir, getWorkFile(subdir), query, new FileHashMask(okChars, sequencelength, compression).evaluate(query), v, searchcontent);
     }
 
     private void search(File f, File w, String query, BitSet bs, FileVisitor v, boolean searchcontent) throws Exception

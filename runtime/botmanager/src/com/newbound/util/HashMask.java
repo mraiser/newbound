@@ -1,15 +1,13 @@
 package com.newbound.util;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
 import java.util.BitSet;
 
 public class HashMask
 {
     private short[] okChars = new short[256];
 
-    private short sequencelength;
+    protected short sequencelength;
+
     private double compression;
     private short numchars;
     private int numbits;
@@ -40,40 +38,6 @@ public class HashMask
         //System.out.println("Number of bits: "+ numbits);
         //System.out.println("Number of bytes: "+ numbytes);
         //System.out.println("Unused bits: "+ ((numbytes * 8) - numbits));
-    }
-
-    public BitSet evaluate(File f) throws IOException
-    {
-        return evaluate(new BitSet(), f);
-    }
-
-    public BitSet evaluate(BitSet bs, File f) throws IOException
-    {
-        String remainder = "";
-        FileReader fr = new FileReader(f);
-        while (true)
-        {
-            char[] cbuf = new char[1024];
-            int n = fr.read(cbuf);
-            if (n == -1) break;
-
-            String s = remainder + new String(cbuf, 0, n);
-            int len = s.length();
-            if (len>=sequencelength)
-            {
-                evaluate(bs, s);
-                remainder = s.substring(len-(sequencelength-1));
-            }
-            else
-            {
-                remainder += s;
-                // FIXME
-                System.out.println("WARNING last "+sequencelength+" characters could be dropped. This shouldn't happen but it does.");
-            }
-        }
-        fr.close();
-
-        return bs;
     }
 
     public BitSet evaluate(String s)
@@ -118,7 +82,7 @@ public class HashMask
     public static void main(String[] args)
     {
         String s = "abracadabra abracadabra aaa";
-        BitSet bs = new HashMask("abcdefghijklmnopqrstuvwxyz0123456789.-_", (short)3, 3d).evaluate(s);
+        BitSet bs = new HashMask("abcdefghijklmnopqrstuvwxyz0123456789.-_", (short)3, 5d).evaluate(s);
         System.out.println(bs);
         System.out.println(bs.toByteArray().length);
     }

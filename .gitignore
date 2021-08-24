@@ -66,6 +66,7 @@ data/proxybot
 data/nebula
 data/commerce
 data/raiser
+data/demo
 
 #non-core apps
 runtime/blog
