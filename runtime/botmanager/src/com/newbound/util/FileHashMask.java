@@ -29,6 +29,7 @@ public class FileHashMask extends HashMask
 
             String s = remainder + new String(cbuf, 0, n);
             int len = s.length();
+            short sequencelength = getSequenceLength();
             if (len>=sequencelength)
             {
                 evaluate(bs, s);

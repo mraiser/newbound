@@ -5,39 +5,23 @@ import java.util.BitSet;
 public class HashMask
 {
     private short[] okChars = new short[256];
-
-    protected short sequencelength;
-
+    private short sequencelength;
     private double compression;
     private short numchars;
-    private int numbits;
-    private short numbytes;
 
-    public HashMask(String chars, short len, double compress) {
+    public HashMask(String chars, short len, double compress)
+    {
         sequencelength = len;
         compression = compress;
 
         numchars = (short)compression;
         int n = chars.length();
-        //System.out.println(n);
         for (int i=0; i<n; i++)
-        {
             okChars[chars.charAt(i)] = (short) ((numchars++) / compression);
-        }
 
         short oval = numchars;
         numchars /= compression;
         if (numchars * compression < oval) numchars++;
-
-        numbits = (int) Math.pow(numchars, sequencelength);
-        numbytes = (short) (numbits / 8);
-        if (numbytes * 8 < numbits) numbytes++;
-
-        //System.out.println("original number of characters: " + oval);
-        //System.out.println("Number of characters: "+ numchars);
-        //System.out.println("Number of bits: "+ numbits);
-        //System.out.println("Number of bytes: "+ numbytes);
-        //System.out.println("Unused bits: "+ ((numbytes * 8) - numbits));
     }
 
     public BitSet evaluate(String s)
@@ -79,11 +63,32 @@ public class HashMask
         bs.set(val);
     }
 
+    public short getSequenceLength()
+    {
+        return sequencelength;
+    }
+
+    public int getNumberOfBytes()
+    {
+        int numbits = (int) Math.pow(numchars, sequencelength);
+        int numbytes = (short) (numbits / 8);
+        if (numbytes * 8 < numbits) numbytes++;
+        return numbytes;
+    }
+
+    public int getNumberOfBits()
+    {
+        return getNumberOfBytes()*8;
+    }
+
     public static void main(String[] args)
     {
         String s = "abracadabra abracadabra aaa";
-        BitSet bs = new HashMask("abcdefghijklmnopqrstuvwxyz0123456789.-_", (short)3, 5d).evaluate(s);
+        HashMask mask = new HashMask("abcdefghijklmnopqrstuvwxyz0123456789.-_", (short)3, 5d);
+        BitSet bs = mask.evaluate(s);
         System.out.println(bs);
         System.out.println(bs.toByteArray().length);
+        System.out.println(mask.getNumberOfBits());
+        System.out.println(mask.getNumberOfBytes());
     }
 }
