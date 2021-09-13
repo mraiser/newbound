@@ -1,6 +1,7 @@
 package com.newbound.util;
 
 import java.util.BitSet;
+import java.util.stream.IntStream;
 
 public class HashMask
 {
@@ -70,7 +71,7 @@ public class HashMask
 
     public int getNumberOfBytes()
     {
-        int numbits = (int) Math.pow(numchars, sequencelength);
+        int numbits = getNumberOfBits();
         int numbytes = (short) (numbits / 8);
         if (numbytes * 8 < numbits) numbytes++;
         return numbytes;
@@ -78,14 +79,23 @@ public class HashMask
 
     public int getNumberOfBits()
     {
-        return getNumberOfBytes()*8;
+        return (int) Math.pow(numchars, sequencelength);
+    }
+
+    public String toBinary(BitSet bs, int nbits)
+    {
+        final StringBuilder buffer = new StringBuilder(nbits);
+        IntStream.range(0, nbits).mapToObj(i -> bs.get(i) ? '1' : '0').forEach(buffer::append);
+        return buffer.toString();
     }
 
     public static void main(String[] args)
     {
-        String s = "abracadabra abracadabra aaa";
-        HashMask mask = new HashMask("abcdefghijklmnopqrstuvwxyz0123456789.-_", (short)3, 5d);
+        double compress = 6d;
+        String s = "72301-6344 Armstrong Connie 774 Rowe Viaduct Dibbertside New York";
+        HashMask mask = new HashMask("abcdefghijklmnopqrstuvwxyz0123456789.-_", (short)3, compress);
         BitSet bs = mask.evaluate(s);
+        System.out.println(mask.toBinary(bs, mask.getNumberOfBits()));
         System.out.println(bs);
         System.out.println(bs.toByteArray().length);
         System.out.println(mask.getNumberOfBits());
