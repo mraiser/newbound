@@ -31,6 +31,8 @@ public class DirectoryIndex
     private boolean INDEXCONTENT;
     private int MAXFILESIZE;
 
+    private Hashtable<String, Boolean> excluded = new Hashtable();
+
     public DirectoryIndex(File directory, File workdirectory, FilenameFilter filenamefilter, String chars, short len, double compress, boolean indexcontent, int maxfilelength)
     {
         dir = directory;
@@ -54,6 +56,22 @@ public class DirectoryIndex
     {
         File f2 = getWorkFile(f);
         return index(f, f2, new BitSet());
+    }
+
+    public long lastIndex(File f) throws Exception
+    {
+        File w = getWorkFile(f);
+        File dw = new File(w, DIRNAME);
+
+        boolean isdir = f.isDirectory();
+
+        long last = -1;
+        if (isdir){
+            if (dw.exists()) last = dw.lastModified();
+        }
+        else if (w.exists()) last = w.lastModified();
+
+        return last;
     }
 
     // FIXME - Handle workdir inside of search dir (don't index/search)
@@ -92,6 +110,12 @@ public class DirectoryIndex
 
         if (isdir)
         {
+            if (excluded.get(f.getCanonicalPath()) != null)
+            {
+                if (dw.exists()) bs2.or(BitSet.valueOf(BotUtil.readFile(dw)));
+                return false;
+            }
+
             //System.out.println("indexing folder "+f.getCanonicalPath()+" as "+w.getCanonicalPath());
             w.mkdirs();
             String[] list = f.list(filter);
@@ -249,5 +273,11 @@ public class DirectoryIndex
             }
         };
         di.search("camera_frame_v5_top", v, searchcontent, false);
+    }
+
+    public void exclude(String[] excludes) {
+        excluded.clear();
+        int i = excludes.length;
+        while (i-->0) if (!excludes[i].equals("")) excluded.put(excludes[i], true);
     }
 }
