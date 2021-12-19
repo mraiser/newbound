@@ -17,7 +17,7 @@ functionality with our easy to use
 
 [Newbound, Inc.](https://www.newbound.com/site/index.html)
 
-### Java
+### Installation
 
 *The Newbound source code requires JDK 1.8 or later.*
 
