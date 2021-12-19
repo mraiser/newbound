@@ -17,18 +17,6 @@ functionality with our easy to use
 
 [Newbound, Inc.](https://www.newbound.com/site/index.html)
 
-### Python Early Access
-
-**NOTE:** *Not all features are available, and editing apps in Python 
-mode may break them for use with Java. We're working on it! If you would 
-like to help, please initiate a pull request.*
-
-To run in python mode on any platform, execute the following:
-
-```
-python3 main.py
-```
-
 ### Java
 
 *The Newbound source code requires JDK 1.6 or later.*
