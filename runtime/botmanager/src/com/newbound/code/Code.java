@@ -1,10 +1,10 @@
 package com.newbound.code;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Hashtable;
-import java.util.Iterator;
+import java.lang.reflect.Field;
+import java.util.*;
 
 import com.newbound.robot.*;
 import org.json.JSONArray;
@@ -33,7 +33,7 @@ public class Code
 
 	public static JSONObject PRIMS = new JSONObject();
 	public static String PYTHON = "python3"; //"/Library/Frameworks/Python.framework/Versions/3.6/bin/python3";
-	
+
 	public JSONObject CODE;
 	public String LIB;
 
@@ -110,9 +110,11 @@ public class Code
 			
 			if (type.equals("python"))
 			{
+				BotBase bb = BotBase.getBot("botmanager");
+
 				String py = CODE.getString("id");
 				String pyid = CODE.has("python") ? CODE.getString("python") : CODE.getString("cmd");
-				JSONObject cmd = BotBase.getBot("botmanager").getData(LIB, pyid).getJSONObject("data");
+				JSONObject cmd = bb.getData(LIB, pyid).getJSONObject("data");
 				return evalCommandLine(PYTHON, cmd, args, new File(getRoot(py), py+".py"));
 			}
 			
@@ -588,16 +590,45 @@ public class Code
 	{
 		JSONArray params = cmd.getJSONArray("params");
 		int i = params.length();
-		String[] call = new String[i+2];
+		String[] call = new String[2]; //[i+2];
 		call[0] = app;
 		call[1] = py.getCanonicalPath();
+
+		ByteArrayInputStream is = new ByteArrayInputStream(args.toString().getBytes());
+
+		/*
 		while (i-->0) 
 		{
 			String s = params.getJSONObject(i).getString("name");
 			s = ""+args.get(s);
 			call[i+2] = s;
 		}
-		
+		*/
+
+		try
+		{
+			String[] sa = BotUtil.systemCall(call, is);
+			try
+			{
+				return new JSONObject(sa[0]);
+			}
+			catch (Exception xx)
+			{
+				JSONObject jo = new JSONObject();
+				jo.put("status",  "err");
+				jo.put("msg",  sa[1]);
+				return jo;
+			}
+		}
+		catch (Exception x)
+		{
+			JSONObject jo = new JSONObject();
+			jo.put("status",  "err");
+			jo.put("msg",  x.getMessage());
+			return jo;
+		}
+
+/*
 		Process p = Runtime.getRuntime().exec(call);
 		p.waitFor();
 		i = p.exitValue();
@@ -625,6 +656,8 @@ public class Code
 			
 			return jo;
 		}
+
+ */
 	}
 
 }

@@ -1668,10 +1668,15 @@ public class BotManager extends BotBase
 	private JSONObject handleSavePython(String db, String id, String cmd, String python, String params, String imports, String returntype, String readers, String writers, String sessionidx) throws Exception
 	{
 		JSONArray p = new JSONArray(params == null ? "[]" : params);
-		
-		File root = new File(getRootDir().getParentFile().getParentFile(), "generated");
+
+		File home = getRootDir().getParentFile().getParentFile();
+		File root = new File(home, "generated");
 		root.mkdirs();
-		
+
+		File f = new File(home, "lib_python");
+		f.mkdirs();
+		String PYTHONPATH = f.getCanonicalPath();
+
 		if (returntype == null) returntype = "JSONObject";
 		if (imports == null) imports = "import sys\rimport json\r";
 		else imports = imports.replace('\n', '\r');
@@ -1681,18 +1686,21 @@ public class BotManager extends BotBase
 		String top = "";
 		String bottom = "";
 		String invoke = "";
-		String invoke2 = "";
+		String invoke2 = "args = json.loads(sys.stdin.read())\n";
+		String invoke3 = "";
 		for (i=0;i<n;i++)
 		{
 			if (!invoke.equals("")) invoke += ", ";
+			if (!invoke3.equals("")) invoke3 += ", ";
 
 			JSONObject o = p.getJSONObject(i);
 			String name = o.getString("name");
-			invoke += name;
-			invoke2 += name+" = sys.argv["+(i+1)+"]\r";
+			invoke += "arg"+(i+1);
+			invoke2 += "arg"+(i+1)+" = args['"+name+"']\r";
+			invoke3 += name;
 		}
 		
-		File f = new File(root, "com");
+		f = new File(root, "com");
 		f = new File(f, "newbound");
 		f = new File(f, "robot");
 		f = new File(f, "published");
@@ -1701,10 +1709,13 @@ public class BotManager extends BotBase
 		f.mkdirs();
 
 		f = new File(f, id+".py");
+
+		String loadpath = "import sys\rsys.path.append(\""+PYTHONPATH+"\")\r\r";
 		
-		String code = 
-			imports
-			+ "\rdef "+id+"("+invoke+"):\r"
+		String code =
+			loadpath
+			+ imports
+			+ "\rdef "+id+"("+invoke3+"):\r"
 			+ indent(python, 2)+"\r"
 			+ invoke2+"\r"
 			+ "val = { 'status':'ok', 'data': "

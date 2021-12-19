@@ -67,6 +67,7 @@ data/nebula
 data/commerce
 data/raiser
 data/demo
+data/calcpose
 
 #non-core apps
 runtime/blog
@@ -90,6 +91,7 @@ runtime/nebula
 runtime/footer
 runtime/raise
 runtime/commerce
+runtime/calcpose
 
 # Distribution / packaging
 .Python
@@ -100,6 +102,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+lib_python/*
 lib64/
 parts/
 sdist/
