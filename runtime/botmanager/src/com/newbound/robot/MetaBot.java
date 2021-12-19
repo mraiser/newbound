@@ -1036,7 +1036,9 @@ public abstract class MetaBot extends BotBase
 							String imports = meta.has("import") ? meta.getString("import") : null;
 							String returntype = meta.has("returntype") ? meta.getString("returntype") : null;
 
-							JSONArray params = meta.getJSONArray("params");
+							JSONArray params;
+							if (meta.has("params")) params = meta.getJSONArray("params");
+							else params = new JSONArray();
 
 							bm.handleSaveCode(lang, lib, cmd.getString("id"), codeid, code, params.toString(), imports, returntype, groups, null, "");
 						}
