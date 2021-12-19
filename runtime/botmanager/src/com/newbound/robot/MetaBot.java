@@ -1016,6 +1016,7 @@ public abstract class MetaBot extends BotBase
 				while (k-->0)
 				{
 					JSONObject cmd = cmds.getJSONObject(k);
+					cmd = getData(lib, cmd.getString("id")).getJSONObject("data");
 					String[] langs = {"java", "python", "js"};
 					int i = langs.length;
 					while (i-->0) try
@@ -1024,7 +1025,6 @@ public abstract class MetaBot extends BotBase
 
 						if (cmd.has(lang)) {
 							String codeid = cmd.getString(lang);
-
 							JSONObject meta = getData(lib, codeid).getJSONObject("data");
 							String code = meta.getString(lang);
 							String groups = meta.has("groups") ? meta.getString("groups") : null;
