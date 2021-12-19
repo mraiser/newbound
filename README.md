@@ -19,7 +19,7 @@ functionality with our easy to use
 
 ### Java
 
-*The Newbound source code requires JDK 1.6 or later.*
+*The Newbound source code requires JDK 1.8 or later.*
 
 To compile and execute from the Desktop, just clone or download this repository and double-click the appropriate launcher for your Operating System.
 
