@@ -1343,7 +1343,8 @@ public abstract class MetaBot extends BotBase
 		BotManager bm = (BotManager)BotBase.getBot("botmanager");
 		JSONObject ctl = getData(lib, id).getJSONObject("data");
 		File ctlfile = bm.getDataFile(lib, id, bm.getKeys(lib));
-		
+		String name = ctlfile.getName();
+
 		File sub4 = ctlfile.getParentFile();
 		File sub3 = sub4.getParentFile();
 		File sub2 = sub3.getParentFile();
@@ -1353,10 +1354,22 @@ public abstract class MetaBot extends BotBase
 		dest = new File(dest, sub3.getName());
 		dest = new File(dest, sub4.getName());
 		dest.mkdirs();
-		dest = new File(dest, ctlfile.getName());
+		dest = new File(dest, name);
 		
 		copyFile(ctlfile, dest);
-		
+
+		if (ctl.has("attachmentkeynames")) // FIXME - HACK
+		{
+			JSONArray ja = ctl.getJSONArray("attachmentkeynames");
+			int i = ja.length();
+			while (i-- > 0) {
+				String key = ja.getString(i);
+				File f1 = new File(ctlfile.getParentFile(), name + "." + key);
+				File f2 = new File(dest.getParentFile(), name + "." + key);
+				copyFile(f1, f2);
+			}
+		}
+
 		return ctl;
 	}
 	
