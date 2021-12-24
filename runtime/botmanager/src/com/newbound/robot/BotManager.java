@@ -1036,7 +1036,12 @@ public class BotManager extends BotBase
 		{
 			String key = ja.getString(i);
 			File f = new File(root, name + "." + key);
-			d.put(key, new String(BotUtil.readFile(f)));
+			String s = new String(BotUtil.readFile(f));
+			String ss = s.trim();
+			if (ss.startsWith("{") && ss.endsWith("}")) // FIXME - HACK
+				d.put(key, new JSONObject(ss));
+			else
+				d.put(key, s);
 		}
 	}
 
