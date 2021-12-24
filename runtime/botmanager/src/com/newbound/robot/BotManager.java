@@ -972,6 +972,8 @@ public class BotManager extends BotBase
 
 	public JSONObject handleWrite(String db, String data, String id, String readers, String writers, String sessionid, String sessionlocation) throws Exception
 	{
+		// FIXME - Why not use setData instead of duplicating it here?
+
 		if (id == null) id = uniqueSessionID();
 
 		if (!checkAuth(db, id, sessionid, true)) throw new Exception("UNAUTHORIZED");
@@ -982,23 +984,27 @@ public class BotManager extends BotBase
 		Session s = getSession(sessionid);
 		String username = (String)s.get("username");
 		
-		File f = getDB(db);
+		File root = getDB(db);
 		SuperSimpleCipher[] keys = getKeys(db);
 		String name = keys.length == 0 ? id : toHexString(keys[1].encrypt(id.getBytes()));
-		f = getSubDir(f, name, 4, 4);
-		f.mkdirs();
-		f = new File(f, name);
-		
+		root = getSubDir(root, name, 4, 4);
+		root.mkdirs();
+
+		JSONObject d = new JSONObject(data);
+		if (d.has("attachmentkeynames")) // FIXME - HACK
+			saveAttachments(root, d, name);
+
 		JSONObject jo = new JSONObject();
 		jo.put("id", id);
-		jo.put("data", new JSONObject(data));
+		jo.put("data", d);
 		jo.put("username", username);
 		jo.put("sessionid", sessionid);
 		jo.put("addr", sessionlocation);
 		jo.put("time", System.currentTimeMillis());
 		if (readers != null) jo.put("readers", rs);
 		if (writers != null) jo.put("writers", ws);
-		
+
+		File f = new File(root, name);
 		writeFile(f, keys.length == 0 ? jo.toString().getBytes() : keys[1].encrypt(jo.toString().getBytes()));
 		
 		jo.put("db", db);
@@ -1010,7 +1016,43 @@ public class BotManager extends BotBase
 		return jo;
 	}
 
-	private JSONObject handleJSearch(String db, String id, String java, String imports, String json, String javascript, String readers, String writers, String deletex, String sessionid, String sessionlocation) throws Exception 
+	private void saveAttachments(File root, JSONObject d, String name) throws IOException
+	{
+		JSONArray ja = d.getJSONArray("attachmentkeynames");
+		int i = ja.length();
+		while (i-->0)
+		{
+			String key = ja.getString(i);
+			File f = new File(root, name + "." + key);
+			writeFile(f, d.remove(key).toString().getBytes());
+		}
+	}
+
+	private void loadAttachments(File root, JSONObject d, String name) throws Exception
+	{
+		JSONArray ja = d.getJSONArray("attachmentkeynames");
+		int i = ja.length();
+		while (i-- > 0)
+		{
+			String key = ja.getString(i);
+			File f = new File(root, name + "." + key);
+			d.put(key, new String(BotUtil.readFile(f)));
+		}
+	}
+
+	private void deleteAttachments(File root, JSONObject d, String name) throws Exception
+	{
+		JSONArray ja = d.getJSONArray("attachmentkeynames");
+		int i = ja.length();
+		while (i-- > 0)
+		{
+			String key = ja.getString(i);
+			File f = new File(root, name + "." + key);
+			f.delete();
+		}
+	}
+
+	private JSONObject handleJSearch(String db, String id, String java, String imports, String json, String javascript, String readers, String writers, String deletex, String sessionid, String sessionlocation) throws Exception
 	{
 		File jdb = getDB("jsearch");
 		if (!jdb.exists() || !new File(jdb, "meta.json").exists())
@@ -1318,13 +1360,16 @@ public class BotManager extends BotBase
 
 	public boolean setData(String db, String id, JSONObject data, JSONArray readers, JSONArray writers) throws Exception
 	{
-		File f = getDB(db);
+		File root = getDB(db);
 		SuperSimpleCipher[] keys = getKeys(db);
 		String name = keys.length == 0 ? id : toHexString(keys[1].encrypt(id.getBytes()));
-		f = getSubDir(f, name, 4, 4);
-		f.mkdirs();
-		f = new File(f, name);
-		
+		root = getSubDir(root, name, 4, 4);
+		root.mkdirs();
+		File f = new File(root, name);
+
+		if (data.has("attachmentkeynames")) // FIXME - HACK
+			saveAttachments(root, data, name);
+
 		JSONObject jo = new JSONObject();
 		jo.put("id", id);
 		jo.put("data", data);
@@ -1355,6 +1400,11 @@ public class BotManager extends BotBase
 		byte[] ba = readFile(f);
 		JSONObject jo = new JSONObject(new String(keys.length == 0 ? ba : keys[0].decrypt(ba)));
 
+		JSONObject d = jo.getJSONObject("data");
+		if (d.has("attachmentkeynames")) // FIXME - HACK
+			loadAttachments(f.getParentFile(), d, id);
+
+
 		return jo;
 	}
 
@@ -1380,10 +1430,17 @@ public class BotManager extends BotBase
 	  f = new File(f, name);
 	  
 	  if (!f.exists()) throw new Exception("No such record");
-	  
-//	  byte[] ba = readFile(f);
-//	  JSONObject jo = new JSONObject(new String(keys[0].decrypt(ba)));
-	  
+
+	  try
+	  {
+		  byte[] ba = readFile(f);
+		  JSONObject jo = new JSONObject(new String(keys[0].decrypt(ba)));
+		  JSONObject d = jo.getJSONObject("data");
+		  if (d.has("attachmentkeynames")) // FIXME - HACK
+			  deleteAttachments(f.getParentFile(), d, id);
+	  }
+	  catch (Exception x) { x.printStackTrace(); }
+
 	  f.delete();
 	  
 	  return newResponse();

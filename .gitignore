@@ -19,6 +19,7 @@ data/metabot/version.txt
 data/peerbot/version.txt
 data/securitybot/version.txt
 data/threejs/version.txt
+data/flow/version.txt
 
 # runtime data and local properties
 runtime/botmanager/botd.properties
