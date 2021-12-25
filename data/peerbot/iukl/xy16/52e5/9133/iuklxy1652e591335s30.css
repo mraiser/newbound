@@ -1,0 +1,31 @@
+.localbrokers, .clickme{
+  cursor:pointer;
+}
+
+.localbrokers:hover,.clickme:hover{
+  color:#83bc00;
+}
+
+.localbrokers3{
+  position:absolute;
+  display:none;
+  width:600px;
+  max-width: 90vw;
+}
+
+.inlineselect{
+  display:inline-block;
+  width:200px;
+  margin-right:20px;
+}
+
+.inlinemed{
+  display:inline-block;
+  width:120px;
+  margin-right:20px;
+}
+.inlineshort{
+  display:inline-block;
+  width:60px;
+  margin-right:20px;
+}

@@ -1,0 +1,100 @@
+.aligncenter{
+  vertical-align:top;
+}
+
+.rp-status{
+  float:right;
+}
+
+.rp-info {
+  display:inline-block;
+  vertical-align:top;
+}
+
+.rp-uuid {
+  font-size:x-small;
+  margin-top:-10px;
+}
+
+.width100{
+  width:100%;
+}
+
+.dark .mdl-tabs__tab{
+  color:white;
+  width:50%;
+}
+
+.dark .mdl-tabs.is-upgraded .mdl-tabs__tab.is-active{
+  color:#83bc00;
+}
+
+.upsome{
+  margin-top:-20px;
+}
+
+.padsome{
+  padding:20px;
+}
+
+.clickmore{
+  color:#83bc00;
+  cursor:pointer;
+}
+
+.moreip{
+  padding:10px;
+  display:none;
+}
+
+.iconmode{
+  width:140px;
+  height:140px;
+  display:inline-block;
+  vertical-align:top;
+}
+
+.availablecontrols{
+  display:none;
+  color:black;
+  height:300px;
+}
+
+.aclist{
+  height: 200px;
+  overflow-y: auto;
+  width: 95%;
+}
+
+.actable{
+  width:100%;
+}
+
+.controlsettings .mdl-button{
+  color:white;
+}
+
+.controlsettings{
+  display:none;
+}
+
+.popmeup {
+  width:80%;
+  height:80%;
+  display:none;
+  z-index:100000;
+}
+
+.popupcontents{
+  height:100%;
+}
+
+.deletepeerbutton{
+  display:none;
+  float:right;
+  margin-top:30px;
+}
+
+.remlab > .mdl-checkbox__box-outline{
+  border-color:white;
+}

@@ -1,0 +1,180 @@
+.fullwidth {
+  position:absolute;
+  top:0px;
+  left:0px;
+  width:100%;
+  height:100%;
+  background-color:black;
+}
+
+.headsupdisplay{
+  position:fixed;
+  top:0px;
+  right:-100%;
+  max-width:100%;
+  width:700px;
+  height:100%;
+  overflow-y:scroll;
+  background-color:#202020D0;
+  color:white;
+}
+
+.headsupdisplay::-webkit-scrollbar {
+    width: 4px;
+}
+ 
+.headsupdisplay::-webkit-scrollbar-track {
+    -webkit-box-shadow: inset 0 0 6px rgba(255,255,255,0.3);
+}
+ 
+.headsupdisplay::-webkit-scrollbar-thumb {
+  background-color: darkgrey;
+  outline: 1px solid slategrey;
+}
+
+.headsupdisplayinner, .padsome{
+  padding:20px;
+}
+
+.floatright{
+  float:right;
+}
+
+.topleftcorner{
+  position:fixed;
+  top:20px;
+  left:20px;
+  color:#83bc00;
+}
+
+.bigtext{
+  font-size:20px;
+}
+
+.bottomleftcorner{
+  position:fixed;
+  bottom:20px;
+  left:20px;
+  color:white;
+}
+
+.homebutton{
+  margin-top:-3px;
+}
+
+.localpeername{
+  color:#83bc00;
+  cursor:pointer;
+  font-size:24px;
+}
+
+.localpeerid{
+  font-size:x-small;
+}
+
+.localbrokers{
+  color:#83bc00;
+  cursor:pointer;
+}
+
+.popmeup {
+  width:80%;
+  height:80%;
+  display:none;
+  z-index:100000;
+}
+
+.popupcontents{
+  height:100%;
+}
+
+.popupclose{
+  color:black;
+}
+
+.addpeerpopupclose, .accesscodespopupclose, .lanpopupclose, .localbrokers3 .mdl-card__menu i{
+  color:white;
+}
+
+.addpeerpopup, .accesscodespopup, .lanpopup{
+  max-width:90%;
+  max-height:90%;
+  display:none;
+}
+
+.addpeerpopup{
+  height:400px;
+  width:600px;
+}
+
+.addpeerpopup .mdl-card__title, .accesscodespopup .mdl-card__title, .lanpopup .mdl-card__title, .popmeup .mdl-card__title, .localbrokers3 .mdl-card__title {
+  background-color:#83bc00;
+  color:white;
+}
+
+.mdl-layout.is-upgraded .mdl-layout__tab.is-active {
+  color:white;
+}
+
+.addpeerpopup .mdl-layout.is-upgraded .mdl-layout__tab.is-active::after{
+  background-color:white;
+}
+
+.invitegroupselect {
+  margin-bottom: -10px;
+  margin-left: 40px;
+  width: 510px;
+}
+
+.accesscodespopup, .lanpopup{
+  height:400px;
+  width:600px;
+}
+
+#ul_botlist{
+  width:100%;
+  font-size:small;
+  list-style-type:none;
+  margin-bottom:5px;
+  text-align:left;
+}
+
+.li_botlist{
+  text-decoration:none;
+}
+
+.flex{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  position:relative;
+}
+
+.botlist {
+  height: 300px;
+  overflow-y: scroll;
+  position: relative;
+  padding:30px;
+}
+
+.codelist{
+  height:120px;
+  overflow-y:scroll;
+  padding-left:30px;
+  padding-right:30px;
+}
+
+.addaccesscodebutton {
+    float: right;
+    margin-top: -5px;
+}
+
+.singleuse {
+    width: 120px;
+}
+
+.codelist .mdl-chip__text {
+    padding-top: 7px;
+    font-size: x-small;
+    line-height: 10px;
+}

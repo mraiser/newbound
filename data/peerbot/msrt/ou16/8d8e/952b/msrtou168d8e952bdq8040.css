@@ -1,0 +1,302 @@
+.matrixviewer{
+  position:relative;
+  top:0px;
+  left:0px;
+  width:100%;
+  height:100%;
+}
+
+.localinfo{
+  position:fixed;
+  top:20px;
+  left:100px;
+  color:white;
+}
+
+.localpeername{
+  font-size:large;
+  cursor:pointer;
+}
+
+.localpeername:hover{
+  color:#83bc00;
+}
+
+.hud{
+  position:fixed;
+  background-color: #000000aa;
+  color: #ffffff;
+  padding:40px;
+  display: none;
+  overflow-y: auto;
+}
+
+.hud1 {
+  top: 0vw;
+  right: 0vw;
+  width: 600px;
+  height: 100vh;
+  max-width:90%;
+}
+
+.closehudbutton{
+  position:fixed;
+  top:0px;
+  right:0px;
+  color:white;
+}
+
+.editcontrolsbutton{
+  position:absolute;
+  left: 2px;
+  top: 35px;
+}
+
+.connectedandadminonly {
+  display:none;
+}
+
+.pb-peer-name{
+  font-size:large;
+}
+
+.pb-peer-alladdr {
+  margin-top:20px;
+}
+
+.connectionindicator {
+    margin-top: 6px;
+    margin-left: 3px;
+    height: 10px;
+    width: 10px;
+    border: thin solid black;
+    border-radius: 10px;
+    display: inline-block;
+}
+
+.pb-peer-strength {
+  float: right;
+  cursor:pointer;
+}
+
+.hudms{
+  font-size:x-small;
+  float:right;
+  text-align:right;
+}
+
+.hudappsx{
+  position:absolute;
+  top:100px;
+  bottom:0px;
+  left:40px;
+  right:0px;
+  overflow:auto;
+}
+
+.app-card{
+  width:100px;
+  height:100px;
+  display:none;
+  vertical-align:top;
+  margin:5px;
+  overflow:hidden;
+  text-align:center;
+  font-size:x-small;
+  position:relative;
+  cursor:pointer;
+}
+
+.mdl-card__actions>.app-card-image__filename{
+  font-size:x-small;
+}
+
+.app-card > .app-card-square > .mdl-card__actions{
+  height:24px;
+  padding:6px;
+}
+
+.app-card > .app-card-square > .mdl-card--expand{
+  height:76px;
+}
+
+.appinfo-meta{
+  color:black;
+}
+
+.deletepeerbutton{
+  display:none;
+  float:right;
+  margin-top:30px;
+}
+
+.iconmode{
+  width:140px;
+  height:140px;
+  display:inline-block;
+  vertical-align:top;
+}
+
+.hudappdetail{
+  margin-bottom:40px;
+}
+
+
+.mdl-button--fab.mdl-button--colored{
+  background-color:#83bc00;
+}
+
+.mdl-button--fab.mdl-button--colored:hover{
+  background-color:#b7ef49;
+}
+
+.mdl-card__title{
+  background-color:#83bc00;
+  color:white;
+}
+
+.mdl-card__menu>.mdl-button--icon{
+  color:white;
+}
+
+.availablecontrols{
+  display:none;
+  color:black;
+  height:300px;
+}
+
+.aclist{
+  height:200px;
+  overflow-y:auto;
+}
+
+.bottombuttons{
+  position: fixed;
+  bottom:20px;
+  left:20px;
+}
+
+.topbuttons{
+  position: fixed;
+  top:20px;
+  left:20px;
+}
+
+.mdl-button--raised.mdl-button--colored{
+  color:white;
+}
+
+.addpeerpopup, .accesscodespopup, .lanpopup{
+  max-width:90%;
+  max-height:90%;
+  display:none;
+}
+
+.addpeerpopup{
+  height:400px;
+  width:600px;
+}
+
+.botlist{
+  height:300px;
+  overflow-y:scroll;
+  position:relative;
+}
+
+.accesscodespopup, .lanpopup{
+  height:400px;
+  width:600px;
+}
+
+#newconactmsgx{
+  position:absolute;
+  top:-20px;
+}
+
+.codelist{
+  height:120px;
+  overflow-y:scroll;
+}
+
+.addaccesscodebutton{
+  float:right;
+  margin-top:-5px;
+}
+
+.singleuse{
+  width:120px;
+}
+
+div .mdl-chip__text{
+  padding-top:7px;
+  font-size:x-small;
+  line-height:10px;
+}
+
+#ul_botlist{
+  width:100%;
+  font-size:small;
+  list-style-type:none;
+  margin-bottom:5px;
+  text-align:left;
+}
+
+.li_botlist{
+  text-decoration:none;
+}
+
+.flex{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  position:relative;
+}
+
+.mdl-layout.is-upgraded .mdl-layout__tab.is-active {
+  color:white;
+}
+
+.mdl-layout.is-upgraded .mdl-layout__tab.is-active::after{
+  background-color:white;
+}
+
+.smallcols>.mdl-textfield, .invitegroupselect{
+  width:200px;
+}
+
+.invitegroupselect{
+  margin-bottom:-10px;
+  margin-left:40px;
+  width:510px;
+}
+
+.invitegroupselect>.groupselect>.injectselect>.mdl-selectfield{
+  width:510px;
+}
+
+.inline{
+  background-color:#fff8;
+}
+
+.controlsettings{
+  background-color:white;
+  display:none;
+}
+
+.close-settings{
+  display:none;
+  position:absolute;
+  top:100px;
+  left:2px;
+}
+
+.popmeup {
+  width:80%;
+  height:80%;
+  display:none;
+  z-index:100000;
+}
+
+.popupcontents{
+  height:100%;
+}

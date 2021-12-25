@@ -1,0 +1,20 @@
+.connectionindicator {
+    margin-top: 6px;
+    margin-left: 3px;
+    height: 10px;
+    width: 10px;
+    border: thin solid black;
+    border-radius: 10px;
+    display: inline-block;
+}
+
+.pb-peer-strength {
+  text-align: right;
+  cursor:pointer;
+}
+
+.hudms{
+  font-size:x-small;
+  float:right;
+  text-align:right;
+}

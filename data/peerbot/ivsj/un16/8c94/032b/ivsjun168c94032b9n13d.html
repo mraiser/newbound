@@ -1,0 +1,166 @@
+<div class='fullwidth matrixviewer'></div>
+<div class="networkviewer"></div>
+<div class='headsupdisplay'>
+  <button class="mdl-button mdl-js-button mdl-button--icon floatright closehud">
+    <i class="material-icons">close</i>
+  </button>
+  <div class='headsupdisplayinner'></div>
+</div>
+<div class='topleftcorner'>
+  <div class='bigtext'>
+    <button class="mdl-button mdl-js-button mdl-button--icon homebutton" onclick="window.location.href='../botmanager/index.html';">
+      <i class="material-icons">menu</i>
+    </button>  
+    &nbsp;&nbsp;
+    Peerbot
+  </div>
+</div>
+<div class='bottomleftcorner'>
+  LOCAL DEVICE:
+  <div class='padsome'>
+    <div class='localpeername'>devicename</div>
+    <div class='localpeerid'>uuid</div>
+    <div class='localpeerport'>port</div>  
+    <div class='localbrokers2'>brokers</div>
+  </div>
+  <button class="addpeerbutton mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored"><i class="material-icons">person_add</i></button>
+  <button class="accesscodebutton mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored"><i class="material-icons">security</i></button>
+  <button class="lanbutton mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored"><i class="material-icons">wifi</i></button>
+</div>
+<div class='popmeup'><div class='popupcontents'></div></div>
+
+
+
+<div class='addpeerpopup'>
+  <div class="mdl-card__title">
+    <h2 class="mdl-card__title-text">Add Connection</h2>
+  </div>
+
+  
+  <div class="mdl-layout mdl-js-layout mdl-layout--fixed-header">
+    <header class="mdl-layout__header">
+      <div class="mdl-layout__tab-bar mdl-js-ripple-effect">
+        <a href="#scroll-tab-1" class="mdl-layout__tab is-active">Invitations</a>
+        <a href="#scroll-tab-2" class="mdl-layout__tab">Manual</a>
+      </div>
+    </header>
+    <main class="mdl-layout__content">
+      <section class="mdl-layout__tab-panel is-active" id="scroll-tab-1">
+        <div class="page-content">
+          <div class='gep1'>
+            <br>
+            <div class='data-control invitegroupselect' data-control='securitybot:groupselect'></div>
+            <table border='0' cellpadding='0' cellspacing='0' style='width:100%;'>
+              <tr>
+                <td style='text-align:center;vertical-align:bottom;'>
+                  <div class='generatedinvite'>&nbsp;</div>
+                  <button id="createtheinvite"  class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">
+                    Generate Invite
+                  </button>
+                </td>
+                <td>OR&nbsp;&nbsp;&nbsp;&nbsp;</td>
+                <td style='vertical-align:top;width:250px;'>
+                  <form class="smallcols" action="#">
+                    <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                      <input class="mdl-textfield__input" type="text" id="enterinvitecode">
+                      <label class="mdl-textfield__label" for="enterinvitecode">Enter Invite Code</label>
+                    </div>
+                  </form>
+                  <button id="accepttheinvite" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">
+                    Accept Invite
+                  </button>
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class='gep2'></div>
+      </section>
+      <section class="mdl-layout__tab-panel" id="scroll-tab-2">
+        <div class="page-content">
+          <div class='addpeerform mdl-card__supporting-text'>
+            <form action="#">
+              <table border='0' cellpadding='0' cellspacing='0' style='margin-bottom:-20px;'>
+                <tr>
+                  <td style='vertical-align:top;width:250px;'>
+                    <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                      <input class="mdl-textfield__input" type="text" id="newcontactid">
+                      <label class="mdl-textfield__label" for="newcontactid">Device UUID</label>
+                    </div>
+                    <div class='data-control peergroupselect' data-control='securitybot:groupselect'></div>
+                    <br><br>
+                    <div id='newconactmsg'></div>
+                  </td>
+                  <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+                  <td style='vertical-align:top;width:250px;'>
+                    <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                      <input class="mdl-textfield__input" type="text" id="newcontactcode">
+                      <label class="mdl-textfield__label" for="newcontactcode">Access Code (if you have one)</label>
+                    </div>
+                    <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                      <input class="mdl-textfield__input" type="text" id="newcontactip">
+                      <label class="mdl-textfield__label" for="newcontactip">IP Address (if you have it)</label>
+                    </div>
+                    <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                      <input class="mdl-textfield__input" type="text" id="newcontactport">
+                      <label class="mdl-textfield__label" for="newcontactport">Port Number (if you have it)</label>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </form>    
+
+          </div>  
+          <div class="mdl-card__actions mdl-card--border">
+            <a id="addcontactbutton" class="mdl-button mdl-button--colored mdl-js-button mdl-js-ripple-effect">
+              Add
+            </a>
+          </div>    
+        </div>
+      </section>
+    </main>
+  </div>
+  
+  
+  <div class="mdl-card__menu">
+    <button id="adconbackbutton" class="addpeerpopupclose mdl-button mdl-button--icon mdl-js-button mdl-js-ripple-effect">
+      <i class="material-icons">close</i>
+    </button>
+  </div>
+</div>
+
+<div class='accesscodespopup'>
+  <div class="mdl-card__title"><h2 class="mdl-card__title-text">Access Codes</h2></div>
+  <div class='codelist mdl-card__supporting-text'></div>
+  <div class="mdl-card__actions mdl-card--border">
+    <form action="#">
+      <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+        <input class="mdl-textfield__input" type="text" id="newaccesscode" value=" ">
+        <label class="mdl-textfield__label" for="newaccesscode">Access Code</label>
+      </div>
+      <div class='data-control acgroupselect' data-control='securitybot:groupselect' data-exclude="anonymous"></div>
+      <a class="addaccesscodebutton mdl-button mdl-button--colored mdl-js-button mdl-js-ripple-effect">
+        Add
+      </a>
+      <label class="singleuse mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="deleteonuse">
+        <input type="checkbox" id="deleteonuse" class="mdl-checkbox__input" checked>
+        <span class="mdl-checkbox__label">Single use</span>
+      </label>    
+    </form>    
+  </div>    
+  <div class="mdl-card__menu">
+    <button id="accesscodespopupclose" class="accesscodespopupclose mdl-button mdl-button--icon mdl-js-button mdl-js-ripple-effect">
+      <i class="material-icons">close</i>
+    </button>
+  </div>
+</div>
+
+<div class='lanpopup'>
+  <div class="mdl-card__title"><h2 class="mdl-card__title-text">Local Area Network</h2></div>
+  <div id="botlist" class='botlist mdl-card__supporting-text'></div>
+  <div class="mdl-card__menu">
+    <button id="lanpopupclose" class="lanpopupclose mdl-button mdl-button--icon mdl-js-button mdl-js-ripple-effect">
+      <i class="material-icons">close</i>
+    </button>
+  </div>
+</div>
