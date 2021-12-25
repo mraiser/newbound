@@ -1,0 +1,13 @@
+#botlistinner{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+}
+
+
+.loadingmsg {
+  font-size: 10vw;
+  color: white;
+  text-align:center;
+  margin-top:30vh;
+}

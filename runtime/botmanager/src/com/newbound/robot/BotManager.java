@@ -1047,7 +1047,7 @@ public class BotManager extends BotBase
 
 	private void deleteAttachments(File root, JSONObject d, String name) throws Exception
 	{
-		JSONArray ja = d.getJSONArray("attachmentkeynames");
+		JSONArray ja = d.getJSONArray("attachmentkeynames"); // FIXME - HACK
 		int i = ja.length();
 		while (i-- > 0)
 		{
