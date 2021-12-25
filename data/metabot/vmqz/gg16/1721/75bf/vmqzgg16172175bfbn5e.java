@@ -1,0 +1,1 @@
+return ((com.newbound.robot.MetaBot)metabot).updateLibrary(peer, lib, guid, sessionid);

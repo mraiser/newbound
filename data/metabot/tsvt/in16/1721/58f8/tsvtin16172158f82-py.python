@@ -1,0 +1,9 @@
+p = botmanager.properties
+ja = p['bots'].split(',')
+if id in ja:
+    i = ja.index(id)
+    ja = ja[:i]+ja[i+1:]
+    s = ','.join(ja)
+    p['bots'] = s
+    botmanager.saveSettings()
+return botmanager.newResponse()

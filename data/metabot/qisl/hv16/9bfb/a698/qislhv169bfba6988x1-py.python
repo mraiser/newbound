@@ -1,0 +1,3 @@
+libraries = metabot.appproperties['libraries'].split(',')
+for lib in libraries: metabot.rebuildLibrary(lib)
+return 'OK'

@@ -1,0 +1,6 @@
+f = os.path.join(botmanager.getParentFile(botmanager.root), id)
+f = os.path.join(f, 'app.properties')
+p = botmanager.load_properties(f)
+o = botmanager.newResponse()
+o['data'] = p
+return o

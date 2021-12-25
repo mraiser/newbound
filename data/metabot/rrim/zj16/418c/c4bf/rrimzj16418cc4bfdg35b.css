@@ -1,0 +1,13 @@
+.installbutton{
+  display:none;
+  margin-top:20px;
+}
+
+.libid {
+  min-width:120px;
+}
+
+.shrinkme {
+  position:relative;
+  overflow:hidden;
+}

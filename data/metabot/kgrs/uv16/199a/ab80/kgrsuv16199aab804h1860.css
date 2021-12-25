@@ -1,0 +1,63 @@
+.autoupdatelibraries{
+  margin-left:40px;
+}
+
+.hideme {
+  display:none;
+}
+
+.upbut{
+  margin:40px;
+}
+
+.listtable{
+  position:absolute;
+  top:0px;
+  left:0px;
+  height:100%;
+  width:180px;
+  overflow-y:auto;
+  overflow-x:hidden;
+  z-index:100;
+  background-color:white;
+}
+
+.listtable-inner{
+  position:relative;
+  left:-50px;
+}
+
+.libdetail{
+  position:absolute;
+  left:190px;
+  right:0px;
+  height:100%;
+  overflow:auto;
+}
+
+.floatleft{
+  position:absolute;
+  left:120px;
+}
+
+.pointy{
+  cursor:pointer;
+}
+
+.lesslibs{
+  display:none;
+}
+
+.updatebadge{
+  vertical-align:bottom;
+  cursor:pointer;
+  margin-left:20px;
+}
+
+.mdl-badge.mdl-badge--overlap:after{
+  background-color:#83bc00;
+}
+
+.libid{
+  cursor:pointer;
+}

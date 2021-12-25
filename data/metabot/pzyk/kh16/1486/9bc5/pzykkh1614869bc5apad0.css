@@ -1,0 +1,24 @@
+.padsides{
+  margin-left:50px;
+  margin-right:50px;
+}
+
+.mdl-data-table-wrapper{
+  display:inline-block;
+  vertical-align:top;
+  margin-right:50px;
+}
+
+.deletelibrarybutton{
+  float:right;
+}
+
+.mdc-list-item__graphic{
+  cursor:pointer;
+}
+
+.chiptable{
+  position:relative;
+  top:-20px;
+  font-size:xx-small;
+}

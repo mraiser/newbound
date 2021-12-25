@@ -1,0 +1,62 @@
+<div class='fullwidth matrixviewer'></div>
+<div class='ctllistwrap'>
+  <div class = "mdl-tabs mdl-js-tabs">
+    <div class = "mdl-tabs__tab-bar">
+      <a href = "#tab1-panel" class = "3dtab controltab mdl-tabs__tab is-active">Controls</a>
+      <a href = "#tab2-panel" class = "3dtab assettab mdl-tabs__tab">Assets</a>
+      <a href = "#tab3-panel" class = "3dtab behaviortab mdl-tabs__tab">Behaviors</a>
+      <a href = "#tab4-panel" class = "3dtab posetab mdl-tabs__tab">Poses</a>
+    </div>
+    <div class = "mdl-tabs__panel is-active" id = "tab1-panel">
+      <h4>Models</h4>
+      <div class='ctllist'></div>
+      <div id='new3dctl' class='data-control' data-control='metabot:controlselect'></div>
+      <button class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored" id="add3dctlbutton">
+        <i class="material-icons">add</i>
+      </button>  
+    </div>
+    <div class = "mdl-tabs__panel" id = "tab2-panel">
+      <div class='assetlist'></div>
+      <div id='new3dasset' class='data-control' data-control='metabot:assetselect'></div>
+      <button class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored" id="add3dassetbutton">
+        <i class="material-icons">add</i>
+      </button>
+    </div>
+    <div class = "mdl-tabs__panel" id = "tab3-panel">
+      <div class='behaviorlistgoeshere'></div>
+    </div>
+    <div class = "mdl-tabs__panel" id = "tab4-panel">
+      <h4>Poses</h4>
+      <div class='poselistgoeshere'><br></div>
+      <button class="newposebutton mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored">
+        <i class="material-icons">add</i>
+      </button>
+      <h4>Pose Animations</h4>
+      <div class='animationlistgoeshere'></div>
+    </div>
+  </div>
+</div>
+
+<div class='edit3dhere'>
+  <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+    <input class="mdl-textfield__input" type="text" id="edit3dctlname">
+    <label class="mdl-textfield__label" for="edit3dctlname">Name</label>
+  </div>
+  <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label is-dirty">
+    <div id='edit3dctlpos'></div>
+    <label class="mdl-textfield__label" for="edit3dctlpos">Position</label>
+  </div>
+  <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label is-dirty">
+    <div class='data-control' data-control='threejs:vector3' id='edit3dctlrot'></div>
+    <label class="mdl-textfield__label" for="edit3dctlrot">Rotation</label>
+  </div>
+  <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label is-dirty">
+    <div class='data-control' data-control='threejs:vector3' id='edit3dctlscale'></div>
+    <label class="mdl-textfield__label" for="edit3dctlscale">Scale</label>
+  </div>
+  <div id='edit3dctlinner'></div>
+</div>
+
+<div class='editbehaviorhere'></div>
+
+<div id='popmeup2'></div>

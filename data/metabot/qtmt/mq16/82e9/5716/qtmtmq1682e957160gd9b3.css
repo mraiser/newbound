@@ -1,0 +1,91 @@
+.ctllistwrap::-webkit-scrollbar {
+    width: 4px;
+}
+ 
+.ctllistwrap::-webkit-scrollbar-track {
+    -webkit-box-shadow: inset 0 0 6px rgba(255,255,255,0.3);
+}
+ 
+.ctllistwrap::-webkit-scrollbar-thumb {
+  background-color: darkgrey;
+  outline: 1px solid slategrey;
+}
+
+.fullwidth {
+  position:absolute;
+  top:0px;
+  left:340px;
+  right:0px;
+  height:100%;
+  background-color:black;
+}
+
+.dg.ac {
+  display:none;
+  top:100px;
+}
+
+.ctllistwrap{
+  color:#fff8;
+  width:300px;
+  height:100%;
+  position:absolute;
+  top:0px;
+  left:0px;
+  overflow-y:scroll;
+  padding-left:20px;
+  padding-right:20px;
+}
+
+.mdl-tabs__tab {
+  color: #fff8;
+  font-size:x-small;
+}
+
+.mdl-tabs.is-upgraded .mdl-tabs__tab.is-active {
+  color: #fff;
+}
+
+.mdl-list__item{
+  color:#fff8;
+  width:100%;
+}
+
+.mdl-list__item--two-line .mdl-list__item-primary-content .mdl-list__item-sub-title{
+  color:#fff8;
+  width:100%;
+  overflow:hidden;
+  font-size:xx-small;
+}
+
+.editctl, .delctl{
+  cursor:pointer;
+}
+
+.edit3dhere, .editbehaviorhere{
+  position:absolute;
+  top:20px;
+  left:365px;
+  display:none;
+  vertical-align:top;
+}
+
+.edit3dhere .mdl-textfield{
+  vertical-align:bottom;
+}
+
+.edit3dhere .mdl-textfield__label, .edit3dhere .mdl-textfield__input, .edit3dhere table{
+  color:#fff8;
+}
+
+.poselistgoeshere, .animationlistgoeshere {
+  padding: 20px;
+}
+
+.clickme{
+  cursor:pointer;
+}
+
+.assettab{
+  display: none;
+}

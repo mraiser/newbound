@@ -1,0 +1,22 @@
+.applist{
+  display: flex;
+  justify-content: center;
+  width:100%;
+  flex-wrap: wrap;
+}
+
+.applist-filters{
+  margin-left:auto;
+  margin-right:auto;
+  margin-top:20px;
+  margin-bottom:10px;
+}
+
+.app-card{
+  height:0px;
+  width:0px;
+}
+
+.app-card{
+  overflow:hidden;
+}

@@ -1,0 +1,57 @@
+<div class="mdl-card mdl-shadow--2dp app-card-square">
+  <div class="mdl-card__title mdl-card--expand"></div>
+  <div class="mdl-card__actions">
+    <button class="mdl-button mdl-js-button mdl-button--fab mdl-button--mini-fab mdl-button--colored appupdatebutton">
+      <i class="material-icons">get_app</i>
+    </button>
+    <span class="app-card-image__filename"></span>
+  </div>
+</div>
+
+<div class='greyout'></div>
+
+<div class="mdl-card mdl-shadow--4dp app-detail">
+  <div class="mdl-layout mdl-js-layout mdl-layout--fixed-header">
+    <header class="mdl-layout__header appinfo-header">
+      <div class="mdl-layout__header-row">
+        <span class="mdl-layout-title appinfo-title"></span>
+        <div class="mdl-layout-spacer"></div>
+        <button class="mdl-button mdl-js-button mdl-button--fab mdl-button--mini-fab appinfo-close">
+          <i class="material-icons">close</i>
+        </button>
+      </div>
+    </header>
+    
+    <div class='flex'>
+      <img class='appinfo-img'>
+      
+      <div class='appinfo-meta'>
+        App ID: <span class='appinfo-ctlid'></span><br>
+        Author: <span class='appinfo-author'></span><br>
+        <br>
+        
+        <div class='injectselect'></div>
+        
+        <div class='installarea'></div>
+        <div class="appactions">
+<button class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored app-update-button appbutton">Update</button>
+<button class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored app-install-button appbutton">Install</button>
+<button class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored app-run-button appbutton">Run</button>
+<button class="mdl-button mdl-js-button mdl-button--raised mdl-button--accent app-edit-button appbutton">Edit</button>        
+<button class="mdl-button mdl-js-button mdl-button--raised mdl-button--accent app-activate-button appbutton">activate</button>        
+<button class="mdl-button mdl-js-button mdl-button--raised mdl-button--accent app-deactivate-button appbutton">deactivate</button>        
+<button class="mdl-button mdl-js-button mdl-button--raised mdl-button--accent app-uninstall-button appbutton">uninstall</button>        
+        </div>
+        <div class='restartarea'>
+          <br>
+          You will need to restart services to see the changes.
+          <div class='data-control' data-control='metabot:restartbutton'></div>
+        </div>      
+        <br><br>
+        <span class='appinfo-desc'></span>
+      </div>
+  
+      <div class='appinfo-api'></div>
+    </div>
+  </div>
+</div>

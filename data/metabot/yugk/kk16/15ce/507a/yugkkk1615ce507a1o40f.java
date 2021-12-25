@@ -1,0 +1,1 @@
+return Publisher.publish(data);

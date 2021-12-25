@@ -1,0 +1,16 @@
+.mdl-layout__drawer-button {
+  padding-top:12px;
+  height:40px;
+}
+
+.mdl-layout__tab.is-active {
+    background-color: #0002;
+}
+
+.centerme{
+  margin:auto;
+}
+
+.mainbg{
+  background-color:#fff;
+}

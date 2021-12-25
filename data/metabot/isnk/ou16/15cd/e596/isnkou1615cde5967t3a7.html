@@ -1,0 +1,78 @@
+<div class='padmain'>
+  <h3>Build Executable</h3>
+  <div class='bjpanel' id='bjstep1'>
+    <b>Step 1 - Select Apps and Libraries</b>
+    <br><br>
+    <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored step2button">
+      Next
+    </button>
+    <br><br>
+    <div class="publish-apptable"></div>
+    <div class="publish-libtable"></div>
+  </div>
+  <div class='bjpanel' id='bjstep2'>
+    <b>Step 2 - Customize Executable</b>
+    <br><br>
+    <div>
+      <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+        <input class="mdl-textfield__input" type="text" id="pubappname" value="Untitled">
+        <label class="mdl-textfield__label" for="pubappname">Executable Name</label>
+      </div>
+      <div class='pubappstartupselect'></div>
+      <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+        <input class="mdl-textfield__input" type="text" id="pubapphttpport" value="5773">
+        <label class="mdl-textfield__label" for="pubapphttpport">HTTP Port</label>
+      </div>
+      
+<div class='hideme'>
+      <label class="mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="pubappnative">
+        <input type="checkbox" id="pubappnative" class="mdl-checkbox__input">
+        <span class="mdl-checkbox__label">Build native app</span>
+      </label>
+      <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+        <input class="mdl-textfield__input thevalue" type="text" id="thevalue" value="metabot:icon-square-app-builder.png">
+        <label class="mdl-textfield__label" for="thevalue">Icon</label>
+      </div>
+      <button class="mdl-button mdl-js-button mdl-button--icon assetpickerbutton">
+        <i class="material-icons">list</i>
+      </button>
+</div>
+
+      
+      
+      
+      
+      
+      <br><br>
+    </div>
+    <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent step1button">
+      back
+    </button>
+    <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored step3button">
+      build
+    </button>
+    <br><br>
+  </div>
+  <div class='bjpanel' id='bjstep3'>
+    <i>Building archive, please wait...</i>
+  </div>
+</div>
+<br><br>
+<div class='popmeup'>
+  <div class="mdl-card__title">
+    <h2 class="mdl-card__title-text">Select an Asset</h2>
+  </div>
+  <div class="mdl-card__title mdl-card--expand">
+    <div class='assetpicker'></div>
+  </div>
+  <div class="mdl-card__actions mdl-card--border">
+    <a class="mdl-button mdl-button--colored mdl-js-button mdl-js-ripple-effect chooseassetbutton" onclick="$(this).closest('.popmeup').parent()[0].api.select();">
+      select
+    </a>
+  </div>
+  <div class="mdl-card__menu">
+    <button class="mdl-button mdl-button--icon mdl-js-button mdl-js-ripple-effect closeme" onclick="$(this).closest('.popmeup')[0].api.closeAndReset();">
+      <i class="material-icons">close</i>
+    </button>
+  </div>
+</div>    

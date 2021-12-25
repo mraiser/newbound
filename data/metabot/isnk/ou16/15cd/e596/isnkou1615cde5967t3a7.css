@@ -1,0 +1,25 @@
+.padmain{
+  margin-left:50px;
+  margin-right:50px;
+}
+
+.publish-apptable, .publish-libtable{
+  display:inline-block;
+  vertical-align:top;
+  padding-right:50px;
+}
+
+#bjstep2, #bjstep3{
+  display:none;
+}
+
+.popmeup{
+  position:absolute;
+  display:none;
+  width:360px;
+  height:280px;
+}
+
+.thevalue{
+  width:300px;
+}

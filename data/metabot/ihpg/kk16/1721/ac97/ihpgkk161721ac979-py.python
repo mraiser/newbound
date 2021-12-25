@@ -1,0 +1,3 @@
+f = os.path.join(botmanager.getParentFile(botmanager.root), appid)
+shutil.rmtree(f)
+return 'OK'

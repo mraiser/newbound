@@ -1,0 +1,40 @@
+.thin{
+  height:40px;
+}
+
+.thin2{
+  height:80px;
+}
+
+.greyedout{
+  position:fixed;
+  z-index:5;
+  top:0px;
+  left:0px;
+  width:100%;
+  height:100%;
+  background-color:#00000033;
+}
+
+.dbg{
+  position:fixed;
+  z-index:6;
+  top:0px;
+  left:0px;
+  width:0px;
+  height:0px;
+  overflow:hidden;
+}
+
+.dialog-card-wide{
+  margin-left:auto;
+  margin-right:auto;
+}
+
+.floatright{
+  float:right;
+}
+
+.bggreen{
+  background-color:#84bd00;
+}

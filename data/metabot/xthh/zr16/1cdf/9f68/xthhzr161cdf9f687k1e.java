@@ -1,0 +1,1 @@
+return ((MetaBot)BotBase.getBot("metabot")).buildJSAPI(lib, id);

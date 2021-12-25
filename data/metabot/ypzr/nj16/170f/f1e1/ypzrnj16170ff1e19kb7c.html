@@ -1,0 +1,55 @@
+<div id='timer_edit' class='padmex'>
+  <h1>Edit Timer Task</h1>
+  <h2 id='timer_edit_name' class='timer_edit_name'></h2>
+  
+  <div>
+      <label for='timer_edit_task'>Fire Command:</label>
+      <select id='timer_edit_task' class='cmdselect' onchange='TB.setTaskParams($(this).val());'></select>
+  </div>
+  <br><br>With Values:<br>
+  <div id='timer_edit_params'></div>
+  <br><br>
+  <div data-role="controlgroup">
+      <input type="radio" name="timer_edit_start" id="timer_edit_start-1" class="timer_edit_start" value="0" checked="checked" />
+      <label for="timer_edit_start-1">At Startup</label>
+      <br>
+      <input type="radio" name="timer_edit_start" id="timer_edit_start-2" class="timer_edit_start" value="1" />
+      <label for="timer_edit_start-2">
+          <select id='tes2-1' data-role='none' class='digitselect'></select><select id='tes2-2' data-role='none' class='digitselect'></select>
+          <select id='tes2-unit' data-role='none' class='timeunitselect'></select>
+          After Startup
+      </label>
+      <br>
+      <input type="radio" name="timer_edit_start" id="timer_edit_start-3" class="timer_edit_start" value="2" />
+      <label for="timer_edit_start-3">
+          At a specific time: 
+          <br>
+          <select id='tes3-h1' data-role='none' class='h1select' onchange='TB.adjustMinuteSelect($(this).val(), "tes3-h2");'></select><select id='tes3-h2' data-role='none' class='digitselect'></select> : 
+          <select id='tes3-m1' data-role='none' class='m1select'></select><select id='tes3-m2' data-role='none' class='digitselect'></select> 
+          <select id='tes3-ampm' data-role='none'><option>AM</option><option>PM</option></select> 
+          on 
+          <select id='tes3-m' data-role='none' class='monthselect' onchange='TB.adjustDaySelect("tes3-m", "tes3-d", "tes3-y");'></select>
+          <select id='tes3-d1' data-role='none' class='d1select' onchange='TB.adjustDaySelect("tes3-m", "tes3-d", "tes3-y");'></select><select id='tes3-d2' data-role='none' class='digitselect'></select> , 
+          <select id='tes3-y' data-role='none' class='yearselect' onchange='TB.adjustDaySelect("tes3-m", "tes3-d", "tes3-y");'></select>
+      </label>
+  </div>
+  <br><br>
+  <div>
+      <input style='vertical-align:top;' type='checkbox' id='timer_edit_repeat' onchange='$("#timer_edit_repeat_data").css("display", $(this).prop("checked") ? "inline" : "none");'>
+      <label for='timer_edit_repeat'>
+          Repeat
+          <span id='timer_edit_repeat_data' style='display:none;'>
+            Every 
+            <select id='timer_edit_repeat1' data-role='none' class='digitselect' onclick='event.stopPropagation();'></select><select id='timer_edit_repeat2' data-role='none' class='digitselect' onclick='event.stopPropagation();'></select>
+            <select id='timer_edit_repeat_unit' data-role='none' class='timeunitselect' onclick='event.stopPropagation();'></select>
+          </span>
+      </label>
+  </div>
+  <br>
+  <div id='timer_edit_msg'></div>
+  <br><br>
+  <button class='bggreen butpad' id='savethetimerbutton'>save</button>
+  <button class='bggray butpad' id='cancelthetimerbutton'>cancel</button>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <button class='bgwhite butpad' id='deletethetimerbutton'>delete</button>
+</div>

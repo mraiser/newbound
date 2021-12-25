@@ -1,0 +1,21 @@
+allapps = metabot.apps({})['data']['list']
+ja = []
+sa = lib.split(',')
+for lib in sa:
+    jo = {}
+    hashdir = os.path.join(metabot.root, 'libraries')
+    f = os.path.join(hashdir, lib+'.json')
+    if not os.path.exists(f):
+        jo['dirty'] = True
+        jo['published'] = False
+    else:
+        pass # FIXME - check dirty/published
+    jo['id'] = lib
+    apps = []
+    for app in allapps:
+        for applib in app['libraries']:
+            if applib == lib: apps.append(app)
+    jo['apps'] = apps
+    ja.append(jo)
+jo = { 'libraries': ja }
+return jo
