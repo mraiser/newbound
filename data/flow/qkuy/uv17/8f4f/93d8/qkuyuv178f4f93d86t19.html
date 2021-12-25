@@ -1,0 +1,61 @@
+<h3>Operation</h3>
+<div class="operation_type_div"></div>
+<form action="#">
+  <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+    <input class="mdl-textfield__input operation_name" type="text" id="operation_name">
+    <label class="mdl-textfield__label" for="operation_name">Label</label>
+  </div>
+</form>
+<div class="operation_prim_list_div"></div>
+<div class="operation_ctype">
+  <div class="operation_ctype_list_div"></div>
+  <form action="#">
+    <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+      <input class="mdl-textfield__input operation_cvalue" type="text" id="operation_cvalue">
+      <label class="mdl-textfield__label" for="operation_cvalue">Value</label>
+    </div>
+  </form>
+</div>
+<div class="commandselectdiv" ></div>
+<div class="conditionselectdiv" style="position:relative;">
+  <label class="mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect isconcheckbox" for="isconditional" style="position:absolute;top:-2px;">
+    <input type="checkbox" id="isconditional" class="mdl-checkbox__input">
+    <span class="mdl-checkbox__label"></span>
+  </label>
+  <div class="ifconditionisallowed" style="margin-left:25px;">Condition</div>
+  <div class="showonconditional">
+    <div class="indent">
+      <label class="mdl-radio mdl-js-radio mdl-js-ripple-effect" for="ontrue">
+        <input type="radio" id="ontrue" class="mdl-radio__button" name="conditions" value="1" checked>
+        <span class="mdl-radio__label">on true</span>
+      </label>
+      <br>
+      <label class="mdl-radio mdl-js-radio mdl-js-ripple-effect" for="onfalse">
+        <input type="radio" id="onfalse" class="mdl-radio__button" name="conditions" value="2">
+        <span class="mdl-radio__label">on false</span>
+      </label>
+    </div>
+    Rule
+    <div class="indent">
+      <label class="mdl-radio mdl-js-radio mdl-js-ripple-effect" for="nextcase">
+        <input type="radio" id="nextcase" class="mdl-radio__button" name="rules" value="1" checked>
+        <span class="mdl-radio__label">next case</span>
+      </label>
+      <br>
+      <label class="mdl-radio mdl-js-radio mdl-js-ripple-effect" for="terminate">
+        <input type="radio" id="terminate" class="mdl-radio__button" name="rules" value="2">
+        <span class="mdl-radio__label">terminate</span>
+      </label>
+      <br>
+      <label class="mdl-radio mdl-js-radio mdl-js-ripple-effect" for="finish">
+        <input type="radio" id="finish" class="mdl-radio__button" name="rules" value="2">
+        <span class="mdl-radio__label">finish</span>
+      </label>
+      <br>
+      <label class="mdl-radio mdl-js-radio mdl-js-ripple-effect" for="fail">
+        <input type="radio" id="fail" class="mdl-radio__button" name="rules" value="2">
+        <span class="mdl-radio__label">fail</span>
+      </label>
+    </div>
+  </div>
+</div>
