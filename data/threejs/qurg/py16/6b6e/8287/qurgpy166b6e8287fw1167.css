@@ -1,0 +1,30 @@
+.model-card-image.mdl-card{
+  width:128px;
+  height:128px;
+  min-height:128px;
+  background-color:black;
+  background-position:center;
+  background-size:cover;
+  margin-bottom:10px;
+}
+
+.model-card-image__filename{
+  color:#fff;
+  font-size:14px;
+  font-weight:bold;
+}
+
+.model-card-image > .mdl-card__actions{
+  height:40px;
+  padding:12px;
+  background:rgba(0,0,0,0.5);
+  cursor:pointer;
+}
+
+.model-card-image > .mdl-card__menu{
+  background-color:#0008;
+  color:#fff;
+  top:0px;
+  right:0px;
+  border-radius:20px;
+}

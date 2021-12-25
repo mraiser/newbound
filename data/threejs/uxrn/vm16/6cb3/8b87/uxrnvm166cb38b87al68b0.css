@@ -1,0 +1,24 @@
+.hideme{
+  display:none;
+}
+
+.aeditor{
+  display:none;
+  position:absolute;
+  width:330px;
+  height:400px;
+}
+
+.scrolllist{
+  position:relative;
+  height:255px;
+  overflow-y:scroll;
+}
+
+.animationstep{
+  height:118px;
+}
+
+.deleteanimationbutton{
+  float:right;
+}
