@@ -1342,7 +1342,10 @@ public abstract class MetaBot extends BotBase
 	{
 		BotManager bm = (BotManager)BotBase.getBot("botmanager");
 		JSONObject ctl = getData(lib, id).getJSONObject("data");
-		File ctlfile = bm.getDataFile(lib, id, bm.getKeys(lib));
+		SuperSimpleCipher[] keys = bm.getKeys(lib);
+		boolean plaintext = keys.length == 0;
+
+		File ctlfile = bm.getDataFile(lib, id, keys);
 		String name = ctlfile.getName();
 
 		File sub4 = ctlfile.getParentFile();
@@ -1358,7 +1361,7 @@ public abstract class MetaBot extends BotBase
 		
 		copyFile(ctlfile, dest);
 
-		if (ctl.has("attachmentkeynames")) // FIXME - HACK
+		if (plaintext && ctl.has("attachmentkeynames")) // FIXME - HACK
 		{
 			JSONArray ja = ctl.getJSONArray("attachmentkeynames");
 			int i = ja.length();

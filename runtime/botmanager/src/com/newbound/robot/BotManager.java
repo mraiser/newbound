@@ -986,12 +986,13 @@ public class BotManager extends BotBase
 		
 		File root = getDB(db);
 		SuperSimpleCipher[] keys = getKeys(db);
-		String name = keys.length == 0 ? id : toHexString(keys[1].encrypt(id.getBytes()));
+		boolean plaintext = keys.length == 0;
+		String name = plaintext ? id : toHexString(keys[1].encrypt(id.getBytes()));
 		root = getSubDir(root, name, 4, 4);
 		root.mkdirs();
 
 		JSONObject d = new JSONObject(data);
-		if (d.has("attachmentkeynames")) // FIXME - HACK
+		if (plaintext && d.has("attachmentkeynames")) // FIXME - HACK
 			saveAttachments(root, d, name);
 
 		JSONObject jo = new JSONObject();
@@ -1005,7 +1006,7 @@ public class BotManager extends BotBase
 		if (writers != null) jo.put("writers", ws);
 
 		File f = new File(root, name);
-		writeFile(f, keys.length == 0 ? jo.toString().getBytes() : keys[1].encrypt(jo.toString().getBytes()));
+		writeFile(f, plaintext ? jo.toString().getBytes() : keys[1].encrypt(jo.toString().getBytes()));
 		
 		jo.put("db", db);
 		fireEvent("write", jo);
@@ -1016,6 +1017,7 @@ public class BotManager extends BotBase
 		return jo;
 	}
 
+	// FIXME - Doesn't work with encrypted libraries
 	private void saveAttachments(File root, JSONObject d, String name) throws IOException
 	{
 		JSONArray ja = d.getJSONArray("attachmentkeynames");
@@ -1028,6 +1030,7 @@ public class BotManager extends BotBase
 		}
 	}
 
+	// FIXME - Doesn't work with encrypted libraries
 	private void loadAttachments(File root, JSONObject d, String name) throws Exception
 	{
 		JSONArray ja = d.getJSONArray("attachmentkeynames");
@@ -1045,6 +1048,7 @@ public class BotManager extends BotBase
 		}
 	}
 
+	// FIXME - Doesn't work with encrypted libraries
 	private void deleteAttachments(File root, JSONObject d, String name) throws Exception
 	{
 		JSONArray ja = d.getJSONArray("attachmentkeynames"); // FIXME - HACK
@@ -1367,12 +1371,13 @@ public class BotManager extends BotBase
 	{
 		File root = getDB(db);
 		SuperSimpleCipher[] keys = getKeys(db);
-		String name = keys.length == 0 ? id : toHexString(keys[1].encrypt(id.getBytes()));
+		boolean plaintext = keys.length == 0;
+		String name = plaintext ? id : toHexString(keys[1].encrypt(id.getBytes()));
 		root = getSubDir(root, name, 4, 4);
 		root.mkdirs();
 		File f = new File(root, name);
 
-		if (data.has("attachmentkeynames")) // FIXME - HACK
+		if (plaintext && data.has("attachmentkeynames")) // FIXME - HACK
 			saveAttachments(root, data, name);
 
 		JSONObject jo = new JSONObject();
@@ -1383,7 +1388,7 @@ public class BotManager extends BotBase
 		if (readers != null) jo.put("readers", readers);
 		if (writers != null) jo.put("writers", writers);
 		
-		writeFile(f, keys.length == 0 ? jo.toString().getBytes() : keys[1].encrypt(jo.toString().getBytes()));
+		writeFile(f, plaintext ? jo.toString().getBytes() : keys[1].encrypt(jo.toString().getBytes()));
 		return true;
 	}
 
@@ -1397,18 +1402,18 @@ public class BotManager extends BotBase
 	public JSONObject getData(String db, String id) throws Exception
 	{
 		SuperSimpleCipher[] keys = getKeys(db);
+		boolean plaintext = keys.length == 0;
 		File f = getDataFile(db, id, keys);
 
 		if (!f.exists())
 			throw new Exception("No such record "+db+"/"+id);
 
 		byte[] ba = readFile(f);
-		JSONObject jo = new JSONObject(new String(keys.length == 0 ? ba : keys[0].decrypt(ba)));
+		JSONObject jo = new JSONObject(new String(plaintext ? ba : keys[0].decrypt(ba)));
 
 		JSONObject d = jo.getJSONObject("data");
-		if (d.has("attachmentkeynames")) // FIXME - HACK
+		if (plaintext && d.has("attachmentkeynames")) // FIXME - HACK
 			loadAttachments(f.getParentFile(), d, id);
-
 
 		return jo;
 	}
@@ -1430,16 +1435,17 @@ public class BotManager extends BotBase
 	{
 	  File f = getDB(db);
 	  SuperSimpleCipher[] keys = getKeys(db);
-	  String name = keys.length == 0 ? id : toHexString(keys[1].encrypt(id.getBytes()));
+      boolean plaintext = keys.length == 0;
+	  String name = plaintext ? id : toHexString(keys[1].encrypt(id.getBytes()));
 	  f = getSubDir(f, name, 4, 4);
 	  f = new File(f, name);
 	  
 	  if (!f.exists()) throw new Exception("No such record");
 
-	  try
+	  if (plaintext) try
 	  {
 		  byte[] ba = readFile(f);
-		  JSONObject jo = new JSONObject(new String(keys[0].decrypt(ba)));
+		  JSONObject jo = new JSONObject(new String(plaintext ? ba : keys[0].decrypt(ba))); // FIXME - plaintext always true
 		  JSONObject d = jo.getJSONObject("data");
 		  if (d.has("attachmentkeynames")) // FIXME - HACK
 			  deleteAttachments(f.getParentFile(), d, id);
