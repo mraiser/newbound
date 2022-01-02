@@ -825,6 +825,7 @@ public class BotManager extends BotBase
 		throw new Exception("No such asset: "+db+"/"+name);
 	}
 
+	// FIXME - does not handle plaintext to encrypted attachments
 	public Object handleConvertdb(String db, String readers, String writers, String encryption, String sessionid) throws Exception
 	{
 		File f = getDB(db);
