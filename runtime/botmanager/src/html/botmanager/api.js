@@ -384,6 +384,18 @@ function startWebSocket(){
 	};
   }
 }
+//FIXME - Doesn't work without websocket or for local tempfiles
+function tempfile(peer, stream, cb){
+  	var pid = guid();
+  	CMDS[pid] = cb;
+
+	var wrap = {
+	  "pid": pid,
+	  "peer": peer,
+	  "stream": stream
+	};
+	SOCK.send("tempfile "+JSON.stringify(wrap));
+}
 
 function json(cmd, vars, cb) { 
   if (SOCK && cmd.indexOf('http') != 0) {

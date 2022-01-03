@@ -221,3 +221,5 @@ dmypy.json
 /data/discord
 /data/test/
 /data/code/
+/data/documentation/
+/runtime/documentation/

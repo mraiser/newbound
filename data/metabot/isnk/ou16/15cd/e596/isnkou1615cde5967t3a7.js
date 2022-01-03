@@ -195,9 +195,9 @@ function init(){
   el.closest('tr').addClass('is-selected');
   el[0].MaterialCheckbox.check();
   
-//  el = $('#publibid_taskbot').find('.mdl-checkbox');
-//  el.closest('tr').addClass('is-selected');
-//  el[0].MaterialCheckbox.check();
+  el = $('#publibid_flow').find('.mdl-checkbox');
+  el.closest('tr').addClass('is-selected');
+  el[0].MaterialCheckbox.check();
   
 //  el = $('#publibid_Koreapps').find('.mdl-checkbox');
 //  el.closest('tr').addClass('is-selected');

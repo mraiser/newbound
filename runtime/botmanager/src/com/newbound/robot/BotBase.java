@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.Vector;
 
+import com.newbound.net.mime.Base64Coder;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -1012,6 +1013,22 @@ System.out.println("Loading Properties: "+f.getCanonicalPath());
 		catch (Exception x)
 		{
 			x.printStackTrace();
+		}
+		else if (msg.startsWith("tempfile "))
+		{
+			try
+			{
+				JSONObject jo = new JSONObject(msg.substring(9));
+				final String peer = jo.getString("peer");
+				final String stream = jo.getString("stream");
+				//final String pid = jo.getString("pid");
+				String s = PeerBot.getPeerBot().getUploadedFile(peer, stream);
+				byte[] ba = readFile(new File(s));
+				String b64 = new String(Base64Coder.encodeBytes(ba));
+				jo.put("data", b64);
+				sendWebsocketMessage(sock, jo.toString());
+			}
+			catch (Exception x) { x.printStackTrace(); }
 		}
 		else if (sc != null) sendChannelMessage(sock, sc, msg);
 		else if (msg.startsWith("subscribe "))
