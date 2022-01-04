@@ -118,19 +118,10 @@ public abstract class BotBase extends BotUtil implements Container, App //Channe
     	ROOT.mkdirs();
 //    	deleteDir(newTempFile().getParentFile());
     	
-        PROPERTIES = new Properties();
-
 		try
 		{
-			File f = new File(getRootDir(), "botd.properties");
-			if (f.exists()) 
-			{
-				FileInputStream fis = new FileInputStream(f);
-				PROPERTIES.load(fis);
-				fis.close();
-			}
-System.out.println("Loading Properties: "+f.getCanonicalPath());
-			f = new File(getRootDir(), "app.properties");
+			loadBotProperties();
+			File f = new File(getRootDir(), "app.properties");
 			if (!f.exists())
 			{
 				Properties p = new Properties();
@@ -171,7 +162,19 @@ System.out.println("Loading Properties: "+f.getCanonicalPath());
 		}
 		catch (Exception x) { x.printStackTrace(); }
 	}
-	
+
+	protected void loadBotProperties() throws IOException
+	{
+		PROPERTIES = new Properties();
+		File f = new File(getRootDir(), "botd.properties");
+		if (f.exists())
+		{
+			FileInputStream fis = new FileInputStream(f);
+			PROPERTIES.load(fis);
+			fis.close();
+		}
+	}
+
 	public int getVersion()
 	{
 		return Integer.parseInt(APPPROPERTIES.getProperty("version"));

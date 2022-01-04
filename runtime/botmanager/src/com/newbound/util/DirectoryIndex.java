@@ -207,7 +207,7 @@ public class DirectoryIndex
                     while (scanner.hasNextLine())
                     {
                         // FIXME - How long is a line?
-                        String line = scanner.nextLine();
+                        String line = scanner.nextLine().toLowerCase();
                         for (int i = 0; i < n; i++)
                         {
                             if (line.contains(sa[i]))

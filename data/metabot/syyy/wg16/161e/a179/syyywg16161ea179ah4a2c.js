@@ -164,7 +164,7 @@ me.ready = function(){
       $('.api-editcommand').css('display', 'none').empty();
     });
     
-    $(ME).find('#deletecommandbutton').click(function(){
+    $(ME).find('#deletecommandbutton').click(function(){ // FIXME - Does not delete code controls or attachments
       if (confirm('Are you sure you want to delete this command? This cannot be undone.')) {
         json('../botmanager/delete', 'db='+ME.DATA.db+'&id='+encodeURIComponent(ME.DATA.cmd.id), function(result){
           if (result.status != 'ok') {
