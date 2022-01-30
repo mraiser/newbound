@@ -64,20 +64,26 @@ public class UDPServerSocket implements ServerSocket
 			@Override
 			public void run() {
 				while (!SOCK.isClosed()) try {
-					Thread.sleep(1000);
+					Thread.sleep(100);
 					Enumeration<String> e = SOCKS.keys();
+					int n = 0;
 					while (e.hasMoreElements()) try{
 						String session = e.nextElement();
 						UDPSocket sock = SOCKS.get(session);
 						if (sock != null){
 							long millis = System.currentTimeMillis() - sock.LASTCONTACT;
-							if (sock.SOTIMEOUT == -1 || millis > sock.SOTIMEOUT){
+							if (sock.SOTIMEOUT != -1 && millis > sock.SOTIMEOUT){
 								System.out.println("UDP Socket to "+sock.getRemoteSocketAddress()+"with session "+session+" timed out.");
 								SOCKS.remove(session);
 								sock.close();
 							}
-							else { //if (millis>1000) {
-								sock.requestResend();
+							else {
+								//sock.requestResend();
+								boolean fetch = sock.pushRecvd();
+								if (fetch || n++ % 10 == 0){
+									n = 0;
+									sock.requestResend();
+								}
 							}
 						}
 					}

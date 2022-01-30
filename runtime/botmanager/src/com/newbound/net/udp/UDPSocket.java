@@ -151,19 +151,20 @@ public class UDPSocket implements Socket
 		updateRecvdLast(msgid);
 		int n = msgid - RECVDOFFSET;
 		if (n>=0) RECVD.set(n, new RecvdMsg(b, off, len));
-		pushRecvd();
+		//pushRecvd();
 	}
 
-	private void pushRecvd() throws IOException {
+	protected boolean pushRecvd() throws IOException {
 		while (RECVDOFFSET<=RECVDLAST){
 			if (RECVD.elementAt(0) == null) break;
 			RecvdMsg msg = RECVD.remove(0);
 			RECVDOFFSET++;
 			INCOMING.write(msg.ba, msg.off, msg.len);
 		}
-
-		if (RECVDOFFSET<=RECVDLAST) requestResend();
+		boolean b = RECVDOFFSET<=RECVDLAST;
+		//if (b) requestResend();
 		//else SOCK.sendACK(SESSION, RECVDLAST, ADDR, PORT);
+		return b;
 	}
 
 	public void requestResend() throws IOException {
