@@ -1888,7 +1888,7 @@ public class BotManager extends BotBase
 //		  System.out.println(getClass().getName() + ">>> Done looping over all network interfaces. Now waiting for a reply!");
 		 
 		  //Wait for a response
-		  c. setSoTimeout(5000);
+		  c.setSoTimeout(5000);
 		  Vector v = new Vector();
 		  while (true) try
 		  {
@@ -1911,7 +1911,7 @@ public class BotManager extends BotBase
 			      if (!o.has(uuid)) o.put(uuid, jo);
 			      else jo = o.getJSONObject(uuid);
 			      String addr = receivePacket.getAddress().getHostAddress();
-				  if (p != null && !p.isUDP()) p.addOtherAddress(addr);
+				  if (p != null) p.addOtherAddress(addr);
 			      if (!jo.has("address"))
 			      {
 			        jo.put("address", new JSONArray());
