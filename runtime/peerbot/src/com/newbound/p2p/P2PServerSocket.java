@@ -6,6 +6,7 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.net.SocketTimeoutException;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
@@ -32,7 +33,7 @@ public class P2PServerSocket implements ServerSocket
 	P2PManager P2P;
 
 	TCPServerSocket TCP;
-	UDPServerSocket UDP;
+	//UDPServerSocket UDP;
 	RelayServerSocket RELAY;
 
 	Vector<P2PSocket> INCOMING = new Vector();
@@ -54,8 +55,8 @@ public class P2PServerSocket implements ServerSocket
 		
 		port = PORT = TCP.getLocalPort();
 		
-		UDP = new UDPServerSocket(p2p, port);
-		listen(UDP);
+		//UDP = new UDPServerSocket(p2p, port);
+		//listen(UDP);
 		
 		RELAY = new RelayServerSocket(P2P);
 		listen(RELAY);
@@ -95,6 +96,7 @@ public class P2PServerSocket implements ServerSocket
 						MUTEX.notify();
 					}
 				}
+				catch (SocketTimeoutException x) {}
 				catch (Exception x) { x.printStackTrace(); }
 			}
 		}, "SERVER SOCKET ACCEPT "+SS.getClass().getName());
@@ -328,7 +330,7 @@ public class P2PServerSocket implements ServerSocket
 	{
 		RUNNING = false;
 		TCP.close();
-		UDP.close();
+		//UDP.close();
 		RELAY.close();
 		synchronized (MUTEX) { MUTEX.notifyAll(); }
 	}

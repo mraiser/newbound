@@ -14,7 +14,7 @@ public class PipeStreamer
 			{
 				try
 				{
-					System.out.println(threadname+" BEGIN");
+					//System.out.println(threadname+" BEGIN");
 
 					byte[] ba = new byte[4096];
 					int i;
@@ -22,13 +22,13 @@ public class PipeStreamer
 					{
 						i = is.read(ba);
 						if (i == -1) break;
-						System.out.println(threadname+" "+i+" bytes");
+						//System.out.println(threadname+" "+i+" bytes");
 						os.write(ba, 0, i);
 					}
 				}
 				catch (Exception x) { x.printStackTrace(); }
 				
-				System.out.println(threadname+" END");
+				//System.out.println(threadname+" END");
 
 				try { is.close(); } catch (Exception x) { x.printStackTrace(); }
 				try { os.close(); } catch (Exception x) { x.printStackTrace(); }

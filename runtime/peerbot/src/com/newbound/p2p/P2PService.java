@@ -48,7 +48,7 @@ public class P2PService extends Service
 		}
 
 		public boolean available() throws IOException {
-			return (s.SOCK == null ? false : RUNNING && s.isConnected() && !s.isClosed() && s.SOCK.getInputStream().available()>0);
+			return (s.SOCK == null ? false : s.getInputStream().available()>0);
 		}
 
 		public void listen(){

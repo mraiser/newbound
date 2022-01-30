@@ -64,26 +64,20 @@ public class UDPServerSocket implements ServerSocket
 			@Override
 			public void run() {
 				while (!SOCK.isClosed()) try {
-					Thread.sleep(100);
+					Thread.sleep(1000);
 					Enumeration<String> e = SOCKS.keys();
-					int n = 0;
 					while (e.hasMoreElements()) try{
 						String session = e.nextElement();
 						UDPSocket sock = SOCKS.get(session);
 						if (sock != null){
 							long millis = System.currentTimeMillis() - sock.LASTCONTACT;
 							if (sock.SOTIMEOUT != -1 && millis > sock.SOTIMEOUT){
-								System.out.println("UDP Socket to "+sock.getRemoteSocketAddress()+"with session "+session+" timed out.");
+								System.out.println("UDP Socket to "+sock.getRemoteSocketAddress()+" with session "+session+" timed out.");
 								SOCKS.remove(session);
 								sock.close();
 							}
 							else {
-								//sock.requestResend();
-								boolean fetch = sock.pushRecvd();
-								if (fetch || n++ % 10 == 0){
-									n = 0;
-									sock.requestResend();
-								}
+								sock.requestResend();
 							}
 						}
 					}
@@ -143,7 +137,7 @@ public class UDPServerSocket implements ServerSocket
 		baos.write(session.getBytes());
 		baos.close();
 		byte[] buf = baos.toByteArray();
-		//System.out.println("HANDSHAKE: "+cmd+" VIA UDP: "+BotUtil.toHexString(buf));
+		System.out.println("HANDSHAKE: "+cmd+" to "+addr+":"+port+" VIA UDP: "+BotUtil.toHexString(buf));
 		DatagramPacket dp = new DatagramPacket(buf, buf.length, addr, port);
 		SOCK.send(dp);
 	}
@@ -185,9 +179,8 @@ public class UDPServerSocket implements ServerSocket
 
 	protected void route(DatagramPacket p) throws IOException {
 		byte[] b = Arrays.copyOfRange(p.getData(), 0, p.getLength());
-		//System.out.println("Received UDP from "+p.getAddress()+":"+p.getPort()+" containing "+BotUtil.toHexString(b));
-
 		byte cmd = b[0];
+		System.out.println("Received UDP "+cmd+" from "+p.getAddress()+":"+p.getPort()+" containing "+BotUtil.toHexString(b));
 		if (cmd == MSG){
 			int len1 = (int)b[1] & 0xff;
 			String s = new String(b, 2, len1);
@@ -207,15 +200,16 @@ public class UDPServerSocket implements ServerSocket
 			String s = new String(b, 2, len1);
 			UDPSocket sock = SOCKS.get(s);
 			if (sock != null) {
-				sock.LASTCONTACT = System.currentTimeMillis();
+				//sock.LASTCONTACT = System.currentTimeMillis();
 				InetSocketAddress isa = sock.getRemoteSocketAddress();
 				int off = 2 + len1;
 				int msgid = BotUtil.bytesToInt(b, off);
 				//System.out.println("RECEIVED RESEND REQUEST: "+msgid+"/"+s);
 				byte[] ba = sock.getSentMsg(msgid);
 				if (ba != null) send(s, msgid, ba, isa.getAddress(), isa.getPort());
-				//else System.out.println("Message ID not found: "+msgid+"/"+s);
+				else System.out.println("Message ID not found: "+msgid+"/"+s);
 			}
+			else System.out.println("UDP Session ID not found: "+s);
 		}
 /*
 		else if (cmd == ACK){ // FIXME - Should not happen, we always ask for resend instead
