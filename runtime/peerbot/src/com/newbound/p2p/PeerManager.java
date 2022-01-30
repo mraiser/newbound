@@ -38,7 +38,7 @@ public class PeerManager extends BotUtil
 			f.getParentFile().mkdirs();
 			Properties p = new Properties();
 			peer.store(p);
-			if (peer.hasChanged(p))
+			if (peer.hasChanged(p))  // FIXME - Fire update event?
 			{
 				storeProperties(p, f);
 				peer.updateSaved(p);

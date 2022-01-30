@@ -1607,8 +1607,6 @@ public class PeerBot extends MetaBot
 
 	public void fireEvent(String event, JSONObject data) 
 	{
-		if (event.equals("disconnect"))
-			System.out.println("FIRING EVENT: "+event+" "+data);
 		System.out.println("FIRING EVENT: "+event+" "+data);
 		super.fireEvent(event, data);
 		JSONObject o = new JSONObject();
