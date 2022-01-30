@@ -1,4 +1,4 @@
-System.out.println("Rebuilding list of libraries...");
+//System.out.println("Rebuilding list of libraries...");
 
 JSONObject installed = new JSONObject();
 BotBase b = BotBase.getBot("botmanager");
@@ -36,7 +36,7 @@ for (i=0;i<sa.length;i++)
   }
 }
     
-System.out.println("List of libraries rebuilt");
+//System.out.println("List of libraries rebuilt");
 
 JSONObject result = new JSONObject();
 result.put("data", installed);

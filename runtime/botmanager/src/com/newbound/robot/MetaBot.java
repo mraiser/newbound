@@ -878,7 +878,7 @@ public abstract class MetaBot extends BotBase
 //		System.out.println(db+"/"+id);
 //		System.out.println(jo);
 //		System.out.println("**************************************************************************************************");
-		System.out.println("rebuilding "+db+"/"+id);
+//		System.out.println("rebuilding "+db+"/"+id);
 
 		JSONArray cmds = jo.has("cmd") ? jo.getJSONArray("cmd") : null;
 		int i,j;
@@ -892,7 +892,7 @@ public abstract class MetaBot extends BotBase
 		  cmd.put("id", x); // FIXME - hack
 		  String lang = cmd.has("type") ? cmd.getString("type") : cmd.has("lang") ? cmd.getString("lang") : "java";
 		  String cmdid = cmd.getString(lang);
-		  System.out.println("lang: "+lang+" / src: "+cmdid+" / "+"cmd: "+cmd.getString("id"));
+//		  System.out.println("lang: "+lang+" / src: "+cmdid+" / "+"cmd: "+cmd.getString("id"));
 		  JSONObject data = b.getData(db, cmdid).getJSONObject("data");
 //		  System.out.println(data);
 		  JSONArray params = data.has("params") ? data.getJSONArray("params") : new JSONArray();

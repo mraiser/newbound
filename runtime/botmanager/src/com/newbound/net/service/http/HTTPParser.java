@@ -79,9 +79,6 @@ public class HTTPParser extends BotUtil implements Parser
 		
 		String loc = s.getRemoteSocketAddress() == null ? "unknown" : s.getRemoteSocketAddress().toString();
 
-		if (!oneline.startsWith("peerbot/"))
-			System.out.println("CHECKME");
-
 		return new HTTPRequest(protocol, method, cmd, headers, params, loc);
 	}
 	

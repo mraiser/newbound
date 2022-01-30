@@ -223,3 +223,5 @@ dmypy.json
 /data/code/
 /data/documentation/
 /runtime/documentation/
+/runtime/cinema/
+/data/cinema/

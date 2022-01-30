@@ -69,10 +69,11 @@ me.animate = function(model){
 
     var c = model.models[0] ? model.models[0].material[0].color : {};
     if (p.connected) {
+debugger;      
 //      console.log(p.millis);
       c.b = Math.max(0, Math.min(1, (p.millis - 10000)/10000)); //p.millis < 10000 ? 0 : 0.5;
-      c.g = 0.403921568627451;
-      c.r = p.tcp ? 0.1843137254901961 :  0.4;
+      c.g = p.udp ? 0.2 : 0.403921568627451;
+      c.r = p.tcp ? 0.1843137254901961 : p.udp ? 0.2 : 0.4;
     }
     else{
       c.b = 0.5;
@@ -138,8 +139,8 @@ me.animate = function(model){
             lines[el2.id].geometry.vertices[0] = v1;
             lines[el2.id].geometry.vertices[1] = v2;
             lines[el2.id].geometry.verticesNeedUpdate = true;
-            lines[el2.id].material.color.r = p2.tcp ? 0 : 0.4;
-            lines[el2.id].material.color.g = 0.4;
+            lines[el2.id].material.color.r = p2.tcp ? 0 : p.udp ? 0.2 : 0.4;
+            lines[el2.id].material.color.g = p.udp ? 0.2 : 0.4;
 //            lines[el2.id].material.color.b = 0;
 //            debugger;
             lines[el2.id].material.color.b = p.oldlastcontact == p.lastcontact ? 0 : 1;

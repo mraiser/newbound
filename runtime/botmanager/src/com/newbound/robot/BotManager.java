@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.Vector;
 
+import com.newbound.p2p.P2PPeer;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -1906,10 +1907,12 @@ public class BotManager extends BotBase
 		      String uuid = jo.getString("uuid");
 		      if (!uuid.equals(getLocalID()))
 		      {
+				  P2PPeer p = PeerBot.getPeerBot().getPeer(uuid, false, false);
 			      if (!o.has(uuid)) o.put(uuid, jo);
 			      else jo = o.getJSONObject(uuid);
 			      String addr = receivePacket.getAddress().getHostAddress();
-			      if (!jo.has("address")) 
+				  if (p != null && !p.isUDP()) p.addOtherAddress(addr);
+			      if (!jo.has("address"))
 			      {
 			        jo.put("address", new JSONArray());
 			 

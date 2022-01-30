@@ -48,9 +48,9 @@ public class P2PParser implements Parser
 		OUT = sock.getOutputStream();
 		
 		SOCK.PARSER = this;
-		
+
 		OutputStream os = sock.getOutputStream();
-		if (SOCK.SOCK instanceof TCPSocket)
+		if (SOCK.SOCK instanceof TCPSocket || SOCK.SOCK instanceof UDPSocket)
 		{
 			os.write(SOCK.LOCALID.getBytes());
 			os.write(BotUtil.intToBytes(SOCK.PORT));
@@ -65,8 +65,10 @@ public class P2PParser implements Parser
 			REMOTEID = new String(buf, 0, 36);
 			REMOTEPORT = BotUtil.bytesToInt(buf, 36);
 
-			PS.getPeer(REMOTEID).setPort(REMOTEPORT);
-			PS.addConfirmedAddress(REMOTEID, new InetSocketAddress(((InetSocketAddress)SOCK.SOCK.getRemoteSocketAddress()).getHostString(), REMOTEPORT));
+			P2PPeer p = PS.getPeer(REMOTEID);
+			p.setPort(REMOTEPORT); // FIXME - Probably shouldn't just set it here. Check for when they are not equal and why.
+			if (SOCK.SOCK instanceof TCPSocket || !p.isTCP()) p.setAddress(SOCK.SOCK.getRemoteHostName());
+			// xxx PS.addConfirmedAddress(REMOTEID, new InetSocketAddress(((InetSocketAddress)SOCK.SOCK.getRemoteSocketAddress()).getHostString(), REMOTEPORT));
 		}
 		else if (SOCK.SOCK instanceof RelaySocket)
 		{

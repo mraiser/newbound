@@ -51,7 +51,7 @@ public class P2PConnection implements Socket
 
 		mID = id;
 		mPeer = peer;
-		MTU = peer.isTCP() || peer.isRelay() ? MTU : peer.MTU - 80;
+		MTU = peer.isTCP() || peer.isRelay() ? MTU : peer.MTU - 80; // FIXME - What is headersize?
 		
 		mInputStream = new InputStream() 
 		{

@@ -1,7 +1,9 @@
 package com.newbound.thread;
 
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.PrintStream;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Map;
@@ -388,9 +390,11 @@ public class ThreadHandler
 		catch (Exception x) { x.printStackTrace(); }
 	}
 
-	public void report() 
+	public static String report()
 	{
-		System.out.println("---------------- THREADS ----------------");
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		PrintStream ps = new PrintStream(baos);
+		ps.println("---------------- THREADS ----------------");
 		Thread[] tarray = new Thread[Thread.activeCount()];
 		Thread.enumerate(tarray);
 		Map<Thread, StackTraceElement[]> m = Thread.getAllStackTraces();
@@ -404,7 +408,7 @@ public class ThreadHandler
 			
 			String s = t.getName();
 			int j = s.indexOf(' ');
-			if (j != -1) 
+			if (false) //(j != -1)
 			{
 				String key = s.substring(0, j);
 				Integer k = counts.get(key);
@@ -412,36 +416,39 @@ public class ThreadHandler
 				else k++;
 				counts.put(key,  k);
 			}
-			else 
+			else if (!t.getName().equals("No work"))
 			{
 				StackTraceElement[] stea = m.get(t);
-				if (stea.length>1) System.out.println(t+" "+stea[1]);
-				else if (stea.length>0) System.out.println(t+" "+stea[0]);
-				else System.out.println(t);
+				if (stea.length>1) ps.println(t+" "+stea[1]);
+				else if (stea.length>0) ps.println(t+" "+stea[0]);
+				else ps.println(t);
 			}
 		}
 
-		System.out.println("-----------------------------------------");
-		System.out.println("-   count: "+count);
+		ps.println("-----------------------------------------");
+		ps.println("-   count: "+count);
 
 		Enumeration<String> ee = counts.keys();
 		while (ee.hasMoreElements()) 
 		{
 			String key = ee.nextElement();
 			Integer val = counts.get(key);
-			System.out.println("- "+key+": "+val);
+			ps.println("- "+key+": "+val);
 		}
 		
-		System.out.println("-----------------------------------------");
+		ps.println("-----------------------------------------");
 		
 		Enumeration<ThreadHandler> eee = mThreadHandlers.elements();
 		while (eee.hasMoreElements())
 		{
 			ThreadHandler th = eee.nextElement();
-			System.out.println("- "+th.mName+" "+th.waiting()+"/"+th.available()+"/"+th.size()+"/"+th.mMaxThreads);
+			ps.println("- "+th.mName+" "+th.waiting()+"/"+th.available()+"/"+th.size()+"/"+th.mMaxThreads);
 		}
 		
-		System.out.println("---------------- THREADS ----------------");
+		ps.println("---------------- THREADS ----------------");
+		ps.close();
+
+		return new String(baos.toByteArray());
 	}
 }
 

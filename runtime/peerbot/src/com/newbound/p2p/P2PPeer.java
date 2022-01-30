@@ -24,15 +24,13 @@ public class P2PPeer
 {
 	private static final int MAXMTU = 2048; // 512;
 
-//	private static long mNextPeerID = 1;
-//	private static Hashtable<Long, P2PPeer> mPeers = new Hashtable();
-	
 	private String mID;
 	private String mName;
 	private byte[] mPublicKey = null;
 	private SuperSimpleCipher mReadKey = null;
 	private SuperSimpleCipher mWriteKey = null;
 	private boolean mKeepAlive = false;
+	private String mAddress = "127.0.0.1";
 	private int mPort = -1;
 	private boolean connected = false;
 	
@@ -42,19 +40,15 @@ public class P2PPeer
 	protected Hashtable<Long, P2PConnection> mStreams = new Hashtable();
 	
 	protected P2PManager mP2PManager = null;
-
-//	protected long mLocal = mNextPeerID++;
-//	protected long mRemote = -1;
 	protected int MTU = MAXMTU;
-	
-//	private Vector<String> mRelays = new Vector();
-	public Vector<InetSocketAddress> mKnownAddresses = new Vector();
-	public Hashtable<InetSocketAddress, Long> mSeenAddresses = new Hashtable<>();
+// xxx
+//	public Vector<InetSocketAddress> mKnownAddresses = new Vector();
+//	public Hashtable<InetSocketAddress, Long> mSeenAddresses = new Hashtable<>();
+	private Vector<String> mOtherAddresses = new Vector();
 	
 	public String code = null;
 
 	private long mLastContact;
-//	protected long mLastSend;
 	private Properties OPROP;
 
 	public boolean closing = false;
@@ -63,7 +57,9 @@ public class P2PPeer
 	{
 		this(pm, uuid, new Properties());
 		mName = name;
-		addSocketAddress(new InetSocketAddress(address, port));
+		// xxx addSocketAddress(new InetSocketAddress(address, port));
+		mAddress = address;
+		mPort = port;
 	}
 
 	public P2PPeer(P2PManager pm, String uuid, Properties p) throws IOException
@@ -88,7 +84,7 @@ public class P2PPeer
 			s = p.getProperty("writekey");
 			if (s != null) mWriteKey = new SuperSimpleCipher(BotUtil.fromHexString(s), true);
 			else mWriteKey = new SuperSimpleCipher(SuperSimpleCipher.getSeed(SuperSimpleCipher.KEYSIZE), true);
-			
+/* xxx
 			s = p.getProperty("addresses");
 			if (s != null) try
 			{
@@ -102,18 +98,19 @@ public class P2PPeer
 				catch (Exception x) { x.printStackTrace(); }
 			}
 			catch (Exception x) { x.printStackTrace(); }
-			
+*/
 			s = p.getProperty("keepalive");
 			if (s != null) mKeepAlive = Boolean.parseBoolean(s);
 			
 			s = p.getProperty("port");
 			if (s != null) mPort = Integer.parseInt(s);
-	
+
 			s = p.getProperty("address");
-			if (s!= null) addSocketAddress(new InetSocketAddress(s, mPort));
-	
+			if (s!= null) mAddress = s;
+
 			s = p.getProperty("local");
-			if (s!= null) addSocketAddress(new InetSocketAddress(s, mPort));
+			if (s!= null) addOtherAddress(s);
+
 		}
 		catch (Exception x)
 		{
@@ -135,6 +132,7 @@ public class P2PPeer
 		if (mWriteKey != null) p.setProperty("writekey", BotUtil.toHexString(mWriteKey.toBytes()));
 		
 		JSONArray ja = new JSONArray();
+/*
 		int i = mKnownAddresses.size();
 		while (i-->0)
 		{
@@ -145,10 +143,13 @@ public class P2PPeer
 			ja.put(ja2);
 			if (mPort == -1) mPort = isa.getPort();
 		}
+		xxx
+ */
 		p.setProperty("addresses", ja.toString());
 
 		p.setProperty("uuid", mID);
 		p.setProperty("keepalive", ""+mKeepAlive);
+		p.setProperty("address", ""+mAddress);
 		p.setProperty("port", ""+mPort);
 	}
 	
@@ -156,7 +157,7 @@ public class P2PPeer
 	
 	public void closeStream(long mid)
 	{
-		System.out.println("STREAM["+mid+"] closed");
+//		System.out.println("STREAM["+mid+"] closed");
 		P2PConnection con = mStreams.get(mid);
 		if (con != null) try { con.close(); } catch (Exception x) { x.printStackTrace(); }
 		mStreams.remove(mid);
@@ -175,7 +176,7 @@ public class P2PPeer
 //		if (v == null) mIncoming.put(mid, v = new Vector());
 //		v.addElement(msg);
 		
-		System.out.println("STREAM["+mid+"/"+mID+"] got "+n+" bytes");
+//		System.out.println("STREAM["+mid+"/"+mID+"] got "+n+" bytes");
 		
 //		flushIncoming(mid);
 		
@@ -211,7 +212,7 @@ public class P2PPeer
 			if (c.mP2PCallback != null) try
 			{
 				String s = new String(msg, 8, msg.length-8);
-				System.out.println("RESPONSE["+mid+"/"+mID+"] got "+s);
+//				System.out.println("RESPONSE["+mid+"/"+mID+"] got "+s);
 
 				final JSONObject o = new JSONObject(s);
 				Runnable r = new Runnable() 
@@ -241,7 +242,7 @@ public class P2PPeer
 		long mid = BotUtil.bytesToLong(msg, 0);
 		String s = new String(msg, 8, msg.length-8);
 		
-		System.out.println("COMMAND["+mid+"/"+mID+"] got "+s);
+//		System.out.println("COMMAND["+mid+"/"+mID+"] got "+s);
 		
 		JSONObject o = new JSONObject(s);
 	
@@ -368,16 +369,16 @@ public class P2PPeer
 	{ 
 		return getSocketAddress();
 	}
-	
+
 	// FIXME - REMOVE
 	public InetSocketAddress getLocalSocketAddress() 
 	{
 		return (InetSocketAddress)mP2PManager.getLocalSocketAddress(); 
 	}
 
-	public Vector<InetSocketAddress> getknownSocketAddresses() 
+	public Vector<String> getOtherAddresses()
 	{
-		return mKnownAddresses;
+		return mOtherAddresses;
 	}
 
 	public String getID() 
@@ -428,12 +429,22 @@ public class P2PPeer
 		OPROP = (Properties) p.clone();
 	}
 
-	public void addSocketAddress(InetSocketAddress isa) throws Exception 
+	public void addOtherAddress(String addr) throws Exception
+	{
+		if (!addr.equals(mAddress) && !addr.equals("127.0.0.1") && !addr.equals("localhost") && mOtherAddresses.indexOf(addr) == -1)
+		{
+			if (mAddress.equals("127.0.0.1") || mAddress.equals("localhost")) setAddress(addr);
+			else mOtherAddresses.addElement(addr);
+		}
+	}
+
+	/* xxx
+	public void addSocketAddress(InetSocketAddress isa) throws Exception
 	{
 //		mP2PManager.sendUDP(isa, Codes.PING, mID.getBytes());
 		confirmSocketAddress(isa);
 	}
-	
+
 	public void confirmSocketAddress(InetSocketAddress isa)
 	{
 		if (mKnownAddresses.indexOf(isa) == -1)
@@ -449,21 +460,21 @@ public class P2PPeer
 
 	public synchronized void addConfirmedAddress(InetSocketAddress isa)
 	{
-		if (mKnownAddresses.indexOf(isa) == -1) 
+		if (mKnownAddresses.indexOf(isa) == -1)
 		{
 			mKnownAddresses.addElement(isa);
 			try { mP2PManager.savePeer(this); } catch (Exception x) { x.printStackTrace(); }
 			try { mP2PManager.fireEvent("update", new JSONObject(this.toString())); } catch (Exception x) { x.printStackTrace(); }
 		}
-		
+
 //		if (!isTCP())
 //		{
 //			try { mP2PManager.initiateTCPConnection(this, isa); }
 //			catch (Exception x) { System.out.println("TCP Unable to reach "+mName+" at "+isa); }
 //		}
 	}
-	
-	public void removeSocketAddress(InetSocketAddress isa) 
+
+	public void removeSocketAddress(InetSocketAddress isa)
 	{
 //		synchronized(mKnownAddresses)
 		{
@@ -477,7 +488,7 @@ public class P2PPeer
 			}
 		}
 	}
-
+*/
 	public String getName() 
 	{
 		return mName;
@@ -589,11 +600,11 @@ public class P2PPeer
 	private JSONArray buildAddressList() 
 	{
 		JSONArray addresses = new JSONArray();
-        Enumeration<InetSocketAddress> a = mKnownAddresses.elements();
+        Enumeration<String> a = mOtherAddresses.elements();
         for (; a.hasMoreElements();)
         {
-            InetSocketAddress addr = a.nextElement();
-           	addresses.put(addr.getHostString()+":"+addr.getPort());
+            String addr = a.nextElement();
+           	addresses.put(addr+":"+mPort);
         }
 
 		return addresses;
@@ -661,10 +672,10 @@ public class P2PPeer
 
 	public void accept(P2PConnection con) 
 	{
-		System.out.println("accepting stream "+con.getID());
+//		System.out.println("accepting stream "+con.getID());
 		mStreams.put(con.getID(), con);
 		con.setConnected(true);
-		System.out.println("accepted stream "+con.getID());
+//		System.out.println("accepted stream "+con.getID());
 	}
 
 	public void remove(final long stream)
@@ -703,31 +714,16 @@ public class P2PPeer
 
 	public InetSocketAddress getSocketAddress()
 	{
-//		synchronized (mKnownAddresses)
-		{
-			if (mKnownAddresses.size() > 0)
-			{
-				return mKnownAddresses.get(0);			
-			}
-		}
-		
-		return null;
+		return new InetSocketAddress(mAddress, mPort);
 	}
-	
+
 	public String getAddress() 
 	{
-		InetSocketAddress isa = getSocketAddress();
-		if (isa != null) return isa.getHostString();
-		return "127.0.0.1";
+		return mAddress;
 	}
 
 	public int getPort() 
 	{
-		if (mPort == -1)
-		{
-			InetSocketAddress isa = getSocketAddress();
-			if (isa != null) return isa.getPort();
-		}
 		return mPort;
 	}
 
@@ -740,14 +736,26 @@ public class P2PPeer
 		mLastContact = System.currentTimeMillis();
 	}
 
-	public void setPort(int port) 
+	public void setAddress(String addr)
+	{
+		String old = mAddress;
+		if (!old.equals(addr)) try
+		{
+			mAddress = addr;
+			addOtherAddress(old);
+			mP2PManager.savePeer(this);
+		}
+		catch (Exception x) { x.printStackTrace(); }
+	}
+
+	public void setPort(int port)
 	{
 		int old = mPort;
 		mPort = port;
 		try { if (old != port) mP2PManager.savePeer(this); } catch (Exception x) { x.printStackTrace(); }
 	}
 
-	public boolean isTCP() 
+	public boolean isTCP()
 	{
 		return mP2PManager.isTCP(mID);
 	}

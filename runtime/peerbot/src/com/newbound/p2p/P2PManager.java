@@ -7,10 +7,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.Hashtable;
-import java.util.Iterator;
+import java.util.*;
 
 import com.newbound.robot.Callback;
 import org.json.JSONArray;
@@ -96,12 +93,12 @@ public class P2PManager implements Container
 		return P2P.getLocalSocketAddress();
 	}
 
-	public P2PPeer getPeer(String id) throws IOException 
+	public P2PPeer getPeer(String id) throws IOException
 	{
 		return PEERS.getPeer(id);
 	}
 
-	public void savePeer(P2PPeer p) throws IOException 
+	public void savePeer(P2PPeer p) throws IOException
 	{
 		PEERS.savePeer(p);
 	}
@@ -131,8 +128,9 @@ public class P2PManager implements Container
 	{
 		if (address != null && port != -1) 
 		{
-			InetSocketAddress isa = new InetSocketAddress(address, port);
-			addInetSocketAddress(uuid, isa);
+			P2PPeer p = getPeer(uuid);
+			p.setAddress(address);
+			p.setPort(port);
 		}
 		return connect(uuid);
 	}
@@ -145,7 +143,7 @@ public class P2PManager implements Container
 		{
 			p.setConnected(true);
 			P2PSocket sock = P2PParser.any(id, TCPSocket.class);
-			addConfirmedAddress(id, new InetSocketAddress(((InetSocketAddress) sock.getRemoteSocketAddress()).getHostString(), p.getPort()));
+			// addConfirmedAddress(id, new InetSocketAddress(((InetSocketAddress) sock.getRemoteSocketAddress()).getHostString(), p.getPort()));
 		}
 		else initiateTCPConnection(p);
 
@@ -157,10 +155,13 @@ public class P2PManager implements Container
 	Hashtable<InetSocketAddress, Long> DNC = new Hashtable(); // FIXME - Probably not needed and just breaking stuff. Merge with known/seen addresses. Used by connect(p)
 	protected void initiateTCPConnection(final P2PPeer p) 
 	{
-		Enumeration<InetSocketAddress> e = p.getknownSocketAddresses().elements();
+		int port = p.getPort();
+		Vector<String> v = new Vector<>(p.getOtherAddresses());
+		v.insertElementAt(p.getAddress(), 0);
+		Enumeration<String> e = p.getOtherAddresses().elements();
 		while (e.hasMoreElements())
 		{
-			final InetSocketAddress isa = e.nextElement();
+			final InetSocketAddress isa = new InetSocketAddress(e.nextElement(), port);
 			Long l = DNC.get(isa);
 			long now = System.currentTimeMillis();
 			if (l == null || now - l > 30000) {
@@ -171,8 +172,9 @@ public class P2PManager implements Container
 						try {
 							initiateTCPConnection(p, isa);
 						} catch (Exception x) {
-							p.removeSocketAddress(isa);
-							System.out.println("unable to establish TCP connection with " + p.getID() + " at " + isa);
+							// xxx p.removeSocketAddress(isa);
+							//x.printStackTrace();
+							//System.out.println("unable to establish TCP connection with " + p.getID() + " at " + isa);
 						}
 					}
 				}, "Initiate TCP connection with " + p.getID());
@@ -211,13 +213,13 @@ public class P2PManager implements Container
 		while (e.hasMoreElements()) try { l.add(getPeer(e.nextElement())); } catch (Exception x) { x.printStackTrace(); }
 		return l.iterator();
 	}
-
+/* xxx
 	public void addInetSocketAddress(String uuid, InetSocketAddress isa) throws Exception 
 	{
 		P2PPeer p = getPeer(uuid);
 		p.addSocketAddress(isa);
 	}
-
+*/
 	public boolean isTCP(String uuid) 
 	{
 		return P2PParser.any(uuid, TCPSocket.class) != null;
@@ -418,19 +420,19 @@ public class P2PManager implements Container
 			P2P.listen(psock, parse);
 			
 //			p.mKnownAddresses.clear();
-			p.addConfirmedAddress(isa);
+			p.setAddress(isa.getHostString());
 		}
 	}
-
+/* xxx
 	public void addConfirmedAddress(String uuid, InetSocketAddress isa) throws IOException 
 	{
 		getPeer(uuid).addConfirmedAddress(isa);
 	}
-
 	public void confirmSocketAddress(P2PPeer peer, InetSocketAddress isa)
 	{
 		P2P.confirmSocketAddress(peer, isa);
 	}
+*/
 
 	public JSONArray myPeers()
 	{

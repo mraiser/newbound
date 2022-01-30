@@ -3,6 +3,8 @@ package com.newbound.p2p;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
@@ -10,15 +12,10 @@ import java.util.Vector;
 
 import javax.crypto.BadPaddingException;
 
+import com.newbound.net.service.*;
 import org.json.JSONObject;
 
 import com.newbound.crypto.SuperSimpleCipher;
-import com.newbound.net.service.Parser;
-import com.newbound.net.service.Request;
-import com.newbound.net.service.Response;
-import com.newbound.net.service.ServerSocket;
-import com.newbound.net.service.Service;
-import com.newbound.net.service.Socket;
 import com.newbound.net.tcp.TCPSocket;
 import com.newbound.p2p.protocol.COMMAND;
 import com.newbound.p2p.protocol.KEEPALIVE;
@@ -39,6 +36,45 @@ public class P2PService extends Service
 {
 	String UUID;
 	P2PManager P2P;
+
+	class SyncListener{
+		P2PSocket s;
+		Parser p;
+		boolean listening = false;
+
+		SyncListener(Socket sock, Parser parser){
+			s = (P2PSocket)sock;
+			p = parser;
+		}
+
+		public boolean available() throws IOException {
+			return (s.SOCK == null ? false : RUNNING && s.isConnected() && !s.isClosed() && s.SOCK.getInputStream().available()>0);
+		}
+
+		public void listen(){
+			try
+			{
+				Request jo2 = p.parse();
+				Object cmd = jo2.getCommand();
+				execute(cmd, jo2, p);
+			}
+			catch (SocketTimeoutException | SocketClosedException | SocketException x) // Requires Java 7+
+			{
+				LISTENERS.remove(this);
+				try { p.close(); } catch (Exception xx) { xx.printStackTrace(); }
+				try { s.close(); } catch (Exception xx) { xx.printStackTrace(); }
+			}
+			catch (ReleaseSocketException x)
+			{
+				LISTENERS.remove(this);
+			}
+			catch (Exception x)
+			{
+				p.error(x);
+			}
+		}
+	}
+	Vector<SyncListener> LISTENERS = new Vector<>();
 
 	public P2PService(P2PManager p2p, String uuid, ServerSocket ss, String name, Class parser) throws IOException 
 	{
@@ -62,8 +98,45 @@ public class P2PService extends Service
 		on(Codes.READKEY, new READKEY(this));
 		
 		on(Codes.KEEPALIVE, new KEEPALIVE(this));
+
+		p2p.addJob(new Runnable() {
+			@Override
+			public void run() {
+				while (!RUNNING) try { Thread.sleep(500); } catch (Exception x) { x.printStackTrace(); }
+				while (RUNNING){
+					int i = LISTENERS.size();
+					int n = 0;
+					while (i-->0) try{
+						final SyncListener listen = LISTENERS.elementAt(i);
+						if (listen.available() && !listen.listening) { // FIXME - Should probably sync on a mutex when checking/changing "listen.listening" but maybe not since only one thread is checking/changing/listening
+							listen.listening = true;
+							n++;
+							p2p.addJob(new Runnable() {
+								@Override
+								public void run() {
+									listen.listening = true;
+									try {
+										while (listen.available()) listen.listen();
+									}
+									catch (Exception x) { x.printStackTrace(); }
+									finally { listen.listening = false; }
+								}
+							}, "Parsing synchronous P2P socket");
+						}
+					}
+					catch (Exception x) { x.printStackTrace(); }
+					try { if (n == 0) Thread.sleep(100);} catch (Exception x) { x.printStackTrace(); }
+				}
+			}
+		}, "Listening to synchronous P2P sockets");
 	}
 
+	@Override
+	public void listen(Socket s, Parser p) throws Exception
+	{
+		if (((P2PSocket)s).SOCK instanceof TCPSocket) super.listen(s, p);
+		else LISTENERS.addElement(new SyncListener(s, p));
+	}
 
 	@Override
 	protected void execute(Object cmd, Request data, Parser parser) throws Exception 
@@ -232,7 +305,7 @@ public class P2PService extends Service
 	{
 		return P2P.getLocalID();
 	}
-
+/* xxx
 	public void addConfirmedAddress(String uuid, InetSocketAddress isa) throws IOException 
 	{
 		P2P.addConfirmedAddress(uuid, isa);
@@ -243,7 +316,6 @@ public class P2PService extends Service
 		((P2PServerSocket)SS).CHECKING.addElement(new Object[] { peer, isa });
     }
 
-/*
 	public void sendPing(InetSocketAddress isa) throws Exception
 	{
 		((P2PServerSocket)SS).sendPing(isa);

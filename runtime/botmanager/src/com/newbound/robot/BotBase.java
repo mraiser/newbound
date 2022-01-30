@@ -792,12 +792,12 @@ public abstract class BotBase extends BotUtil implements Container, App //Channe
 			{
 				try
 				{
-					System.out.println("Opening websocket connection");
+//					System.out.println("Opening websocket connection");
 					int pow7 = (int)Math.pow(2, 7);
 					ByteArrayOutputStream baos = new ByteArrayOutputStream();
 					int lastopcode = 0;
 			
-					System.out.println("WEBSOCKET CONNECTED: "+sock.isConnected());
+//					System.out.println("WEBSOCKET CONNECTED: "+sock.isConnected());
 					InputStream is = sock.getInputStream();
 					while (sock.isConnected()) 
 					{
@@ -944,7 +944,7 @@ public abstract class BotBase extends BotUtil implements Container, App //Channe
 	
 	public void webSocketMessage(final WebSocket sock, String msg) throws Exception
 	{
-		System.out.println("TEXT MSG: "+msg);
+//		System.out.println("TEXT MSG: "+msg);
 		
 		String sc = socketChanel(sock);
 		if (msg.startsWith("cmd ")) try

@@ -1,67 +1,53 @@
 package com.newbound.net.udp;
 
+import com.newbound.net.service.ServerSocket;
+import com.newbound.net.service.Socket;
+import com.newbound.p2p.P2PManager;
+import com.newbound.p2p.P2PPeer;
+import com.newbound.p2p.PeerManager;
+import com.newbound.robot.BotUtil;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
-import java.net.SocketException;
+import java.net.*;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
 
-import com.newbound.net.service.ServerSocket;
-import com.newbound.robot.BotUtil;
-
 public class UDPServerSocket implements ServerSocket
 {
-	private static final int MAXLAG = 10;
-	private static final Vector<UDPMessage> SENT = new Vector();
-	private static final Hashtable<Integer, UDPServerSocket> SERVS = new Hashtable();
-
-	private Hashtable<Integer, UDPSocket> SOCKS = new Hashtable();
-	private Vector<UDPSocket> INCOMING = new Vector();
-	private Object MUTEX = new Object();
-	
-	protected int BUFLEN = 65535;
 	protected int PORT;
 	protected DatagramSocket SOCK;
-	
-	public UDPServerSocket() throws SocketException
-	{
-		this(new DatagramSocket());
-	}
-	
-	public UDPServerSocket(int port) throws SocketException
-	{
-		this(new DatagramSocket(port));
-	}
-	
-	private UDPServerSocket(DatagramSocket sock) throws SocketException
-	{
-		PORT = sock.getLocalPort();
-		
-		synchronized(SERVS)
+	protected int BUFLEN = 65535;
+
+	private Vector<UDPSocket> INCOMING = new Vector();
+	private Object MUTEX = new Object();
+	private P2PManager P2P = null;
+	private Hashtable<String, UDPSocket> SOCKS = new Hashtable<>();
+
+	private static final byte HELO = 99;
+	private static final byte WELCOME = 98;
+	private static final byte BEGIN = 97;
+	private static final byte MSG = 96;
+	private static final byte RESEND = 95;
+	//private static final byte ACK = 94;
+
+	public UDPServerSocket(P2PManager p2p, int port) throws SocketException {
+		PORT = port;
+		SOCK = new DatagramSocket(port);
+
+		Runnable r = new Runnable()
 		{
-			if (SERVS.get(PORT) != null) throw new SocketException("There is already a UDP service bound to that port.");
-			SOCK = sock;
-			SERVS.put(PORT, this);
-		}
-		
-		Runnable r = new Runnable() 
-		{
-			public void run() 
+			public void run()
 			{
 				byte[] buf = new byte[BUFLEN];
-				DatagramPacket p = new DatagramPacket(buf, BUFLEN);
 
 				while (!SOCK.isClosed())
 				{
 					try
 					{
+						DatagramPacket p = new DatagramPacket(buf, BUFLEN);
 						SOCK.receive(p);
 						route(p);
 					}
@@ -70,135 +56,196 @@ public class UDPServerSocket implements ServerSocket
 						x.printStackTrace();
 					}
 				}
-				
-				SERVS.remove(PORT);
 			}
 		};
-		
 		new Thread(r).start();
-	}
 
-	public static UDPServerSocket any() throws SocketException 
-	{
-		synchronized(SERVS)
-		{
-			Enumeration<UDPServerSocket> e = SERVS.elements();
-			if (e.hasMoreElements()) return e.nextElement();
-			
-			return new UDPServerSocket();
+		r = new Runnable() {
+			@Override
+			public void run() {
+				while (!SOCK.isClosed()) try {
+					Thread.sleep(1000);
+					Enumeration<String> e = SOCKS.keys();
+					while (e.hasMoreElements()) try{
+						String session = e.nextElement();
+						UDPSocket sock = SOCKS.get(session);
+						if (sock != null){
+							long millis = System.currentTimeMillis() - sock.LASTCONTACT;
+							if (sock.SOTIMEOUT == -1 || millis > sock.SOTIMEOUT){
+								System.out.println("UDP Socket to "+sock.getRemoteSocketAddress()+"with session "+session+" timed out.");
+								SOCKS.remove(session);
+								sock.close();
+							}
+							else { //if (millis>1000) {
+								sock.requestResend();
+							}
+						}
+					}
+					catch (Exception x)
+					{
+						x.printStackTrace();
+					}
+				}
+				catch (Exception x)
+				{
+					x.printStackTrace();
+				}
+			}
+		};
+		new Thread(r).start();
+
+		if (p2p != null) {
+			P2P = p2p;
+			r = new Runnable() {
+				@Override
+				public void run() {
+					while (!SOCK.isClosed()) try {
+						Thread.sleep(20000);
+						Enumeration<String> it = PeerManager.loaded(); //P2P.connected();
+						while (it.hasMoreElements()) try {
+							P2PPeer p = p2p.getPeer(it.nextElement());
+							if (!p.isTCP() && !p.isUDP()) {
+								Vector<String> v = p.getOtherAddresses();
+								Enumeration<String> e = v.elements();
+								while (e.hasMoreElements()) try {
+									String name = e.nextElement();
+									if (!name.equals("127.0.0.1") && !name.equals("localhost")) {
+										InetAddress addr = InetAddress.getByName(name);
+										//System.out.println("Sending UDP to " + name + " for " + p.getName());
+										handshake(addr, p.getPort(), HELO, BotUtil.uniqueSessionID());
+									}
+								} catch (Exception x) {
+									// IGNORE
+									// x.printStackTrace();
+								}
+							}
+						} catch (Exception x) {
+							x.printStackTrace();
+						}
+					} catch (Exception x) {
+						x.printStackTrace();
+					}
+				}
+			};
+			new Thread(r).start();
 		}
 	}
 
-	public static UDPServerSocket get(int port) throws SocketException 
-	{
-		synchronized(SERVS)
-		{
-			UDPServerSocket uss = SERVS.get(port);
-			if (uss != null) return uss;
-			return new UDPServerSocket(port);
-		}
-	}
-	
-	protected void connect(UDPSocket sock) throws Exception
-	{
-		long l = System.currentTimeMillis();
-		SOCKS.put(sock.getLocalID(), sock);
-
-		UDPMessage m = new UDPMessage(sock, UDPMessage.CONNECT, 0l, new byte[0]);
-		send(m, true);
-
-		ByteArrayOutputStream baos = new ByteArrayOutputStream(5);
-		BotUtil.sendData(sock.getInputStream(), baos, 5, 5);
+	private void handshake(InetAddress addr, int port, byte cmd, String session) throws IOException {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		baos.write(cmd);
+		baos.write(session.getBytes());
 		baos.close();
-		String hello = new String(baos.toByteArray());
-		
-		if (!hello.equals("hello")) {
-			l = System.currentTimeMillis() - l;
-			throw new Exception("Unable to establish connection with "+sock.getRemoteAddr()+" after "+l+"ms");
+		byte[] buf = baos.toByteArray();
+		//System.out.println("HANDSHAKE: "+cmd+" VIA UDP: "+BotUtil.toHexString(buf));
+		DatagramPacket dp = new DatagramPacket(buf, buf.length, addr, port);
+		SOCK.send(dp);
+	}
+
+	public void send(String session, int msgid, byte[] ba, InetAddress addr, int port) throws IOException {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		baos.write(MSG);
+		baos.write(session.length());
+		baos.write(session.getBytes());
+		baos.write(BotUtil.intToBytes(msgid));
+		baos.write(BotUtil.intToBytes(ba.length));
+		baos.write(ba);
+		baos.close();
+		byte[] buf = baos.toByteArray();
+		DatagramPacket dp = new DatagramPacket(buf, buf.length, addr, port);
+		SOCK.send(dp);
+	}
+
+	public void requestResend(String session, int msgid, InetAddress addr, int port) throws IOException {
+		//System.out.println("Requesting RESEND of message "+msgid+" for "+session);
+		sendInt(session, RESEND, msgid, addr, port);
+	}
+/*
+	public void sendACK(String session, int msgid, InetAddress addr, int port) throws IOException {
+		sendInt(session, ACK, msgid, addr, port);
+	}
+*/
+	public void sendInt(String session, byte cmd, int i, InetAddress addr, int port) throws IOException {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		baos.write(cmd);
+		baos.write(session.length());
+		baos.write(session.getBytes());
+		baos.write(BotUtil.intToBytes(i));
+		baos.close();
+		byte[] buf = baos.toByteArray();
+		DatagramPacket dp = new DatagramPacket(buf, buf.length, addr, port);
+		SOCK.send(dp);
+	}
+
+	protected void route(DatagramPacket p) throws IOException {
+		byte[] b = Arrays.copyOfRange(p.getData(), 0, p.getLength());
+		//System.out.println("Received UDP from "+p.getAddress()+":"+p.getPort()+" containing "+BotUtil.toHexString(b));
+
+		byte cmd = b[0];
+		if (cmd == MSG){
+			int len1 = (int)b[1] & 0xff;
+			String s = new String(b, 2, len1);
+			UDPSocket sock = SOCKS.get(s);
+			if (sock != null) {
+				int off = 2 + len1;
+				int msgid = BotUtil.bytesToInt(b, off);
+				off += 4;
+				int len2 = BotUtil.bytesToInt(b, off);
+				off += 4;
+				// FIXME - Check if off + len2 < p.getLength()
+				sock.incoming(msgid, b, off, len2);
+			}
+		}
+		else if (cmd == RESEND){
+			int len1 = (int)b[1] & 0xff;
+			String s = new String(b, 2, len1);
+			UDPSocket sock = SOCKS.get(s);
+			if (sock != null) {
+				sock.LASTCONTACT = System.currentTimeMillis();
+				InetSocketAddress isa = sock.getRemoteSocketAddress();
+				int off = 2 + len1;
+				int msgid = BotUtil.bytesToInt(b, off);
+				//System.out.println("RECEIVED RESEND REQUEST: "+msgid+"/"+s);
+				byte[] ba = sock.getSentMsg(msgid);
+				if (ba != null) send(s, msgid, ba, isa.getAddress(), isa.getPort());
+				//else System.out.println("Message ID not found: "+msgid+"/"+s);
+			}
+		}
+/*
+		else if (cmd == ACK){ // FIXME - Should not happen, we always ask for resend instead
+			int len1 = (int)b[1] & 0xff;
+			String s = new String(b, 2, len1);
+			UDPSocket sock = SOCKS.get(s);
+			if (sock != null) {
+				sock.LASTCONTACT = System.currentTimeMillis();
+				int off = 2 + len1;
+				int msgid = BotUtil.bytesToInt(b, off);
+				System.out.println("RECEIVED ACK: "+msgid+"/"+s);
+				sock.ack(msgid);
+			}
+		}
+*/
+		else if (cmd == HELO || cmd == WELCOME || cmd == BEGIN) {
+			String s = new String(b, 1, p.getLength()-1); // FIXME - Do sanity check on length
+			UDPSocket sock = new UDPSocket(this, s, p.getAddress(), p.getPort());
+
+			if (cmd == HELO) handshake(p.getAddress(), p.getPort(), WELCOME, s);
+			else {
+				synchronized (MUTEX) {
+					SOCKS.put(s, sock);
+					INCOMING.addElement(sock);
+					MUTEX.notify();
+				}
+				if (cmd == WELCOME) handshake(p.getAddress(), p.getPort(), BEGIN, s);
+			}
+		}
+		else {
+			System.out.println("UNKNOWN UDP COMMAND: "+cmd+"/"+BotUtil.toHexString(b)+"/"+new String(b));
 		}
 	}
 
-	protected void send(UDPMessage m, boolean skip) throws IOException 
-	{
-		synchronized (SENT)
-		{
-			if (!skip && m.getType() == UDPMessage.DATA && SENT.size() >= MAXLAG) try { SENT.wait(); } catch (Exception x) {}
-			
-			byte[] buf = m.toBytes();
-			DatagramPacket dp = new DatagramPacket(buf, buf.length, InetAddress.getByName(m.getRemoteAddress()), m.getRemotePort());
-			SOCK.send(dp);
-			
-			if (!skip && m.getType() == UDPMessage.DATA) SENT.addElement(m);
-		}
-	}
-
-	protected synchronized void route(DatagramPacket p) throws IOException
-	{
-		UDPMessage m = new UDPMessage(p, PORT);
-
-		if (m.getType() == UDPMessage.CONNECT) newSock(m);
-		else if (m.getType() == UDPMessage.ACK) remove(m.getID());
-		else if (m.getType() == UDPMessage.RESEND) resend(m.getID());
-		else if (m.getType() == UDPMessage.PING) System.out.println("PING "+m);
-		else if (m.getType() == UDPMessage.DATA)
-		{
-			UDPSocket sock = getSock(m.getLocalSocketID());
-			if (sock == null) 
-				System.out.println("Unsolicited packet from "+p.getSocketAddress());
-			else sock.incoming(m);
-		}
-		else 
-			System.out.println("Receieved packet of unknown type from "+p.getSocketAddress());
-	}
-
-	private void resend(long id) throws IOException 
-	{
-		int i = 0;
-		int n = SENT.size();
-		for (i=0; i<n; i++)
-		{
-			UDPMessage m = SENT.elementAt(i);
-			if (m.getID() == id) send(m, true);
-		}
-	}
-
-	private void remove(long id) 
-	{
-		synchronized (SENT)
-		{
-			while (SENT.size()>0 && SENT.elementAt(0).getID()<=id) SENT.removeElementAt(0);
-			SENT.notify();
-		}
-	}
-
-	private UDPSocket getSock(int sockid) 
-	{
-		return SOCKS.get(sockid);
-	}
-
-	private void newSock(UDPMessage m) throws IOException 
-	{
-		synchronized (MUTEX)
-		{
-			UDPSocket sock = new UDPSocket(m);
-			SOCKS.put(sock.getLocalID(), sock);
-			INCOMING.addElement(sock);
-			
-			OutputStream os = sock.getOutputStream();
-			os.write("hello".getBytes());
-			os.flush();
-			
-			INCOMING.notify();
-		}
-	}
-
-	public int getPort() 
-	{
-		return PORT;
-	}
-	
-	public UDPSocket accept()
-	{
+	@Override
+	public Socket accept() throws IOException {
 		synchronized (MUTEX)
 		{
 			if (INCOMING.isEmpty()) try { MUTEX.wait(); } catch (Exception x) {}
@@ -206,71 +253,28 @@ public class UDPServerSocket implements ServerSocket
 		}
 	}
 
-	public void close()
-	{
-		SOCK.close();
-		synchronized (MUTEX) { MUTEX.notifyAll(); }
-	}
-	
-	public static void main(String[] args) throws Exception
-	{
-		UDPServerSocket USS1 = new UDPServerSocket();
-		UDPServerSocket USS2 = new UDPServerSocket();
-		
-		UDPSocket sock1 = new UDPSocket(USS1.getPort(), "localhost", USS2.getPort());
-		UDPSocket sock2 = USS2.accept();
-		
-		OutputStream os = sock1.getOutputStream();
-		os.write("HELLO WORLD".getBytes());
-		os.flush();
-		byte[] buf = new byte[11];
-		sock2.getInputStream().read(buf);
-		System.out.println(new String(buf));
-		
-		USS1.close();
-		USS2.close();
-	}
-
-	protected void close(UDPSocket sock) 
-	{
-		if (SOCKS.get(sock.getRemotePort()) == sock) SOCKS.remove(sock.getRemotePort());
-	}
-
-	public void sendBytes(InetSocketAddress isa, int code, byte[] ba) throws Exception 
-	{
-		int off = 0;
-		int len = ba.length;
-		ByteArrayOutputStream OUT = new ByteArrayOutputStream();
-		OUT.write(BotUtil.intToBytes(code));
-		OUT.write(BotUtil.intToBytes(len));
-		OUT.write(ba, off, len);
-		OUT.flush();
-		OUT.close();
-		ba = OUT.toByteArray();
-		
-		UDPMessage m = new UDPMessage(SOCK.getLocalPort(), isa, 0, 0, UDPMessage.DATA, 0, ba);
-		byte[] buf = m.toBytes();
-		DatagramPacket dp = new DatagramPacket(buf, buf.length, InetAddress.getByName(m.getRemoteAddress()), m.getRemotePort());
-		SOCK.send(dp);
-	}
-
 	@Override
-	public SocketAddress getLocalSocketAddress() 
-	{
+	public SocketAddress getLocalSocketAddress() {
 		return SOCK.getLocalSocketAddress();
 	}
 
 	@Override
-	public InetAddress getInetAddress() 
-	{
-		return SOCK.getLocalAddress();
+	public InetAddress getInetAddress() {
+		return SOCK.getLocalAddress(); // FIXME - Is this correct?
 	}
 
 	@Override
-	public int getLocalPort() 
-	{
-		return getLocalPort();
+	public int getLocalPort() {
+		return PORT;
 	}
 
+	@Override
+	public void close() throws IOException {
+		SOCK.close();
+	}
 
+	public Socket connect(InetSocketAddress isa) throws IOException {
+		handshake(isa.getAddress(), isa.getPort(), HELO, BotUtil.uniqueSessionID());
+		return accept();
+	}
 }

@@ -13,7 +13,7 @@ public class DiscoveryServerSocket extends UDPServerSocket
 	
 	public DiscoveryServerSocket(Container c) throws SocketException 
 	{
-		super(5772);
+		super(null,5772);
 		BUFLEN = 8;
 		C = c;
 	}

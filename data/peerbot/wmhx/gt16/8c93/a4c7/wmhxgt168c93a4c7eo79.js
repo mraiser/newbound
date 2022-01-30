@@ -139,7 +139,7 @@ me.render = function(model){
 //                  new THREE.Vector3(r1.pos_x,r1.pos_y,r1.pos_z),
 //                  new THREE.Vector3(r2.pos_x,r2.pos_y,r2.pos_z)
 //              );
-              var color = con.tcp ? 0x00ff00 : 0xffff00;
+              var color = con.tcp ? 0x00ff00 : con.udp ? 0x0000ff : 0xffff00;
               var material = new THREE.LineBasicMaterial( { color: color } );
               var mesh = new THREE.Line( geometry, material );
               me.model.scene.add(mesh);
@@ -161,14 +161,14 @@ me.render = function(model){
 //              vs[0].set(r1.pos_x,r1.pos_y,r1.pos_z);
 //              vs[1].set(r2.pos_x,r2.pos_y,r2.pos_z);
 //              con.line.geometry.verticesNeedUpdate = true;
-              if (con.tcp){
+              if (con.tcp || con.udp){
                 d = vs[1].distanceTo(vs[0]);
                 v.copy(vs[1]).sub(vs[0]).normalize().multiplyScalar(0.01*d*d);
                 dv.add(v);
                 count++;
                 con.line.material.color.r = 0;
-                con.line.material.color.g = 0.5;
-                con.line.material.color.b = 0;
+                con.line.material.color.g = con.tcp ? 0.5 : 0;
+                con.line.material.color.b = con.udp ? 0.5 : 0;
               }
               else{
                 con.line.material.color.r = 0.5;
@@ -220,6 +220,7 @@ me.render = function(model){
     c = 1 - Math.min(1, 1/((new Date().getTime() - ME.DATA.lastcontact + network.timedelta)/15000));
     if (ME.DATA.connected){
       if (ME.DATA.tcp) orb.setColor(c,1,c);
+      else if (ME.DATA.udp) orb.setColor(c,c,1);
       else orb.setColor(1,1,c);
     }
     else orb.setColor(1,1,1);

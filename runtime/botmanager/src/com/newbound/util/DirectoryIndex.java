@@ -184,11 +184,9 @@ public class DirectoryIndex
         File dw = new File(w, DIRNAME);
         if ((isdir && dw.exists()) || (searchcontent && w.exists()))
         {
-            BitSet bs1 = (BitSet) bs.clone();
             byte[] ba = BotUtil.readFile(isdir ? dw : w);
             BitSet bs2 = BitSet.valueOf(ba);
-            bs1.and(bs2);
-            if (bs.equals(bs1))
+            if (andequals(bs, bs2))
             {
                 if (isdir)
                 {
@@ -228,11 +226,27 @@ public class DirectoryIndex
                             break;
                         }
                     }
-                    //if (m != n) System.out.println("False positive: "+f);
+                    if (m != n) v.visitFileFailed(f, null); //System.out.println("False positive: "+f);
                     scanner.close();
                 }
             }
         }
+    }
+
+    private boolean andequals(BitSet bs, BitSet bs2) {
+//        BitSet bs1 = (BitSet) bs.clone();
+//        bs1.and(bs2);
+//        return bs.equals(bs1);
+
+//        int len1 = bs.cardinality();
+//        int len2 = bs2.cardinality();
+//        if (len2<len1) return false;
+
+        for (int i = bs.nextSetBit(0); i >= 0; i = bs.nextSetBit(i+1)) {
+            if (!bs2.get(i)) return false;
+        }
+
+        return true;
     }
 
     public static void main(String[] args) throws Exception

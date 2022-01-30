@@ -92,7 +92,7 @@ public class PeerBot extends MetaBot
 		if (cmd.equals("addaccesscode")) return handleAddAccessCode(params);
 		if (cmd.equals("accesscode")) return handleAccessCode(params);
 		if (cmd.equals("deleteaccesscode")) return handleDeleteAccessCode(params);
-		if (cmd.equals("newconnection")) return handleNewConnection(cmd, params);
+//		if (cmd.equals("newconnection")) return handleNewConnection(cmd, params);
 		if (cmd.equals("togglekeepalive")) return handleToggleKeepAlive(cmd, params);
 		if (cmd.equals("deletepeer")) return handleDeletePeer(cmd, params);
 //		if (cmd.equals("sendpacket")) return handleSendPacket(cmd, params);
@@ -214,10 +214,10 @@ public class PeerBot extends MetaBot
 			cmd.put("desc", "Delete an existing access code.");
 			commands.put("deleteaccesscode", cmd);
 
-			cmd = new JSONObject();
-			cmd.put("desc", "Connect to a remote device. Optionally, you may pass a suggested IP Address and port number. You can also specify an access code and/or the groups you want to assign the device to. All parameters other than uuid are optional.");
-			cmd.put("parameters", new JSONArray("[\"uuid\",\"addr\",\"port\",\"code\",\"groups\"]"));
-			commands.put("newconnection", cmd);
+//			cmd = new JSONObject();
+//			cmd.put("desc", "Connect to a remote device. Optionally, you may pass a suggested IP Address and port number. You can also specify an access code and/or the groups you want to assign the device to. All parameters other than uuid are optional.");
+//			cmd.put("parameters", new JSONArray("[\"uuid\",\"addr\",\"port\",\"code\",\"groups\"]"));
+//			commands.put("newconnection", cmd);
 
 			cmd = new JSONObject();
 			cmd.put("desc", "Specify whether or not this device should attempt to remain connected to the given peer.");
@@ -489,8 +489,11 @@ public class PeerBot extends MetaBot
 		return o;
 	}
 
+	// FIXME - Deprecate this. Is it used anywhere?
 	private Object handleRegister(Hashtable params) throws Exception
 	{
+		System.err.println("PeerBot 'register' command called");
+
 		String id = (String)params.get("uuid");
 		String ip = (String)params.get("local");
 		String addresses = (String)params.get("addresses");
@@ -504,6 +507,7 @@ public class PeerBot extends MetaBot
 			p.setName(name);
 			b = true;
 		}
+/* xxx
 		InetSocketAddress isa = new InetSocketAddress(ip, Integer.parseInt(port));
 		p.addSocketAddress(isa);
 		
@@ -522,7 +526,7 @@ public class PeerBot extends MetaBot
 			}
 			catch (Exception x) { x.printStackTrace(); }
 		}
-		
+*/
 		if (p.getPublicKey() == null)
 		{
 			JSONObject jo = p.sendCommand("peerbot", "pubkey", new Hashtable());
@@ -558,13 +562,15 @@ public class PeerBot extends MetaBot
 				throw new Exception(msg);
 			}
 
-			String addresses = "";
-			for (int i=0;i<p.mKnownAddresses.size();i++) 
+			String addresses = p.getAddress();
+			Vector<String> list = p.getOtherAddresses();
+			for (int i=0;i<list.size();i++)
 			{
-				if (!addresses.equals("")) addresses += ",";
-				addresses += p.mKnownAddresses.elementAt(i).getHostString();
+				//if (!addresses.equals(""))
+				addresses += ",";
+				addresses += list.elementAt(i);
 			}
-			
+
 			JSONObject o = newResponse();
 			o.put("uuid", id);
 			o.put("addr", p.getAddress());
@@ -609,7 +615,7 @@ public class PeerBot extends MetaBot
 	{
 		return "OK";
 	}
-
+/*
 	private Object handleNewConnection(String cmd, Hashtable params) throws Exception
 	{
 		String id = (String)params.get("uuid");
@@ -651,7 +657,7 @@ public class PeerBot extends MetaBot
 				
 		return o;
 	}
-
+*/
 	private Object handleSuggestAccessCode(Hashtable params) throws Exception
 	{
 		return uniqueSessionID();
@@ -1601,6 +1607,8 @@ public class PeerBot extends MetaBot
 
 	public void fireEvent(String event, JSONObject data) 
 	{
+		if (event.equals("disconnect"))
+			System.out.println("FIRING EVENT: "+event+" "+data);
 		System.out.println("FIRING EVENT: "+event+" "+data);
 		super.fireEvent(event, data);
 		JSONObject o = new JSONObject();
@@ -1729,7 +1737,8 @@ public class PeerBot extends MetaBot
 					while (j-->0)
 					{
 						String address = addr.getString(j);
-						mP2PManager.addInetSocketAddress(uuid, new InetSocketAddress(address, port));
+						// xxx mP2PManager.addInetSocketAddress(uuid, new InetSocketAddress(address, port));
+						peer.addOtherAddress(address);
 					}
 				}
 			}

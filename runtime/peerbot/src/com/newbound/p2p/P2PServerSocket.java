@@ -12,6 +12,7 @@ import java.util.Iterator;
 import java.util.Vector;
 
 import com.newbound.net.tcp.TCPSocket;
+import com.newbound.net.udp.UDPSocket;
 import com.newbound.robot.Callback;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -19,9 +20,9 @@ import org.json.JSONObject;
 import com.newbound.net.service.ServerSocket;
 import com.newbound.net.service.Socket;
 import com.newbound.net.tcp.TCPServerSocket;
-import com.newbound.net.udp.UDPMessage;
+//import com.newbound.net.udp.UDPMessage;
 import com.newbound.net.udp.UDPServerSocket;
-import com.newbound.net.udp.UDPSocket;
+//import com.newbound.net.udp.UDPSocket;
 import com.newbound.robot.BotUtil;
 
 public class P2PServerSocket implements ServerSocket 
@@ -31,11 +32,11 @@ public class P2PServerSocket implements ServerSocket
 	P2PManager P2P;
 
 	TCPServerSocket TCP;
-//	UDPServerSocket UDP;
+	UDPServerSocket UDP;
 	RelayServerSocket RELAY;
 
 	Vector<P2PSocket> INCOMING = new Vector();
-	Vector CHECKING = new Vector();
+	Vector<P2PPeer> CHECKING = new Vector();
 	Object MUTEX = new Object();
 	
 	String UUID;
@@ -53,8 +54,8 @@ public class P2PServerSocket implements ServerSocket
 		
 		port = PORT = TCP.getLocalPort();
 		
-//		UDP = new UDPServerSocket(port);
-//		listen(UDP);
+		UDP = new UDPServerSocket(p2p, port);
+		listen(UDP);
 		
 		RELAY = new RelayServerSocket(P2P);
 		listen(RELAY);
@@ -107,7 +108,8 @@ public class P2PServerSocket implements ServerSocket
 		{
 			if (INCOMING.size() == 0) try { MUTEX.wait(); } catch (Exception x) {}
 			if (INCOMING.size() == 0) return null;
-			return INCOMING.remove(0);
+			P2PSocket sock = INCOMING.remove(0);
+			return sock;
 		}
 	}
 	
@@ -117,7 +119,7 @@ public class P2PServerSocket implements ServerSocket
 	{
 		P2PParser.maintenance();
 		//mod++;
-		if (true) //(mod++ % 10 == 0)
+		if (false) //(mod++ % 10 == 0)
 		{
 			Iterator<Thread> it = Thread.getAllStackTraces().keySet().iterator();
 			while (it.hasNext())
@@ -154,8 +156,13 @@ public class P2PServerSocket implements ServerSocket
 
 						//					if (p.isConnected() && System.currentTimeMillis() - p.lastContact() > 35000) p.disconnect();
 						//					else
-						if (p.isTCP() && !brokers.contains(uuid)) {
-							brokers.addElement(uuid);
+						if (p.isTCP()) {
+							if (!brokers.contains(uuid)) {
+								brokers.addElement(uuid);
+							}
+						}
+						else {
+							if (p.isConnected() && CHECKING.indexOf(p) == -1) CHECKING.addElement(p);
 						}
 
 						if (p.keepAlive() && !p.isConnected()) P2P.connect(uuid);
@@ -165,7 +172,7 @@ public class P2PServerSocket implements ServerSocket
 
 								@Override
 								public P2PCommand execute(JSONObject result) {
-									System.out.println("Heartbeat " + p.getName() + "/" + p.getID() + " " + result);
+//									System.out.println("Heartbeat " + p.getName() + "/" + p.getID() + " " + result);
 
 									try {
 										String name = result.getString("name");
@@ -175,19 +182,19 @@ public class P2PServerSocket implements ServerSocket
 
 										if (!name.equals(p.getName())) p.setName(name);
 
-										p.addSocketAddress(new InetSocketAddress(localip, port));
-										p.addSocketAddress(new InetSocketAddress(addr, port));
+										p.addOtherAddress(localip);
+										p.addOtherAddress(addr);
 
 										if (result.has("localaddresses")) {
 											JSONObject jo = result.getJSONObject("localaddresses");
 											JSONArray ja = jo.getJSONArray("link");
 											int i = ja.length();
 											while (i-- > 0)
-												p.addSocketAddress(new InetSocketAddress(ja.getString(i), port));
+												p.addOtherAddress(ja.getString(i));
 											ja = jo.getJSONArray("site");
 											i = ja.length();
 											while (i-- > 0)
-												p.addSocketAddress(new InetSocketAddress(ja.getString(i), port));
+												p.addOtherAddress(ja.getString(i));
 										}
 									} catch (Exception x) {
 										x.printStackTrace();
@@ -204,44 +211,22 @@ public class P2PServerSocket implements ServerSocket
 
 			if (CHECKING.size()>0)
 			{
-				Object[] oa = (Object[]) CHECKING.remove(0);
-				P2PPeer peer = (P2PPeer) oa[0];
-				InetSocketAddress isa = (InetSocketAddress) oa[1];
+				P2PPeer peer = (P2PPeer) CHECKING.remove(0);
 				try {
-					if (!peer.isTCP()) P2P.initiateTCPConnection(peer, isa);
-					else {
-						TCPSocket sock = new TCPSocket(isa.getHostString(), isa.getPort(), 5000);
-						sock.setSoTimeout(5000);
-						InputStream is = sock.getInputStream();
-						byte[] ba = new byte[36];
-						int n = is.read(ba);
-						if (n == 36) {
-							String id = new String(ba);
-							if (peer.getID().equals(id)) {
-								peer.addConfirmedAddress(isa);
-								try {
-									P2P.fireEvent("update", new JSONObject(peer.toString()));
-								} catch (Exception x) {
-									x.printStackTrace();
-								}
-								return;
-							} else
-								System.out.println("Mismatched ID checking " + peer.getName() + " at " + isa + " (" + id + ")");
-						} else
-							System.out.println("Unexpected response checking " + peer.getName() + " at " + isa + " (" + new String(ba) + ")");
-					}
+ 					if (peer.isConnected() && !peer.isTCP())
+						 P2P.initiateTCPConnection(peer);
 				} catch (Exception x) {
-					System.out.println("Unable to reach " + peer.getName() + " at " + isa + " (" + x.getMessage() + ")");
+					//System.out.println("Unable to reach " + peer.getName() + " at " + isa + " (" + x.getMessage() + ")");
 				}
-
+/* xxx but also, this is bad code
 				peer.mKnownAddresses.removeElement(isa);
 				try {
 					P2P.savePeer(peer);
 				} catch (Exception x) {
 					x.printStackTrace();
 				}
+*/
 			}
-
 			if (!UUIDS.equals("")) // && mod % 6 == 0)
 			{
 				Hashtable h = new Hashtable();
@@ -301,7 +286,8 @@ public class P2PServerSocket implements ServerSocket
 									{
 										int j = addr.length;
 										while (j-- > 0)
-											P2P.addInetSocketAddress(p.getString("uuid"), new InetSocketAddress(addr[j], port));
+											// xxx P2P.addInetSocketAddress(p.getString("uuid"), new InetSocketAddress(addr[j], port));
+											P2P.getPeer(p.getString("uuid")).addOtherAddress(addr[j]);
 									}
 								}
 							}
@@ -342,7 +328,7 @@ public class P2PServerSocket implements ServerSocket
 	{
 		RUNNING = false;
 		TCP.close();
-//		UDP.close();
+		UDP.close();
 		RELAY.close();
 		synchronized (MUTEX) { MUTEX.notifyAll(); }
 	}

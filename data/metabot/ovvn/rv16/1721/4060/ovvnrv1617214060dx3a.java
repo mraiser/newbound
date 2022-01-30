@@ -34,7 +34,7 @@ while (i-->0)
     f = new java.io.File(f, "app.properties");
     if (f.exists()) try
     {
-  System.out.println(id);
+//  System.out.println(id);
       
       java.util.Properties p = bm.loadProperties(f);
       JSONObject jo = new JSONObject();

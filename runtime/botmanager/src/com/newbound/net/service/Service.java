@@ -48,8 +48,17 @@ public class Service
 				while (RUNNING) try 
 				{ 
 					final Socket s = ss.accept();
-					Parser p = (Parser)(parser.newInstance());
-					if (p.init(me, s)) listen(s, p);
+					CONTAINER.getDefault().addJob(new Runnable() {
+						@Override
+						public void run() {
+							try
+							{
+								Parser p = (Parser) (parser.getDeclaredConstructor().newInstance());
+								if (p.init(me, s)) listen(s, p);
+							}
+							catch (Exception x) { x.printStackTrace(); }
+						}
+					}, "INIT NEW SOCKET for "+name);
 				}
 				catch (SocketTimeoutException x) { /** IGNORE **/ }
 				catch (Exception x) { x.printStackTrace(); }
@@ -66,10 +75,10 @@ public class Service
 			public void run() 
 			{
 				while (RUNNING && s.isConnecting() && ! s.isClosed()) try { Thread.sleep(500); } catch (Exception x) { x.printStackTrace(); }
-				
+
 				boolean release = false;
-				
-				while (RUNNING && s.isConnected() && !s.isClosed()) try 
+
+				while (RUNNING && s.isConnected() && !s.isClosed()) try
 				{
 					Request jo2 = (Request)p.parse();
 					Object cmd = jo2.getCommand();
@@ -93,21 +102,22 @@ public class Service
 				}
 				catch (SocketClosedException x)
 				{
-					System.out.println(NAME+" socket closed ");
+//					System.out.println(NAME+" socket closed ");
 					break;
 				}
-				catch (Exception x) 
-				{ 
+				catch (Exception x)
+				{
+					//x.printStackTrace();
 					p.error(x);
 				}
 
 				if (!release)
 				{
 					try { p.close(); } catch (Exception xx) { xx.printStackTrace(); }
-					try { s.close(); } catch (Exception xx) { xx.printStackTrace(); } 
+					try { s.close(); } catch (Exception xx) { xx.printStackTrace(); }
 				}
-				
-				System.out.println("SOCKET "+NAME+" "+s+" listen loop END");
+
+//				System.out.println("SOCKET "+NAME+" "+s+" listen loop END");
 			}
 		}, "SOCKET "+NAME+" "+s+" listen loop BEGIN");
 	}
