@@ -186,7 +186,7 @@ public class UDPServerSocket implements ServerSocket
 			String s = new String(b, 2, len1);
 			UDPSocket sock = SOCKS.get(s);
 			if (sock != null) {
-				//sock.LASTCONTACT = System.currentTimeMillis();
+				sock.LASTCONTACT = System.currentTimeMillis();
 				InetSocketAddress isa = sock.getRemoteSocketAddress();
 				int off = 2 + len1;
 				int msgid = BotUtil.bytesToInt(b, off);
@@ -197,21 +197,7 @@ public class UDPServerSocket implements ServerSocket
 			}
 			else System.out.println("UDP Session ID not found: "+s);
 		}
-/*
-		else if (cmd == ACK){ // FIXME - Should not happen, we always ask for resend instead
-			int len1 = (int)b[1] & 0xff;
-			String s = new String(b, 2, len1);
-			UDPSocket sock = SOCKS.get(s);
-			if (sock != null) {
-				sock.LASTCONTACT = System.currentTimeMillis();
-				int off = 2 + len1;
-				int msgid = BotUtil.bytesToInt(b, off);
-				System.out.println("RECEIVED ACK: "+msgid+"/"+s);
-				sock.ack(msgid);
-			}
-		}
-*/
-		else if (cmd == HELO || cmd == WELCOME || cmd == BEGIN) {
+		else if (cmd == HELO || cmd == WELCOME || cmd == BEGIN) { // FIXME - add encrypted challenge
 			String s = new String(b, 1, p.getLength()-1); // FIXME - Do sanity check on length
 			UDPSocket sock = new UDPSocket(this, s, p.getAddress(), p.getPort());
 
