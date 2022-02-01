@@ -4,11 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
-import java.util.Enumeration;
-import java.util.Hashtable;
-import java.util.Iterator;
-import java.util.Properties;
-import java.util.Vector;
+import java.util.*;
 
 import com.newbound.net.tcp.TCPSocket;
 import org.json.JSONArray;
@@ -37,7 +33,9 @@ public class P2PPeer
 	private String mAddress = "127.0.0.1";
 	private int mPort = -1;
 	private boolean connected = false;
-	
+	private boolean[] incoming = new boolean[] { true, false, true };
+	private boolean[] outgoing = new boolean[] { true, false, true };
+
 	protected long nextsendcommand = 0;
 
 	protected Hashtable<Long, P2PCommand> mCommands = new Hashtable();
@@ -115,6 +113,29 @@ public class P2PPeer
 			s = p.getProperty("local");
 			if (s!= null) addOtherAddress(s);
 
+			s = p.getProperty("incoming");
+			if (s != null) {
+				String[] sa = s.split(",");
+				int n = sa.length;
+				while (n-->0){
+					s = sa[n].trim().toLowerCase();
+					if (s.equals("tcp")) allow(ALLOW_TCP, true, true);
+					else if (s.equals("udp")) allow(ALLOW_UDP, true, true);
+					else if (s.equals("relay")) allow(ALLOW_RELAY, true, true);
+				}
+			}
+
+			s = p.getProperty("outgoing");
+			if (s != null) {
+				String[] sa = s.split(",");
+				int n = sa.length;
+				while (n-->0){
+					s = sa[n].trim().toLowerCase();
+					if (s.equals("tcp")) allow(ALLOW_TCP, false, true);
+					else if (s.equals("udp")) allow(ALLOW_UDP, false, true);
+					else if (s.equals("relay")) allow(ALLOW_RELAY, false, true);
+				}
+			}
 		}
 		catch (Exception x)
 		{
@@ -122,7 +143,17 @@ public class P2PPeer
 			throw new IOException(x.getMessage());
 		}
 	}
-	
+
+	private boolean allow(byte protocol, boolean is_incoming) {
+		boolean[] ba = is_incoming ? incoming : outgoing;
+		return ba[protocol];
+	}
+
+	private void allow(byte protocol, boolean is_incoming, boolean allow) {
+		boolean[] ba = is_incoming ? incoming : outgoing;
+		ba[protocol] = allow;
+	}
+
 //	public static P2PPeer get(long id)
 //	{
 //		return mPeers.get(id);
@@ -155,6 +186,18 @@ public class P2PPeer
 		p.setProperty("keepalive", ""+mKeepAlive);
 		p.setProperty("address", ""+mAddress);
 		p.setProperty("port", ""+mPort);
+
+		String s = "";
+		if (incoming[ALLOW_TCP]) s = "tcp";
+		if (incoming[ALLOW_UDP]) { if (!s.equals("")) s += ","; s += "udp"; }
+		if (incoming[ALLOW_RELAY]) { if (!s.equals("")) s += ","; s += "relay"; }
+		p.setProperty("incoming", s);
+
+		s = "";
+		if (outgoing[ALLOW_TCP]) s = "tcp";
+		if (outgoing[ALLOW_UDP]) { if (!s.equals("")) s += ","; s += "udp"; }
+		if (outgoing[ALLOW_RELAY]) { if (!s.equals("")) s += ","; s += "relay"; }
+		p.setProperty("outgoing", s);
 	}
 	
 //	Hashtable<Long, Vector<byte[]>> mIncoming = new Hashtable(); 
