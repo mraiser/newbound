@@ -22,6 +22,10 @@ import com.newbound.robot.PeerBot;
 
 public class P2PPeer
 {
+	public static final byte ALLOW_TCP = 0;
+	public static final byte ALLOW_UDP = 1;
+	public static final byte ALLOW_RELAY = 2;
+
 	private static final int MAXMTU = 2048; // 512;
 
 	private String mID;
@@ -414,8 +418,7 @@ public class P2PPeer
 		if (b) try 
 		{ 
 			mP2PManager.savePeer(this); 
-			mP2PManager.fireEvent("update", new JSONObject(this.toString())); 
-		} 
+		}
 		catch (Exception x) { x.printStackTrace(); }
 	}
 
