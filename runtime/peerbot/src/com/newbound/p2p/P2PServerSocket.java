@@ -33,7 +33,7 @@ public class P2PServerSocket implements ServerSocket
 	P2PManager P2P;
 
 	TCPServerSocket TCP;
-	//UDPServerSocket UDP;
+	UDPServerSocket UDP;
 	RelayServerSocket RELAY;
 
 	Vector<P2PSocket> INCOMING = new Vector();
@@ -55,8 +55,8 @@ public class P2PServerSocket implements ServerSocket
 		
 		port = PORT = TCP.getLocalPort();
 		
-		//UDP = new UDPServerSocket(p2p, port);
-		//listen(UDP);
+		UDP = new UDPServerSocket(p2p, port);
+		listen(UDP);
 		
 		RELAY = new RelayServerSocket(P2P);
 		listen(RELAY);
@@ -215,7 +215,7 @@ public class P2PServerSocket implements ServerSocket
 			{
 				P2PPeer peer = (P2PPeer) CHECKING.remove(0);
 				try {
- 					if (peer.isConnected() && !peer.isTCP())
+ 					if (peer.isConnected() && !peer.isTCP() && peer.allow(peer.ALLOW_TCP))
 						 P2P.initiateTCPConnection(peer);
 				} catch (Exception x) {
 					//System.out.println("Unable to reach " + peer.getName() + " at " + isa + " (" + x.getMessage() + ")");
@@ -273,8 +273,11 @@ public class P2PServerSocket implements ServerSocket
 								if (p.has("tcp") && p.getBoolean("tcp"))
 								{
 									String peerid = p.getString("uuid");
-									RELAY.addRelay(peerid, relay);
-									P2P.getPeer(peerid).updateLastContact();
+									P2PPeer local = P2P.getPeer(peerid);
+									if (local.allow(P2PPeer.ALLOW_RELAY)){
+										RELAY.addRelay(peerid, relay);
+										local.updateLastContact();
+									}
 								}
 								else if (p.has("uuid"))
 									RELAY.removeRelay(p.getString("uuid"), relay);
@@ -330,7 +333,7 @@ public class P2PServerSocket implements ServerSocket
 	{
 		RUNNING = false;
 		TCP.close();
-		//UDP.close();
+		UDP.close();
 		RELAY.close();
 		synchronized (MUTEX) { MUTEX.notifyAll(); }
 	}

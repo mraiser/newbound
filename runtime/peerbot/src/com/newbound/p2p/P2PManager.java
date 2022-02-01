@@ -4,11 +4,12 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.util.*;
 
+import com.newbound.net.service.Socket;
+import com.newbound.net.udp.UDPServerSocket;
 import com.newbound.robot.Callback;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -142,12 +143,12 @@ public class P2PManager implements Container
 		if (isTCP(id))
 		{
 			p.setConnected(true);
-			P2PSocket sock = P2PParser.any(id, TCPSocket.class);
-			// addConfirmedAddress(id, new InetSocketAddress(((InetSocketAddress) sock.getRemoteSocketAddress()).getHostString(), p.getPort()));
 		}
-		else initiateTCPConnection(p);
-
-		if (isUDP(id) || isRelay(id)) p.setConnected(true);
+		else {
+			if (isUDP(id) || isRelay(id)) p.setConnected(true);
+			if (p.allow(p.ALLOW_TCP)) initiateTCPConnection(p);
+			if (p.allow(p.ALLOW_UDP)) initiateUDPConnection(p);
+		}
 		
 		return p;
 	}
@@ -437,6 +438,29 @@ public class P2PManager implements Container
 	public JSONArray myPeers()
 	{
 		return mBot.myPeers();
+	}
+
+	public void initiateUDPConnection(P2PPeer p) {
+		Vector<String> v = p.getOtherAddresses();
+		Enumeration<String> e = v.elements();
+		while (e.hasMoreElements()) try {
+			String name = e.nextElement();
+			if (!name.equals("127.0.0.1") && !name.equals("localhost")) {
+				InetAddress addr = InetAddress.getByName(name);
+				//System.out.println("Sending UDP to " + name + " for " + p.getName());
+				UDPServerSocket uss = ((P2PServerSocket)P2P.getServerSocket()).UDP;
+				uss.handshake(addr, p.getPort(), uss.HELO, BotUtil.uniqueSessionID());
+			}
+		} catch (Exception x) {
+			// IGNORE
+			// x.printStackTrace();
+		}
+	}
+
+	public void closeAll(String id, Class claz)
+	{
+		Socket s;
+		while ((s = P2PParser.any(id, claz)) != null) try { s.close(); } catch (Exception x) { x.printStackTrace(); }
 	}
 /*
 	public void sendPing(InetSocketAddress isa) throws Exception

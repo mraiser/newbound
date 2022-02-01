@@ -66,6 +66,12 @@ public class P2PParser implements Parser
 			REMOTEPORT = BotUtil.bytesToInt(buf, 36);
 
 			P2PPeer p = PS.getPeer(REMOTEID);
+			if ((SOCK.SOCK instanceof TCPSocket && !p.allow(p.ALLOW_TCP)) || (SOCK.SOCK instanceof UDPSocket && !p.allow(p.ALLOW_UDP))) {
+				String name = SOCK.SOCK.getClass().getName();
+				SOCK.close();
+				throw new Exception("Connections of type "+name+" not allowed for peer "+p.getName()+"/"+p.getID());
+			}
+
 			p.setPort(REMOTEPORT); // FIXME - Probably shouldn't just set it here. Check for when they are not equal and why.
 			if (SOCK.SOCK instanceof TCPSocket || !p.isTCP()) p.setAddress(SOCK.SOCK.getRemoteHostName());
 			// xxx PS.addConfirmedAddress(REMOTEID, new InetSocketAddress(((InetSocketAddress)SOCK.SOCK.getRemoteSocketAddress()).getHostString(), REMOTEPORT));

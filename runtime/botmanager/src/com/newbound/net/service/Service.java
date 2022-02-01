@@ -162,4 +162,8 @@ public class Service
 	{
 		return SS.getLocalSocketAddress();
 	}
+
+	public ServerSocket getServerSocket(){
+		return SS;
+	}
 }

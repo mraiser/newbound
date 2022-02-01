@@ -11,6 +11,22 @@ me.ready = me.refresh = function(){
   $(ME).find('.hudapps').css('display', 'block');
   $(ME).find('.controlsettings').css('display', 'none').css('opacity', '1');
   
+  var protocols = ME.DATA.protocols.split(',');
+  for (var i in protocols){
+    var p = protocols[i].trim().toLowerCase();
+    $(ME).find('.allow'+p).prop('checked', true);
+  }
+  $(ME).find('.protocol').change(function(e){
+    var s = '';
+    if ($(ME).find('.allowtcp').prop('checked')) s = "tcp";
+    if ($(ME).find('.allowudp').prop('checked')) { if (s !="") s += ","; s += "udp"; }
+    if ($(ME).find('.allowrelay').prop('checked')) { if (s !="") s += ","; s += "relay"; }
+    json('../peerbot/protocols', 'uuid='+encodeURIComponent(ME.DATA.id)+'&protocols='+encodeURIComponent(s), function(result){
+      if (result.status != 'ok')
+	    alert(JSON.stringify(result));
+    });
+  });
+  
   $(ME).find('.rememberme').prop('checked', document.body.mypeers.indexOf(ME.DATA.id) != -1);
 
   var addr = '';
@@ -30,7 +46,7 @@ me.ready = me.refresh = function(){
       $(this).text('more_horiz');
       $(ME).find('.moreip').css('display', 'none');
     }
-  });;
+  });
   
   $(ME).find('.hudapps').html('<i>Scanning...</i>');
   $(ME).find('.deletepeerbutton').css('display', ME.DATA.connected ? 'none' : 'block');

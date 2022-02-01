@@ -43,7 +43,7 @@ public class PeerManager extends BotUtil
 				storeProperties(p, f);
 				peer.updateSaved(p);
 				System.out.println("Saved peer " + peer.getName() + "/" + peer.getID());
-				fireEvent("update", new JSONObject(this.toString()));
+				fireEvent("update", new JSONObject(peer.toString()));
 			}
 //			System.out.println("Unchanged peer " + peer.getName() + "/" + peer.getID());
 		}

@@ -26,11 +26,11 @@ public class UDPServerSocket implements ServerSocket
 	private P2PManager P2P = null;
 	private Hashtable<String, UDPSocket> SOCKS = new Hashtable<>();
 
-	private static final byte HELO = 99;
-	private static final byte WELCOME = 98;
-	private static final byte BEGIN = 97;
-	private static final byte MSG = 96;
-	private static final byte RESEND = 95;
+	public static final byte HELO = 99;
+	public static final byte WELCOME = 98;
+	public static final byte BEGIN = 97;
+	public static final byte MSG = 96;
+	public static final byte RESEND = 95;
 	//private static final byte ACK = 94;
 
 	public UDPServerSocket(P2PManager p2p, int port) throws SocketException {
@@ -104,21 +104,7 @@ public class UDPServerSocket implements ServerSocket
 						Enumeration<String> it = PeerManager.loaded(); //P2P.connected();
 						while (it.hasMoreElements()) try {
 							P2PPeer p = p2p.getPeer(it.nextElement());
-							if (!p.isTCP() && !p.isUDP()) {
-								Vector<String> v = p.getOtherAddresses();
-								Enumeration<String> e = v.elements();
-								while (e.hasMoreElements()) try {
-									String name = e.nextElement();
-									if (!name.equals("127.0.0.1") && !name.equals("localhost")) {
-										InetAddress addr = InetAddress.getByName(name);
-										//System.out.println("Sending UDP to " + name + " for " + p.getName());
-										handshake(addr, p.getPort(), HELO, BotUtil.uniqueSessionID());
-									}
-								} catch (Exception x) {
-									// IGNORE
-									// x.printStackTrace();
-								}
-							}
+							if (!p.isTCP() && p.allow(p.ALLOW_UDP) && !p.isUDP()) p2p.initiateUDPConnection(p);
 						} catch (Exception x) {
 							x.printStackTrace();
 						}
@@ -131,7 +117,7 @@ public class UDPServerSocket implements ServerSocket
 		}
 	}
 
-	private void handshake(InetAddress addr, int port, byte cmd, String session) throws IOException {
+	public void handshake(InetAddress addr, int port, byte cmd, String session) throws IOException {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		baos.write(cmd);
 		baos.write(session.getBytes());

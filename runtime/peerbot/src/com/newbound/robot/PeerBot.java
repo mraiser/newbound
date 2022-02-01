@@ -25,15 +25,7 @@ import java.nio.channels.DatagramChannel;
 import java.security.KeyPair;
 import java.security.Provider;
 import java.security.Security;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Hashtable;
-import java.util.Iterator;
-import java.util.Properties;
-import java.util.UUID;
-import java.util.Vector;
+import java.util.*;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -106,6 +98,7 @@ public class PeerBot extends MetaBot
 		if (cmd.equals("setreadkey")) return handleSetReadKey(params);
 		if (cmd.equals("brokers")) return handleBrokers(params);
 		if (cmd.equals("localaddresses")) return handleLocalAddresses(params);
+		if (cmd.equals("protocols")) return handleProtocols(params);
 		throw new Exception("Unknown command: "+cmd);
 	}
 
@@ -282,6 +275,12 @@ public class PeerBot extends MetaBot
 			cmd = new JSONObject();
 			cmd.put("desc", "Get the list of local IP addresses");
 			commands.put("localaddresses", cmd);
+
+			cmd = new JSONObject();
+			cmd.put("desc", "Set the list of supported protocols");
+			cmd.put("parameters", new JSONArray("[\"uuid\"]"));
+			cmd.put("parameters", new JSONArray("[\"protocols\"]"));
+			commands.put("protocols", cmd);
 		}
 		catch (Exception x) { x.printStackTrace(); }
 /*
@@ -303,6 +302,26 @@ public class PeerBot extends MetaBot
 		return sa;
 	}
 */
+
+	private JSONObject handleProtocols(Hashtable params) throws Exception
+	{
+		String uuid = (String)params.get("uuid");
+		String protocols = (String)params.get("protocols");
+		String[] sa = protocols.split(",");
+		P2PPeer p = getPeer(uuid, true, true);
+		boolean[] ba = { false, false, false };
+		if (!sa.equals("")) for (int i=0; i<sa.length; i++){
+			String s = sa[i].trim().toLowerCase();
+			byte b = s.equals("tcp") ? p.ALLOW_TCP : s.equals("udp") ? p.ALLOW_UDP : s.equals("relay") ? p.ALLOW_RELAY : -1;
+			if (b == -1)
+				throw new Exception("Unsupported protocol: "+s);
+			ba[b] = true;
+		}
+		int i = ba.length;
+		while (i-->0) p.allow((byte)i, ba[i]);
+		mP2PManager.savePeer(p);
+		return newResponse();
+	}
 
 	private JSONObject handleLocalAddresses(Hashtable params) throws Exception
 	{
