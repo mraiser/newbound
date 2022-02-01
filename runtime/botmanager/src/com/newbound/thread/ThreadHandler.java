@@ -397,7 +397,7 @@ public class ThreadHandler
 		ps.println("---------------- THREADS ----------------");
 		Thread[] tarray = new Thread[Thread.activeCount()];
 		Thread.enumerate(tarray);
-		Map<Thread, StackTraceElement[]> m = Thread.getAllStackTraces();
+		Map<Thread, StackTraceElement[]> map = Thread.getAllStackTraces();
 
 		int count = tarray.length;
 		Hashtable<String, Integer> counts = new Hashtable();
@@ -418,7 +418,7 @@ public class ThreadHandler
 			}
 			else if (!t.getName().equals("No work"))
 			{
-				StackTraceElement[] stea = m.get(t);
+				StackTraceElement[] stea = map.get(t);
 				if (stea.length>1) ps.println(t+" "+stea[1]);
 				else if (stea.length>0) ps.println(t+" "+stea[0]);
 				else ps.println(t);
@@ -426,7 +426,7 @@ public class ThreadHandler
 		}
 
 		ps.println("-----------------------------------------");
-		ps.println("-   count: "+count);
+		ps.println("- Number of threads: "+count);
 
 		Enumeration<String> ee = counts.keys();
 		while (ee.hasMoreElements()) 
@@ -435,16 +435,36 @@ public class ThreadHandler
 			Integer val = counts.get(key);
 			ps.println("- "+key+": "+val);
 		}
-		
+
 		ps.println("-----------------------------------------");
-		
+		ps.println("- waiting / available / total / maximum -");
+
+		int wait = 0;
+		int avail = 0;
+		int total = 0;
+		int max = 0;
+		ByteArrayOutputStream baos2 = new ByteArrayOutputStream();
+		PrintStream ps2 = new PrintStream(baos2);
 		Enumeration<ThreadHandler> eee = mThreadHandlers.elements();
 		while (eee.hasMoreElements())
 		{
 			ThreadHandler th = eee.nextElement();
-			ps.println("- "+th.mName+" "+th.waiting()+"/"+th.available()+"/"+th.size()+"/"+th.mMaxThreads);
+			int w = th.waiting();
+			int a = th.available();
+			int t = th.size();
+			int m = th.mMaxThreads;
+			ps2.println("- "+th.mName+" "+w+"/"+a+"/"+t+"/"+m);
+			wait += w;
+			avail += a;
+			total += t;
+			max += m;
 		}
-		
+		ps2.close();
+
+		ps.println("-----------------------------------------");
+		ps.println("- All Thread Handlers: "+wait+"/"+avail+"/"+total+"/"+max);
+		ps.println("-----------------------------------------");
+		ps.println(new String(baos2.toByteArray()));
 		ps.println("---------------- THREADS ----------------");
 		ps.close();
 
