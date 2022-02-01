@@ -437,7 +437,10 @@ public class P2PPeer
 		if (!addr.equals(mAddress) && !addr.equals("127.0.0.1") && !addr.equals("localhost") && mOtherAddresses.indexOf(addr) == -1)
 		{
 			if (mAddress.equals("127.0.0.1") || mAddress.equals("localhost")) setAddress(addr);
-			else mOtherAddresses.addElement(addr);
+			else {
+				mOtherAddresses.addElement(addr);
+				mP2PManager.fireEvent("update", new JSONObject(this.toString()));
+			}
 		}
 	}
 
