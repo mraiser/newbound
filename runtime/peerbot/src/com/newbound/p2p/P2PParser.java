@@ -87,7 +87,7 @@ public class P2PParser implements Parser
 			System.out.println("bb");
 		}
 
-		System.out.println("P2P connect "+REMOTEID);
+		//System.out.println("P2P connect "+REMOTEID);
 		
 		Vector<P2PSocket> v = ALLSOCKS.get(REMOTEID);
 		if (v == null) ALLSOCKS.put(REMOTEID, v = new Vector());

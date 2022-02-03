@@ -256,7 +256,7 @@ public class P2PManager implements Container
 
 	public void stream(P2PPeer p, long streamid, byte[] data) throws Exception 
 	{
-		System.out.println(ID+" Sending stream data "+streamid+" of length "+data.length+" to "+p.getID());
+//		System.out.println(ID+" Sending stream data "+streamid+" of length "+data.length+" to "+p.getID());
 
 		P2PConnection s = p.getStream(streamid);
 		if (s == null)

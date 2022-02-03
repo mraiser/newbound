@@ -728,7 +728,7 @@ public class P2PPeer
 			@Override
 			public void run() 
 			{
-				System.out.println("REMOVING STREAM "+mID);
+				//System.out.println("REMOVING STREAM "+mID);
 
 				P2PConnection con = mStreams.remove(stream);
 				if (con != null) try

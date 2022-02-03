@@ -601,6 +601,7 @@ public class PeerBot extends MetaBot
 			o.put("name", p.getName());
 			o.put("tcp", p.isTCP());
 			o.put("relays", p.relays());
+			o.put("protocols", p.getProtocols());
 
 			return o;
 		}

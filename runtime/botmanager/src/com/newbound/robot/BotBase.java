@@ -1579,7 +1579,7 @@ public abstract class BotBase extends BotUtil implements Container, App //Channe
 	
 	public void addNumThreads(int numToAllocate)
 	{
-		System.out.println("ADDING NUM THREADS "+numToAllocate);
+		//System.out.println("ADDING NUM THREADS "+numToAllocate);
 		mThreadHandler.addNumThreads(numToAllocate);
 	}
 

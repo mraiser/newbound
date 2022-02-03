@@ -1935,7 +1935,7 @@ public class BotManager extends BotBase
 			          }
 			          catch (Exception x2) 
 			          {
-			            System.out.println("No discovery at "+addr+": "+x.getMessage());
+			            //System.out.println("No discovery at "+addr+": "+x.getMessage());
 			          }
 			        }
 			      }
