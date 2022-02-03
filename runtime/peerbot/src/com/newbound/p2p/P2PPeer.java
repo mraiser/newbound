@@ -740,7 +740,7 @@ public class P2PPeer
 				}
 				catch (Exception x) { x.printStackTrace(); }
 			}
-		}, "REMOVE STREAM "+mID, 1000);
+		}, "REMOVE STREAM "+mID, 5000);
 	}
 
 	public void keepAlive(boolean keepalive) 

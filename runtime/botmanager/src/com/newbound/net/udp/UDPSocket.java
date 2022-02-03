@@ -9,7 +9,7 @@ import com.newbound.net.service.Socket;
 
 public class UDPSocket implements Socket
 {
-	private int MTU = 1400; // FIXME - should be 1500 - headersize
+	protected int MTU = 1400; // FIXME - should be 1500 - headersize
 
 	private UDPServerSocket SOCK;
 	private String SESSION;
@@ -30,6 +30,7 @@ public class UDPSocket implements Socket
 	private int SENTNEXT = 0;
 
 	public long LASTCONTACT;
+	public long LASTRESEND;
 	public int SOTIMEOUT = 10000;
 
 	class RecvdMsg{
@@ -54,7 +55,7 @@ public class UDPSocket implements Socket
 		SESSION = session;
 		ADDR = addr;
 		PORT = port;
-		LASTCONTACT = System.currentTimeMillis();
+		LASTCONTACT = LASTRESEND = System.currentTimeMillis();
 		STATE = CONNECTED;
 	}
 
@@ -70,6 +71,7 @@ public class UDPSocket implements Socket
 
 			@Override
 			public void write(int i) throws IOException {
+				//if ((SENTNEXT - SENTOFFSET)>20) try { Thread.sleep(100); } catch (Exception x) { x.printStackTrace(); }
 				OUTGOING.write(i);
 				if (OUTGOING.size() >= MTU) flush();
 			}
@@ -82,6 +84,7 @@ public class UDPSocket implements Socket
 					byte[] ba = baos.toByteArray();
 					SENT.addElement(ba);
 					SOCK.send(SESSION, SENTNEXT++, ba, ADDR, PORT); // FIXME - if SENTLAST - SENTOFFSET > MAX don't send more
+					//System.out.println((SENTNEXT - SENTOFFSET)+" packets in SENT queue");
 				}
 			}
 		};
@@ -122,7 +125,7 @@ public class UDPSocket implements Socket
 
 	@Override
 	public String getLocalHostName() throws IOException {
-		return SOCK.getInetAddress().getHostName(); // FIXME - Is this correct?
+		return SOCK.getInetAddress().getHostName();
 	}
 
 	@Override
@@ -130,13 +133,16 @@ public class UDPSocket implements Socket
 		SOTIMEOUT = millis;
 	}
 
-	public byte[] getSentMsg(int msgid) {
+	public void resend(int msgid) throws IOException {
 		ack(msgid-1);
 		int off = msgid - SENTOFFSET;
-		if (off<SENT.size())
-			return SENT.elementAt(off); // FIXME - should always be zero or one?
-
-		return null;
+		int n = 0;
+		while (off<SENT.size()){
+			byte[] ba = SENT.elementAt(off);
+			SOCK.send(SESSION, off + SENTOFFSET, ba, ADDR, PORT);
+			if (++n == 10) break;
+			off++;
+		}
 	}
 
 	public void ack(int msgid){
@@ -151,22 +157,17 @@ public class UDPSocket implements Socket
 		updateRecvdLast(msgid);
 		int n = msgid - RECVDOFFSET;
 		if (n>=0) RECVD.set(n, new RecvdMsg(b, off, len));
-		pushRecvd();
-	}
-
-	private void pushRecvd() throws IOException {
 		while (RECVDOFFSET<=RECVDLAST){
 			if (RECVD.elementAt(0) == null) break;
 			RecvdMsg msg = RECVD.remove(0);
 			RECVDOFFSET++;
 			INCOMING.write(msg.ba, msg.off, msg.len);
 		}
-
-		if (RECVDOFFSET<=RECVDLAST) requestResend();
-		//else SOCK.sendACK(SESSION, RECVDLAST, ADDR, PORT);
 	}
 
 	public void requestResend() throws IOException {
+		LASTRESEND = System.currentTimeMillis();
+		//System.out.println("Requesting resend of "+RECVDOFFSET+"/"+SESSION);
 		SOCK.requestResend(SESSION, RECVDOFFSET, ADDR, PORT);
 	}
 
@@ -174,5 +175,11 @@ public class UDPSocket implements Socket
 		int n = RECVDLAST;
 		while (n++<msgid) RECVD.addElement(null);
 		if (msgid>RECVDLAST) RECVDLAST = msgid;
+	}
+
+	public boolean needsResend() {
+		boolean b = RECVDOFFSET<=RECVDLAST && RECVD.elementAt(0) == null;
+		if (b) System.out.println("NEEDS RESEND");
+		return b;
 	}
 }

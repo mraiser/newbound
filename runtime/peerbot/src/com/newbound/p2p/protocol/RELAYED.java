@@ -33,7 +33,7 @@ public class RELAYED implements Callback
 			P2PPeer p = P2P.getPeer(target);
 			if (p.allow(p.ALLOW_RELAY)) {
 				int code = BotUtil.bytesToInt(ba, 36);
-
+/*
 				// FIXME major hack
 				if (ba.length == 76) {
 					String s = new String(ba, 36, 36);
@@ -46,7 +46,7 @@ public class RELAYED implements Callback
 						x.printStackTrace();
 					}
 				}
-
+*/
 				// FIXME maybe?
 				int len = ba.length - 40;
 				byte[] ba2 = new byte[len + 8];

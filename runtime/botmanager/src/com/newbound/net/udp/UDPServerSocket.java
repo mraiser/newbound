@@ -31,7 +31,8 @@ public class UDPServerSocket implements ServerSocket
 	public static final byte BEGIN = 97;
 	public static final byte MSG = 96;
 	public static final byte RESEND = 95;
-	//private static final byte ACK = 94;
+	private static final byte TEST = 94;
+	private static final byte TESTOK = 93;
 
 	public UDPServerSocket(P2PManager p2p, int port) throws SocketException {
 		PORT = port;
@@ -64,20 +65,25 @@ public class UDPServerSocket implements ServerSocket
 			@Override
 			public void run() {
 				while (!SOCK.isClosed()) try {
-					Thread.sleep(1000);
+					Thread.sleep(500);
+					int n = 0;
 					Enumeration<String> e = SOCKS.keys();
 					while (e.hasMoreElements()) try{
 						String session = e.nextElement();
 						UDPSocket sock = SOCKS.get(session);
 						if (sock != null){
-							long millis = System.currentTimeMillis() - sock.LASTCONTACT;
-							if (sock.SOTIMEOUT != -1 && millis > sock.SOTIMEOUT){
+							long now = System.currentTimeMillis();
+							long millis = now - sock.LASTCONTACT;
+							if (sock.isClosed() || (sock.SOTIMEOUT != -1 && millis > sock.SOTIMEOUT)){
 								System.out.println("UDP Socket to "+sock.getRemoteSocketAddress()+" with session "+session+" timed out.");
 								SOCKS.remove(session);
 								sock.close();
 							}
 							else {
-								sock.requestResend();
+								if (sock.needsResend() || (millis > 1000 && now - sock.LASTRESEND > 1000)) {
+									//System.out.println("Requesting resend "+session);
+									sock.requestResend(); // FIXME - also/instead resend first in sent list?
+								}
 							}
 						}
 					}
@@ -94,7 +100,7 @@ public class UDPServerSocket implements ServerSocket
 		};
 		new Thread(r).start();
 
-		if (p2p != null) {
+		if (p2p != null) { // FIXME - Move to P2PServerSocket.maintenance()
 			P2P = p2p;
 			r = new Runnable() {
 				@Override
@@ -115,6 +121,33 @@ public class UDPServerSocket implements ServerSocket
 			};
 			new Thread(r).start();
 		}
+	}
+
+	public void testSize(int size, InetAddress addr, int port, String session) throws IOException {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		baos.write(TEST);
+		baos.write(BotUtil.intToBytes(session.length()));
+		baos.write(session.getBytes());
+		baos.write(BotUtil.intToBytes(size));
+		baos.write(new byte[size]);
+		baos.close();
+		byte[] buf = baos.toByteArray();
+		System.out.println("TEST: "+size+" to "+addr+":"+port+" VIA UDP session: "+session);
+		DatagramPacket dp = new DatagramPacket(buf, buf.length, addr, port);
+		SOCK.send(dp);
+	}
+
+	public void testSizeOK(int size, InetAddress addr, int port, String session) throws IOException {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		baos.write(TESTOK);
+		baos.write(BotUtil.intToBytes(session.length()));
+		baos.write(session.getBytes());
+		baos.write(BotUtil.intToBytes(size));
+		baos.close();
+		byte[] buf = baos.toByteArray();
+		System.out.println("TEST SIZE OK: "+size+" to "+addr+":"+port+" VIA UDP session: "+session);
+		DatagramPacket dp = new DatagramPacket(buf, buf.length, addr, port);
+		SOCK.send(dp);
 	}
 
 	public void handshake(InetAddress addr, int port, byte cmd, String session) throws IOException {
@@ -166,7 +199,7 @@ public class UDPServerSocket implements ServerSocket
 	protected void route(DatagramPacket p) throws IOException {
 		byte[] b = Arrays.copyOfRange(p.getData(), 0, p.getLength());
 		byte cmd = b[0];
-		System.out.println("Received UDP "+cmd+" from "+p.getAddress()+":"+p.getPort()+" containing "+BotUtil.toHexString(b));
+		//System.out.println("Received UDP "+cmd+" from "+p.getAddress()+":"+p.getPort()+" containing "+BotUtil.toHexString(b));
 		if (cmd == MSG){
 			int len1 = (int)b[1] & 0xff;
 			String s = new String(b, 2, len1);
@@ -191,9 +224,7 @@ public class UDPServerSocket implements ServerSocket
 				int off = 2 + len1;
 				int msgid = BotUtil.bytesToInt(b, off);
 				//System.out.println("RECEIVED RESEND REQUEST: "+msgid+"/"+s);
-				byte[] ba = sock.getSentMsg(msgid);
-				if (ba != null) send(s, msgid, ba, isa.getAddress(), isa.getPort());
-				else System.out.println("Message ID not found: "+msgid+"/"+s);
+				sock.resend(msgid);
 			}
 			else System.out.println("UDP Session ID not found: "+s);
 		}
@@ -209,6 +240,32 @@ public class UDPServerSocket implements ServerSocket
 					MUTEX.notify();
 				}
 				if (cmd == WELCOME) handshake(p.getAddress(), p.getPort(), BEGIN, s);
+				testSize(2000, p.getAddress(), p.getPort(), s);
+				testSize(5000, p.getAddress(), p.getPort(), s);
+				testSize(10000, p.getAddress(), p.getPort(), s);
+				testSize(20000, p.getAddress(), p.getPort(), s);
+				testSize(50000, p.getAddress(), p.getPort(), s);
+			}
+		}
+		else if (cmd == TEST){
+			int len1 = BotUtil.bytesToInt(b, 1);
+			String s = new String(b, 5, len1);
+			int off = 5 + len1;
+			int len2 = BotUtil.bytesToInt(b, off);
+			off += 4;
+			if (off + len2 == p.getLength()) { // FIXME - MTU is actually 1 byte more than tested
+				testSizeOK(len2, p.getAddress(), p.getPort(), s);
+			}
+		}
+		else if (cmd == TESTOK){
+			int len1 = BotUtil.bytesToInt(b, 1);
+			String s = new String(b, 5, len1);
+			int off = 5 + len1;
+			int len2 = BotUtil.bytesToInt(b, off);
+			UDPSocket sock = SOCKS.get(s);
+			if (sock != null && sock.MTU < len2) {
+				sock.MTU = len2;
+				System.out.println("New MTU for "+s+" is "+len2);
 			}
 		}
 		else {

@@ -76,45 +76,28 @@ public class Service
 			{
 				while (RUNNING && s.isConnecting() && ! s.isClosed()) try { Thread.sleep(500); } catch (Exception x) { x.printStackTrace(); }
 
-				boolean release = false;
-
 				while (RUNNING && s.isConnected() && !s.isClosed()) try
 				{
 					Request jo2 = (Request)p.parse();
 					Object cmd = jo2.getCommand();
 					execute(cmd, jo2, p);
 				}
-				catch (SocketTimeoutException x)
-				{
-					// IGNORE - No data != dead connection
-					//System.err.println(NAME+" REQUEST TIMEOUT: "+x.getMessage());
-					//break;
-				}
 				catch (ReleaseSocketException x)
 				{
-					release = true;
 					break;
 				}
-				catch (SocketException x)
+				catch (SocketClosedException | SocketException x)
 				{
-					//System.err.println(NAME+" REQUEST SOCKET ERROR: "+x.getMessage());
-					break;
-				}
-				catch (SocketClosedException x)
-				{
-//					System.out.println(NAME+" socket closed ");
+					try { p.close(); } catch (Exception xx) {}
+					try { s.close(); } catch (Exception xx) {}
 					break;
 				}
 				catch (Exception x)
 				{
-					//x.printStackTrace();
-					p.error(x);
-				}
-
-				if (!release)
-				{
+					try { p.error(x); } catch (Exception xx) { xx.printStackTrace(); }
 					try { p.close(); } catch (Exception xx) { xx.printStackTrace(); }
 					try { s.close(); } catch (Exception xx) { xx.printStackTrace(); }
+					break;
 				}
 
 //				System.out.println("SOCKET "+NAME+" "+s+" listen loop END");

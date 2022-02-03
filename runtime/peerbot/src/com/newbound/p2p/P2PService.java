@@ -58,19 +58,22 @@ public class P2PService extends Service
 				Object cmd = jo2.getCommand();
 				execute(cmd, jo2, p);
 			}
-			catch (SocketTimeoutException | SocketClosedException | SocketException x) // Requires Java 7+
-			{
-				LISTENERS.remove(this);
-				try { p.close(); } catch (Exception xx) { xx.printStackTrace(); }
-				try { s.close(); } catch (Exception xx) { xx.printStackTrace(); }
-			}
 			catch (ReleaseSocketException x)
 			{
 				LISTENERS.remove(this);
 			}
+			catch (SocketClosedException | SocketException x)
+			{
+				try { p.close(); } catch (Exception xx) { xx.printStackTrace(); }
+				try { s.close(); } catch (Exception xx) { xx.printStackTrace(); }
+				LISTENERS.remove(this);
+			}
 			catch (Exception x)
 			{
-				p.error(x);
+				try { p.error(x); } catch (Exception xx) { xx.printStackTrace(); }
+				try { p.close(); } catch (Exception xx) { xx.printStackTrace(); }
+				try { s.close(); } catch (Exception xx) { xx.printStackTrace(); }
+				LISTENERS.remove(this);
 			}
 		}
 	}
