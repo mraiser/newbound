@@ -179,7 +179,7 @@ public class UDPSocket implements Socket
 
 	public boolean needsResend() {
 		boolean b = RECVDOFFSET<=RECVDLAST && RECVD.elementAt(0) == null;
-		if (b) System.out.println("NEEDS RESEND");
+		//if (b) System.out.println("NEEDS RESEND");
 		return b;
 	}
 }
