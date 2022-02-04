@@ -3,6 +3,7 @@ package com.newbound.net.udp;
 import java.io.*;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.util.Arrays;
 import java.util.Vector;
 
 import com.newbound.net.service.Socket;
@@ -33,18 +34,7 @@ public class UDPSocket implements Socket
 	public long LASTRESEND;
 	public int SOTIMEOUT = 10000;
 
-	class RecvdMsg{
-		byte[] ba;
-		int off;
-		int len;
-		RecvdMsg(byte[] ba, int off, int len){
-			this.ba = ba;
-			this.off = off;
-			this.len = len;
-		}
-	}
-
-	private Vector<RecvdMsg> RECVD = new Vector<>();
+	private Vector<byte[]> RECVD = new Vector<>();
 	private int RECVDOFFSET = 0;
 	private int RECVDLAST = -1;
 
@@ -156,12 +146,15 @@ public class UDPSocket implements Socket
 		LASTCONTACT = System.currentTimeMillis();
 		updateRecvdLast(msgid);
 		int n = msgid - RECVDOFFSET;
-		if (n>=0) RECVD.set(n, new RecvdMsg(b, off, len));
-		while (RECVDOFFSET<=RECVDLAST){
-			if (RECVD.elementAt(0) == null) break;
-			RecvdMsg msg = RECVD.remove(0);
-			RECVDOFFSET++;
-			INCOMING.write(msg.ba, msg.off, msg.len);
+		if (n>=0 && RECVD.elementAt(n) == null) {
+			b = Arrays.copyOfRange(b, off, off+len);
+			RECVD.set(n, b);
+			while (RECVDOFFSET<=RECVDLAST){
+				if (RECVD.elementAt(0) == null) break;
+				byte[] msg = RECVD.remove(0);
+				RECVDOFFSET++;
+				INCOMING.write(msg);
+			}
 		}
 	}
 

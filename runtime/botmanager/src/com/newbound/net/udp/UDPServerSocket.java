@@ -197,7 +197,7 @@ public class UDPServerSocket implements ServerSocket
 	}
 
 	protected void route(DatagramPacket p) throws IOException {
-		byte[] b = Arrays.copyOfRange(p.getData(), 0, p.getLength());
+		byte[] b = p.getData();
 		byte cmd = b[0];
 		//System.out.println("Received UDP "+cmd+" from "+p.getAddress()+":"+p.getPort()+" containing "+BotUtil.toHexString(b));
 		if (cmd == MSG){
@@ -269,7 +269,7 @@ public class UDPServerSocket implements ServerSocket
 			}
 		}
 		else {
-			System.out.println("UNKNOWN UDP COMMAND: "+cmd+"/"+BotUtil.toHexString(b)+"/"+new String(b));
+			System.out.println("UNKNOWN UDP COMMAND: "+cmd);
 		}
 	}
 

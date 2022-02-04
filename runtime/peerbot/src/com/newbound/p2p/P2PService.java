@@ -197,6 +197,7 @@ public class P2PService extends Service
 				if (p.getPublicKey() != null && p.getReadKey() != null)
 				{
 					sock.CONNECTING = false;
+					p.setConnected(true);
 					return true;
 				}
 
@@ -213,6 +214,7 @@ public class P2PService extends Service
 						sock.PARSER.send(new P2PResponse(Codes.SEND_READKEY, "".getBytes()));
 					}
 					else {
+						p.setConnected(true);
 						return true;
 					}
 				}
