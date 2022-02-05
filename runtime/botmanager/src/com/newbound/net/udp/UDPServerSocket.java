@@ -269,7 +269,7 @@ public class UDPServerSocket implements ServerSocket
 			}
 		}
 		else {
-			System.out.println("UNKNOWN UDP COMMAND: "+cmd);
+			System.out.println("UNKNOWN UDP COMMAND: "+cmd+" from "+p.getAddress()+"/"+p.getPort());
 		}
 	}
 

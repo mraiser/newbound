@@ -35,18 +35,42 @@
        <div class='rp-update'></div>
        <button class="deletepeerbutton mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">delete</button>
        <br><br>
-       <label class="remlab mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="allowtcp">
-        <input type="checkbox" id="allowtcp" class="protocol allowtcp mdl-checkbox__input">
-        <span class="mdl-checkbox__label">Allow TCP</span>
-      </label>
-       <label class="remlab mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="allowudp">
-        <input type="checkbox" id="allowudp" class="protocol allowudp mdl-checkbox__input">
-        <span class="mdl-checkbox__label">Allow UDP</span>
-      </label>
-       <label class="remlab mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="allowrelay">
-        <input type="checkbox" id="allowrelay" class="protocol allowrelay mdl-checkbox__input">
-        <span class="mdl-checkbox__label">Allow Relay</span>
-      </label>
+       <table border='0' cellpadding='0' cellspacing='0'>
+         <tr>
+           <td class='remlab'>
+             <div class='whitetext'>Local:</div>
+             <br>
+             <label class="remlab mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="allowtcp">
+              <input type="checkbox" id="allowtcp" class="protocol allowtcp mdl-checkbox__input">
+              <span class="mdl-checkbox__label">Allow TCP</span>
+            </label>
+             <label class="remlab mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="allowudp">
+              <input type="checkbox" id="allowudp" class="protocol allowudp mdl-checkbox__input">
+              <span class="mdl-checkbox__label">Allow UDP</span>
+            </label>
+             <label class="remlab mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="allowrelay">
+              <input type="checkbox" id="allowrelay" class="protocol allowrelay mdl-checkbox__input">
+              <span class="mdl-checkbox__label">Allow Relay</span>
+            </label>
+           </td>
+           <td>
+             <div class='whitetext'>Remote:</div>
+             <br>
+             <label class="remlab mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="remoteallowtcp">
+              <input type="checkbox" id="remoteallowtcp" class="remoteprotocol remoteallowtcp mdl-checkbox__input">
+              <span class="mdl-checkbox__label">Allow TCP</span>
+            </label>
+             <label class="remlab mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="remoteallowudp">
+              <input type="checkbox" id="remoteallowudp" class="remoteprotocol remoteallowudp mdl-checkbox__input">
+              <span class="mdl-checkbox__label">Allow UDP</span>
+            </label>
+             <label class="remlab mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="remoteallowrelay">
+              <input type="checkbox" id="remoteallowrelay" class="remoteprotocol remoteallowrelay mdl-checkbox__input">
+              <span class="mdl-checkbox__label">Allow Relay</span>
+            </label>
+           </td>
+         </tr>
+       </table>
      </div>
 
      <div class = "mdl-tabs__panel padsome" id = "tab2-panel">

@@ -171,6 +171,24 @@ me.ready = me.refresh = function(){
     var u = getByProperty(result.data, 'username', ME.DATA.id);
     var g = u.groups[0] ? u.groups : 'anonymous';
     $(ME).find('.rp-lock').text(g);
+    var myid = $('.localpeerid').text();
+    json('../peerbot/remote/'+ME.DATA.id+'/peerbot/lookup', 'uuid='+myid, function(result){
+      var protocols = result.protocols.split(',');
+      for (var i in protocols){
+        var p = protocols[i].trim().toLowerCase();
+        $(ME).find('.remoteallow'+p).prop('checked', true).parent()[0].MaterialCheckbox.checkToggleState();
+      }
+      $(ME).find('.remoteprotocol').change(function(e){
+        var s = '';
+        if ($(ME).find('.remoteallowtcp').prop('checked')) s = "tcp";
+        if ($(ME).find('.remoteallowudp').prop('checked')) { if (s !="") s += ","; s += "udp"; }
+        if ($(ME).find('.remoteallowrelay').prop('checked')) { if (s !="") s += ","; s += "relay"; }
+        json('../peerbot/remote/'+ME.DATA.id+'/peerbot/protocols', 'uuid='+encodeURIComponent(myid)+'&protocols='+encodeURIComponent(s), function(result){
+          if (result.status != 'ok')
+            alert(JSON.stringify(result));
+        });
+      });
+    });
   });
 };
 

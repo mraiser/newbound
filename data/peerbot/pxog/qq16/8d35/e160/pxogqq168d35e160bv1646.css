@@ -70,7 +70,7 @@
   width:100%;
 }
 
-.controlsettings .mdl-button{
+.whitetext, .controlsettings .mdl-button{
   color:white;
 }
 
@@ -97,4 +97,8 @@
 
 .remlab > .mdl-checkbox__box-outline{
   border-color:white;
+}
+
+.remlab > .mdl-checkbox__label{
+  color:white;
 }
