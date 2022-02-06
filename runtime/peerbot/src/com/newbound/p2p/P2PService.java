@@ -147,7 +147,6 @@ public class P2PService extends Service
 		super.execute(cmd, data, parser);
 	}
 
-
 	public boolean sendTCP(String uuid, byte[] ba, int code) throws Exception 
 	{
 		while (true) try
