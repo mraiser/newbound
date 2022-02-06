@@ -26,13 +26,15 @@ public class UDPSocket implements Socket
 	private static byte CONNECTED = 1;
 	private static byte DEAD = 2;
 
+	public int SOTIMEOUT = 10000;
+
 	private Vector<byte[]> SENT = new Vector<>();
 	private int SENTOFFSET = 0;
 	private int SENTNEXT = 0;
 
 	public long LASTCONTACT;
 	public long LASTRESEND;
-	public int SOTIMEOUT = 10000;
+	public int LASTRESENDID;
 
 	private Vector<byte[]> RECVD = new Vector<>();
 	private int RECVDOFFSET = 0;
@@ -46,6 +48,7 @@ public class UDPSocket implements Socket
 		ADDR = addr;
 		PORT = port;
 		LASTCONTACT = LASTRESEND = System.currentTimeMillis();
+		LASTRESENDID = -1;
 		STATE = CONNECTED;
 	}
 
@@ -82,10 +85,9 @@ public class UDPSocket implements Socket
 					baos.close();
 					byte[] ba = baos.toByteArray();
 					SENT.addElement(ba);
-					//if (SENTNEXT - SENTOFFSET < 20)
-						SOCK.send(SESSION, SENTNEXT, ba, ADDR, PORT); // FIXME - if SENTNEXT - SENTOFFSET > MAX don't send more
-					SENTNEXT++;
+					SOCK.send(SESSION, SENTNEXT++, ba, ADDR, PORT);
 					//System.out.println((SENTNEXT - SENTOFFSET)+" packets in SENT queue");
+					//if (SENTNEXT - SENTOFFSET < 200) try { Thread.sleep(100); } catch (Exception x) { x.printStackTrace(); }
 				}
 			}
 		};
@@ -141,7 +143,7 @@ public class UDPSocket implements Socket
 		while (off<SENT.size()){
 			byte[] ba = SENT.elementAt(off);
 			SOCK.send(SESSION, off + SENTOFFSET, ba, ADDR, PORT);
-			if (++n == 10) break;
+			if (++n == 50) break;
 			off++;
 		}
 	}
@@ -172,6 +174,7 @@ public class UDPSocket implements Socket
 	public void requestResend() throws IOException {
 		LASTRESEND = System.currentTimeMillis();
 		//System.out.println("Requesting resend of "+RECVDOFFSET+"/"+SESSION);
+		LASTRESENDID = RECVDOFFSET;
 		SOCK.requestResend(SESSION, RECVDOFFSET, ADDR, PORT);
 	}
 
@@ -182,7 +185,7 @@ public class UDPSocket implements Socket
 	}
 
 	public boolean needsResend() {
-		boolean b = RECVDOFFSET<=RECVDLAST && RECVD.elementAt(0) == null;
+		boolean b = LASTRESENDID != RECVDOFFSET && RECVDOFFSET<=RECVDLAST && RECVD.elementAt(0) == null;
 		//if (b) System.out.println("NEEDS RESEND");
 		return b;
 	}

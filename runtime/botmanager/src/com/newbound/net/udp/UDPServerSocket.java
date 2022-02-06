@@ -65,7 +65,7 @@ public class UDPServerSocket implements ServerSocket
 			@Override
 			public void run() {
 				while (!SOCK.isClosed()) try {
-					Thread.sleep(500);
+					Thread.sleep(100);
 					int n = 0;
 					Enumeration<String> e = SOCKS.keys();
 					while (e.hasMoreElements()) try{
@@ -73,14 +73,13 @@ public class UDPServerSocket implements ServerSocket
 						UDPSocket sock = SOCKS.get(session);
 						if (sock != null){
 							long now = System.currentTimeMillis();
-							long millis = now - sock.LASTCONTACT;
-							if (sock.isClosed() || (sock.SOTIMEOUT != -1 && millis > sock.SOTIMEOUT)){
+							if (sock.isClosed() || (sock.SOTIMEOUT != -1 && now - sock.LASTCONTACT > sock.SOTIMEOUT)){
 								System.out.println("UDP Socket to "+sock.getRemoteSocketAddress()+" with session "+session+" timed out.");
 								SOCKS.remove(session);
 								sock.close();
 							}
 							else {
-								if (sock.needsResend() || (millis > 1000 && now - sock.LASTRESEND > 1000)) {
+								if (sock.needsResend() || (now - sock.LASTRESEND > 1000)) {
 									//System.out.println("Requesting resend "+session);
 									sock.requestResend(); // FIXME - also/instead resend first in sent list?
 								}
