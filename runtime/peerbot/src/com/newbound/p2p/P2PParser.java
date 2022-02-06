@@ -72,9 +72,12 @@ public class P2PParser implements Parser
 				throw new Exception("Connections of type "+name+" not allowed for peer "+p.getName()+"/"+p.getID());
 			}
 
-			p.setPort(REMOTEPORT); // FIXME - Probably shouldn't just set it here. Check for when they are not equal and why.
-			if (SOCK.SOCK instanceof TCPSocket || !p.isTCP()) p.setAddress(SOCK.SOCK.getRemoteHostName());
-			// xxx PS.addConfirmedAddress(REMOTEID, new InetSocketAddress(((InetSocketAddress)SOCK.SOCK.getRemoteSocketAddress()).getHostString(), REMOTEPORT));
+			if (p.getPort() == -1)
+				p.setPort(REMOTEPORT);
+			else if (p.getPort() != REMOTEPORT)
+				System.out.println("CHECK PORT ("+p.getPort()+"/"+REMOTEPORT+") FOR PEER "+REMOTEID);
+
+			if (SOCK.SOCK instanceof TCPSocket && !p.isTCP()) p.setAddress(SOCK.SOCK.getRemoteHostName());
 		}
 		else if (SOCK.SOCK instanceof RelaySocket)
 		{

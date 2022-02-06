@@ -119,8 +119,8 @@ public class RelaySocket implements Socket {
 			if (ISCLOSED) throw new IOException("RelaySocket OutputStream is closed");
 
 			int len2 = Math.min(len, buf.length-offset);
-			System.arraycopy(b, off, buf, offset, len);
-			offset += len;
+			System.arraycopy(b, off, buf, offset, len2);
+			offset += len2;
 			if (offset == buf.length) flush();
 			if (len2<len) write(b, off+len2, len-len2);
 		}

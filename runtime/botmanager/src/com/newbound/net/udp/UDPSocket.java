@@ -58,7 +58,16 @@ public class UDPSocket implements Socket
 	@Override
 	public OutputStream getOutputStream() throws IOException {
 		if (MYOUTPUTSTREAM == null) MYOUTPUTSTREAM = new OutputStream() {
-
+			@Override
+			public void write(byte[] b, int off, int len) throws IOException
+			{
+				int offset = OUTGOING.size();
+				int len2 = Math.min(len, MTU-offset);
+				OUTGOING.write(b, off, len2);
+				offset += len2;
+				if (offset >= MTU) flush();
+				if (len2<len) write(b, off+len2, len-len2);
+			}
 			@Override
 			public void write(int i) throws IOException {
 				//if ((SENTNEXT - SENTOFFSET)>20) try { Thread.sleep(100); } catch (Exception x) { x.printStackTrace(); }
@@ -73,7 +82,9 @@ public class UDPSocket implements Socket
 					baos.close();
 					byte[] ba = baos.toByteArray();
 					SENT.addElement(ba);
-					SOCK.send(SESSION, SENTNEXT++, ba, ADDR, PORT); // FIXME - if SENTLAST - SENTOFFSET > MAX don't send more
+					//if (SENTNEXT - SENTOFFSET < 20)
+						SOCK.send(SESSION, SENTNEXT, ba, ADDR, PORT); // FIXME - if SENTNEXT - SENTOFFSET > MAX don't send more
+					SENTNEXT++;
 					//System.out.println((SENTNEXT - SENTOFFSET)+" packets in SENT queue");
 				}
 			}
