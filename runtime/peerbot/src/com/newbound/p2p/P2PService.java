@@ -142,9 +142,27 @@ public class P2PService extends Service
 	}
 
 	@Override
-	protected void execute(Object cmd, Request data, Parser parser) throws Exception 
+	protected void execute(Object cmd, Request data, Parser parser) throws Exception
 	{
-		super.execute(cmd, data, parser);
+		if ((int)cmd != Codes.STREAM) CONTAINER.getDefault().addJob(new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				try
+				{
+					Callback cb = callbacks.get(cmd);
+					if (cb == null) throw new Exception("No such command: "+cmd);
+					parser.execute(data, cb);
+				}
+				catch (Exception x)
+				{
+					parser.error(x);
+				}
+			}
+		}, "Executing P2P command");
+		else
+			super.execute(cmd, data, parser);
 	}
 
 	public boolean sendTCP(String uuid, byte[] ba, int code) throws Exception 

@@ -102,3 +102,7 @@
 .remlab > .mdl-checkbox__label{
   color:white;
 }
+
+.remoteallowcheckboxes{
+  display:none;
+}

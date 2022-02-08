@@ -304,13 +304,13 @@ public class P2PConnection implements Socket
 		return mConnected;
 	}
 
-	public void close() throws IOException 
+	public void close()
 	{
-		disconnect();
+		try { mOutputStream.flush(); } catch (Exception x) {x.printStackTrace(); }
+		try { disconnect(); } catch (Exception x) {x.printStackTrace(); }
 		mConnected = false;
-		mInputStream.close();
-		mOutputStream.flush();
-		mOutputStream.close();
+		try { mInputStream.close(); } catch (Exception x) {x.printStackTrace(); }
+		try { mOutputStream.close(); } catch (Exception x) {x.printStackTrace(); }
 	}
 
 	public void sendWebsocketMessage(byte[] msg, int offset, int len, boolean bytes) throws IOException

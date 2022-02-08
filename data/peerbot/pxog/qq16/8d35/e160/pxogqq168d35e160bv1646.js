@@ -178,6 +178,7 @@ me.ready = me.refresh = function(){
         var p = protocols[i].trim().toLowerCase();
         $(ME).find('.remoteallow'+p).prop('checked', true).parent()[0].MaterialCheckbox.checkToggleState();
       }
+      $(ME).find('.remoteallowcheckboxes').css('display', 'block');
       $(ME).find('.remoteprotocol').change(function(e){
         var s = '';
         if ($(ME).find('.remoteallowtcp').prop('checked')) s = "tcp";
