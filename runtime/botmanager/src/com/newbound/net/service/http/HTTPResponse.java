@@ -1,7 +1,10 @@
 package com.newbound.net.service.http;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Enumeration;
+import java.util.Hashtable;
 
 import com.newbound.net.service.Response;
 
@@ -12,27 +15,37 @@ public class HTTPResponse extends InputStream implements Response
 	boolean onedone = false;
 	InputStream is = null;
 	InputStream is2 = null;
-	public int LEN = -1;
+	public int HEADERLEN = -1;
 	
-	public HTTPResponse(InputStream a, InputStream b, int len)
+	public HTTPResponse(String responsecode, Hashtable headers, InputStream a) throws IOException
 	{
-		super();
-		is = a;
-		is2 = b;
-		LEN = len;
+		this(responsecode, headers, a, -1, -1);
 	}
 	
-	public HTTPResponse(InputStream a, InputStream b, int len, int rangebegin, int rangeend) throws IOException
+	public HTTPResponse(String responsecode, Hashtable headers, InputStream a, int rangebegin, int rangeend) throws IOException
 	{
 		super();
 		is = a;
-		is2 = b;
-		LEN = rangeend == -1 ? len : Math.min(len, rangeend-rangebegin+1);
-		if (rangebegin >0) 
+		is2 = buildHeaders(responsecode, headers);
+		if (rangebegin >0)
 		{
 			int n = 0;
 			while (n<rangebegin) n += is.skip(rangebegin-n);
 		}
+	}
+
+	private InputStream buildHeaders(String res, Hashtable headers) {
+		String s = "";
+		Enumeration<String> e = headers.keys();
+		while (e.hasMoreElements())
+		{
+			String key = e.nextElement();
+			String val = ""+headers.get(key);
+			s += key+": "+val+"\r\n";
+		}
+		byte[] ba = ("HTTP/1.1 "+res+"\r\n"+s+"\r\n").getBytes();
+		HEADERLEN = ba.length;
+		return new ByteArrayInputStream(ba);
 	}
 
 	public int read() throws IOException 
@@ -70,7 +83,5 @@ public class HTTPResponse extends InputStream implements Response
 		super.close();
 		is.close();
 		is2.close();
-		
-//		synchronized (is) { is.notifyAll(); }
 	}
 }

@@ -1,11 +1,6 @@
 package com.newbound.net.service.http;
 
-import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URL;
 import java.net.URLConnection;
 import java.security.MessageDigest;
@@ -90,6 +85,7 @@ public class HTTPService extends Service
 			}	
 		}
 		if (c == null || c.equals("undefined")) c = BotUtil.uniqueSessionID();
+
 		headers.put("nn-sessionid", c);
 		
 		Session ses = CONTAINER.getDefault().getSession(c, true);
@@ -171,7 +167,9 @@ public class HTTPService extends Service
 				HTTPResponse response = handleCommand(req.METHOD, headers, params, cmd);
 				if (response != null)
 				{
-					response.KEEPALIVE = response.LEN != -1 && ka != null && ka.equalsIgnoreCase("keep-alive");
+					String cl = (String)getHeader(headers, "Content-Length");
+					int len = cl == null ? -1 : Integer.parseInt(cl);
+					response.KEEPALIVE = len != -1 && ka != null && ka.equalsIgnoreCase("keep-alive");
 					parser.send(response);
 					if (!response.KEEPALIVE) parser.s.close();
 				}
@@ -204,6 +202,8 @@ public class HTTPService extends Service
 	{
 		String path = pathx;
 		if (path.equals("")) path = CONTAINER.getDefault().getIndexFileName();
+
+		String sessionid = (String)params.get("sessionid");
 		
 		Object[] result = { "ok", "" };
 		try 
@@ -262,7 +262,7 @@ public class HTTPService extends Service
 				headers.put("nn-request-type", "file");
 				int x = f.getName().lastIndexOf('.');
 				headers.put("nn-extension", x == -1 ? "" : f.getName().substring(x+1));
-				result[1] = handleFile(f, params, headers);
+				result[1] = handleFile(f, path, params, headers);
 			}
 			else
 			{
@@ -277,7 +277,7 @@ public class HTTPService extends Service
 					headers.put("nn-request-type", "src");
 					int x = u.getPath().lastIndexOf('.');
 					headers.put("nn-extension", x == -1 ? "" : u.getPath().substring(x+1));
-					result[1] = handleURL(u, params, headers);
+					result[1] = handleURL(u, path, params, headers);
 				}
 				else 
 				{
@@ -310,7 +310,7 @@ public class HTTPService extends Service
 		if (result[0].equals("file")) return (HTTPResponse)result[1];
 		if (result[1] instanceof HTTPResponse) return (HTTPResponse)result[1];
 		if (result[1] instanceof InputStream) return handleContent((InputStream)result[1], params, -1, path, headers);
-		if (result[1] instanceof URL) return handleContent(headers,(URL)result[1], path);
+		if (result[1] instanceof URL) return handleContent(sessionid, headers,(URL)result[1], path);
 		
 		if (result[1] == null) return null;
 		
@@ -336,25 +336,25 @@ public class HTTPService extends Service
 		{
 			Object[] oa = (Object[])result[1];
 			if (oa.length == 4) 
-				return handleContent((InputStream)oa[0], (Integer)oa[1], (String)oa[2], oa[3]);
+				return handleContent(sessionid, path, (InputStream)oa[0], (Integer)oa[1], (String)oa[2], oa[3]);
 			else 
 				return handleContent((InputStream)oa[0], params, (Integer)oa[1], path, headers);
 		}
 
-		return buildJSONResponse(result, params);
+		return buildJSONResponse(path, result, params);
 	}
 
-	private InputStream handleFile(File f, Hashtable params, Hashtable headers) throws Exception 
+	private InputStream handleFile(File f, String path, Hashtable params, Hashtable headers) throws Exception
 	{
 		InputStream is = new BufferedInputStream(new FileInputStream(f));
-		return handleContent(is, params, (int)f.length(), f.getName(), headers, System.currentTimeMillis()+3600000l);
+		return handleContent(is, params, (int)f.length(), path, headers, System.currentTimeMillis()+3600000l);
 	}
 
-	private InputStream handleURL(URL u, Hashtable params, Hashtable headers) throws Exception 
+	private InputStream handleURL(URL u, String path, Hashtable params, Hashtable headers) throws Exception
 	{
 		URLConnection uc = u.openConnection(); 
 		int len = uc.getContentLength();
-		return handleContent(uc.getInputStream(), params, len, u.getFile(), headers, System.currentTimeMillis()+3600000l);
+		return handleContent(uc.getInputStream(), params, len, path, headers, System.currentTimeMillis()+3600000l);
 	}
 
 	private HTTPResponse handleContent(InputStream is, Hashtable paramsx, int len, String name, Hashtable h) throws Exception 
@@ -362,56 +362,67 @@ public class HTTPService extends Service
 		return handleContent(is, paramsx, len, name, h, -1);
 	}
 	
-	private HTTPResponse handleContent(InputStream is, Hashtable paramsx, int len, String name, Hashtable h, long expires) throws Exception 
+	private HTTPResponse handleContent(InputStream is, Hashtable params, int len, String path, Hashtable h, long expires) throws Exception
 	{
-//		System.out.println("HEADERS: "+h);
-//		if (h == null || h.get("RANGE") == null)
-//		{
-//			paramsx.remove("request-headers");
-//			return handleContent(is, paramsx, len, name);
-//		}
-		
 		int olen = len;
 		int[] range = extractRange(len, h);
 		if (range[1] != -1) len = range[1] - range[0] + 1;
-		String s = len == -1 ? "" : "\r\nContent-Length: "+len;
-		if (range[0] != -1) s += "\r\nContent-Range: bytes "+range[0]+"-"+range[1]+"/"+olen;
-		if (expires != -1) s += "\r\nExpires: "+toHTTPDate(new Date(expires));
-		String mimeType = getMIMEType(name);
+		String mimeType = getMIMEType(path);
 		String res = range[0] == -1 ? "200 OK" : "206 Partial Content";
-		final InputStream is2 = new ByteArrayInputStream(("HTTP/1.1 "+res+s+"\r\nAccept-Ranges: bytes\r\nDate: "+toHTTPDate(new Date())+"\r\nContent-type: "+mimeType+"\r\n\r\n").getBytes());
-		
-		HTTPResponse sis = new HTTPResponse(is, is2, len, range[0], range[1]); 
-//		if (len == -1) sis.KEEPALIVE = false;
-		
-//		System.out.println("Sent "+name+" ("+mimeType+") "+len+" bytes");
+
+		Hashtable outheaders = buildHeaders((String)params.get("sessionid"), path, len, mimeType, range, "bytes", expires);
+		HTTPResponse sis = new HTTPResponse(res, outheaders, is, range[0], range[1]);
+
 		return sis;
 	}
 
-	private HTTPResponse handleContent(InputStream is, Hashtable paramsx, int len, String name) throws Exception 
-	{
-		String s = len == -1 ? "" : "\r\nContent-Length: "+len;
-		String mimeType = getMIMEType(name);
-		final InputStream is2 = new ByteArrayInputStream(("HTTP/1.1 200 OK\r\nDate: "+toHTTPDate(new Date())+"\r\nContent-type: "+mimeType+s+"\r\n\r\n").getBytes());
-		
-		HTTPResponse sis = new HTTPResponse(is, is2, len); 
-		
-//		System.out.println("Sent "+name+" ("+mimeType+") "+len+" bytes");
-		return sis;
+	public static Hashtable buildHeaders(String sessionid, String name, int len, String mimeType, int[] range, String acceptRanges, long expires) {
+		Hashtable h = new Hashtable();
+		h.put("Date", toHTTPDate(new Date()));
+		if (len != -1) h.put("Content-Length", len);
+		if (mimeType != null) h.put("Content-type", mimeType);
+		if (acceptRanges != null) h.put("Accept-Ranges", acceptRanges);
+		if (range != null && range[0] != -1) h.put("Content-Range","bytes "+range[0]+"-"+range[1]+"/"+range[2]);
+		if (expires != -1) h.put("Expires", toHTTPDate(new Date(expires)));
+		if (sessionid != null) h.put("Set-Cookie", buildCookie(sessionid));
+
+		String cors = getCORS(name);
+		if (cors != null)
+		{
+			h.put("Access-Control-Allow-Origin", cors);
+			if (!cors.equals("*")) h.put("Vary", "Origin");
+		}
+
+		return h;
 	}
 
-	private HTTPResponse handleContent(InputStream is, int len, String mimeType, Object o) throws Exception 
+	private static String getCORS(String name)
 	{
-		String headers;
+		return null; // FIXME
+	}
+
+	private HTTPResponse handleContent(String sessionid, String path, InputStream is, int len, String mimeType, Object o) throws Exception
+	{
+		Hashtable headers = buildHeaders(sessionid, path, len, mimeType, null, null, -1);
 		if (o instanceof String) 
 		{
-			headers = (String)o;
-			int i = headers.indexOf("Set-Cookie");
-			if (i != -1) headers = headers.substring(0, i)+"Do-Not-"+headers.substring(i);
+			BufferedReader br = new BufferedReader(new StringReader((String)o));
+			String header;
+			while ((header = br.readLine()) != null)
+			{
+				int i = header.indexOf(":");
+				if (i != -1)
+				{
+					String key = header.substring(0, i);
+					String val = header.substring(i + 1).trim();
+					if (!(key.equals("Set-Cookie") && val.startsWith("sessionid=")))
+						headers.put(key, val);
+				}
+			}
+			br.close();
 		}
 		else
 		{
-			headers = "";
 			JSONObject head = (JSONObject)o;
 			Iterator<String> i = head.keys();
 			while (i.hasNext())
@@ -419,43 +430,36 @@ public class HTTPService extends Service
 				String key = i.next();
 				String val = head.getString(key);
 				if (!(key.equals("Set-Cookie") && val.startsWith("sessionid=")))
-					headers += "\r\n"+key+": "+val;
-	//				if (key.equals("Content-Range")) res = "206 Partial Content";
-	//			System.out.println(key+": "+val);
+					headers.put(key, val);
 			}
 		}
-		String res = headers.indexOf("\r\nContent-Range: ") == -1 ? "200 OK" : "206 Partial Content";
-		
-		final InputStream is2 = new ByteArrayInputStream(("HTTP/1.1 "+res+headers+"\r\n\r\n").getBytes());
-		
-		HTTPResponse sis = new HTTPResponse(is, is2, len, -1, -1); 
-//		System.out.println("Sent ??? ("+mimeType+") "+len+" bytes - "+ headers);
+		String res = headers.get("Content-Range") == null ? "200 OK" : "206 Partial Content";
+		HTTPResponse sis = new HTTPResponse(path, headers, is, -1, -1);
 		return sis;
 	}
 
-	private HTTPResponse handleContent(Hashtable h, URL url, String name) throws Exception 
+	private HTTPResponse handleContent(String sessionid, Hashtable h, URL url, String name) throws Exception
 	{
 		URLConnection con = url.openConnection();
 		int len = con.getContentLength();
 		int olen = len;
 		int[] range = extractRange(len, h);
 		if (range[1] != -1) len = range[1] - range[0] + 1;
-		String headers = len == -1 ? "" : "\r\nContent-Length: "+len;
-		if (range[0] != -1) headers += "\r\nContent-Range: bytes "+range[0]+"-"+range[1]+"/"+olen;
+		Hashtable headers = buildHeaders(sessionid, name, len, getMIMEType(name), range, "bytes", -1);
 		int i = con.getHeaderFields().size();
 		while (i-->0)
 		{
 			String key = con.getHeaderFieldKey(i);
 			String val = con.getHeaderField(i);
-			headers += "\r\n"+key+": "+val;
+			if (!(key.equals("Set-Cookie") && val.startsWith("sessionid=")))
+				headers.put(key, val);
 		}
 		
 		String mimeType = getMIMEType(name);
 		String res = range[0] == -1 ? "200 OK" : "206 Partial Content";
 		final InputStream is2 = new ByteArrayInputStream(("HTTP/1.1 "+res+"\r\nAccept-Ranges: bytes"+headers+"\r\n\r\n").getBytes());
 		
-		HTTPResponse sis = new HTTPResponse(con.getInputStream(), is2, con.getContentLength(), range[0], range[1]); 
-//		System.out.println("Sent "+name+" ("+mimeType+") "+len+" bytes - "+ headers);
+		HTTPResponse sis = new HTTPResponse(res, headers, con.getInputStream(), range[0], range[1]);
 		return sis;
 	}
 
@@ -472,7 +476,7 @@ public class HTTPService extends Service
 		return s;
 	}
 
-	private HTTPResponse buildJSONResponse(Object[] result, Hashtable params) throws IOException
+	private HTTPResponse buildJSONResponse(String path, Object[] result, Hashtable params) throws IOException
 	{
 		String s1 = (String)params.get("callback");
 		boolean JSONP = s1 != null;
@@ -493,15 +497,17 @@ public class HTTPService extends Service
 		catch (Exception x) { x.printStackTrace(); }
 		
 		if (JSONP) s1 += ")";
-		
-		String s2 = "HTTP/1.1 200 OK\r\nDate: "+toHTTPDate(new Date())+"\r\nSet-Cookie: "+buildCookie(params)+"\r\nContent-type: application/json\r\nContent-Length: "+s1.length()+"\r\n\r\n";
-		
-		return new HTTPResponse(new ByteArrayInputStream(s1.getBytes()), new ByteArrayInputStream(s2.getBytes()), s1.length(), -1, -1); 
+
+		byte[] ba = s1.getBytes();
+		Hashtable headers = buildHeaders((String)params.get("sessionid"), path, ba.length, "application/json", null, null, -1);
+		return new HTTPResponse("200 OK", headers, new ByteArrayInputStream(ba), -1, -1);
 	}
 
-	private String buildCookie(Hashtable params) 
+	private static String buildCookie(String sid)
 	{
-		String sid = (String)params.get("sessionid");
+		if (sid == null)
+			throw new RuntimeException("NO SESSIONID");
+
 		long l = System.currentTimeMillis()+YEARINMILLIS;
 		Date d = new Date(l);
 		String c = "sessionid="+sid+"; Path=/; Expires="+toHTTPDate(d);
@@ -510,8 +516,7 @@ public class HTTPService extends Service
 
 	private int[] extractRange(int len, Hashtable h) 
 	{
-		int[] out = {-1,-1};
-//		System.out.println("HEADERS: "+h);
+		int[] out = {-1,-1,len};
 		if (h != null) {
 			String r = (String)h.get("RANGE");
 			if (r != null)

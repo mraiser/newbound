@@ -1,18 +1,6 @@
 package com.newbound.robot;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.PrintStream;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
@@ -27,6 +15,7 @@ import java.security.Provider;
 import java.security.Security;
 import java.util.*;
 
+import com.newbound.net.service.http.HTTPService;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -44,10 +33,7 @@ import com.newbound.p2p.P2PPeer;
 import com.newbound.thread.PeriodicTask;
 import com.newbound.util.NoDotFilter;
 
-//import de.tud.kom.nat.comm.msg.IPeerID;
-//import de.tud.kom.nat.comm.msg.Peer;
-
-public class PeerBot extends MetaBot 
+public class PeerBot extends MetaBot
 {
 	private static final int NUMPEERBOTTHREADS = 103;
 	
@@ -57,13 +43,10 @@ public class PeerBot extends MetaBot
 	public PeerBot()
 	{
 		super();
-//		LIBRARIES = new String[] { "coreapps" };
 	}
 	
 	public Object handleCommand(String cmd, Hashtable params) throws Exception 
 	{
-//		if (cmd.equals("relay")) return handleRelay(params);
-//		if (cmd.equals("packet")) return handlePacket(params);
 		if (cmd.equals("register")) return handleRegister(params);
 		if (cmd.equals("noop")) return handleNOOP(params);
 		if (cmd.equals("lookup")) return handleLookUp(params);
@@ -84,10 +67,8 @@ public class PeerBot extends MetaBot
 		if (cmd.equals("addaccesscode")) return handleAddAccessCode(params);
 		if (cmd.equals("accesscode")) return handleAccessCode(params);
 		if (cmd.equals("deleteaccesscode")) return handleDeleteAccessCode(params);
-//		if (cmd.equals("newconnection")) return handleNewConnection(cmd, params);
 		if (cmd.equals("togglekeepalive")) return handleToggleKeepAlive(cmd, params);
 		if (cmd.equals("deletepeer")) return handleDeletePeer(cmd, params);
-//		if (cmd.equals("sendpacket")) return handleSendPacket(cmd, params);
 		if (cmd.equals("tempfile")) return handleTempfile(cmd, params);
 		if (cmd.equals("shutdown")) return handleShutdown(params); // FIXME - REMOVE 
 		if (cmd.equals("allowanon")) return handleAllowAnon(params);
@@ -107,202 +88,172 @@ public class PeerBot extends MetaBot
 		JSONObject commands = new JSONObject();
 		JSONObject cmd;
 
-		try {
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("desc", "Send information on how to locate yourself to another peer.");
-			cmd.put("parameters", new JSONArray("[\"uuid\",\"local\",\"addresses\",\"port\",\"name\"]"));
-			commands.put("register", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("desc", "Do nothing.");
-			commands.put("noop", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("desc", "Returns the connection information for a specific device.");
-			cmd.put("parameters", new JSONArray("[\"uuid\"]"));
-			commands.put("lookup", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("desc", "Deprecated. Do not use. Use botmanager/discover instead.");
-			commands.put("listzeroconf", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("desc", "Returns the universal ID of this device.");
-			commands.put("getpeerid", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("desc", "Returns the connection information about this device.");
-			commands.put("getpeerinfo", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("desc", "Returns the name of this device.");
-			commands.put("getmachineid", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("desc", "Returns the connection status of the remote device.");
-			cmd.put("parameters", new JSONArray("[\"uuid\"]"));
-			commands.put("connectionstatus", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("desc", "Connect to a remote device. Optionally, you may pass a suggested IP Address and port number. You can also specify an access code and/or the groups you want to assign the device to. All parameters other than uuid are optional.");
-			cmd.put("parameters", new JSONArray("[\"uuid\",\"addr\",\"port\",\"code\",\"groups\"]"));
-			commands.put("connect", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("desc", "Disconnect from a remote device.");
-			cmd.put("parameters", new JSONArray("[\"uuid\"]"));
-			commands.put("disconnect", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("groups", "trusted");
-			cmd.put("desc", "Send a command or http request to a remote device.<br><b>Usage:</b> http://localhost:5773/peerbot/remote/remote-universal-id/botname/cmd?param1=val1&param2=val2");
-			commands.put("remote", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("desc", "Execute a command or http request on the local device. Used internally by the remote command.");
-			commands.put("local", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("desc", "Accepts a bidirectional data stream request with the remote device if connect=true, otherwise disconnects the specified stream.");
-			cmd.put("parameters", new JSONArray("[\"peer\",\"stream\",\"connect\"]"));
-			commands.put("stream", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("desc", "Open a websocket connection on the remote device and attach it to the given stream.");
-			cmd.put("parameters", new JSONArray("[\"peer\",\"bot\",\"stream\"]"));
-			commands.put("websocket", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("groups", "trusted");
-			cmd.put("desc", "List all of the devices the local device knows how to connect to.");
-			commands.put("connections", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("parameters", new JSONArray("[\"uuid\",\"code\"]"));
-			cmd.put("desc", "Grant the permissions defined by the given access code to the given peer.");
-			commands.put("accesscode", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("desc", "List all access codes for connecting to this device.");
-			commands.put("accesscodes", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("parameters", new JSONArray("[\"code\",\"groups\",\"delete\"]"));
-			cmd.put("desc", "Define a new access code. Access code will be single-use if delete=true.");
-			commands.put("addaccesscode", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("parameters", new JSONArray("[\"code\"]"));
-			cmd.put("desc", "Delete an existing access code.");
-			commands.put("deleteaccesscode", cmd);
-
-//			cmd = new JSONObject();
-//			cmd.put("desc", "Connect to a remote device. Optionally, you may pass a suggested IP Address and port number. You can also specify an access code and/or the groups you want to assign the device to. All parameters other than uuid are optional.");
-//			cmd.put("parameters", new JSONArray("[\"uuid\",\"addr\",\"port\",\"code\",\"groups\"]"));
-//			commands.put("newconnection", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("desc", "Specify whether or not this device should attempt to remain connected to the given peer.");
-			cmd.put("parameters", new JSONArray("[\"uuid\",\"keepalive\"]"));
-			commands.put("togglekeepalive", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("desc", "Delete an existing peer connection.");
-			cmd.put("parameters", new JSONArray("[\"uuid\"]"));
-			commands.put("deletepeer", cmd);
-/*
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("desc", "Send a UDP packet to the peer at the given IP Address and port number.");
-			cmd.put("parameters", new JSONArray("[\"uuid\",\"addr\",\"port\"]"));
-			commands.put("sendpacket", cmd);
-*/
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("desc", "Send the temporary file with the given ID to the requesting peer via a new stream. Returns the new stream ID.");
-			cmd.put("parameters", new JSONArray("[\"id\",\"sessionid\"]"));
-			commands.put("tempfile", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("desc", "Allow or disallow anonymous incoming peer connection requests.");
-			cmd.put("parameters", new JSONArray("[\"allow\"]"));
-			commands.put("allowanon", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("desc", "Add the requesting peer to the websocket subscriptions for the given bot and channel.");
-			cmd.put("parameters", new JSONArray("[\"bot\",\"channel\",\"sessionid\"]"));
-			commands.put("subscribe", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("desc", "Returns an error if the given peer is not responding.");
-			cmd.put("parameters", new JSONArray("[\"uuid\"]"));
-			commands.put("available", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("groups", "anonymous");
-			cmd.put("desc", "Returns the public key for the given peer.");
-			cmd.put("parameters", new JSONArray("[\"uuid\"]"));
-			commands.put("pubkey", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("desc", "Set the public key for the given peer.");
-			cmd.put("parameters", new JSONArray("[\"uuid\",\"pub\"]"));
-			commands.put("setpubkey", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("desc", "Set the read key for the given peer.");
-			cmd.put("parameters", new JSONArray("[\"uuid\",\"key\"]"));
-			commands.put("setreadkey", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("desc", "Get/set the list of connection brokers");
-			cmd.put("parameters", new JSONArray("[\"brokers\"]"));
-			commands.put("brokers", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("desc", "Get the list of local IP addresses");
-			commands.put("localaddresses", cmd);
-
-			cmd = new JSONObject();
-			cmd.put("desc", "Set the list of supported protocols");
-			cmd.put("parameters", new JSONArray("[\"uuid\"]"));
-			cmd.put("parameters", new JSONArray("[\"protocols\"]"));
-			commands.put("protocols", cmd);
-		}
-		catch (Exception x) { x.printStackTrace(); }
-/*
 		cmd = new JSONObject();
 		cmd.put("groups", "anonymous");
-		commands.put("relay", cmd);
+		cmd.put("desc", "Send information on how to locate yourself to another peer.");
+		cmd.put("parameters", new JSONArray("[\"uuid\",\"local\",\"addresses\",\"port\",\"name\"]"));
+		commands.put("register", cmd);
 
 		cmd = new JSONObject();
 		cmd.put("groups", "anonymous");
-		commands.put("packet", cmd);
-*/
+		cmd.put("desc", "Do nothing.");
+		commands.put("noop", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("groups", "anonymous");
+		cmd.put("desc", "Returns the connection information for a specific device.");
+		cmd.put("parameters", new JSONArray("[\"uuid\"]"));
+		commands.put("lookup", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("desc", "Deprecated. Do not use. Use botmanager/discover instead.");
+		commands.put("listzeroconf", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("groups", "anonymous");
+		cmd.put("desc", "Returns the universal ID of this device.");
+		commands.put("getpeerid", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("groups", "anonymous");
+		cmd.put("desc", "Returns the connection information about this device.");
+		commands.put("getpeerinfo", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("groups", "anonymous");
+		cmd.put("desc", "Returns the name of this device.");
+		commands.put("getmachineid", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("groups", "anonymous");
+		cmd.put("desc", "Returns the connection status of the remote device.");
+		cmd.put("parameters", new JSONArray("[\"uuid\"]"));
+		commands.put("connectionstatus", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("desc", "Connect to a remote device. Optionally, you may pass a suggested IP Address and port number. You can also specify an access code and/or the groups you want to assign the device to. All parameters other than uuid are optional.");
+		cmd.put("parameters", new JSONArray("[\"uuid\",\"addr\",\"port\",\"code\",\"groups\"]"));
+		commands.put("connect", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("desc", "Disconnect from a remote device.");
+		cmd.put("parameters", new JSONArray("[\"uuid\"]"));
+		commands.put("disconnect", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("groups", "trusted");
+		cmd.put("desc", "Send a command or http request to a remote device.<br><b>Usage:</b> http://localhost:5773/peerbot/remote/remote-universal-id/botname/cmd?param1=val1&param2=val2");
+		commands.put("remote", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("groups", "anonymous");
+		cmd.put("desc", "Execute a command or http request on the local device. Used internally by the remote command.");
+		commands.put("local", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("groups", "anonymous");
+		cmd.put("desc", "Accepts a bidirectional data stream request with the remote device if connect=true, otherwise disconnects the specified stream.");
+		cmd.put("parameters", new JSONArray("[\"peer\",\"stream\",\"connect\"]"));
+		commands.put("stream", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("groups", "anonymous");
+		cmd.put("desc", "Open a websocket connection on the remote device and attach it to the given stream.");
+		cmd.put("parameters", new JSONArray("[\"peer\",\"bot\",\"stream\"]"));
+		commands.put("websocket", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("groups", "trusted");
+		cmd.put("desc", "List all of the devices the local device knows how to connect to.");
+		commands.put("connections", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("groups", "anonymous");
+		cmd.put("parameters", new JSONArray("[\"uuid\",\"code\"]"));
+		cmd.put("desc", "Grant the permissions defined by the given access code to the given peer.");
+		commands.put("accesscode", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("desc", "List all access codes for connecting to this device.");
+		commands.put("accesscodes", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("parameters", new JSONArray("[\"code\",\"groups\",\"delete\"]"));
+		cmd.put("desc", "Define a new access code. Access code will be single-use if delete=true.");
+		commands.put("addaccesscode", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("parameters", new JSONArray("[\"code\"]"));
+		cmd.put("desc", "Delete an existing access code.");
+		commands.put("deleteaccesscode", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("desc", "Specify whether or not this device should attempt to remain connected to the given peer.");
+		cmd.put("parameters", new JSONArray("[\"uuid\",\"keepalive\"]"));
+		commands.put("togglekeepalive", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("desc", "Delete an existing peer connection.");
+		cmd.put("parameters", new JSONArray("[\"uuid\"]"));
+		commands.put("deletepeer", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("groups", "anonymous");
+		cmd.put("desc", "Send the temporary file with the given ID to the requesting peer via a new stream. Returns the new stream ID.");
+		cmd.put("parameters", new JSONArray("[\"id\",\"sessionid\"]"));
+		commands.put("tempfile", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("desc", "Allow or disallow anonymous incoming peer connection requests.");
+		cmd.put("parameters", new JSONArray("[\"allow\"]"));
+		commands.put("allowanon", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("groups", "anonymous");
+		cmd.put("desc", "Add the requesting peer to the websocket subscriptions for the given bot and channel.");
+		cmd.put("parameters", new JSONArray("[\"bot\",\"channel\",\"sessionid\"]"));
+		commands.put("subscribe", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("groups", "anonymous");
+		cmd.put("desc", "Returns an error if the given peer is not responding.");
+		cmd.put("parameters", new JSONArray("[\"uuid\"]"));
+		commands.put("available", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("groups", "anonymous");
+		cmd.put("desc", "Returns the public key for the given peer.");
+		cmd.put("parameters", new JSONArray("[\"uuid\"]"));
+		commands.put("pubkey", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("desc", "Set the public key for the given peer.");
+		cmd.put("parameters", new JSONArray("[\"uuid\",\"pub\"]"));
+		commands.put("setpubkey", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("desc", "Set the read key for the given peer.");
+		cmd.put("parameters", new JSONArray("[\"uuid\",\"key\"]"));
+		commands.put("setreadkey", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("desc", "Get/set the list of connection brokers");
+		cmd.put("parameters", new JSONArray("[\"brokers\"]"));
+		commands.put("brokers", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("desc", "Get the list of local IP addresses");
+		commands.put("localaddresses", cmd);
+
+		cmd = new JSONObject();
+		cmd.put("desc", "Set the list of supported protocols");
+		cmd.put("parameters", new JSONArray("[\"uuid\"]"));
+		cmd.put("parameters", new JSONArray("[\"protocols\"]"));
+		commands.put("protocols", cmd);
+
 		return commands;
 	}
 	
-/*	
-	public String[] getCommandNames()
-	{
-		String[] sa = { "register","noop","lookup","listzeroconf","getpeerid","getpeerinfo","getmachineid","connectionstatus","connect","disconnect","remote","local","stream","websocket","connections","newconnection","togglekeepalive","deletepeer","sendpacket" };
-		return sa;
-	}
-*/
-
 	private JSONObject handleProtocols(Hashtable params) throws Exception
 	{
 		String uuid = (String)params.get("uuid");
@@ -394,28 +345,7 @@ public class PeerBot extends MetaBot
 		params.put("uuid", params.get("sessionid"));
 		return sendCommand(uuid, "peerbot", "packet", params);
 	}
-/*	
-	private Object handlePacket(Hashtable params) throws Exception
-	{
-		String uuid = (String)params.get("uuid");
-		
-		byte[] ba = fromHexString((String)params.get("data"));
-		ByteArrayInputStream is = new ByteArrayInputStream(ba);
-		ByteArrayOutputStream os = new ByteArrayOutputStream();
-		decrypt(uuid, is, os, null);
-		os.flush();
-		os.close();
-		is.close();
-		ba = os.toByteArray();
-		is = new ByteArrayInputStream(ba);
-		P2PMsg msg = new P2PMsg(is);
-		msg.remotehost = (String)params.get("addr");
-		msg.remoteport = Integer.parseInt((String)params.get("port"));
-		mP2PManager.handleMsg(uuid, msg);
-		
-		return newResponse();
-	}
-*/	
+
 	private Object handleSubscribe(Hashtable params) throws Exception
 	{
 		String uuid = (String)params.get("sessionid");
@@ -443,27 +373,7 @@ public class PeerBot extends MetaBot
 		saveSettings();
 		return "OK";
 	}
-/*	
-	private Object handleSendPacket(String cmd, Hashtable params) throws Exception 
-	{
-		String uuid = (String)params.get("uuid");
-		String address = (String)params.get("addr");
-		String addresses = (String)params.get("addresses");
-		int port = Integer.parseInt((String)params.get("port"));
-		
-		try { mP2PManager.tickle(uuid, address, port); } catch (Exception x) { System.out.println("No tickle: "+x.getMessage()); }
-		
-		if (addresses != null && !addresses.equals(""))
-		{
-			String[] list = addresses.split(",");
-//			Vector<String> v2 = new Vector();
-			int i = list.length;
-			while (i-->0) try { mP2PManager.tickle(uuid, list[i], port); } catch (Exception x) { System.out.println("No tickle: "+x.getMessage()); }
-		}
-		
-		return "OK";
-	}
-*/
+
 	private Object handleDeletePeer(String cmd, Hashtable params) throws Exception
 	{
 		String id = (String)params.get("uuid");
@@ -585,7 +495,6 @@ public class PeerBot extends MetaBot
 			Vector<String> list = p.getOtherAddresses();
 			for (int i=0;i<list.size();i++)
 			{
-				//if (!addresses.equals(""))
 				addresses += ",";
 				addresses += list.elementAt(i);
 			}
@@ -635,49 +544,7 @@ public class PeerBot extends MetaBot
 	{
 		return "OK";
 	}
-/*
-	private Object handleNewConnection(String cmd, Hashtable params) throws Exception
-	{
-		String id = (String)params.get("uuid");
-		if (id.length() != 36) throw new Exception("Invalid Universal ID");
-		
-		String addr = (String)params.get("addr");
-		String code = (String)params.get("code");
-		if (code == null || code.trim().equals("")) code = null;
-		String groups = (String)params.get("groups");
-		if (groups == null || groups.trim().equals("")) groups = null;
-		String port = (String)params.get("port");
-		if (port == null || port.trim().equals("")) port = "-1";
-		
-		if (addr != null && addr.trim().equals("")) addr = null;
-		P2PPeer p = mP2PManager.getPeer(id);
-		p.addSocketAddress(new InetSocketAddress(addr, Integer.parseInt(port)));
-		
-		p.code = code;
-		if (groups != null) setGroups(id, groups);
-		
-		final String i = id;
-		final String a = addr;
-		final String n = port;
-		
-		setTimeout(new Runnable() 
-		{
-			public void run() 
-			{
-				try
-				{
-					P2PPeer p = connect(i, a, Integer.parseInt(n));
-				}
-				catch (Exception x) { x.printStackTrace(); }
-			}
-		}, "new connection", 100);
 
-		JSONObject o = newResponse();
-		o.put("data", new JSONObject(p.toString()));
-				
-		return o;
-	}
-*/
 	private Object handleSuggestAccessCode(Hashtable params) throws Exception
 	{
 		return uniqueSessionID();
@@ -1061,6 +928,7 @@ public class PeerBot extends MetaBot
 	private Object handleRemote(String cmd, Hashtable params) throws Exception 
 	{
 		final String c = cmd;
+		final String sessionid = (String)params.get("sessionid");
 
 		JSONObject o = new JSONObject(params);
 		cmd = cmd.substring(cmd.indexOf('/')+1);
@@ -1112,28 +980,27 @@ public class PeerBot extends MetaBot
 
 						String m = HTTP.getMIMEType(command);
 						if (m == null) m = "text/html";
-						String headers = o.getString("R-HEAD");
-						int i = headers.indexOf("Set-Cookie");
-						if (i != -1)
-							headers = headers.substring(0, i) + "Do-Not-" + headers.substring(i);
-
-						String look = "\r\nContent-Length: ";
-						int off = headers.indexOf(look);
-						int off2 = headers.indexOf('\r', off + 2);
-						if (off2 == -1) off2 = headers.length();
-						int len2 = off == -1 ? -1 : Integer.parseInt(headers.substring(off + look.length(), off2));
-
-						if (len != len2)
-							System.out.println("WHAT? " + len2 + " OF " + len + " bytes!!!");
-
+						Hashtable headers = HTTPService.buildHeaders(sessionid, c, len, null, null, null, -1);
+						BufferedReader br = new BufferedReader(new StringReader(o.getString("R-HEAD")));
+						String header;
+						while ((header = br.readLine()) != null)
+						{
+							int i = header.indexOf(":");
+							if (i != -1)
+							{
+								String key = header.substring(0, i);
+								String val = header.substring(i + 1).trim();
+								if (!(key.equals("Set-Cookie") && val.startsWith("sessionid=")))
+									headers.put(key, val);
+							}
+						}
+						br.close();
 
 						try {
-							String res = headers.indexOf("\r\nContent-Range: ") == -1 ? "200 OK" : "206 Partial Content";
-							byte[] ba = ("HTTP/1.1 " + res + headers + "\r\n\r\n").getBytes();
-							InputStream is2 = new ByteArrayInputStream(ba);
-							InputStream sis = new HTTPResponse(is, is2, len, -1, -1);
+							String res = headers.get("Content-Range") == null ? "200 OK" : "206 Partial Content";
+							HTTPResponse sis = new HTTPResponse(res, headers, is, -1, -1);
 
-							len += ba.length;
+							len += sis.HEADERLEN;
 
 							long n = sendData(sis, os, len, 4096);
 							if (n != len)
@@ -1237,8 +1104,7 @@ public class PeerBot extends MetaBot
 	{
 		P2PPeer peer = mP2PManager.connect(uuid, address, port);
 		if (peer == null) throw new Exception("Unable to connect to peer (timeout)");
-//		peer.sendCommand("peerbot", "noop", new Hashtable<String,String>());
-		
+
 		return peer;
 	}
 

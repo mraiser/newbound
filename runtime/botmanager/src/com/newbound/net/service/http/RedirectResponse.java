@@ -1,15 +1,17 @@
 package com.newbound.net.service.http;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.util.Hashtable;
 
 public class RedirectResponse extends HTTPResponse 
 {
 	static String response = "HTTP/1.1 302 Found\r\nLocation: ";
 	
-	public RedirectResponse(String url) 
+	public RedirectResponse(String url) throws IOException
 	{
-		super(buildBody(), buildHeader(url), 0);
+		super("302 Found", buildHeader(url), buildBody());
 	}
 
 	private static InputStream buildBody() 
@@ -18,10 +20,12 @@ public class RedirectResponse extends HTTPResponse
 		return new ByteArrayInputStream(s.getBytes());
 	}
 
-	private static InputStream buildHeader(String url) 
+	private static Hashtable buildHeader(String url)
 	{
-		String s = response+url+"\r\nContent-Length: 0\r\n\r\n";
-		return new ByteArrayInputStream(s.getBytes());
+		Hashtable h = new Hashtable();
+		h.put("Location",url);
+		h.put("Content-Length",0);
+		return h;
 	}
 
 }
