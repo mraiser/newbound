@@ -144,7 +144,7 @@ public class P2PService extends Service
 	@Override
 	protected void execute(Object cmd, Request data, Parser parser) throws Exception
 	{
-		if ((int)cmd != Codes.STREAM) CONTAINER.getDefault().addJob(new Runnable()
+		if ((int)cmd == Codes.COMMAND || (int)cmd == Codes.RESPONSE) CONTAINER.getDefault().addJob(new Runnable()
 		{
 			@Override
 			public void run()
