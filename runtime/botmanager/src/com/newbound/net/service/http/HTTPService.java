@@ -36,10 +36,16 @@ import com.newbound.net.service.Request;
 public class HTTPService extends Service 
 {
 	private static final long YEARINMILLIS = 365l*24l*60l*60l*1000l;
+	private static CORS CORS = null;
 
 	public HTTPService(Container c, int port) throws IOException 
 	{
 		super(new TCPServerSocket(port), "HTTP", HTTPParser.class, c);
+		try
+		{
+			CORS = new CORS(c.getDefault().getRootDir());
+		}
+		catch (Exception x) { x.printStackTrace(); }
 	}
 
 	private static Hashtable<Thread, Hashtable> REQTHREADS = new Hashtable();
@@ -204,7 +210,8 @@ public class HTTPService extends Service
 		if (path.equals("")) path = CONTAINER.getDefault().getIndexFileName();
 
 		String sessionid = (String)params.get("sessionid");
-		
+		String origin = (String)headers.get("ORIGIN");
+
 		Object[] result = { "ok", "" };
 		try 
 		{
@@ -262,7 +269,7 @@ public class HTTPService extends Service
 				headers.put("nn-request-type", "file");
 				int x = f.getName().lastIndexOf('.');
 				headers.put("nn-extension", x == -1 ? "" : f.getName().substring(x+1));
-				result[1] = handleFile(f, path, params, headers);
+				result[1] = handleFile(f, path, params, headers, origin);
 			}
 			else
 			{
@@ -277,7 +284,7 @@ public class HTTPService extends Service
 					headers.put("nn-request-type", "src");
 					int x = u.getPath().lastIndexOf('.');
 					headers.put("nn-extension", x == -1 ? "" : u.getPath().substring(x+1));
-					result[1] = handleURL(u, path, params, headers);
+					result[1] = handleURL(u, path, params, headers, origin);
 				}
 				else 
 				{
@@ -309,8 +316,8 @@ public class HTTPService extends Service
 
 		if (result[0].equals("file")) return (HTTPResponse)result[1];
 		if (result[1] instanceof HTTPResponse) return (HTTPResponse)result[1];
-		if (result[1] instanceof InputStream) return handleContent((InputStream)result[1], params, -1, path, headers);
-		if (result[1] instanceof URL) return handleContent(sessionid, headers,(URL)result[1], path);
+		if (result[1] instanceof InputStream) return handleContent((InputStream)result[1], params, -1, path, headers, origin);
+		if (result[1] instanceof URL) return handleContent(sessionid, headers,(URL)result[1], path, origin);
 		
 		if (result[1] == null) return null;
 		
@@ -318,7 +325,7 @@ public class HTTPService extends Service
 		{
 			byte[] ba = (byte[])result[1];
 			InputStream is = new ByteArrayInputStream(ba);
-			return handleContent(is, params, ba.length, path, headers);
+			return handleContent(is, params, ba.length, path, headers, origin);
 		}
 		if (result[1] instanceof File)
 		{
@@ -330,53 +337,52 @@ public class HTTPService extends Service
 				return new ExceptionResponse(404, "Not Found", f);
 			}
 			FileInputStream is = new FileInputStream(f);
-			return handleContent(is, params, (int)f.length(), path, headers);
+			return handleContent(is, params, (int)f.length(), path, headers, origin);
 		}
 		if (result[1] instanceof Object[])
 		{
 			Object[] oa = (Object[])result[1];
 			if (oa.length == 4) 
-				return handleContent(sessionid, path, (InputStream)oa[0], (Integer)oa[1], (String)oa[2], oa[3]);
+				return handleContent(sessionid, path, (InputStream)oa[0], (Integer)oa[1], (String)oa[2], oa[3], origin);
 			else 
-				return handleContent((InputStream)oa[0], params, (Integer)oa[1], path, headers);
+				return handleContent((InputStream)oa[0], params, (Integer)oa[1], path, headers, origin);
 		}
 
-		return buildJSONResponse(path, result, params);
+		return buildJSONResponse(path, result, params, origin);
 	}
 
-	private InputStream handleFile(File f, String path, Hashtable params, Hashtable headers) throws Exception
+	private InputStream handleFile(File f, String path, Hashtable params, Hashtable headers, String origin) throws Exception
 	{
 		InputStream is = new BufferedInputStream(new FileInputStream(f));
-		return handleContent(is, params, (int)f.length(), path, headers, System.currentTimeMillis()+3600000l);
+		return handleContent(is, params, (int)f.length(), path, headers, System.currentTimeMillis()+3600000l, origin);
 	}
 
-	private InputStream handleURL(URL u, String path, Hashtable params, Hashtable headers) throws Exception
+	private InputStream handleURL(URL u, String path, Hashtable params, Hashtable headers, String origin) throws Exception
 	{
 		URLConnection uc = u.openConnection(); 
 		int len = uc.getContentLength();
-		return handleContent(uc.getInputStream(), params, len, path, headers, System.currentTimeMillis()+3600000l);
+		return handleContent(uc.getInputStream(), params, len, path, headers, System.currentTimeMillis()+3600000l, origin);
 	}
 
-	private HTTPResponse handleContent(InputStream is, Hashtable paramsx, int len, String name, Hashtable h) throws Exception 
+	private HTTPResponse handleContent(InputStream is, Hashtable paramsx, int len, String name, Hashtable h, String origin) throws Exception
 	{
-		return handleContent(is, paramsx, len, name, h, -1);
+		return handleContent(is, paramsx, len, name, h, -1, origin);
 	}
 	
-	private HTTPResponse handleContent(InputStream is, Hashtable params, int len, String path, Hashtable h, long expires) throws Exception
+	private HTTPResponse handleContent(InputStream is, Hashtable params, int len, String path, Hashtable h, long expires, String origin) throws Exception
 	{
 		int olen = len;
 		int[] range = extractRange(len, h);
 		if (range[1] != -1) len = range[1] - range[0] + 1;
 		String mimeType = getMIMEType(path);
 		String res = range[0] == -1 ? "200 OK" : "206 Partial Content";
-
-		Hashtable outheaders = buildHeaders((String)params.get("sessionid"), path, len, mimeType, range, "bytes", expires);
+		Hashtable outheaders = buildHeaders((String)params.get("sessionid"), path, len, mimeType, range, "bytes", expires, origin);
 		HTTPResponse sis = new HTTPResponse(res, outheaders, is, range[0], range[1]);
 
 		return sis;
 	}
 
-	public static Hashtable buildHeaders(String sessionid, String name, int len, String mimeType, int[] range, String acceptRanges, long expires) {
+	public static Hashtable buildHeaders(String sessionid, String name, int len, String mimeType, int[] range, String acceptRanges, long expires, String origin) throws Exception {
 		Hashtable h = new Hashtable();
 		h.put("Date", toHTTPDate(new Date()));
 		if (len != -1) h.put("Content-Length", len);
@@ -386,24 +392,28 @@ public class HTTPService extends Service
 		if (expires != -1) h.put("Expires", toHTTPDate(new Date(expires)));
 		if (sessionid != null) h.put("Set-Cookie", buildCookie(sessionid));
 
-		String cors = getCORS(name);
-		if (cors != null)
+		if (origin != null)
 		{
-			h.put("Access-Control-Allow-Origin", cors);
-			if (!cors.equals("*")) h.put("Vary", "Origin");
+			String cors = getCORS(name, origin);
+			if (cors != null)
+			{
+				h.put("Access-Control-Allow-Origin", cors);
+				if (!cors.equals("*")) h.put("Vary", "Origin");
+			}
 		}
-
 		return h;
 	}
 
-	private static String getCORS(String name)
-	{
-		return null; // FIXME
+	private static String getCORS(String name, String origin) throws Exception {
+		if (CORS != null)
+			return CORS.lookup(name, origin);
+
+		return null;
 	}
 
-	private HTTPResponse handleContent(String sessionid, String path, InputStream is, int len, String mimeType, Object o) throws Exception
+	private HTTPResponse handleContent(String sessionid, String path, InputStream is, int len, String mimeType, Object o, String origin) throws Exception
 	{
-		Hashtable headers = buildHeaders(sessionid, path, len, mimeType, null, null, -1);
+		Hashtable headers = buildHeaders(sessionid, path, len, mimeType, null, null, -1, origin);
 		if (o instanceof String) 
 		{
 			BufferedReader br = new BufferedReader(new StringReader((String)o));
@@ -438,14 +448,14 @@ public class HTTPService extends Service
 		return sis;
 	}
 
-	private HTTPResponse handleContent(String sessionid, Hashtable h, URL url, String name) throws Exception
+	private HTTPResponse handleContent(String sessionid, Hashtable h, URL url, String name, String origin) throws Exception
 	{
 		URLConnection con = url.openConnection();
 		int len = con.getContentLength();
 		int olen = len;
 		int[] range = extractRange(len, h);
 		if (range[1] != -1) len = range[1] - range[0] + 1;
-		Hashtable headers = buildHeaders(sessionid, name, len, getMIMEType(name), range, "bytes", -1);
+		Hashtable headers = buildHeaders(sessionid, name, len, getMIMEType(name), range, "bytes", -1, origin);
 		int i = con.getHeaderFields().size();
 		while (i-->0)
 		{
@@ -476,7 +486,7 @@ public class HTTPService extends Service
 		return s;
 	}
 
-	private HTTPResponse buildJSONResponse(String path, Object[] result, Hashtable params) throws IOException
+	private HTTPResponse buildJSONResponse(String path, Object[] result, Hashtable params, String origin) throws Exception
 	{
 		String s1 = (String)params.get("callback");
 		boolean JSONP = s1 != null;
@@ -499,7 +509,7 @@ public class HTTPService extends Service
 		if (JSONP) s1 += ")";
 
 		byte[] ba = s1.getBytes();
-		Hashtable headers = buildHeaders((String)params.get("sessionid"), path, ba.length, "application/json", null, null, -1);
+		Hashtable headers = buildHeaders((String)params.get("sessionid"), path, ba.length, "application/json", null, null, -1, origin);
 		return new HTTPResponse("200 OK", headers, new ByteArrayInputStream(ba), -1, -1);
 	}
 
@@ -640,6 +650,12 @@ public class HTTPService extends Service
 
 				@Override
 				public String getProperty(String string) {
+					// TODO Auto-generated method stub
+					return null;
+				}
+
+				@Override
+				public File getRootDir() {
 					// TODO Auto-generated method stub
 					return null;
 				}

@@ -980,7 +980,7 @@ public class PeerBot extends MetaBot
 
 						String m = HTTP.getMIMEType(command);
 						if (m == null) m = "text/html";
-						Hashtable headers = HTTPService.buildHeaders(sessionid, c, len, null, null, null, -1);
+						Hashtable headers = HTTPService.buildHeaders(sessionid, c, len, null, null, null, -1, null);
 						BufferedReader br = new BufferedReader(new StringReader(o.getString("R-HEAD")));
 						String header;
 						while ((header = br.readLine()) != null)

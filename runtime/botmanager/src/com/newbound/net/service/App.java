@@ -23,4 +23,5 @@ public interface App
 	public void webSocketConnect(WebSocket webSocket, String cmd) throws Exception;
 	public boolean running();
 	public String getProperty(String string);
+	public File getRootDir();
 }

@@ -149,6 +149,12 @@ public class SimpleHTTPServer implements Container
 			// TODO Auto-generated method stub
 			return null;
 		}
+
+		@Override
+		public File getRootDir() {
+			// TODO Auto-generated method stub
+			return null;
+		}
 	};
 	
 	@Override
