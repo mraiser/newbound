@@ -17,17 +17,17 @@ public class CORS
     public CORS(File root) throws Exception
     {
         JSON = new File(root, "cors.json");
-        LASTMODIFIED = JSON.lastModified();
         load();
     }
 
     private void load() throws Exception
     {
+        PATHS = new Vector();
+        MAP = new Hashtable();
+
         byte[] ba = BotUtil.readFile(JSON);
         JSONObject jo = new JSONObject(new String(ba));
         Iterator<String> i = jo.keys();
-        PATHS = new Vector();
-        MAP = new Hashtable();
         while (i.hasNext())
         {
             String key = i.next();
@@ -45,6 +45,8 @@ public class CORS
                 return s.length() - t1.length();
             }
         });
+
+        LASTMODIFIED = JSON.lastModified();
     }
 
     public String lookup(String path, String origin) throws Exception
