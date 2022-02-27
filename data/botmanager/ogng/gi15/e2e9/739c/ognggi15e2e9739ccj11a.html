@@ -1,24 +1,18 @@
 <div id='settingserror'>
 </div>
 <div id='hidesettings'>
-	<div data-role="fieldcontain">
-		<label for='devicename'>Device Name:</label> <input type='text' id='devicename' value=''> 
-	</div>
-	<div data-role="fieldcontain">
-		<label for='devicename'>Port Number:</label> <input type='text' id='portnum' value=''> 
-	</div>
-	<div data-role="fieldcontain">
-		<label for='defaultbot'>Default App:</label> <select name='defaultbot' id='defaultbot' data-role="select"> 
-			<option>
-				ABC
-			</option>
-		</select> 
-	</div>
-	<br>
-	<br>
-	<div id='settingsmsg'>
-	</div>
-	<input type='button' value='save' id='savesettingsbutton' data-theme='a'> 
-	<hr>
-  <div class='data-control' data-control='metabot:restartbutton'></div>
+  <div class='textinputlabel'>Device Name</div>
+  <input type='text' class='textinput' placeholder='Name of this device' id='devicename'>
+  <br><br>
+  <div class='textinputlabel'>Port Number</div>
+  <input type='number' class='textinput' placeholder='Port for HTTP' id='portnum'>
+  <br><br>
+  <div class='textinputlabel'>Default App</div>
+  <select name='defaultbot' class='textinput' id='defaultbot'></select> 
+  <br><br>
+  <div id='settingsmsg'></div>
+  <br><br>
+  <button class='coloredbutton' id='savesettingsbutton'>Save</button>
+  &nbsp;&nbsp;
+  <div class='data-control' data-control='metabot:restartbutton' style='display:inline-block;'></div>
 </div>

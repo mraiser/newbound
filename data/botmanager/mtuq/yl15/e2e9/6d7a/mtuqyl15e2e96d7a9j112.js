@@ -16,21 +16,25 @@ function populateBotList(dbval) {
 			var rdi = result.data[item];
 			allapps[rdi.id] = rdi;
 			defaultbot += "<option value='"+rdi.botname+"'>"+rdi.botname+"</option>";
-			var a = "<a href='../"+rdi.botname+"/"+rdi.index+"' rel='external'>";
-//			var e = rdi.registered ? '' : '<br>'+(rdi.expires >= 0 ? 'Expires: '+(rdi.expires+1)+' days' : "Expired");
-//			if (e == "<br>Expired") a = "<a href='expired.html?bot="+rdi.botname+"' rel='external'>";
-			var u = "<div id='update_"+rdi.id+"' style='position:absolute;right:-10px;text-align:right;'></div>";
+//			var a = "<a href='../"+rdi.botname+"/"+rdi.index+"' rel='external'>";
+//			var u = "<div id='update_"+rdi.id+"' style='position:absolute;right:-10px;text-align:right;'></div>";
 			
-          newhtml += "<div style='display:inline-block;'><div style='width: 300px; height: 300px; padding: 5px;'>"
-				+ "<div style='width: 290px; height: 290px;'><div class='ui-body ui-body-c ui-corner-all' style='height:270px;position:relative;background-color:whitesmoke;'>"
-				+ "<span style='position:absolute;right:10px;margin:10px;'>"+a+rdi.name+"</a>"+u+"</span>"+a+"<img src='.."+rdi.img+"' width='140'></a><div style='padding:10px;font-size:small;'>"+rdi.desc+"</div></div></div></div></div>";
+          newhtml += "<div class='card appcard'>"
+            + "<img src='.."+rdi.img+"'>"
+			+ "<div class='overlay'>"
+            + rdi.name
+            + "</div>"
+            + "<div class='bottomhugger'>"
+            + "<div class='description'>"+rdi.desc+"</div>"
+            + "</div>"
+            + "</div>";
 		}
 		$('#botlistinner').css('opacity', '0');
 		$('#botlistinner').html(newhtml);
         $('#botlistinner').animate({"opacity":"1"},500);
 		$('#defaultbot').html(defaultbot);
 		$('#defaultbot').val(dbval);
-		$('#defaultbot').selectmenu('refresh', true);
+		//$('#defaultbot').selectmenu('refresh', true);
       
       $(window).resize();
 	});

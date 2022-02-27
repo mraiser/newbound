@@ -7,10 +7,10 @@ me.ready = function(){
   var selid = 'x'+guid();
   var val = ME.DATA.value ? ME.DATA.value : '';
   var sellable = ME.DATA.label ? ME.DATA.label : 'Options';
-  var selhtml = '<div class="mdl-selectfield mdl-js-selectfield mdl-selectfield--floating-label"><select id="'+selid+'" class="mdl-selectfield__select">';
+  var selhtml = '<div class="mdl-selectfield mdl-js-selectfield mdl-selectfield--floating-label"><label class="mdl-selectfield__label textinputlabel" for="'+selid+'">'+sellable+'</label><select id="'+selid+'" class="mdl-selectfield__select textinput">';
   var connectedonly = ME.DATA.connected;
   
-  var data = ME.DATA.list ? ME.DATA.list : [{name:'opt1', id:'OOO1'},{name:'opt2', id:'OOO2'}];
+  var data = ME.DATA.list ? ME.DATA.list.slice() : [{name:'opt1', id:'OOO1'},{name:'opt2', id:'OOO2'}];
 
   if (ME.DATA.allownone && !ME.DATA.value) data.unshift({name:' ', id:'', connected:true});
   else if (ME.DATA.addlocal) data.unshift({name:'(local)', id:'local', connected:true});
@@ -24,9 +24,9 @@ me.ready = function(){
         selhtml += '<option value="'+id+'"'+(id == val ? ' selected' : '')+'>'+name+'</option>';
       }
     }
-    selhtml += '</select><label class="mdl-selectfield__label" for="'+selid+'">'+sellable+'</label><span class="mdl-selectfield__error">Select a value</span></div>';
+    selhtml += '</select></div>';
     $(ME).find('.injectselect').html(selhtml);
-    componentHandler.upgradeAllRegistered();
+    if (typeof componentHandler != 'undefined') componentHandler.upgradeAllRegistered();
 
     $(ME).find('select').on('change', function(x){
       var val = $(x.target).val();

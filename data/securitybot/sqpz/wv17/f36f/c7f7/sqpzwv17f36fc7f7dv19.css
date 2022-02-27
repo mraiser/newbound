@@ -1,0 +1,51 @@
+.appcard{
+  max-width:600px;
+  height:100%;
+  margin-left:auto;
+  margin-right:auto;
+  position:relative;
+}
+
+.appcard-header{
+  background-color:#7c7f86;
+  color:white;
+  position:sticky;
+  top:0px;
+  padding:20px;
+  font-size:large;
+}
+
+.appcard-closebutton{
+  margin-top:-4px;
+}
+
+.appcard-newgroupname{
+  width:120px;
+}
+
+.addgroupbutton{
+  margin-top:-20px;
+  opacity:0.5;
+}
+
+.appcard-save{
+  margin-right:5px;
+}
+
+.appcard-cancel{
+  margin:0px;
+}
+
+.appcard-delete{
+  float: right;
+}
+
+.appcard-grouplist{
+  background-color:#0001;
+  height:220px;
+  overflow-y:auto;
+}
+
+.apptab1, .apptab2{
+  margin-bottom:20px;
+}

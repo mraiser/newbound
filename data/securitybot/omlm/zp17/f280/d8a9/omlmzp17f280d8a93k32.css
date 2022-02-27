@@ -1,0 +1,51 @@
+.hideme{
+  display:none;
+}
+
+.usercard{
+  max-width:600px;
+  height:100%;
+  margin-left:auto;
+  margin-right:auto;
+  position:relative;
+}
+
+.usercard-header{
+  background-color:#7c7f86;
+  color:white;
+  position:sticky;
+  top:0px;
+  padding:20px;
+  font-size:large;
+}
+
+.usercard-closebutton{
+  margin-top:-4px;
+}
+
+.usercard-newgroupname{
+  width:120px;
+}
+
+.addgroupbutton{
+  margin-top:-20px;
+  opacity:0.5;
+}
+
+.usercard-save{
+  margin-right:5px;
+}
+
+.usercard-cancel{
+  margin:0px;
+}
+
+.usercard-delete{
+  float: right;
+}
+
+.usercard-grouplist{
+  background-color:#0001;
+  height:220px;
+  overflow-y:auto;
+}

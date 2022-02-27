@@ -3,6 +3,9 @@ var ME = $('#'+me.UUID)[0];
 
 me.ready = function(){
   componentHandler.upgradeAllRegistered();
+  json('../metabot/apps', null, function(result){
+    me.setApps(result.data);
+  });
 };
 
 function send_build(data, cb){

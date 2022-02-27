@@ -2,7 +2,7 @@ var me = this;
 var ME = $('#'+me.UUID)[0];
 
 me.ready = function(){
-  componentHandler.upgradeAllRegistered();
+  if (typeof componentHandler != 'undefined') componentHandler.upgradeAllRegistered();
 
   var x1, y1;
   if (window.lastElementClicked) {
@@ -17,7 +17,7 @@ me.ready = function(){
     y1 = 0;
   }
   
-  var y2 = Math.max(112, (($(window).height()-112)/2)-$(ME).height()/2);
+  var y2 = Math.max(112, ((window.innerHeight-112)/2)-$(ME).height()/2);
   
   $(ME).find('.dialog-card-wide').width($(ME).width()).height($(ME).height());
   $(ME).css('display', 'block');

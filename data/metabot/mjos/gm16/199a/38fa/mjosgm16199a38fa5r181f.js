@@ -6,7 +6,8 @@ me.ready = function(){
     document.body.securityapps = result.data;
 
     json('../metabot/apps', null, function(result){
-      $('#publish-tab')[0].api.setApps(result.data);
+      var el = $('#publish-tab')[0];
+      if (el) el.api.setApps(result.data);
       me.data = result.data;
       sortApps();
       var listel = $(ME).find('.applist');
@@ -134,7 +135,7 @@ function updateFilters(){
   }
 }
 
-$(ME).find('.mdl-switch').click(updateFilters);
+$(ME).find('.switch-input').change(updateFilters);
 
 json('../botmanager/read', 'db=runtime&id=metabot_applist_filters', function(result){
   if (result.data){

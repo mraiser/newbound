@@ -11,3 +11,44 @@
   text-align:center;
   margin-top:30vh;
 }
+
+.appcard{
+  display:inline-block;
+  width: 280px; 
+  height: 280px;
+  position:relative;
+  margin:10px;
+  cursor:pointer;
+}
+
+.appcard img{
+  position:absolute;
+  top:0px;
+  right:0px;
+  width:256px;
+  height:256px;
+}
+
+.bottomhugger{
+  position:absolute;
+  bottom:0px;
+  left:0px;
+  right:0px;
+}
+
+.description{
+  font-size:small;
+  background-color:#000a;
+  color:white;
+  border-top:thin solid #0002;
+  padding:20px;
+}
+
+.overlay{
+  font-size:large;
+  padding:20px;
+  position:absolute;
+  top:0px;
+  left:0px;
+  right:0px;
+}

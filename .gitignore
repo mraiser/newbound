@@ -226,3 +226,5 @@ dmypy.json
 /runtime/cinema/
 /data/cinema/
 /runtime/botmanager/cors.json
+/runtime/macguffin/
+/data/macguffin/

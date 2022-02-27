@@ -1,0 +1,59 @@
+<div class='data-control' data-control='botmanager:ui:{}'></div>
+<div class='background'></div>
+<div class='wrap' style='display:none;'>
+  <div class='titlebar'>
+    <a href='../botmanager/index.html'><img src='../botmanager/asset/botmanager/menu_icon.png' class='menuicon'></a>
+    Manage Security
+    <div class='upper-right'></div>
+  </div>
+  <div class='navbar'>
+    <div class='navbar-tab navbar-tab1 selected' data-id='tab1'>Settings</div>
+    <div class='navbar-tab navbar-tab2' data-id='tab2'>Users</div>
+    <div class='navbar-tab navbar-tab3' data-id='tab3'>Devices</div>
+    <div class='navbar-tab navbar-tab4' data-id='tab4'>Apps</div>
+  </div>
+  <div class='main'>
+    <div class='tab-content tab1 selected'>
+      <h4>Security</h4>
+      <form action="#">
+        <div class="switch">
+          <input id="appfilter-switch-1" type="checkbox" class="switch-input requirepasswordswitch" />
+          <label for="appfilter-switch-1" class="switch-label">Switch</label>
+        </div>
+        Off / On
+      </form>
+      <form action="#" class='syncapps'>
+        <div class="switch">
+          <input id="appfilter-switch-2" type="checkbox" class="switch-input syncappsswitch" />
+          <label for="appfilter-switch-2" class="switch-label">Switch</label>
+        </div>
+        Sync app security with defaults (recommended)
+      </form>
+    </div>
+    <div class='tab-content tab2'>
+      <div class='usercontrols'>
+        <div class='userfilter'></div>
+        <div class='newuser'>
+          <div class='textinputlabel newusernamelabel'>Add User</div>
+          <input type='text' class='textinput newusername' placeholder='New User Name'>
+        </div>
+        <img src='../botmanager/asset/botmanager/add_icon.png' class='roundbutton adduserbutton'>
+      </div>
+      <h4>Users</h4>
+      <div class='userlist'></div>
+    </div>
+    <div class='tab-content tab3'>
+      <div class='devicecontrols'>
+        <div class='devicefilter'></div>
+      </div>
+      <h4>Devices</h4>
+      <div class='devicelist'></div>
+    </div>
+    <div class='tab-content tab4'>
+      <h4>Apps</h4>
+      <div class='applist'></div>
+    </div>
+    <div class='edituserpopup'></div>
+    <div class='editapppopup'></div>
+  </div>
+</div>

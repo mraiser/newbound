@@ -1,9 +1,28 @@
-<div class='homepagetitle data-control' data-control='botmanager:titlebar:{"title":"App Manager"}'></div> 
-<div class='homepagecontent data-control' data-control='botmanager:navbar:{
-  "tabs": [ "Bots", "Settings" ],
-  "ctls": [ "botlist", "settings" ]
-}'></div> 
-<div class='pad20'>
-  <div id='botlist' class='data-control hidden' data-control='botmanager:botlist'></div> 
-  <div id='settings' class='data-control hidden' data-control='botmanager:settings'></div> 
+<div class='data-control' data-control='botmanager:ui:{}'></div>
+<div class='background'></div>
+<div class='wrap' style='display:none;'>
+  <div class='titlebar'>
+    <a href='../botmanager/index.html'><img src='../botmanager/asset/botmanager/menu_icon.png' class='menuicon'></a>
+    App Manager
+    <div class='upper-right'>
+      <div class='card popupcard left-sided mini mypopupname1'>
+        POPUP MENU
+        <img src='../botmanager/asset/botmanager/close.png' class='popupcard-close roundbutton-small'>
+        <img src='../botmanager/asset/botmanager/corner-left.png' class='popupcard-pointer'>
+      </div>
+      <!-- img src='../botmanager/asset/botmanager/more_icon.png' class='roundbutton-small popupmenu' data-id='mypopupname1' -->
+    </div>
+  </div>
+  <div class='navbar'>
+    <div class='navbar-tab selected' data-id='tab1'>Apps</div>
+    <div class='navbar-tab' data-id='tab2'>Settings</div>
+  </div>
+  <div class='main'>
+    <div class='tab-content tab1 selected'>
+      <div id='botlist' class='data-control hidden' data-control='metabot:applist'></div> 
+    </div>
+    <div class='tab-content tab2'>
+      <div id='settings' class='data-control hidden' data-control='botmanager:settings'></div> 
+    </div>
+  </div>
 </div>

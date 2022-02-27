@@ -30,8 +30,20 @@ me.ready = function(){
     installControl($(ME).find('.appinfo-api')[0], 'botmanager', 'api', function(result){}, {appid:app.id});
   }
   
-  $(ME).find('.app-card-square').click(function(){
-    
+  $(ME).find('.app-card-square').click(function(e){
+    if (app.local && app.installed)
+      window.location.href='../'+app.id+'/'+app.index;
+    else
+      $(ME).find('.maximize-icon').click();
+  });
+
+  $(ME).find('.appupdatebutton').click(function(e){
+    $(ME).find('.maximize-icon').click();
+    $(ME).find('.app-update-button').click();
+    e.preventDefault();
+  });
+  
+  $(ME).find('.maximize-icon').click(function(e){
     var list = [];
     for (var i in app.peers) {
       var p = app.peers[i];
@@ -50,8 +62,8 @@ me.ready = function(){
     $(ME).find('.app-uninstall-button').css('display', app.local && !app.installed ? 'inline-block' : 'none');
     $(ME).find('.app-update-button').css('display', app.local && Number(app.version) < Number(app.available) ? 'inline-block' : 'none');
     
-    var x = $('body').width()-100;
-    var y = $('body').height()-210;
+    var x = window.innerWidth-100;
+    var y = window.innerHeight-210;
     var w = $(ME).width();
     var h = $(ME).height();
     var x2 = $(ME).offset().left;
@@ -133,8 +145,8 @@ me.ready = function(){
 };
 
 $(window).resize(function(){
-  var x = $('body').width()-100;
-  var y = $('body').height()-210;
+  var x = window.innerWidth-100;
+  var y = window.innerHeight-210;
 
   $(ME).find('.app-detail').css('width', x+'px').css('height', y+'px');
 });

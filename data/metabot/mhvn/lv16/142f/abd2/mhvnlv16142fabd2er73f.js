@@ -138,8 +138,8 @@ function install(){
 
             if (result.status != 'ok') {
               card.find('.appmsg2').html('Error installing library '+lib.name+' v'+lib.version+' from '+peer.name+' ('+peer.id+')');
- //             card.find('.libmsg1').html('');
- //             card.find('.libmsg2').html('');
+              card.find('.libmsg1').html('');
+              card.find('.libmsg2').html('');
               handleError();
               return;
             }

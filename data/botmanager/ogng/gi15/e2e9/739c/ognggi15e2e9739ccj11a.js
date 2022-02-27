@@ -7,7 +7,7 @@ me.ready = function(){
 //		result = JSON.parse('{ "msg": "'+result.msg+'" }');
 	    $('#devicename').val(result.machineid);
 	    $('#portnum').val(result.portnum);
-        $('#botlist')[0].api.populateBotList(result.defaultbot);
+        populateBotList(result.defaultbot);
 	  }
 	  else {
 		  $('#hidesettings').css('display', 'none');
@@ -37,3 +37,19 @@ function saveSettings() {
 }
 
 $('#savesettingsbutton').click(saveSettings);
+
+function populateBotList(dbval) {
+  json('../botmanager/listbots', null, function(result) {
+    var select = document.getElementById('defaultbot');
+    select.options.length = 0;
+    var defaultbot = "<option value='botmanager'>botmanager</option>";
+
+    for (var item in result.data) {
+        var rdi = result.data[item];
+        defaultbot += "<option value='"+rdi.botname+"'>"+rdi.botname+"</option>";
+    }
+
+    $('#defaultbot').html(defaultbot);
+    $('#defaultbot').val(dbval);
+  });
+}
