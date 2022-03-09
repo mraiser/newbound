@@ -11,6 +11,11 @@
   margin:auto;
 }
 
-.mainbg{
-  background-color:#fff;
+.main{
+  position:relative;
+  margin-top:4px;
+}
+
+.demo-card-wide{
+  max-width:330px;
 }

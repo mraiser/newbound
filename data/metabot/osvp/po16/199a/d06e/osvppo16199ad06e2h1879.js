@@ -2,14 +2,18 @@ var me = this;
 var ME = $('#'+me.UUID)[0];
 
 me.ready = function(){
-  componentHandler.upgradeAllRegistered();
+  if (typeof componentHandler != 'undefined')
+    componentHandler.upgradeAllRegistered();
   if (ME.DATA.title){
     $(ME).find('.mdl-card__title-text').text(ME.DATA.title);
     $(ME).find('.mdl-textfield__label').text(ME.DATA.text);
     $(ME).find('.subtext').text(ME.DATA.subtext);
     $(ME).find('.continuebutton').text(ME.DATA.ok);
     $(ME).find('.cancelbutton').text(ME.DATA.cancel);
-    $(ME).find('#sample3').val(ME.DATA.value).parent()[0].MaterialTextfield.checkDirty();
+    $(ME).find('#sample3').val(ME.DATA.value);
+    
+    if (typeof MaterialTextfield != 'undefined')
+      $(ME).find('#sample3').parent()[0].MaterialTextfield.checkDirty();
   }
   
   var x1, y1;

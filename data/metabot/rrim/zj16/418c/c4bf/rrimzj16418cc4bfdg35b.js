@@ -40,6 +40,7 @@ me.ready = function(){
   else {
     json('../metabot/libraries', null, function(result){
       if (result.data.data) result.data = result.data.data;
+      result.data.list.sort(function(a,b) {return (a.name.toLowerCase() > b.name.toLowerCase()) ? 1 : ((b.name.toLowerCase() > a.name.toLowerCase()) ? -1 : 0);} ); 
       init(result.data.list);
     });
   }
@@ -104,14 +105,14 @@ function buildMenu(list){
 }
 
 function rebuild(){
-  var newhtml = "<table class='mdl-data-table mdl-js-data-table mdl-data-table--selectable mdl-shadow--2dp'><thead><tr><th class='mdl-data-table__cell--non-numeric'>Library</th><th>Version</th><th>Available</th><th class='mdl-data-table__cell--non-numeric'>Peer</th></tr></thead><tbody>";
+  var newhtml = "<table class='mdl-data-table mdl-js-data-table mdl-data-table--selectable mdl-shadow--2dp card'><thead><tr><th><label class='plaincheckbox'><input type='checkbox' class='selectlibcheckbox togglecheckbox'><span></span></label></th><th class='mdl-data-table__cell--non-numeric'>Library</th><th>Version</th><th>Available</th><th class='mdl-data-table__cell--non-numeric'>Peer</th></tr></thead><tbody>";
 
   for (var i in me.libs){
     var which =  me.libs[i];
     var count = me.updates[which.id].count + me.older[which.id].count + me.alts[which.id].count;
     var menu = '';
     if (count>0){
-      menu = '<button id="peerselect_'+which.id+'" class="mdl-button mdl-js-button mdl-button--icon"><i class="material-icons">arrow_drop_down</i></button><ul class="mdl-menu mdl-menu--bottom-left mdl-js-menu mdl-js-ripple-effect" for="peerselect_'+which.id+'">';
+      menu = '<img id="peerselect_'+which.id+'" class="mdl-button mdl-js-button mdl-button--icon roundbutton-small showpeersbutton" src="../botmanager/asset/botmanager/down_icon.png"><ul class="card popupcard mdl-menu mdl-menu--bottom-left mdl-js-menu mdl-js-ripple-effect peerselectpopup" for="peerselect_'+which.id+'">';
       if (me.updates[which.id].count > 0) menu += buildMenu(me.updates[which.id]);
       if (me.older[which.id].count > 0) {
         menu += '<li disabled class="mdl-menu__item">Older Versions</li>'
@@ -140,7 +141,9 @@ function rebuild(){
     var v = me.updates[which.id].v > 0 ? me.updates[which.id].v : '';
     var vme = me.updates[which.id].c ? me.updates[which.id].c : 0;
     
-    newhtml += '<tr><td class="mdl-data-table__cell--non-numeric">'
+    newhtml += '<tr>'
+      + '<td><label class="plaincheckbox"><input type="checkbox" class="selectlibcheckbox"><span></span></label></td>'
+      + '<td class="mdl-data-table__cell--non-numeric">'
       + '<div class="libid">'+which.id+"</div>"
       + '</td><td>'
       + vme
@@ -159,13 +162,26 @@ function rebuild(){
       var peer = me.peers[uuid];
       var newhtml = $(this).text();
       $(this).closest('td').find('.selectedpeer').text(newhtml).data('peer', uuid);
-      var cb = $(this).closest('tr').find('.mdl-checkbox')
-      if (!cb.hasClass('is-checked')) cb.click();
+      var cb = $(this).closest('tr').find('.selectlibcheckbox')
+      if (!cb.prop('checked')) cb.click();
+      $(this).closest('td').find('.peerselectpopup').css('display','none');
     }
+  });
+  $(ME).find('.showpeersbutton').click(function(){
+    $(this).next().css('display', 'block');
+  });
+  $(ME).find('.peerselectpopup').mouseleave(function(){
+    $(this).css('display','none');
   });
   componentHandler.upgradeAllRegistered();
   
-  $(ME).find('.mdl-checkbox').click(checkInstall);
+  $(ME).find('.togglecheckbox').click(function(){
+    var val = $(this).prop('checked');
+    $(ME).find('.selectlibcheckbox').prop('checked', val);
+    checkInstall();
+  });
+  
+  $(ME).find('.selectlibcheckbox').click(checkInstall);
   checkInstall();
   
   var cb = $(ME).data('cb');
@@ -180,21 +196,21 @@ function rebuild(){
 }
 
 function checkInstall(){
-  $($(ME).find('.mdl-checkbox').css('display', 'none')[0]).css('display', 'block');
+  $($(ME).find('.selectlibcheckbox').css('display', 'none')[0]).css('display', 'block');
   
-  $(ME).find('.mdl-checkbox').each(function(x,y){
+  $(ME).find('.selectlibcheckbox').each(function(x,y){
     var b = $(y).closest('tr').find('.selectedpeer').text() == '';
     $(y).css('display', b ? 'none' : 'block');
   });
-  $($(ME).find('.mdl-checkbox')[0]).css('display', 'block');
+  $($(ME).find('.selectlibcheckbox')[0]).css('display', 'block');
   
   
   setTimeout(function(){
     var c = false;
-    $(ME).find('.mdl-checkbox').each(function(x,y){
+    $(ME).find('.selectlibcheckbox').each(function(x,y){
       if (x>0){
         var b = $(y).closest('tr').find('.selectedpeer').text() == '';
-        var d = $(y).hasClass('is-checked');
+        var d = $(y).prop('checked');
         if (b && d) $(y).click();
         else if (d) c = true;
       }
@@ -206,9 +222,9 @@ function checkInstall(){
 $(ME).find('.installbutton').click(function(){
   $(this).css('display', 'none');
   $(ME).find('.shrinkme').removeClass('shrinkme');
-  $(ME).find('.mdl-checkbox').each(function(x,y){
+  $(ME).find('.selectlibcheckbox').each(function(x,y){
     if (x>0){
-      if (!$(y).hasClass('is-checked')) $(y).closest('tr').addClass('shrinkme');
+      if (!$(y).prop('checked')) $(y).closest('tr').addClass('shrinkme');
     }
   });
   $(ME).find('.shrinkme').animate({"opacity":"0"}, 500, function(){
@@ -226,12 +242,13 @@ $(ME).find('.installbutton').click(function(){
 
 function installNext(){
   $(ME).find('.installupdates').css('display', 'none');
-  var y = $(ME).find('.is-checked').closest('tr').find('.selectedpeer')[0];
+  var y = $(ME).find('.selectlibcheckbox:checked').closest('tr').find('.selectedpeer')[0];
   if (y) install(y);
   else {
     $(ME).find('.shrinkme').css('display', 'table-row').css('opacity', '1');
     json('../metabot/libraries', null, function(result){
       if (result.data.data) result.data = result.data.data;
+      result.data.list.sort(function(a,b) {return (a.name.toLowerCase() > b.name.toLowerCase()) ? 1 : ((b.name.toLowerCase() > a.name.toLowerCase()) ? -1 : 0);} ); 
       init(result.data.list);
     });
   }
@@ -243,14 +260,17 @@ function install(y){
   var td = $(y).closest('tr').find('td')[0];
   var uuid = guid();
   var el1 = $('<span></span>');
-  var el2 = $('<div id="a_'+uuid+'" class="libprog mdl-progress mdl-js-progress mdl-progress__indeterminate" style="width:'+$(y).parent().width()+'px;"></div>');
+  var el2 = $('<div id="a_'+uuid+'" class="progressbar libprog"></div>');
   $(y).parent().append(el2[0]);
-  td.innerHTML = '<i class="material-icons" style="vertical-align:middle;">get_app</i>';
+  td.innerHTML = "<img src='../botmanager/asset/botmanager/download_icon.png' class='roundbutton-small'>";
   $(td).append(el1);
+  document.body.api.ui.initProgress(el2.parent());
+  el2[0].setProgress('indeterminate');
   
   function error(td, msg){
     $(td).html('');
-    el2.html('<font color="red">'+msg+'</font>').removeClass('mdl-progress__indeterminate');
+    $(y).html('<font color="red">'+msg+'</font>');
+    el2[0].setProgress(0);
     var but = $('<button class="mdl-button mdl-js-button mdl-js-ripple-effect">try again</button>');
     $(td).append(but);
     componentHandler.upgradeAllRegistered();
@@ -260,7 +280,7 @@ function install(y){
     });
   }
 
-  el2[0].addEventListener('mdl-componentupgraded', function() {
+//  el2[0].addEventListener('mdl-componentupgraded', function() {
     
     var url = document.URL;
     url = url.substring(url.indexOf(':'));
@@ -274,8 +294,8 @@ function install(y){
 
       json('../metabot/installlib', 'guid=a_'+uuid+'&peer='+peer+'&lib='+lib, function(result){
         if (result.status == 'ok'){
-          el2.removeClass('mdl-progress__indeterminate');
-          $(td).closest('tr').removeClass('is-checked').css('display', 'none').addClass('shrinkme').find('.is-checked').removeClass('is-checked');
+          el2[0].setProgress(100);
+          $(td).closest('tr').css('display', 'none').addClass('shrinkme').find('.selectlibcheckbox').prop('checked', false);
           $(y).text('');
           el1.remove();
           el2.remove();
@@ -298,13 +318,12 @@ function install(y){
     connection.onmessage = function(e){
       if (SOCK) SOCK.onmessage(e);
     };
-  });    
+//  });    
 
   WSCB = function(val){
     if (val.msg) $(y).text(val.msg);
     if (val.percent){
-      el2.removeClass('mdl-progress__indeterminate');
-      el2[0].MaterialProgress.setProgress(val.percent);
+      el2[0].setProgress(val.percent);
       el1.text(val.percent+'%');
     }
   };

@@ -1,5 +1,5 @@
 .thin3{
-  font-size:x-small;
+  font-size:small;
 }
 
 .thin4{
@@ -16,8 +16,4 @@
   margin-left:auto;
   margin-right:auto;
   margin-top:50px;
-}
-
-.floatright{
-  float:right;
 }

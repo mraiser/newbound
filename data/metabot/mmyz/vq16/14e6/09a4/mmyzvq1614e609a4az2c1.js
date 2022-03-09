@@ -2,7 +2,8 @@ var me = this;
 var ME = $('#'+me.UUID)[0];
 
 me.ready = function(){
-  componentHandler.upgradeAllRegistered();
+  if (typeof componentHandler != 'undefined')
+    componentHandler.upgradeAllRegistered();
   load();
 };
 
@@ -26,8 +27,12 @@ function load(){
       var data = result.data;
       if (!data) data = { 'displayname':'Some Dev', organization:'' };
       
-      $('#devname').val(data.displayname).parent()[0].MaterialTextfield.init();
-      $('#devorg').val(data.organization).parent()[0].MaterialTextfield.init();
+      $('#devname').val(data.displayname);
+      $('#devorg').val(data.organization);
+      if (typeof MaterialTextfield != 'undefined'){
+        $('#devname').parent()[0].MaterialTextfield.init();
+        $('#devorg').parent()[0].MaterialTextfield.init();
+      }
       
       json('../peerbot/getpeerid', null, function(result){
         $('#editidentityuuid').text(result.msg);

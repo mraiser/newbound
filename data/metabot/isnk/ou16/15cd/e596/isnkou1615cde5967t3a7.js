@@ -2,7 +2,8 @@ var me = this;
 var ME = $('#'+me.UUID)[0];
 
 me.ready = function(){
-  componentHandler.upgradeAllRegistered();
+  if (typeof componentHandler != 'undefined')
+    componentHandler.upgradeAllRegistered();
   json('../metabot/apps', null, function(result){
     me.setApps(result.data);
   });
@@ -64,7 +65,7 @@ $(ME).find('.step3button').click(function(){
   data.native = $('#pubappnative').prop('checked');
                                  
   function handle(result){
-    if (result.status == 'ok') $('#bjstep3').html('Your executable source archive has been built: <a data-role="none" data-ajax="false" target="_blank" href="'+result.data.jar+'?id='+guid()+'">download</a><br><br><a data-ajax="false" data-role="button" data-theme="b" href="index.html">DONE</a>').trigger("create");
+    if (result.status == 'ok') $('#bjstep3').html('Your executable source archive has been built: <a data-role="none" data-ajax="false" target="_blank" href="'+result.data.jar+'?id='+guid()+'">download</a><br><br><a data-ajax="false" data-role="button" data-theme="b" class="regularbutton" href="index.html">DONE</a>').trigger("create");
     else $('#bjstep3').html('<font color="red">ERROR: '+result.msg+'</font>');
     
     if (data.native){
@@ -89,29 +90,35 @@ me.setApps = function(apps){
 };
 
 function buildApps(apps){
-  var newhtml = '<table class="mdl-data-table mdl-js-data-table mdl-data-table--selectable mdl-shadow--2dp inline"><thead><tr><th class="mdl-data-table__cell--non-numeric">Apps</th></tr></thead><tbody class="publish-applist">';
+  var newhtml = '<table class="tablelist mdl-data-table mdl-js-data-table mdl-data-table--selectable mdl-shadow--2dp inline"><thead><tr><th><label class="plaincheckbox"><input type="checkbox" class="toggleapps"><span></span></label></th><th class="mdl-data-table__cell--non-numeric">Apps</th></tr></thead><tbody class="publish-applist">';
   for (var i in apps){
     var app = apps[i];
-    newhtml += '<tr id="pubappid_'+app.id+'" class="pubappid"><td class="mdl-data-table__cell--non-numeric">'
+    newhtml += '<tr id="pubappid_'+app.id+'" class="pubappid">'
+      + '<td><label class="plaincheckbox"><input type="checkbox"><span></span></label></td>'
+      + '<td class="mdl-data-table__cell--non-numeric">'
       + app.name
       + '</td></tr>';
   }
   newhtml += '</tbody></table>';
   
-  $(ME).find('.publish-apptable').html(newhtml).on('change', appclick);
+  $(ME).find('.publish-apptable').html(newhtml).find('input').on('change', appclick);
+  $(ME).find('.toggleapps').click(function(){
+    var val = $(this).prop('checked');
+    $(ME).find('.publish-apptable').find('input').prop('checked', val);
+  });
   componentHandler.upgradeAllRegistered();
 }
 
 function appclick(e){
   init();
-  
-  $(ME).find('.pubappid.is-selected').each(function(x,y){
-  var id = y.id.substring(9);
-  var app = getByProperty(me.apps, 'id', id);
-    for (var i in app.libraries){
-      var el = $('#publibid_'+app.libraries[i]).find('.mdl-checkbox');
-      el.closest('tr').addClass('is-selected');
-      el[0].MaterialCheckbox.check();
+
+  $(ME).find('.pubappid').each(function(x,y){
+    if ($(y).find('input').prop('checked')){
+      var id = y.id.substring(9);
+      var app = getByProperty(me.apps, 'id', id);
+      for (var i in app.libraries){
+        $('#publibid_'+app.libraries[i]).find('input').prop('checked', true);
+      }
     }
   });
 }
@@ -123,16 +130,22 @@ me.setLibs = function(libs){
 };
 
 function buildLibs(libs){
-  var newhtml = '<table class="mdl-data-table mdl-js-data-table mdl-data-table--selectable mdl-shadow--2dp inline"><thead><tr><th class="mdl-data-table__cell--non-numeric">Libraries</th></tr></thead><tbody class="publish-liblist">';
+  var newhtml = '<table class="tablelist mdl-data-table mdl-js-data-table mdl-data-table--selectable mdl-shadow--2dp inline"><thead><tr><th><label class="plaincheckbox"><input type="checkbox" class="togglelibs"><span></span></label></th><th class="mdl-data-table__cell--non-numeric">Libraries</th></tr></thead><tbody class="publish-liblist">';
   for (var i in libs){
     var lib = libs[i];
-    newhtml += '<tr id="publibid_'+lib.id+'" class="publibid"><td class="mdl-data-table__cell--non-numeric">'
+    newhtml += '<tr id="publibid_'+lib.id+'" class="publibid">'
+      + '<td><label class="plaincheckbox"><input type="checkbox"><span></span></label></td>'
+      + '<td class="mdl-data-table__cell--non-numeric">'
       + lib.name
       + '</td></tr>';
   }
   newhtml += '</tbody></table>';
   
-  $(ME).find('.publish-libtable').html(newhtml).on('change', libclick);
+  $(ME).find('.publish-libtable').html(newhtml).find('input').on('change', libclick);
+  $(ME).find('.togglelibs').click(function(){
+    var val = $(this).prop('checked');
+    $(ME).find('.publish-libtable').find('input').prop('checked', val);
+  });
   componentHandler.upgradeAllRegistered();
 }
 
@@ -140,14 +153,14 @@ function libclick(e){
   init();
   
   $(ME).find('.publibid').each(function(x,y){
-    if (!$(y).hasClass('is-selected')){
+    if (!$(y).find('input').prop('checked')){
       var id = y.id.substring(9);
       var lib = getByProperty(me.libs, 'id', id);
-      
+
       for (var i in lib.apps){
-        var el = $('#pubappid_'+lib.apps[i]).find('.mdl-checkbox');
-        el.closest('tr').removeClass('is-selected');
-        el[0].MaterialCheckbox.uncheck();
+        var app = lib.apps[i];
+        if (typeof app == 'object') app = app.id;
+        $('#pubappid_'+app).find('input').prop('checked', false);
       }
     }
   });
@@ -166,53 +179,16 @@ function init(){
     }
   }
   
-  var el = $('#pubappid_botmanager').find('.mdl-checkbox');
-  el.closest('tr').addClass('is-selected');
-  el[0].MaterialCheckbox.check();
-  
-  el = $('#pubappid_metabot').find('.mdl-checkbox');
-  el.closest('tr').addClass('is-selected');
-  el[0].MaterialCheckbox.check();
-  
-  el = $('#pubappid_securitybot').find('.mdl-checkbox');
-  el.closest('tr').addClass('is-selected');
-  el[0].MaterialCheckbox.check();
-  
-  el = $('#pubappid_peerbot').find('.mdl-checkbox');
-  el.closest('tr').addClass('is-selected');
-  el[0].MaterialCheckbox.check();
-  
-  el = $('#publibid_peerbot').find('.mdl-checkbox');
-  el.closest('tr').addClass('is-selected');
-  el[0].MaterialCheckbox.check();
-  
-  el = $('#publibid_securitybot').find('.mdl-checkbox');
-  el.closest('tr').addClass('is-selected');
-  el[0].MaterialCheckbox.check();
-  
-  el = $('#publibid_botmanager').find('.mdl-checkbox');
-  el.closest('tr').addClass('is-selected');
-  el[0].MaterialCheckbox.check();
-  
-  el = $('#publibid_metabot').find('.mdl-checkbox');
-  el.closest('tr').addClass('is-selected');
-  el[0].MaterialCheckbox.check();
-  
-  el = $('#publibid_flow').find('.mdl-checkbox');
-  el.closest('tr').addClass('is-selected');
-  el[0].MaterialCheckbox.check();
-  
-//  el = $('#publibid_Koreapps').find('.mdl-checkbox');
-//  el.closest('tr').addClass('is-selected');
-//  el[0].MaterialCheckbox.check();
-  
-//  el = $('#publibid_dashboard').find('.mdl-checkbox');
-//  el.closest('tr').addClass('is-selected');
-//  el[0].MaterialCheckbox.check();
-  
-  el = $('#publibid_threejs').find('.mdl-checkbox');
-  el.closest('tr').addClass('is-selected');
-  el[0].MaterialCheckbox.check();
+  $('#pubappid_botmanager').find('input').prop('checked', true);
+  $('#pubappid_metabot').find('input').prop('checked', true);
+  $('#pubappid_securitybot').find('input').prop('checked', true);
+  $('#pubappid_peerbot').find('input').prop('checked', true);
+  $('#publibid_peerbot').find('input').prop('checked', true);
+  $('#publibid_securitybot').find('input').prop('checked', true);
+  $('#publibid_botmanager').find('input').prop('checked', true);
+  $('#publibid_metabot').find('input').prop('checked', true);
+  $('#publibid_flow').find('input').prop('checked', true);
+  $('#publibid_threejs').find('input').prop('checked', true);
 }
 
 $(ME).find('.assetpickerbutton').click(function(event) {

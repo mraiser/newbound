@@ -1,3 +1,8 @@
+a{
+  color: #7c7f86;
+  font-weight: 500;
+}
+
 .background{
   background-color: rgb(250,250,250);
   position:fixed;
@@ -106,6 +111,10 @@
   padding:20px;
 }
 
+.pad16{
+  padding:16px;
+}
+
 .pad10{
   padding:10px;
 }
@@ -134,6 +143,37 @@
   border-top: 1px solid #0002;
 }
 
+.card-header{
+  font-size: 24px;
+  font-weight: 300;
+  padding-left:16px;
+  padding-right:16px;
+}
+
+.card-description{
+  color: rgba(0,0,0,.54);
+  font-size: 1rem;
+  font-weight:400;
+  line-height: 18px;
+  overflow: hidden;
+  padding: 16px;
+  width: 90%;
+}
+
+.card-button-wrap{
+  border-top:thin solid #0002;
+  position:relative;
+  font-size: 16px;
+  line-height: normal;
+  width: 100%;
+  background-color: transparent;
+  padding-top: 20px;
+  padding-bottom: 20px;
+  padding-left: 10px;
+  padding-right: 10px;
+  box-sizing: border-box;
+}
+
 .textinput{
   padding-top: 5px;
   padding-bottom: 5px;
@@ -156,20 +196,35 @@
   border-bottom: 2px solid #83bc00;
 }
 
-.cardbutton{
-  padding: 10px;
-  font-size:large;
-  color:inherit;
-  text-transform: uppercase;
+.chip{
+  height: 32px;
+  line-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 16px;
+  background-color: #dedede;
+  font-size: 13px;
+  vertical-align: middle;
+  display: inline-block;
+  color: rgba(0,0,0,.87);
+  margin: 2px 0;
+  white-space: nowrap;
+}
+
+.chipbutton{
+  background-color:rgb(124, 127, 134);
   border:none;
-  background-color:transparent;
+  vertical-align: middle;
+  margin-right:-6px;
+  margin-left:6px;
+  color:white;
 }
 
-.cardbutton:hover{
-  background-color:rgb(222, 222, 222);
+.chipbutton:hover{
+  background-color:rgb(124, 127, 134);
 }
 
-.regularbutton, .accentbutton, .coloredbutton{
+.regularbutton, .accentbutton, .coloredbutton, .clearbutton{
   padding-left: 20px;
   padding-right: 20px;
   padding-top: 10px;
@@ -178,6 +233,7 @@
   font-weight:800;
   color:inherit;
   text-transform: uppercase;
+  text-decoration: none;
 }
 
 .regularbutton{
@@ -200,6 +256,18 @@
   background-color:rgb(100, 100, 100);
 }
 
+.clearbutton{
+  background-color:transparent;
+  border:none;
+  cursor:pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.clearbutton:hover{
+  background-color:#0002;
+}
+
 .coloredbutton{
   background-color:#83bc00;
   color:rgb(66, 66, 66);
@@ -208,6 +276,19 @@
 
 .coloredbutton:hover{
   background-color:#72ab00;
+}
+
+.card-button-right{
+  position:absolute;
+  right:10px;
+  bottom:10px;
+  color:#83bc00;
+}
+
+.card-button-right[disabled]{
+  color: rgba(0,0,0,.26);
+  cursor: default;
+  background-color: transparent;
 }
 
 .roundbutton{
@@ -222,8 +303,8 @@
 }
 
 .roundbutton:hover{
-  background-color:#0002;
-  border-color:#0002;
+  background-color:#ddd;
+  border-color:#ddd;
 }
 
 .popupcard{
@@ -330,25 +411,25 @@
   background-color: #83bc00;
 }
 
-.plaincheckbox {
+.plaincheckbox, .plainradio {
     display: inline-flex;
     cursor: pointer;
     position: relative;
 }
 
-.plaincheckbox > span {
+.plaincheckbox > span, .plainradio > span {
     color: inherit;
     padding: 0.5rem 0.25rem;
 }
 
 .plaincheckbox > input {
-    height: 16px;
-    width: 16px;
+    height: 15px;
+    width: 15px;
     -webkit-appearance: none;
     -moz-appearance: none;
     -o-appearance: none;
     appearance: none;
-    border: 1px solid #34495E;
+    border: 2px solid #34495E;
     border-radius: 4px;
     outline: none;
     transition-duration: 0.3s;
@@ -357,9 +438,29 @@
     margin-top: 8px;
   }
 
+.plainradio > input {
+    height: 16px;
+    width: 16px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    -o-appearance: none;
+    appearance: none;
+    border: 2px solid #34495E;
+    border-radius: 18px;
+    outline: none;
+    transition-duration: 0.3s;
+    background-color: inherit;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+
 .plaincheckbox > input:checked {
-    border: 1px solid #83bc00;
+    border: 2px solid #83bc00;
     background-color: #83bc00;
+}
+
+.plainradio > input:checked {
+    border: 2px solid #83bc00;
 }
 
 .plaincheckbox > input:checked + span::before {
@@ -373,6 +474,35 @@
     font-size:24px;
 }
 
-.plaincheckbox > input:active {
+.plainradio > input:checked + span::before {
+    display: block;
+    position: absolute;
+    left: 9px;
+    top: 12px;
+    background-color: #83bc00;
+    height: 8px;
+    width: 8px;
+    border-radius: 4px;
+    content: ' ';
+}
+
+.plaincheckbox > input:active, .plainradio > input:active {
     border: 2px solid #83bc00;
+}
+
+.progressbar{
+  height:4px;
+  width:100%;
+  max-width:300px;
+  background-color: #83bc0044;
+  overflow:hidden;
+}
+
+.progressbar-inner{
+  display:inline-block;
+  position:relative;
+  height:4px;
+  width:0%;
+  background-color: #83bc00;
+  content: ' ';
 }

@@ -23,3 +23,17 @@
 .thevalue{
   width:300px;
 }
+
+.tablelist tr {
+  border: thin solid #0002;
+  white-space: nowrap;
+}
+
+.tablelist tr:hover {
+  background-color: #0002;
+}
+
+thead tr:hover {
+  background-color: inherit !important;
+}
+

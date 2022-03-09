@@ -1,27 +1,27 @@
-<div class="mdl-layout mdl-js-layout mdl-layout--fixed-header mdl-layout--fixed-tabs">
-  <header class="mdl-layout__header">
-    <div aria-expanded="false" role="button" tabindex="0" class="mdl-layout__drawer-button" onclick="document.location.href='../botmanager/index.html';"><i class="material-icons">menu</i></div>
-    <div class="mdl-layout__header-row">
-      <span class="mdl-layout-title">MetaBot</span>
-    </div>
-    <div class="mdl-layout__tab-bar mdl-js-ripple-effect">
-      <a href="#scroll-tab-2" class="mdl-layout__tab is-active" id="metabotlibtab">Libraries</a>
-      <a href="#scroll-tab-3" class="mdl-layout__tab">Info</a>
-      <a href="#scroll-tab-4" class="mdl-layout__tab">Build</a>
-    </div>
-  </header>
-  <main class="mdl-layout__content mainbg">
-    <section class="mdl-layout__tab-panel is-active" id="scroll-tab-2">
+<div class='data-control' data-control='botmanager:ui:{}'></div>
+<div class='background'></div>
+<div class='wrap' style='display:none;'>
+  <div class="titlebar">
+    <a href='../botmanager/index.html'><img src='../botmanager/asset/botmanager/menu_icon.png' class='menuicon'></a>
+    MetaBot
+  </div>
+  <div class='navbar'>
+    <div class='navbar-tab selected' data-id='tab1'>Libraries</div>
+    <div class='navbar-tab' data-id='tab2'>Info</div>
+    <div class='navbar-tab' data-id='tab3'>Build</div>
+  </div>
+  <div class="main">
+    <div class='tab-content tab1 selected'>
       <div class="page-content data-control" id="libraries-tab" data-control="metabot:liblist"></div>
-    </section>
-    <section class="mdl-layout__tab-panel" id="scroll-tab-3">
+    </div>
+    <div class='tab-content tab2'>
       <br><br>
-      <div class="demo-card-wide mdl-card mdl-shadow--2dp centerme">
+      <div class="card demo-card-wide mdl-card mdl-shadow--2dp centerme">
         <div class="data-control" id="identity-tab" data-control="metabot:identity"></div>
       </div>
-    </section>
-    <section class="mdl-layout__tab-panel" id="scroll-tab-4">
+    </div>
+    <div class='tab-content tab3'>
       <div class="page-content data-control" id="publish-tab" data-control="metabot:publish"></div>
-    </section>
-  </main>
+    </div>
+  </div>
 </div>

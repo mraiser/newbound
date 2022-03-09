@@ -28,15 +28,19 @@ me.ready = function(){
   
   json('../metabot/call', 'db=metabot&name=metabot&cmd=autoupdate&args={}', function(result){
     var el = $('#autoupdatelibraries').prop('checked', result.msg == 'true').parent()[0];
-    if (result.msg == 'true') el.MaterialSwitch.on();
-    else el.MaterialSwitch.off();
+    if (typeof MaterialSwitch != 'undefined') {
+      if (result.msg == 'true') el.MaterialSwitch.on();
+      else el.MaterialSwitch.off();
+    }
     
     $('#autoupdatelibraries').change(function(){
       var args = {val:""+$(this).prop("checked")};
       json('../metabot/call', 'db=metabot&name=metabot&cmd=autoupdate&args='+encodeURIComponent(JSON.stringify(args)), function(result){
         $('#autoupdatelibraries').prop('checked', result.msg == 'true');
-        if (result.msg == 'true') el.MaterialSwitch.on();
-        else el.MaterialSwitch.off();
+        if (typeof MaterialSwitch != 'undefined') {
+          if (result.msg == 'true') el.MaterialSwitch.on();
+          else el.MaterialSwitch.off();
+        }
       });
     });
   });
@@ -87,7 +91,7 @@ me.build = function(list){
   t.data('cb', cb);
   
   cb = function(){
-    var el = $('<i class="floatleft pointy morelibs material-icons">more</i>');
+    var el = $("<img src='../botmanager/asset/botmanager/more_icon.png' class='roundbutton-small expandywidget pointy morelibs'>");
     el.click(function(){
       $(this).css('display', 'none');
       $(ME).find('.addlibrarybutton').css('display', 'none');
@@ -97,7 +101,7 @@ me.build = function(list){
     });
     $(t.find('th')[1]).prepend(el);
 
-    var el2 = $('<i class="floatleft pointy lesslibs material-icons">backspace</i>');
+    var el2 = $("<img src='../botmanager/asset/botmanager/close.png' class='roundbutton-small expandywidget pointy lesslibs thingreyborder'>");
     el2.click(function(){
       $(this).css('display', 'none');
       $(ME).find('.addlibrarybutton').css('display', 'block');
@@ -112,10 +116,11 @@ me.build = function(list){
 
     var n = t[0].api.updates.count;
     if (n>0){
-      var el3 = $('<div class="updatebadge material-icons mdl-badge mdl-badge--overlap" data-badge="'+n+'">get_app</div>');
+//      var el3 = $('<div class="updatebadge material-icons mdl-badge mdl-badge--overlap" data-badge="'+n+'">get_app</div>');
+      var el3 = $("<span style='position:relative;'><img src='../botmanager/asset/botmanager/download_icon.png' class='roundbutton-small availabledownloads'><span class='downloadbadge'>"+n+"</span></span>");
       $(t.find('th')[1]).append(el3);
       el3.click(function(){
-        $(this).css('display', 'none');
+//        $(this).css('display', 'none');
         el.click();
       });
     }

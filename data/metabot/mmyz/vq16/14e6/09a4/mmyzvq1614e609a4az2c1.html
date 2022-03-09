@@ -1,33 +1,33 @@
 <div class="mdl-card__title">
-  <h2 class="mdl-card__title-text">Public Developer Info</h2>
+  <h2 class="mdl-card__title-text card-header">Public Developer Info</h2>
 </div>
-<div class="mdl-card__supporting-text thin3">
+<div class="mdl-card__supporting-text thin3 card-description pad16">
       Your Universal Unique Identifier (UUID):
   <div id="editidentityuuid"></div>
 </div>
-<div class="mdl-card__supporting-text">
+<div class="mdl-card__supporting-text pad16">
   <form action="#">
     <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-      <input class="mdl-textfield__input" type="text" id="devname">
-      <label class="mdl-textfield__label" for="devname">Name</label>
+      <label class="mdl-textfield__label textinputlabel" for="devname">Name</label>
+      <input class="mdl-textfield__input textinput" type="text" id="devname">
     </div>
   </form>
 </div>    
-<div class="mdl-card__supporting-text thin4">
+<div class="mdl-card__supporting-text thin4 pad16">
   <form action="#">
     <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-      <input class="mdl-textfield__input" type="text" id="devorg">
-      <label class="mdl-textfield__label" for="devorg">Organization</label>
+      <label class="mdl-textfield__label textinputlabel" for="devorg">Organization</label>
+      <input class="mdl-textfield__input textinput" type="text" id="devorg">
     </div>
   </form>
 </div>    
 <div class="mdl-card__supporting-text thin5 subtext" id="savemyidentitymsg">
 </div>
-<div class="mdl-card__actions mdl-card--border">
-  <a class="mdl-button mdl-button--colored mdl-js-button mdl-js-ripple-effect floatright continuebutton" id="savemyidentity">
+<div class="mdl-card__actions mdl-card--border card-button-wrap">
+  <a class="mdl-button mdl-button--colored mdl-js-button mdl-js-ripple-effect continuebutton clearbutton card-button-right" id="savemyidentity">
     save
   </a>
-  <a class="mdl-button mdl-button--flat mdl-js-button mdl-js-ripple-effect cancelbutton">
+  <a class="mdl-button mdl-button--flat mdl-js-button mdl-js-ripple-effect cancelbutton clearbutton">
     reset
   </a>
 </div>

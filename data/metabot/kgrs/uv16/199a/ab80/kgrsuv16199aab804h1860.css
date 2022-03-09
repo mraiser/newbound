@@ -11,10 +11,10 @@
 }
 
 .listtable{
-  position:absolute;
-  top:0px;
+  position:fixed;
   left:0px;
-  height:100%;
+  top:112px;
+  bottom:0px;
   width:180px;
   overflow-y:auto;
   overflow-x:hidden;
@@ -28,10 +28,11 @@
 }
 
 .libdetail{
-  position:absolute;
+  position:fixed;
   left:190px;
   right:0px;
-  height:100%;
+  top:112px;
+  bottom:0px;
   overflow:auto;
 }
 
@@ -60,4 +61,41 @@
 
 .libid{
   cursor:pointer;
+}
+
+.thingreyborder{
+  border: thin solid #0008;
+  margin-top:3px;
+  margin-right:3px;
+}
+
+.thingreyborder:hover{
+  margin-top:0px;
+  margin-right:0px;
+  border: 4px solid #0002;
+}
+
+.expandywidget{
+  position:absolute;
+  top:12px;
+  right:12px;
+}
+
+.availabledownloads{
+  vertical-align:middle;
+  margin-left:5px;
+}
+
+.downloadbadge{
+  display:inline-block;
+  position:relative;
+  width:20px;
+  height:20px;
+  top:-14px;
+  left:-14px;
+  background-color:#83bc00;
+  text-align:center;
+  line-height:20px;
+  border:2px solid #83bc00;
+  border-radius:12px;
 }

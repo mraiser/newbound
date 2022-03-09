@@ -29,8 +29,18 @@
 .dialog-card-wide{
   margin-left:auto;
   margin-right:auto;
+  width:330px;
 }
 
-.floatright{
-  float:right;
+.continuebutton{
+  position:absolute;
+  right:10px;
+  bottom:10px;
+  color:#83bc00;
+}
+
+.continuebutton[disabled]{
+  color: rgba(0,0,0,.26);
+  cursor: default;
+  background-color: transparent;
 }

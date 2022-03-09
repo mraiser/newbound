@@ -74,8 +74,10 @@ public class P2PParser implements Parser
 
 			if (p.getPort() == -1)
 				p.setPort(REMOTEPORT);
-			else if (p.getPort() != REMOTEPORT)
+			else if (p.getPort() != REMOTEPORT) { // Fixme - new value is correct unless from a bad actor
 				System.out.println("CHECK PORT ("+p.getPort()+"/"+REMOTEPORT+") FOR PEER "+REMOTEID);
+//				p.setPort(REMOTEPORT);
+			}
 
 			if (SOCK.SOCK instanceof TCPSocket && !p.isTCP()) p.setAddress(SOCK.SOCK.getRemoteHostName());
 		}

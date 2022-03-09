@@ -104,7 +104,7 @@ function buildGroups(){
   var newhtml = '';
   for (var i in ME.DATA.readers){
     var g = ME.DATA.readers[i];
-    newhtml += '<span class="mdl-chip mdl-chip--deletable"><span class="mdl-chip__text">'+g+'</span><button type="button" class="groupdelete mdl-chip__action"><i class="material-icons">cancel</i></button></span>';
+    newhtml += '<span class="mdl-chip mdl-chip--deletable chip"><span class="mdl-chip__text">'+g+'</span><img src="../botmanager/asset/botmanager/close-white.png" class="roundbutton-small groupdelete mdl-chip__action chipbutton"></span>';
   }
   $(ME).find('.groupchips').html(newhtml).find('.groupdelete').click(function(){
     var i = ME.DATA.readers.indexOf($(this).prev().text());
@@ -113,7 +113,7 @@ function buildGroups(){
     saveGroups();
   });
   json('../securitybot/listgroups', null, function(result){
-    newhtml = '<button id="groupmenu" class="mdl-button mdl-js-button mdl-button--icon"><i class="material-icons">group_add</i></button><ul class="mdl-menu mdl-menu--bottom-left mdl-js-menu mdl-js-ripple-effect" for="groupmenu">';
+    newhtml = '<img src="../botmanager/asset/botmanager/group_add_icon.png" id="groupmenu"><ul class="card popupcard groupmenupopup mdl-menu mdl-menu--bottom-left mdl-js-menu mdl-js-ripple-effect" for="groupmenu">';
     for (var i in result.data){
       newhtml += '<li class="mdl-menu__item addgroup">'+result.data[i]+'</li>';
     }
@@ -127,6 +127,14 @@ function buildGroups(){
         saveGroups();
       }
     });
+    $(ME).find('#groupmenu').click(function(){
+      $(ME).find('.groupmenupopup').css('display', 'block');
+    });
+
+    $(ME).find('.groupmenupopup').mouseleave(function(){
+      $(this).css('display','none');
+    });
+    
     componentHandler.upgradeAllRegistered();
   });
 }
@@ -140,7 +148,7 @@ function buildControls(){
     for (var i in me.controls.list){
       var ctl = me.controls.list[i];
       var clickme = '<a class="previewctl" href="../metabot/preview.html?db='+db+'&id='+ctl.id+'" target="_blank">'+ctl.name+'</a>';
-      newhtml += '<tr data-ctlitem="'+ctl.id+'" class="ctlrow"><td class="mdl-data-table__cell--non-numeric">'+clickme+'</td><td class="mdl-data-table__cell--non-numeric"><i class="editctlicon mdc-list-item__graphic material-icons" aria-hidden="true">edit</i></td></tr>';
+      newhtml += '<tr data-ctlitem="'+ctl.id+'" class="ctlrow"><td class="mdl-data-table__cell--non-numeric">'+clickme+'</td><td class="mdl-data-table__cell--non-numeric"><img src="../botmanager/asset/botmanager/pencil_icon.png" class="editctlicon"></td></tr>';
     }
     $(ME).find('.controlsbody').html(newhtml);
     $(ME).find('.editctlicon').click(function(){
@@ -171,10 +179,10 @@ function buildAssets(){
       for (var i in me.assets.list){
         var ctl = me.assets.list[i];
         var clickme = '<a href="../botmanager/asset/'+db+'/'+ctl.id+'" target="_blank">'+ctl.name+'</a>';
-        newhtml += '<tr data-assitem="'+ctl.id+'" class="assrow"><td class="mdl-data-table__cell--non-numeric">'+clickme+'</td><td class="mdl-data-table__cell--non-numeric"><i class="mdc-list-item__graphic material-icons" aria-hidden="true">delete</i></td></tr>';
+        newhtml += '<tr data-assitem="'+ctl.id+'" class="assrow"><td class="mdl-data-table__cell--non-numeric">'+clickme+'</td><td class="mdl-data-table__cell--non-numeric"><img src="../botmanager/asset/botmanager/delete_icon.png" class="deleteasseticon"></td></tr>';
       }
       $(ME).find('.assetsbody').html(newhtml);
-      $(ME).find('.assrow').find('.mdc-list-item__graphic').click(function(){
+      $(ME).find('.assrow').find('.deleteasseticon').click(function(){
         var id = $(this).closest('.assrow').data('assitem');
         var data = {
           title:'Delete Asset',
