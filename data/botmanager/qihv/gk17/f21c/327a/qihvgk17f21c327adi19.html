@@ -5,7 +5,7 @@
     <a href='../botmanager/index.html'><img src='../botmanager/asset/botmanager/menu_icon.png' class='menuicon'></a>
     Application Name
     <div class='upper-right'>
-      <div class='card popupcard left-sided mini mypopupname1'>
+      <div class='card popupcard left-sided mini mypopupname1 padme'>
         POPUP MENU
         <img src='../botmanager/asset/botmanager/close.png' class='popupcard-close roundbutton-small'>
         <img src='../botmanager/asset/botmanager/corner-left.png' class='popupcard-pointer'>
@@ -29,7 +29,14 @@
         <input type='checkbox' id='usercardgroupcheckbox1'>
         <span>Checkbox</span>
       </label>
-      <br>
+      <br><br>
+      <form action="#">
+        <div class="switch">
+          <input id="appfilter-switch-1" type="checkbox" class="switch-input" />
+          <label for="appfilter-switch-1" class="switch-label">Switch</label>
+        </div>
+        Switch
+      </form>
       <div class='progressbar myprogress'></div>
       <label class="plainradio">
         <input type='radio' id='usercardgroupradio1' name='usercardgroupradio' checked>
@@ -48,13 +55,28 @@
         <span>Indeterminate</span>
       </label>
       <br><br>
-      <form action="#">
-        <div class="switch">
-          <input id="appfilter-switch-1" type="checkbox" class="switch-input" />
-          <label for="appfilter-switch-1" class="switch-label">Switch</label>
+      <button class='regularbutton snackbarbutton'>Snackbar</button>
+      <button class='accentbutton popupmenu' data-popup='{"selector":".mydialog","closeselector":".mydialog-close","modal":true}'>dialog</button>
+      <button class='coloredbutton tooltip' data-tooltip='{"message":"This is a tooltip!"}'>Tooltip</button>
+      <img src='../botmanager/asset/botmanager/more_icon.png' class='roundbutton popupmenu' data-popup='{"selector":".mypopupname2","closeselector":".popupcard-close","popup":true}'>
+      <div class='card popupcard right-sided mypopupname2 padme'>
+        POPUP MENU
+        <img src='../botmanager/asset/botmanager/close.png' class='popupcard-close roundbutton-small'>
+        <img src='../botmanager/asset/botmanager/corner.png' class='popupcard-pointer'>
+      </div>
+      <div class='card modal mydialog'>
+        <h2 class="card-header">Title</h2>
+        <div class='pad16'>
+          <label class="textinputlabel" for="sample3">Text...</label>
+          <input class="textinput" type="text" id="sample3">
         </div>
-        Switch
-      </form>
+        <div class="card-description pad16">Card description goes here.</div>
+        <div class="card-button-wrap">
+          <a class="clearbutton card-button-right">continue</a>
+          <a class="clearbutton mydialog-close">cancel</a>
+        </div>
+      </div>
+      <br><br>
       <div class='textinputlabel'>Text Field</div>
       <input type='text' class='textinput' placeholder='Placeholder Text'>
       <br><br>
@@ -65,15 +87,8 @@
         <option>Bananas</option>
       </select> 
       <br><br>
-      <button class='regularbutton'>Save</button>
-      <button class='accentbutton'>Save</button>
-      <button class='coloredbutton'>Save</button>
-      <img src='../botmanager/asset/botmanager/more_icon.png' class='roundbutton popupmenu' data-id='mypopupname2'>
-      <div class='card popupcard right-sided mypopupname2'>
-        POPUP MENU
-        <img src='../botmanager/asset/botmanager/close.png' class='popupcard-close roundbutton-small'>
-        <img src='../botmanager/asset/botmanager/corner.png' class='popupcard-pointer'>
-      </div>
+      <div class='textinputlabel'>Slider</div>
+      <input class="myslider plainslider" min="0" max="60" type="range" value="30" />
     </div>
     <div class='tab-content tab2'>TAB 2</div>
     <div class='tab-content tab3'>TAB 3</div>

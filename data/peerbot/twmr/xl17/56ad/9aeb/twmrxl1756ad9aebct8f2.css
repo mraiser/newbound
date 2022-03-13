@@ -6,3 +6,7 @@
 .updateablepeerstable{
   white-space: normal;
 }
+
+.updatechip{
+  margin-right: -10px;
+}

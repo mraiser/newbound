@@ -13,7 +13,6 @@
 
 .rp-uuid {
   font-size:x-small;
-  margin-top:-10px;
 }
 
 .width100{
@@ -29,17 +28,13 @@
   color:#83bc00;
 }
 
-.upsome{
-  margin-top:-20px;
-}
-
 .padsome{
   padding:20px;
 }
 
 .clickmore{
-  color:#83bc00;
   cursor:pointer;
+  vertical-align:middle;
 }
 
 .moreip{
@@ -74,6 +69,14 @@
   color:white;
 }
 
+.whitetext input[type='checkbox'], .uptable input[type='checkbox'] {
+  border-color:white;
+}
+
+.whitetext input[type='checkbox']:checked, .uptable input[type='checkbox']:checked {
+  border-color:#83bc00;
+}
+
 .controlsettings{
   display:none;
 }
@@ -95,8 +98,9 @@
   margin-top:30px;
 }
 
-.remlab > .mdl-checkbox__box-outline{
-  border-color:white;
+.remlab{
+  display:block;
+  width:308px;
 }
 
 .remlab > .mdl-checkbox__label{
@@ -106,3 +110,102 @@
 .remoteallowcheckboxes{
   display:none;
 }
+
+.rp-name {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 400;
+}
+
+.nonstick{
+  position:inherit;
+}
+
+
+
+
+
+
+.aclist th, .aclist td{
+  padding-top:12px;
+  padding-bottom:12px;
+  padding-left:24px;
+  padding-right:18px;
+  position:relative;
+}
+
+.aclisttablebody tr:hover{
+  background-color: #0002;
+}
+
+.controlsettings ul{
+  list-style-type: none;
+}
+
+
+
+
+
+
+.mdl-data-table__cell--non-numeric{
+  text-align:left;
+}
+
+.mdl-data-table {
+  font-size:13px;
+  border-collapse: collapse;
+}
+
+.mdl-menu__item:hover {
+  background-color: #0002;
+}
+
+.mdl-menu__item[disabled], .mdl-menu__item[data-mdl-disabled] {
+    color: #bdbdbd;
+    background-color: transparent;
+    cursor: auto;
+}
+
+.mdl-menu__item {
+    display: block;
+    border: none;
+    color: rgba(0,0,0,.87);
+    background-color: transparent;
+    text-align: left;
+    margin: 0;
+    padding: 0 16px;
+    outline-color: #bdbdbd;
+    position: relative;
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-decoration: none;
+    cursor: pointer;
+    height: 48px;
+    line-height: 48px;
+    white-space: nowrap;
+    transition: opacity .2s cubic-bezier(.4,0,.2,1);
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.morebutton{
+  vertical-align:middle;
+}
+
+.rp-more{
+  position:absolute;
+  z-index:10;
+  margin:0px;
+  padding-right:0px !important;
+  display:none;
+}
+
+.rp-more ul{
+  padding:0px;
+  margin:0px;
+}
+

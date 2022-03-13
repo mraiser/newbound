@@ -1,8 +1,14 @@
 var me = this;
 var ME = $('#'+me.UUID)[0];
 
+me.uiReady = function(ui){
+  me.ui = ui;
+  $(ME).find('.wrap').css('display', 'block');
+};
+
 me.ready = function(){
-  componentHandler.upgradeAllRegistered();
+  if (typeof componentHandler != 'undefined')
+    componentHandler.upgradeAllRegistered();
 
   var el = $(ME).find('.matrixviewer');
   el.data('orbitcontrols', true);
@@ -101,6 +107,7 @@ $(ME).find('.addpeerbutton').click(function(){
   installControl(el[0], 'metabot', 'popupdialog', function(){
     el.css('display', 'block');
     setTimeout(function(){
+      me.ui.initNavbar(el);
       $('#addcontactbutton').click(newConnection);
       $('#createtheinvite').click(createInvite);
       $('#accepttheinvite').click(acceptInvite);
@@ -180,7 +187,7 @@ function listAccessCodes(){
     for (var i in result.data){
       var rdi = result.data[i];
       var use = rdi.delete == 'true' ? 'single use' : 'reusable';
-      newhtml += '<div class="mdl-chip mdl-chip--deletable"><div class="mdl-chip__text">'+use+': '+rdi.groups+'<br>'+i+'</div><button type="button" class="codechip mdl-chip__action" onclick="deleteaccesscode(\''+i+'\');"><i class="material-icons">cancel</i></button></div> ';
+      newhtml += '<div class="mdl-chip mdl-chip--deletable chip"><div class="mdl-chip__text inline">'+use+': '+rdi.groups+'<br>'+i+'</div><img src="../botmanager/asset/botmanager/close.png" class="codechip mdl-chip__action roundbutton-small" onclick="deleteaccesscode(\''+i+'\');"></div> ';
     }
     $(ME).find('.codelist').html(newhtml);
   });

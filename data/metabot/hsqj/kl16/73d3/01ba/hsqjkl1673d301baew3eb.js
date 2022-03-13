@@ -14,7 +14,7 @@ me.ready = function(){
     me.redraw();
   });
   $(canvas).click(function(){ 
-    var el = $('<div class="popup999"/>');
+    var el = $('<div class="popup999 wrap"/>');
     $('body').append(el);
     var data = {
       title:'Reboot Device',

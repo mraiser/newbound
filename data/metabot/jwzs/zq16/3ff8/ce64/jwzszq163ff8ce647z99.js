@@ -86,20 +86,17 @@ $(ME).find('.updatebutton').click(function(){
 function installNext(){
   'use strict';
   $(ME).find('.installupdates').css('display', 'none');
-  var y = $(ME).find('.is-checked').closest('tr').find('.selectedpeer')[0];
+  var y = $(ME).find(':checked').closest('tr').find('.selectedpeer')[0];
   if (y) install(y);
   else {
     $(ME).find('.showupdates').css('display', 'none');
     
-    var snackbarContainer = document.querySelector('#restart-snackbar');
-
     var handler = function(event) {
       'use strict';
       var data = {
         message: 'The remote device is restarting.'
       };
-      $('.mdl-snackbar__action').css('display', 'none');
-      snackbarContainer.MaterialSnackbar.showSnackbar(data);
+      document.body.api.ui.snackbar(data);
       json(me.remote_prefix+'botmanager/restart', null, function(result){});
     };
     
@@ -107,9 +104,10 @@ function installNext(){
       message: 'You may need to restart the remote device to see changes',
       timeout: 5000,
       actionHandler: handler,
-      actionText: 'restart'
+      actionText: 'restart',
+      width:'600px'
     };
-    snackbarContainer.MaterialSnackbar.showSnackbar(data);
+    document.body.api.ui.snackbar(data);
   }
 }
   
@@ -118,11 +116,13 @@ function install(y){
   var peer = $(y).data('peer');
   var td = $(y).closest('tr').find('td')[0];
   var uuid = guid();
-  var el1 = $('<span>0%</span>');
-  var el2 = $('<div id="a_'+uuid+'" class="libprog mdl-progress mdl-js-progress mdl-progress__indeterminate"></div>');
+  var el1 = $('<span></span>');
+  var el2 = $('<div id="a_'+uuid+'" class="libprog progressbar mdl-progress mdl-js-progress mdl-progress__indeterminate"></div>');
   $(y).parent().parent().append(el2[0]);
-  td.innerHTML = '<i class="material-icons" style="vertical-align:middle;">get_app</i>';
+  td.innerHTML = '<img src="../botmanager/asset/botmanager/download_icon-white.png" class="icon-small-white">';
   $(td).append(el1);
+  document.body.api.ui.initProgress($(y).parent().parent());
+  el2[0].setProgress('indeterminate');
   
   function error(td, msg){
     $(td).html('');
@@ -136,7 +136,7 @@ function install(y){
     });
   }
 
-  el2[0].addEventListener('mdl-componentupgraded', function() {
+//  el2[0].addEventListener('mdl-componentupgraded', function() {
     
     var url = document.URL;
     url = url.substring(url.indexOf(':'));
@@ -150,7 +150,7 @@ function install(y){
 
       json(me.remote_prefix+'metabot/installlib', 'guid=a_'+uuid+'&peer='+peer+'&lib='+lib, function(result){
         if (result.status == 'ok'){
-          el2.removeClass('mdl-progress__indeterminate');
+          el2[0].setProgress(100);
           $(td).closest('tr').remove();
           connection.close();
           installNext();
@@ -168,15 +168,17 @@ function install(y){
     };
 
     connection.onmessage = function(e){
+      console.log(']]]]]]]]]]]]]]]]]]]]]]]]]]');
+      console.log(e);
       if (SOCK) SOCK.onmessage(e);
     };
-  });    
+//  });    
 
   WSCB = function(val){
     if (val.msg) $(y).text(val.msg);
     if (val.percent){
       el2.removeClass('mdl-progress__indeterminate');
-      el2[0].MaterialProgress.setProgress(val.percent);
+      el2[0].setProgress(val.percent);
       el1.text(val.percent+'%');
     }
   };
@@ -234,7 +236,7 @@ function parse(result, p){
 
 function rebuild(){
   $(ME).find('.updatemsg').text('');
-  var newhtml = "<table class='mdl-data-table mdl-js-data-table mdl-data-table--selectable mdl-shadow--2dp uptable'><thead><tr><th class='mdl-data-table__cell--non-numeric'>Library</th><th>Installed</th><th>Available</th><th class='mdl-data-table__cell--non-numeric'>Peer</th></tr></thead><tbody>";
+  var newhtml = "<table cellpadding='10' class='mdl-data-table mdl-js-data-table mdl-data-table--selectable mdl-shadow--2dp uptable'><thead><tr><th><label class='plaincheckbox'><input type='checkbox' class='toggleinstalls'><span></span></label></th><th class='mdl-data-table__cell--non-numeric'>Library</th><th style='text-align:right'>Installed</th><th style='text-align:right'>Available</th><th class='mdl-data-table__cell--non-numeric'>Peer</th></tr></thead><tbody>";
 
   me.updateable = false;
   for (var i in me.updates){
@@ -265,11 +267,13 @@ function rebuild(){
       
       if (which != null){
         var peer = peers[0];
-        newhtml += '<tr><td class="mdl-data-table__cell--non-numeric">'
+        newhtml += '<tr>'
+          + '<td><label class="plaincheckbox"><input type="checkbox" class="installcheckbox"><span></span></label></td>'
+          + '<td class="mdl-data-table__cell--non-numeric">'
           + which.id
-          + '</td><td>'
+          + '</td><td style="text-align:right">'
           + libs.c
-          + '</td><td>'
+          + '</td><td style="text-align:right">'
           + libs.v
           + '</td><td class="mdl-data-table__cell--non-numeric" width="50%">'
           + dd
@@ -286,7 +290,11 @@ function rebuild(){
     var peer = me.peers[uuid];
     $(this).closest('td').find('.selectedpeer').text(peer.name+' ('+uuid+')').data('peer', uuid);
   });
-
+  $(ME).find('.toggleinstalls').click(function(){
+    var val = $(this).prop('checked');
+    $(ME).find('.installcheckbox').prop('checked', val);
+  });
+  
   if (!me.updateable) $(ME).find('.updatemsg').text('There are no updates currently available.');
   componentHandler.upgradeAllRegistered();
   

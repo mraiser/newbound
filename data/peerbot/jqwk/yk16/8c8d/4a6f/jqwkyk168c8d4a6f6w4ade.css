@@ -15,3 +15,12 @@
   position: absolute;
   right: 20px;
 }
+
+.savebutton{
+  color:#83bc00;
+}
+
+.bottomhugger{
+  position:absolute;
+  bottom:20px;
+}

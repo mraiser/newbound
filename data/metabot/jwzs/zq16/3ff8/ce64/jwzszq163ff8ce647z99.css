@@ -20,8 +20,6 @@
 }
 
 .truncme {
-  position: absolute;
-  top:16px;
   max-width: 95%;
   white-space: nowrap;
   overflow: hidden;         
@@ -31,10 +29,11 @@
 .uptable{
   position:relative;
   width:100%;
+  color:white;
 }
 
 .libprog{
-  margin-top:20px;
+  margin-top:5px;
 }
 
 .nothingavail{

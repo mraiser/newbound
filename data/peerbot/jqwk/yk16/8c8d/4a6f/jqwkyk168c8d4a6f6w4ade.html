@@ -1,25 +1,24 @@
-<div class="ctl-card mdl-card mdl-shadow--2dp">
-  <div class="mdl-card__title">
-    <h2 class="mdl-card__title-text">Edit&nbsp;<span class='editctlname'>Control</span></h2>
-    
-    <button id="editcontrolbackbutton" class="editcontrolbackbutton mdl-button mdl-button--icon mdl-js-button mdl-js-ripple-effect">
-      <i class="material-icons">close</i>
-    </button>
-    
-    
-  </div>
-  <div class="mdl-card__supporting-text">
-  <div class="mdl-card__supporting-text scrollsupport">
-    <form action="#">
-      <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-        <input class="mdl-textfield__input" type="text" id="editcontroltitlefield">
-        <label class="mdl-textfield__label" for="editcontroltitlefield">Title</label>
-      </div>
-    </form>            
-    <div class='editcontrolposgoeshere'></div>
-    <div class='editctlwrap'></div>
-  </div>
-  <div class="mdl-card__actions mdl-card--border">
-    <a class="mdl-button mdl-button--colored mdl-js-button mdl-js-ripple-effect savebutton">Save</a>
+<div class="ctl-card mdl-card mdl-shadow--2dp card">
+  <div style="position:relative;color:black;height:100%;">
+    <div class="mdl-card__titlex">
+      <h2 class="mdl-card__title-text card-header">
+        Edit&nbsp;<span class='editctlname'>Control</span>
+        <img src="../botmanager/asset/botmanager/close.png" class="roundbutton-small editcontrolbackbutton" id="editcontrolbackbutton">
+      </h2>    
+    </div>
+    <div class="mdl-card__supporting-text scrollsupport pad16">
+      <form action="#">
+        <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+          <label class="mdl-textfield__label textinputlabel" for="editcontroltitlefield">Title</label>
+          <input class="mdl-textfield__input textinput" type="text" id="editcontroltitlefield">
+        </div>
+      </form>            
+      <div class='editcontrolposgoeshere'></div>
+      <br>
+      <div class='editctlwrap'></div>
+    </div>
+    <div class="mdl-card__actions mdl-card--border card-button-wrap bottomhugger">
+      <a class="mdl-button mdl-button--colored mdl-js-button mdl-js-ripple-effect clearbutton savebutton">Save</a>
+    </div>
   </div>
 </div>

@@ -4,6 +4,9 @@ var ME = $('#'+me.UUID)[0];
 me.data = {"list":[]};
 
 me.ready = me.refresh = function(){
+  document.body.api.ui.initPopups(ME);
+  document.body.api.ui.initNavbar(ME);
+
   $(ME).find('.rp-name').text(ME.DATA.name);
   $(ME).find('.rp-uuid').text(ME.DATA.id);
   
@@ -34,16 +37,16 @@ me.ready = me.refresh = function(){
     var a = ME.DATA.addresses[i];
     var j = a.lastIndexOf(':');
     a = a.substring(0,j);
-    addr += '<span class="mdl-chip"><span class="mdl-chip__text">'+a+'</span></span> ';
+    addr += '<span class="chip mdl-chip"><span class="mdl-chip__text">'+a+'</span></span> ';
   }
-  var ip = 'Port: '+ME.DATA.port+'<br>IP Address: '+ME.DATA.addr+'&nbsp;<i class="material-icons aligncenter clickmore">more_horiz</i><div class="moreip">'+addr+'</div>';
+  var ip = 'Port: '+ME.DATA.port+'<br>IP Address: '+ME.DATA.addr+'&nbsp;<img src="../botmanager/asset/botmanager/more_icon-green.png" class="roundbutton-small-white clickmore"><div class="moreip">'+addr+'</div>';
   $(ME).find('.rp-ipaddr').html(ip).find('.clickmore').click(function(){
-    if ($(this).text() == 'more_horiz'){
-      $(this).text('close');
+    if ($(ME).find('.moreip').css('display') == 'none'){
+      $(this).prop('src', '../botmanager/asset/botmanager/close-green.png');
       $(ME).find('.moreip').css('display', 'block');
     }
     else{
-      $(this).text('more_horiz');
+      $(this).prop('src', '../botmanager/asset/botmanager/more_icon-green.png');
       $(ME).find('.moreip').css('display', 'none');
     }
   });
@@ -80,28 +83,27 @@ me.ready = me.refresh = function(){
             count++
 
             settings += '<li class="mdl-list__item"><span class="mdl-list__item-primary-content">'
-              + '<i class="material-icons mdl-list__item-avatar">settings</i>'
-              + '<button class="editcontrolbutton mdl-button mdl-js-button mdl-js-ripple-effect" data-index="'
+              + '<a class="deletecontrolbutton mdl-list__item-secondary-action" data-index="'
+              + i
+              +'" href="#"><img src="../botmanager/asset/botmanager/delete_icon-white.png" class="roundbutton-small"></a>'
+              + '<button class="editcontrolbutton mdl-button mdl-js-button mdl-js-ripple-effect clearbutton" data-index="'
               + i
               +'" data-ctltype="'
               + ctl.type
               + '">'
               + ctl.title
               + '</button></span>'
-              + '<a class="deletecontrolbutton mdl-list__item-secondary-action" data-index="'
-              + i
-              +'" href="#"><i class="material-icons">delete</i></a>'
               + '</span></li>';
           }
         }
         if (count == 0) wrap.html("");
         else {
-            $('a.mdl-tabs__tab').removeClass('is-active');
-            $('#dashboardtab').addClass('is-active');
-            $('.mdl-tabs__panel').removeClass('is-active');
-            $('#tab2-panel').addClass('is-active');        
+            $('.navbar-tab1').removeClass('selected');
+            $('.navbar-tab2').addClass('selected');
+            $('.mdl-tabs__panel').removeClass('selected');
+            $('#tab2-panel').addClass('selected');        
         }
-        settings += '</ul><button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect editctldonebutton">Done</button>';
+        settings += '</ul><button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect accentbutton editctldonebutton">Done</button>';
         $('.controlsettings').html(settings).find('.editcontrolbutton').click(function(){
           var sa = $(this).data('ctltype').split(':');
           var el = $(ME).find('.popmeup').css('display', 'block')[0];
@@ -176,7 +178,9 @@ me.ready = me.refresh = function(){
       var protocols = result.protocols.split(',');
       for (var i in protocols){
         var p = protocols[i].trim().toLowerCase();
-        $(ME).find('.remoteallow'+p).prop('checked', true).parent()[0].MaterialCheckbox.checkToggleState();
+        var m = $(ME).find('.remoteallow'+p).prop('checked', true);
+        if (typeof MaterialCheckbox != 'undefined')
+          m.parent()[0].MaterialCheckbox.checkToggleState();
       }
       $(ME).find('.remoteallowcheckboxes').css('display', 'block');
       $(ME).find('.remoteprotocol').change(function(e){
@@ -237,11 +241,10 @@ $(ME).find('.hudctlsettings').click(function(){
 
 $(ME).find('.hudrestart').click(function(){
   json('../peerbot/remote/'+ME.DATA.id+'/botmanager/restart', null, function(result){
-    var snackbarContainer = document.querySelector('#restart-snackbar2');
     var data = {
       message: result.msg
     };
-    snackbarContainer.MaterialSnackbar.showSnackbar(data);
+    document.body.api.ui.snackbar(data);
   });
 });
 
@@ -268,4 +271,9 @@ $(ME).find('.deletepeerbutton').click(function(){
   me.network.delete(ME.DATA);
 });
 
+$(ME).find('.rp-more').mouseleave(function(){
+  $(this).css('display','none');
+}).click(function(){
+  $(this).css('display','none');
+});
 
