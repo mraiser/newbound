@@ -3,6 +3,8 @@ package com.newbound.net.service.http;
 import java.io.*;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -206,7 +208,7 @@ public class HTTPService extends Service
 
 	public HTTPResponse handleCommand(String method, Hashtable headers, Hashtable params, String pathx) throws Exception
 	{
-		String path = pathx;
+		String path = URLDecoder.decode(pathx, StandardCharsets.UTF_8.name());
 		if (path.equals("")) path = CONTAINER.getDefault().getIndexFileName();
 
 		String sessionid = (String)params.get("sessionid");
