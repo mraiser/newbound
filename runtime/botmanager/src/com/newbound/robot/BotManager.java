@@ -1001,7 +1001,7 @@ public class BotManager extends BotBase
 		jo.put("id", id);
 		jo.put("data", d);
 		jo.put("username", username);
-		jo.put("sessionid", sessionid);
+		jo.remove("sessionid");
 		jo.put("addr", sessionlocation);
 		jo.put("time", System.currentTimeMillis());
 		if (readers != null) jo.put("readers", rs);

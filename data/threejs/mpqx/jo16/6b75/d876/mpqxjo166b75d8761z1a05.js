@@ -7,7 +7,7 @@ me.ready = function(){
   $('#editmodelbackground').val(ME.DATA.model.background);
   $('#editmodeloverlay').val(ME.DATA.model.overlay);
   $('#opslider').val(ME.DATA.model.overlayopacity);
-  componentHandler.upgradeAllRegistered();
+  //componentHandler.upgradeAllRegistered();
   
   me.viewer = ME.DATA.viewer;
   

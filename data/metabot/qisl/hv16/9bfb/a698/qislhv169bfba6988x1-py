@@ -1,1 +1,1 @@
-{"data":{"import":"import sys\nimport json\n","returntype":"String","type":"python","params":[{"name":"metabot","type":"Bot"}],"attachmentkeynames":["python"],"desc":""},"id":"qislhv169bfba6988x1-py","sessionid":"jvgvwg16b7a4d277bt3","time":1640451047672,"addr":"/0:0:0:0:0:0:0:1:51690","username":"admin"}
+{"data":{"import":"import sys\nimport json\n","returntype":"String","type":"python","params":[{"name":"metabot","type":"Bot"}],"attachmentkeynames":["python"],"desc":""},"id":"qislhv169bfba6988x1-py","time":1640451047672,"addr":"/0:0:0:0:0:0:0:1:51690","username":"admin"}

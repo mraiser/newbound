@@ -5,7 +5,7 @@ var prefix = typeof CURRENTDEVICEID == 'string' ? '../peerbot/remote/'+CURRENTDE
 var cbs = [];
 
 me.ready = function(){
-  componentHandler.upgradeAllRegistered();
+  //componentHandler.upgradeAllRegistered();
   
   var validchars = 'abcdefghijklmnopqrstuvwxyz_0123456789';
 

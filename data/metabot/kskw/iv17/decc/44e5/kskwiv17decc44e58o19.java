@@ -70,6 +70,18 @@ for (i=0;i<sa.length;i++)
       if (!ff.remove(f3)) 
         break; // Not compatible with encrypted libraries
       
+      if (ctl.has("attachmentkeynames")) {
+        JSONArray ja = ctl.getJSONArray("attachmentkeynames");
+        int k = ja.length();
+        while (k-->0)
+        {
+          String suffix = ja.getString(k);
+          File f4 = new File(f3.getParent(), id+"."+suffix);
+//          System.out.println(f4);
+          ff.remove(f4);
+        }
+      }
+      
       if (ctl.has("timer"))
       {
         JSONArray ja = ctl.getJSONArray("timer");

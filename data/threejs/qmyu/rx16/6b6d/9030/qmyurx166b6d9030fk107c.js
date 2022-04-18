@@ -5,7 +5,7 @@ me.mdb = ME.DATA.mdb ? ME.DATA.mdb : 'runtime';
 me.mid = ME.DATA.mid ? ME.DATA.mid : 'threejs_modellist';
 
 me.ready = function(){
-  componentHandler.upgradeAllRegistered();
+  //componentHandler.upgradeAllRegistered();
   
   var el = $(ME).find('.matrixviewer');
   el.data('orbitcontrols', true);

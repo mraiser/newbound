@@ -212,7 +212,7 @@ me.setPose = function(pose, millis, cb){
   };
   var nrig = me.currentPose.nrig = pose;
   var drig = me.currentPose.drig = {};
-  for (var i in me.rig) if (me.rig[i] != nrig[i]) drig[i] = Number(me.rig[i]);
+  for (var i in nrig) if (me.rig[i] != nrig[i]) drig[i] = Number(me.rig[i]);
   //if (millis == 0) render();
 }
 

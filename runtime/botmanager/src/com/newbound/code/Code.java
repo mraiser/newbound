@@ -384,12 +384,13 @@ public class Code
 
 				evaluateOperation(cmd, in3);
 
-				JSONObject out = cmd.getJSONObject("out"); // FIXME - aren't out & out2 the same?
+				JSONObject out = cmd.getJSONObject("out");
 				list = out2.keys();
 				while (list.hasNext()) {
 					String k = list.next();
 					if (out.has(k)) { // FIXME - JS version outputs an undefined if no out[k]
 						Object val = out.get(k);
+						System.out.println("OUT VAL: "+val);
 						if (list_out.contains(k)) {
 							out3.getJSONArray(k).put(val);
 						} else {
@@ -401,7 +402,7 @@ public class Code
 						}
 					}
 				}
-				if (cmd.getBoolean("FINISHED")) break;
+				if (cmd.has("FINISHED") && cmd.getBoolean("FINISHED")) break;
 				if (n>0) {
 					i++;
 					if (i == count) break;

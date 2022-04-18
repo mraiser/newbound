@@ -6,7 +6,7 @@ me.mdb = ME.DATA.mdb ? ME.DATA.mdb : 'runtime';
 me.mid = ME.DATA.mid ? ME.DATA.mid : 'threejs_modellist';
 
 me.ready = function(){
-  componentHandler.upgradeAllRegistered();
+  ///componentHandler.upgradeAllRegistered();
   json('../botmanager/read', 'db='+me.mdb+'&id='+me.mid, function(result){
     if (result.data && result.data.models) me.models = result.data.models;
     rebuildModels();
