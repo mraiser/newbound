@@ -300,12 +300,12 @@ System.out.println("POST: "+key+": "+value);
 				{
 					Vector<String> v = (Vector<String>)o;
 					String old = v.remove(v.size()-1);
-					old = old+"\r\n"+s;
+					old = old+"\r\n"+oneline;
 					v.addElement(old);
 				}
 				else
 				{
-					String v = o+"\r\n"+s;
+					String v = o+"\r\n"+oneline;
 					headers.put(last, v);
 				}
 			}

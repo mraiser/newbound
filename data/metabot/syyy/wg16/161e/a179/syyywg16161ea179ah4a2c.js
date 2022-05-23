@@ -13,12 +13,12 @@ me.ready = function(){
 
   json('../botmanager/read', 'db='+ME.DATA.db+'&id='+cid, function(result){ 
     me.cmddata = result.data;
-    var code = result.data[lang];
+    var code = lang == "rust" ? result.data["rs"] : result.data[lang];
     $(ME).find('.editcommandiddisplay').text(ME.DATA.cmd.id);
     $(ME).find('.editcommand'+lang+'iddisplay').text(ME.DATA.cmd[lang]);
     $(ME).find('#ecmd_groups').val(result.data.groups);
     $(ME).find('#ecmd_desc').val(result.data.desc);
-    $(ME).find('#commandcode'+lang).val(result.data[lang]);
+    $(ME).find('#commandcode'+lang).val(code);
 
     var rt = result.data.returntype ? result.data.returntype : 'JSONObject';
     $(ME).find('.rtbutton').removeClass('rtbselected');
@@ -36,10 +36,11 @@ me.ready = function(){
     $(ME).find('.cmdlable'+lang).css('display', 'inline-block');
     
     buildParams();
-    
+
     if (result.data.import) {
       if (lang == 'java') $(ME).find('#ecmd_imports').val(result.data.import);
       else if (lang == 'python') $(ME).find('#ecmdpy_imports').val(result.data.import);
+      else if (lang == 'rust') $(ME).find('#ecmdrust_imports').val(result.data.import);
     }
     
     var c = $(ME).find('#commandcode'+lang)[0];
@@ -109,19 +110,23 @@ me.ready = function(){
         var c = $('#commandcode'+lang)[0];
         var data = lang == 'flow' ? me.floweditor.getData() : c.cm.getValue(); //$('#cmd_edit_java').val();
         var returntype = hackFix($(ME).find('.rtbselected')[0].id.substring(3));
-        var imports = lang == 'js' || lang == 'flow' ? '' : lang == 'java' ? $('#ecmd_imports').val() : $('#ecmdpy_imports').val();
+        var imports = lang == "rust" ? $('#ecmdrust_imports').val() : lang == 'js' || lang == 'flow' ? '' : lang == 'java' ? $('#ecmd_imports').val() : $('#ecmdpy_imports').val();
         var desc = $('#ecmd_desc').val().trim();
         var params = me.cmddata.params;
         var cmddata = {};
         var groups = $('#ecmd_groups').val().trim();
         cmddata.type = lang;
-        cmddata[lang] = data;
+        cmddata[lang == "rust" ? "rs" : lang] = data;
         cmddata.params = params;
         cmddata.returntype=returntype;
         cmddata.import = imports;
         cmddata.desc = desc;
-        cmddata.attachmentkeynames = [ lang ];
+        cmddata.attachmentkeynames = [ lang == "rust" ? "rs" : lang ];
         if (groups != '') cmddata.groups = groups;
+        
+        cmddata.lib = ME.DATA.data.db;;
+        cmddata.ctl = ME.DATA.data.name;
+        cmddata.cmd = ME.DATA.name;
 
         console.log("WRITE "+ME.DATA.db+" / "+ME.DATA.cmd[lang]+" / "+readers+" / "+JSON.stringify(cmddata));
         json('../botmanager/write', 'db='+encodeURIComponent(ME.DATA.db)+'&id='+encodeURIComponent(ME.DATA.cmd[lang])+readers+'&data='+encodeURIComponent(JSON.stringify(cmddata)), function(result){
@@ -265,8 +270,8 @@ function inputchange(e){
   $('#savecommandbutton').removeClass('bggray').addClass('bggreen');
 }
 
-var hackfixnames1 = [ 'jsonobject', 'string', 'file', 'inputstream', 'flat' ];
-var hackfixnames2 = [ 'JSONObject', 'String', 'File', 'InputStream', 'FLAT' ];
+var hackfixnames1 = [ 'jsonobject', 'jsonarray', 'string', 'integer', 'float', 'boolean', 'any', 'inputstream', 'flat' ];
+var hackfixnames2 = [ 'JSONObject', 'JSONArray', 'String', 'Integer', 'Float', 'Boolean', 'Any', 'InputStream', 'FLAT' ];
 
 function hackFix(name){
   return hackfixnames2[hackfixnames1.indexOf(name)];

@@ -388,7 +388,7 @@ public class HTTPService extends Service
 		Hashtable h = new Hashtable();
 		h.put("Date", toHTTPDate(new Date()));
 		if (len != -1) h.put("Content-Length", len);
-		if (mimeType != null) h.put("Content-type", mimeType);
+		if (mimeType != null) h.put("Content-Type", mimeType);
 		if (acceptRanges != null) h.put("Accept-Ranges", acceptRanges);
 		if (range != null && range[0] != -1) h.put("Content-Range","bytes "+range[0]+"-"+range[1]+"/"+range[2]);
 		if (expires != -1) h.put("Expires", toHTTPDate(new Date(expires)));

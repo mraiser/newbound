@@ -13,7 +13,8 @@
       <button class='langbutton lbselected' id='lang_java'>Java</button>
       <button class='langbutton' id='lang_python'>Python</button>
       <button class='langbutton' id='lang_js' style='display:none;'>Javascript</button>
-      <button class='langbutton' id='lang_flow' stylex='display:none;'>Flow</button>
+      <button class='langbutton' id='lang_flow'>Flow</button>
+      <button class='langbutton' id='lang_rust'>Rust</button>
     </div>
     <form action="#">
       <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
@@ -45,6 +46,12 @@ import com.newbound.robot.*;
         <label class="mdl-textfield__label" for="ecmd_imports">>Import Statements</label>
       </div>
     </form>              
+    <form action="#" class="importform importrust">
+      <div class="mdl-textfield mdl-js-textfield">
+        <textarea class="mdl-textfield__input" type="text" rows= "5" id="ecmdrust_imports" placeholder="Import classes and/or packages" ></textarea>
+        <label class="mdl-textfield__label" for="ecmdrust_imports">>Import Statements</label>
+      </div>
+    </form>              
     <form action="#" class="importform importpython">
       <div class="mdl-textfield mdl-js-textfield">
         <textarea class="mdl-textfield__input" type="text" rows= "5" id="ecmdpy_imports" placeholder="Import classes and/or packages" >import sys
@@ -64,10 +71,16 @@ import json
   Return Type
   <br><br>
   <button class='rtbutton rtbselected' id='rtbjsonobject'>JSON</button>
+  <button class='rtbutton' id='rtbjsonarray'>Array</button>
   <button class='rtbutton' id='rtbstring'>String</button>
-  <button class='rtbutton' id='rtbfile'>File</button>
-  <button class='rtbutton' id='rtbinputstream'>InputStream</button>
-  <button class='rtbutton' id='rtbflat'>FLAT</button>
+  <button class='rtbutton' id='rtbinteger'>Integer</button>
+  <br>
+  <button class='rtbutton' id='rtbfloat'>Float</button>
+  <button class='rtbutton' id='rtbboolean'>Boolean</button>
+  <button class='rtbutton' id='rtbany'>Any</button>
+  <!-- button class='rtbutton' id='rtbfile'>File</button -->
+  <button class='rtbutton' id='rtbinputstream'>Stream</button>
+  <button class='rtbutton' id='rtbflat' style='display:none;'>FLAT</button>
 </div>
 
 <div class='commandcodediv'>
@@ -88,6 +101,7 @@ import json
     <option value="Boolean">boolean</option>
     <option value="JSONObject">JSONObject</option>
     <option value="JSONArray">JSONArray</option>
+    <option value="Any">Any</option>
     <option value="Data">Data</option>
     <option value="Bot">Bot</option>
   </select>
@@ -101,6 +115,7 @@ import json
   <span class='cmdlable cmdlablejs'>{</span>
   <span class='cmdlable cmdlableflow'>:</span>
   <div class='indent'>
+    <textarea class='cmdlable cmdlablerust' id='commandcoderust'></textarea>
     <textarea class='cmdlable cmdlablejava' id='commandcodejava'></textarea>
     <textarea class='cmdlable cmdlablepython' id='commandcodepython'></textarea>
     <textarea class='cmdlable cmdlablejs' id='commandcodejs'></textarea>
@@ -108,6 +123,7 @@ import json
   </div>
   <span class='cmdlable cmdlablejava'>}</span>
   <br><br>
+  <span class='cmdlable cmdlablerust'>Rust ID: <span class='editcommandrustiddisplay'></span></span>
   <span class='cmdlable cmdlablejava'>Java ID: <span class='editcommandjavaiddisplay'></span></span>
   <span class='cmdlable cmdlablepython'>Python ID: <span class='editcommandpythoniddisplay'></span></span>
   <span class='cmdlable cmdlablejs'>Javascript ID: <span class='editcommandjsiddisplay'></span></span>

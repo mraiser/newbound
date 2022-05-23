@@ -8,7 +8,7 @@ import com.newbound.code.primitive.Primitive;
 public class Minus extends Primitive 
 {
 	public Minus() throws JSONException {
-		super("{ in: { a: {}, b: {} }, out: { c: {} } }");
+		super("{ in: { a: {}, b: {} }, out: { a: {} } }");
 	}
 
 	@Override
@@ -21,7 +21,7 @@ public class Minus extends Primitive
 			Object c = subtract(a, b);
 			if (c == null)
 				throw new RuntimeException("Cannot subtract types " + a.getClass().getName() + " and " + b.getClass().getName());
-			out.put("c", c);
+			out.put("a", c);
 		}
 		catch (Exception x) { x.printStackTrace(); }
 

@@ -1,15 +1,14 @@
 package com.newbound.code.primitive.object;
 
+import com.newbound.code.primitive.Primitive;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.newbound.code.primitive.Primitive;
-
-public class Get extends Primitive 
+public class Length extends Primitive
 {
-	public Get() throws JSONException {
-		super("{ in: { a: {}, b: {} }, out: { a: {} } }");
+	public Length() throws JSONException {
+		super("{ in: { a: {} }, out: { a: {} } }");
 	}
 	
 	@Override
@@ -21,15 +20,11 @@ public class Get extends Primitive
 			Object a = in.get("a");
 			if (a instanceof JSONArray)
 			{
-				int b = in.getInt("b");
-				Object c = ((JSONArray)a).get(b);
-				out.put("c", c);
+				out.put("a", ((JSONArray)a).length());
 			}
 			else
 			{
-				String b = in.getString("b");
-				Object c = ((JSONObject)a).get(b);
-				out.put("c", c);
+				out.put("a", ((String)a).length());
 			}
 		}
 		catch (Exception x) { x.printStackTrace(); }

@@ -1,27 +1,19 @@
 package com.newbound.code;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.lang.reflect.Field;
 import java.util.*;
 
+import com.newbound.code.primitive.math.*;
+import com.newbound.code.primitive.object.*;
+import com.newbound.code.primitive.string.Split;
+import com.newbound.code.primitive.sys.Execute;
+import com.newbound.code.primitive.sys.Time;
 import com.newbound.robot.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import com.newbound.code.primitive.Primitive;
-import com.newbound.code.primitive.math.Divide;
-import com.newbound.code.primitive.math.Equals;
-import com.newbound.code.primitive.math.Int;
-import com.newbound.code.primitive.math.Minus;
-import com.newbound.code.primitive.math.Mod;
-import com.newbound.code.primitive.math.Multiply;
-import com.newbound.code.primitive.math.Plus;
-import com.newbound.code.primitive.object.Get;
-import com.newbound.code.primitive.object.Insert;
-import com.newbound.code.primitive.object.Put;
-import com.newbound.code.primitive.object.Remove;
 //import com.newbound.robot.Primitive;
 
 
@@ -46,16 +38,27 @@ public class Code
 			PRIMS.put("*", new Multiply());
 			PRIMS.put("/", new Divide());
 			PRIMS.put("%", new Mod());
+			PRIMS.put("<", new LessThan());
 			PRIMS.put("int", new Int());
 			PRIMS.put("equals", new Equals());
 
+			// STRING
+			PRIMS.put("split", new Split());
+			PRIMS.put("length", new Length());
+
 			// OBJECT
-			PRIMS.put("Get", new Get());
-			PRIMS.put("Put", new Put());
-			PRIMS.put("Remove", new Remove());
+			PRIMS.put("get", new Get());
+			PRIMS.put("put", new Put());
+			PRIMS.put("remove", new Remove());
+			PRIMS.put("length", new Length());
+			PRIMS.put("to_json", new ToJSON());
 
 			//ARRAY
 			PRIMS.put("insert", new Insert());
+
+			// SYS
+			PRIMS.put("time", new Time());
+			PRIMS.put("execute_command", new Execute());
 		}
 		catch (Exception x) { x.printStackTrace(); }
 	}
@@ -117,7 +120,27 @@ public class Code
 				JSONObject cmd = bb.getData(LIB, pyid).getJSONObject("data");
 				return evalCommandLine(PYTHON, cmd, args, new File(getRoot(py), py+".py"));
 			}
-			
+
+			if (type.equals("rust")) {
+				BotManager bm = (BotManager)BotBase.getBot("botmanager");
+				String homepath = bm.getProperty("rust_home");
+				String id = CODE.getString("rust");
+				JSONObject jo = bm.getData(LIB, id).getJSONObject("data");
+				String ctl = jo.getString("ctl");
+				String cmd = jo.getString("cmd");
+
+				String[] sa = { "flow", LIB, ctl, cmd };
+				File home = new File(homepath);
+				ByteArrayInputStream bais = new ByteArrayInputStream(args.toString().getBytes());
+				Process bogoproc = Runtime.getRuntime().exec(sa, null, home);
+				sa = bm.systemCall(bogoproc, bais);
+
+				if (!sa[1].equals("")) throw new Exception("ERROR: "+sa[1]);
+
+				jo = new JSONObject(sa[0]);
+				return jo;
+			}
+
 			int i;
 			boolean done = false;
 			
@@ -390,7 +413,6 @@ public class Code
 					String k = list.next();
 					if (out.has(k)) { // FIXME - JS version outputs an undefined if no out[k]
 						Object val = out.get(k);
-						System.out.println("OUT VAL: "+val);
 						if (list_out.contains(k)) {
 							out3.getJSONArray(k).put(val);
 						} else {

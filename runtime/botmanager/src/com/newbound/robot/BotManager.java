@@ -1,15 +1,6 @@
 package com.newbound.robot;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintWriter;
-import java.io.StringReader;
+import java.io.*;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -269,7 +260,8 @@ public class BotManager extends BotBase
 			String python = (String)params.get("python");
 			String js = (String)params.get("js");
 			String flow = (String)params.get("flow");
-			return handleCompile(db, id, cmd2, java, python, js, flow, (String)params.get("params"), (String)params.get("import"), (String)params.get("returntype"), (String)params.get("readers"), (String)params.get("writers"), (String)params.get("sessionid"));
+			String rust = (String)params.get("rust");
+			return handleCompile(db, id, cmd2, java, python, js, flow, rust, (String)params.get("params"), (String)params.get("import"), (String)params.get("returntype"), (String)params.get("readers"), (String)params.get("writers"), (String)params.get("sessionid"));
 		}
 		if (cmd.equals("timer") || cmd.startsWith("timer/")) return handleTimer((String)params.get("id"), (String)params.get("mode"), (String)params.get("params"));
 		if (cmd.equals("event") || cmd.startsWith("event/")) return handleEvent((String)params.get("id"), (String)params.get("mode"), (String)params.get("params"));
@@ -1711,19 +1703,63 @@ public class BotManager extends BotBase
 		return data;
 	}
 	
-	public JSONObject handleCompile(String db, String id, String cmd, String java, String python, String js, String flow, String params, String imports, String returntype, String readers, String writers, String sessionidx) throws Exception
+	public JSONObject handleCompile(String db, String id, String cmd, String java, String python, String js, String flow, String rust, String params, String imports, String returntype, String readers, String writers, String sessionidx) throws Exception
 	{
-		JSONObject jo;
-		if (java != null) jo = handleSaveJava(db, id, cmd, java, params, imports, returntype, readers, writers, sessionidx);
-		else if (python != null) jo = handleSavePython(db, id, cmd, python, params, imports, returntype, readers, writers, sessionidx);
-		else if (js != null) jo = handleSaveJavascript(db, id, cmd, js, params, imports, returntype, readers, writers, sessionidx);
-		else if (flow != null) jo = handleSaveFlow(db, id, cmd, flow, params, imports, returntype, readers, writers, sessionidx);
-		else throw new Exception("No readable code");
-		
-		if (java != null) new Code(jo, db).precompile();
+		JSONObject jo = null;
+		if (python != null) jo = handleSavePython(db, id, cmd, python, params, imports, returntype, readers, writers, sessionidx);
+		if (js != null) jo = handleSaveJavascript(db, id, cmd, js, params, imports, returntype, readers, writers, sessionidx);
+		if (flow != null) jo = handleSaveFlow(db, id, cmd, flow, params, imports, returntype, readers, writers, sessionidx);
+		if (rust != null) jo = handleSaveRust(db, id, cmd, rust, params, imports, returntype, readers, writers, sessionidx);
+		if (java != null)
+		{
+			jo = handleSaveJava(db, id, cmd, java, params, imports, returntype, readers, writers, sessionidx);
+			new Code(jo, db).precompile();
+		}
+
+		if (jo == null) throw new Exception("No readable code");
+
 		jo.put("cmd", cmd);
 		
 		return jo;
+	}
+
+	private JSONObject handleSaveRust(String db, String id, String cmd, String code, String params, String imports, String returntype, String readers, String writers, String sessionidx) throws Exception {
+		String homepath = PROPERTIES.getProperty("rust_home");
+		if (homepath == null) throw new Exception("No home directory set for Rust. Add 'rust_home' to runtime/botmanager/botd.properties and restart.");
+
+		JSONObject jo = getData(db, cmd).getJSONObject("data");
+		String ctl = jo.getString("ctl");
+		String cmdname = jo.getString("cmd");
+
+		String[] sa = { "flowb", db, ctl, cmdname };
+		File home = new File(homepath);
+		Process bogoproc = Runtime.getRuntime().exec(sa, null, home);
+		sa = systemCall(bogoproc, (InputStream) null);
+
+		sa = new String[] {"cargo", "build", "--release" };
+		bogoproc = Runtime.getRuntime().exec(sa, null, home);
+		sa = systemCall(bogoproc, (InputStream) null);
+
+		ByteArrayInputStream bais = new ByteArrayInputStream(sa[1].getBytes());
+		BufferedReader br = new BufferedReader(new InputStreamReader(bais));
+		String err = "";
+		String line;
+		while ((line = br.readLine()) != null)
+		{
+			if (line.startsWith("error"))
+			{
+				err += line + "\n";
+				while ((line = br.readLine()) != null)
+				{
+					err += line + "\n";
+					if (line.equals("")) break;
+				}
+			}
+		}
+
+		if (!err.equals("")) throw new Exception(err);
+
+		return newResponse();
 	}
 
 	private JSONObject handleSaveFlow(String db, String id, String cmd, String code, String params, String imports, String returntype, String readers, String writers, String sessionidx) {
@@ -1816,6 +1852,29 @@ public class BotManager extends BotBase
 		while ((oneline = br.readLine()) != null) news += indent + oneline + "\r";
 		br.close();
 		return news;
+	}
+
+	public String lookupCmdId(String lib, String ctl, String cmd) throws Exception {
+		JSONObject libjo = getData(lib, "controls").getJSONObject("data");
+		JSONArray ja = libjo.getJSONArray("list");
+		int i = ja.length();
+		while (i-->0) {
+			JSONObject ctljo = ja.getJSONObject(i);
+			if (ctl.equals(ctljo.getString("name"))) {
+				String ctlid = ctljo.getString("id");
+				ctljo = getData(lib, ctlid).getJSONObject("data");
+				ja = ctljo.getJSONArray("cmd");
+				i = ja.length();
+				while (i-->0) {
+					JSONObject cmdjo = ja.getJSONObject(i).getJSONObject("data");
+					if (cmd.equals(cmdjo.getString("name"))){
+						return cmdjo.getString("id");
+					}
+				}
+				break;
+			}
+		}
+		return null;
 	}
 
 	public Object handleExecute(String db, String id, JSONObject args, String sessionid) throws Exception
