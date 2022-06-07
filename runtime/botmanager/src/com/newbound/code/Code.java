@@ -4,10 +4,13 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.util.*;
 
+import com.newbound.code.primitive.NativePrimitive;
+import com.newbound.code.primitive.NativePrimitiveCall;
 import com.newbound.code.primitive.math.*;
 import com.newbound.code.primitive.object.*;
 import com.newbound.code.primitive.string.Split;
 import com.newbound.code.primitive.sys.Execute;
+import com.newbound.code.primitive.sys.Sleep;
 import com.newbound.code.primitive.sys.Time;
 import com.newbound.robot.*;
 import org.json.JSONArray;
@@ -32,33 +35,55 @@ public class Code
 	static
 	{
 		try {
-			// MATH
-			PRIMS.put("+", new Plus());
-			PRIMS.put("-", new Minus());
-			PRIMS.put("*", new Multiply());
-			PRIMS.put("/", new Divide());
-			PRIMS.put("%", new Mod());
-			PRIMS.put("<", new LessThan());
-			PRIMS.put("int", new Int());
-			PRIMS.put("equals", new Equals());
+			try {
+				String s = NativePrimitiveCall.list();
+				JSONArray ja = new JSONArray(s);
+				int n = ja.length();
+				for (int i=0; i<n; i++) {
+					JSONObject jo = ja.getJSONObject(i);
+					String name = jo.getString("name");
+					String io = jo.getString("io");
+					PRIMS.put(name, new NativePrimitive(name, io));
+				}
+			}
+			catch (Exception x) {
+				x.printStackTrace();
+				System.out.println("Native flow not installed (flowlib). Please install native flow library.");
 
-			// STRING
-			PRIMS.put("split", new Split());
-			PRIMS.put("length", new Length());
+				// MATH
+				PRIMS.put("+", new Plus());
+				PRIMS.put("-", new Minus());
+				PRIMS.put("*", new Multiply());
+				PRIMS.put("/", new Divide());
+				PRIMS.put("%", new Mod());
+				PRIMS.put("<", new LessThan());
+				PRIMS.put("int", new Int());
+				PRIMS.put("equals", new Equals());
 
-			// OBJECT
-			PRIMS.put("get", new Get());
-			PRIMS.put("put", new Put());
-			PRIMS.put("remove", new Remove());
-			PRIMS.put("length", new Length());
-			PRIMS.put("to_json", new ToJSON());
+				// STRING
+				PRIMS.put("split", new Split());
+				PRIMS.put("length", new Length());
 
-			//ARRAY
-			PRIMS.put("insert", new Insert());
+				// OBJECT
+				PRIMS.put("get", new Get());
+				PRIMS.put("put", new Put());
+				PRIMS.put("remove", new Remove());
+				PRIMS.put("length", new Length());
+				PRIMS.put("to_json", new ToJSON());
+				PRIMS.put("has", new Has());
 
-			// SYS
-			PRIMS.put("time", new Time());
-			PRIMS.put("execute_command", new Execute());
+				//ARRAY
+				PRIMS.put("insert", new Insert());
+
+				// SYS
+				PRIMS.put("time", new Time());
+				PRIMS.put("sleep", new Sleep());
+				PRIMS.put("execute_command", new Execute());
+
+				// TCP
+				PRIMS.put("tcp_listen", new NativePrimitive("tcp_listen", "{ in: { address: {}, port: {} }, out: { a: {} } }"));
+				PRIMS.put("tcp_accept", new NativePrimitive("tcp_accept", "{ in: { listener: {} }, out: { a: {} } }"));
+			}
 		}
 		catch (Exception x) { x.printStackTrace(); }
 	}

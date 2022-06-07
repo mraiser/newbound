@@ -1736,14 +1736,32 @@ public class BotManager extends BotBase
 		Process bogoproc = Runtime.getRuntime().exec(sa, null, home);
 		sa = systemCall(bogoproc, (InputStream) null);
 
-		sa = new String[] {"cargo", "build", "--release" };
-		bogoproc = Runtime.getRuntime().exec(sa, null, home);
-		sa = systemCall(bogoproc, (InputStream) null);
-
 		ByteArrayInputStream bais = new ByteArrayInputStream(sa[1].getBytes());
 		BufferedReader br = new BufferedReader(new InputStreamReader(bais));
 		String err = "";
 		String line;
+		while ((line = br.readLine()) != null)
+		{
+			if (line.startsWith("thread 'main' panicked"))
+			{
+				err += line + "\n";
+				while ((line = br.readLine()) != null)
+				{
+					err += line + "\n";
+					if (line.equals("")) break;
+				}
+			}
+		}
+
+		if (!err.equals("")) throw new Exception(err);
+
+		sa = new String[] {"cargo", "build", "--release" };
+		bogoproc = Runtime.getRuntime().exec(sa, null, home);
+		sa = systemCall(bogoproc, (InputStream) null);
+
+		bais = new ByteArrayInputStream(sa[1].getBytes());
+		br = new BufferedReader(new InputStreamReader(bais));
+		err = "";
 		while ((line = br.readLine()) != null)
 		{
 			if (line.startsWith("error"))

@@ -52,7 +52,9 @@ me.ready = function(){
   json("../botmanager/primitives", null, function(result){
     me.prims = result;
     var list = [];
-    for (var name in me.prims) list.push(name);
+    for (var name in me.prims) 
+      if (typeof me.prims[name] != "string")
+        list.push(name);
     var d = { 
       "list": list,
       "value": ME.DATA.name,
