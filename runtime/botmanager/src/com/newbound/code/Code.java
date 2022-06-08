@@ -550,12 +550,32 @@ public class Code
 			}
 			else if (type.equals("match"))
 			{
-				Object a = in.get((String) in.keys().next());
+				Iterator keys = in.keys();
+				Object a = keys.hasNext() ? in.get((String) keys.next()) : null;
 				String ctype = cmd.getString("ctype");
-				Object val1 = forceType(ctype, a);
-				Object val2 = forceType(ctype, cmd.get("name"));
-				b = val1.equals(val2);
+				if (ctype.equals("null")) b = a == null;
+				else {
+					Object val1 = a; //forceType(ctype, a);
+					Object val2 = forceType(ctype, cmd.get("name"));
+					b = val1 == null ? false : val1.equals(val2);
+				}
 				out = new JSONObject();
+			}
+			else if (type.equals("persistent"))
+			{
+				String key = cmd.getString("name");
+				MetaBot mb = MetaBot.getMetaBot();
+				if (in.length()>0) {
+					Object a = in.get((String) in.keys().next());
+					mb.global(key, a);
+				}
+				out = cmd.getJSONObject("out");
+				Iterator<String> i = out.keys();
+				Object val = mb.global(key);
+				while (i.hasNext()) {
+					key = i.next();
+					out.put(key, val);
+				}
 			}
 			else out = new JSONObject();
 
@@ -617,6 +637,10 @@ public class Code
 		{
 			if (val instanceof JSONArray) return (JSONArray)val;
 			return new JSONArray(val.toString());
+		}
+		if (atype.equals("null"))
+		{
+			return null;
 		}
 
 		throw new Exception("Unknown type: "+atype);

@@ -19,7 +19,7 @@ me.ready = function(){
   
   if (!ME.DATA.type) ME.DATA.type = "local";
   var d = { 
-    "list": [ "local", "function", "primitive", "constant", "command", "match" ],
+    "list": [ "local", "function", "primitive", "constant", "command", "match", "persistent" ],
     "value": ME.DATA.type,
     "label": "Type",
     "cb": function(val){
@@ -75,11 +75,18 @@ me.ready = function(){
   
   if (!ME.DATA.ctype) ME.DATA.ctype = 'string';
   var d = { 
-    "list": [ "int", "decimal", "boolean", "string", "object", "array", "me", "ME" ],
+    "list": [ "int", "decimal", "boolean", "string", "object", "array", "me", "ME", "null" ],
     "value": ME.DATA.ctype,
     "label": "Constant Type",
     "cb": function(val){
       ME.DATA.ctype = val;
+      var b = val == "null";
+      if (b) {
+        $(ME).find('.operation_name').val("null");
+        $(ME).find(".operation_cvalue").val("null").closest("form").css("display","none");
+        me.parent.setLabel("null");
+      }
+      else $(ME).find(".operation_cvalue").val("null").closest("form").css("display","block");
     }
   };
   var el = $(ME).find(".operation_ctype_list_div");
@@ -139,7 +146,7 @@ function updateLayout(){
   }
   else $(ME).find(".conditionselectdiv").css("display", "block");
   
-  $(ME).find(".operation_name").closest("form").css("display", ME.DATA.type == "local" || ME.DATA.type == "match" || ME.DATA.type == "function" ? "block" : "none"); 
+  $(ME).find(".operation_name").closest("form").css("display", ME.DATA.type == "local" || ME.DATA.type == "match" || ME.DATA.type == "function" || ME.DATA.type == "persistent" ? "block" : "none"); 
   $(ME).find(".operation_prim_list_div").css("display", ME.DATA.type == "primitive" ? "block" : "none"); 
   $(ME).find(".operation_ctype").css("display", ME.DATA.type == "constant" || ME.DATA.type == "match" ? "block" : "none");   
   $(ME).find(".commandselectdiv").css("display", ME.DATA.type == "command" ? "block" : "none");   
