@@ -18,6 +18,9 @@ public class NativePrimitive extends Primitive
     {
         String args = query.toString();
         String result = NativePrimitiveCall.call(name, args);
-        return new JSONObject(result);
+        try {
+            return new JSONObject(result);
+        }
+        catch(JSONException x) { throw new RuntimeException(result); }
     }
 }
