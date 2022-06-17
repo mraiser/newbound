@@ -37,6 +37,8 @@ public class BotManager extends BotBase
 	protected Timer mTimer = new Timer();
 	protected String mSystemSessionID = null;
 
+	public static boolean LIBFLOW = false;
+
 	public BotManager(File root)
 	{
 		this();
@@ -51,7 +53,11 @@ public class BotManager extends BotBase
 	public void init() throws Exception
 	{
 		super.init();
-		
+
+		String libflow = PROPERTIES.getProperty("libflow");
+		if (libflow != null && libflow.equals("true"))
+			LIBFLOW = true;
+
 		addNumThreads(100); // For timer task execution and general availability
 /*		
 		File old = new File(getRootDir(), "data");
@@ -1230,7 +1236,7 @@ public class BotManager extends BotBase
 	  return isok;
 	}
 	
-	private File getDB(String id)
+	public File getDB(String id)
 	{
 //	  File f = new File(getRootDir(), "data");
 	  File f = new File(getRootDir().getParentFile().getParentFile(), "data");
@@ -1724,16 +1730,17 @@ public class BotManager extends BotBase
 	}
 
 	private JSONObject handleSaveRust(String db, String id, String cmd, String code, String params, String imports, String returntype, String readers, String writers, String sessionidx) throws Exception {
-		String homepath = PROPERTIES.getProperty("rust_home");
-		if (homepath == null) throw new Exception("No home directory set for Rust. Add 'rust_home' to runtime/botmanager/botd.properties and restart.");
+//		String homepath = PROPERTIES.getProperty("rust_home");
+//		if (homepath == null) throw new Exception("No home directory set for Rust. Add 'rust_home' to runtime/botmanager/botd.properties and restart.");
 
 		JSONObject jo = getData(db, cmd).getJSONObject("data");
 		String ctl = jo.getString("ctl");
 		String cmdname = jo.getString("cmd");
 
 		String[] sa = { "flowb", db, ctl, cmdname };
-		File home = new File(homepath);
-		Process bogoproc = Runtime.getRuntime().exec(sa, null, home);
+//		File home = new File(homepath);
+//		Process bogoproc = Runtime.getRuntime().exec(sa, null, home);
+		Process bogoproc = Runtime.getRuntime().exec(sa, null, null);
 		sa = systemCall(bogoproc, (InputStream) null);
 
 		ByteArrayInputStream bais = new ByteArrayInputStream(sa[1].getBytes());
@@ -1756,7 +1763,8 @@ public class BotManager extends BotBase
 		if (!err.equals("")) throw new Exception(err);
 
 		sa = new String[] {"cargo", "build", "--release" };
-		bogoproc = Runtime.getRuntime().exec(sa, null, home);
+//		bogoproc = Runtime.getRuntime().exec(sa, null, home);
+		bogoproc = Runtime.getRuntime().exec(sa, null, null);
 		sa = systemCall(bogoproc, (InputStream) null);
 
 		bais = new ByteArrayInputStream(sa[1].getBytes());

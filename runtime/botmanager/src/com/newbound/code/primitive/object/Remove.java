@@ -9,7 +9,7 @@ import com.newbound.code.primitive.Primitive;
 public class Remove extends Primitive 
 {
 	public Remove() throws JSONException {
-		super("{ in: { a: {}, b: {} }, out: { c: {} } }");
+		super("{ in: { a: {}, b: {} }, out: { a: {} } }");
 	}
 	
 	@Override
@@ -23,13 +23,13 @@ public class Remove extends Primitive
 			{
 				int b = in.getInt("b");
 				Object c = ((JSONArray)a).remove(b);
-				out.put("c", c);
+				out.put("a", c);
 			}
 			else
 			{
 				String b = in.getString("b");
 				Object c = ((JSONObject)a).remove(b);
-				out.put("c", c);
+				out.put("a", c);
 			}
 		}
 		catch (Exception x) { x.printStackTrace(); }

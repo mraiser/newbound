@@ -5,19 +5,17 @@ import java.io.File;
 import java.util.*;
 
 import com.newbound.code.primitive.NativePrimitive;
-import com.newbound.code.primitive.NativePrimitiveCall;
+import com.newbound.code.primitive.data.*;
 import com.newbound.code.primitive.math.*;
 import com.newbound.code.primitive.object.*;
+import com.newbound.code.primitive.object.Set;
 import com.newbound.code.primitive.string.Split;
-import com.newbound.code.primitive.sys.Execute;
-import com.newbound.code.primitive.sys.Sleep;
-import com.newbound.code.primitive.sys.Time;
+import com.newbound.code.primitive.sys.*;
 import com.newbound.robot.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import com.newbound.code.primitive.Primitive;
-//import com.newbound.robot.Primitive;
 
 
 public class Code 
@@ -25,7 +23,6 @@ public class Code
 	private static final boolean DEBUG = false;
 	private static File ROOT = null;
 	private boolean FINISHFLAG = false;
-
 	public static JSONObject PRIMS = new JSONObject();
 	public static String PYTHON = "python3"; //"/Library/Frameworks/Python.framework/Versions/3.6/bin/python3";
 
@@ -35,21 +32,10 @@ public class Code
 	static
 	{
 		try {
-			try {
-				String s = NativePrimitiveCall.list();
-				JSONArray ja = new JSONArray(s);
-				int n = ja.length();
-				for (int i=0; i<n; i++) {
-					JSONObject jo = ja.getJSONObject(i);
-					String name = jo.getString("name");
-					String io = jo.getString("io");
-					PRIMS.put(name, new NativePrimitive(name, io));
-				}
+			if (BotManager.LIBFLOW) {
+				NativePrimitive.init(PRIMS);
 			}
-			catch (Exception x) {
-				x.printStackTrace();
-				System.out.println("Native flow not installed (flowlib). Please install native flow library.");
-
+			else {
 				// MATH
 				PRIMS.put("+", new Plus());
 				PRIMS.put("-", new Minus());
@@ -66,23 +52,28 @@ public class Code
 
 				// OBJECT
 				PRIMS.put("get", new Get());
-				PRIMS.put("put", new Put());
+				PRIMS.put("set", new Set());
 				PRIMS.put("remove", new Remove());
 				PRIMS.put("length", new Length());
 				PRIMS.put("to_json", new ToJSON());
 				PRIMS.put("has", new Has());
 
 				//ARRAY
-				PRIMS.put("insert", new Insert());
+				PRIMS.put("push", new Push());
 
 				// SYS
 				PRIMS.put("time", new Time());
 				PRIMS.put("sleep", new Sleep());
 				PRIMS.put("execute_command", new Execute());
+				PRIMS.put("unique_session_id", new UniqueSessionID());
+				PRIMS.put("stdout", new StdOut());
 
-				// TCP
-				PRIMS.put("tcp_listen", new NativePrimitive("tcp_listen", "{ in: { address: {}, port: {} }, out: { a: {} } }"));
-				PRIMS.put("tcp_accept", new NativePrimitive("tcp_accept", "{ in: { listener: {} }, out: { a: {} } }"));
+				// DATA
+				PRIMS.put("library_exists", new LibraryExists());
+				PRIMS.put("library_new", new LibraryNew());
+				PRIMS.put("data_exists", new DataExists());
+				PRIMS.put("data_read", new DataRead());
+				PRIMS.put("data_write", new DataWrite());
 			}
 		}
 		catch (Exception x) { x.printStackTrace(); }
@@ -111,7 +102,7 @@ public class Code
 
 		//FIXME - Total hack
 		try {
-			if (CODE.has("type") && CODE.get("type").equals("flow") && CODE.has("flow"))
+			if (!BotManager.LIBFLOW && CODE.has("type") && CODE.get("type").equals("flow") && CODE.has("flow"))
 				CODE = BotBase.getBot("botmanager").getData(LIB, CODE.getString("flow")).getJSONObject("data").getJSONObject("flow");
 		}
 		catch (Exception x) { x.printStackTrace(); }
@@ -146,18 +137,19 @@ public class Code
 				return evalCommandLine(PYTHON, cmd, args, new File(getRoot(py), py+".py"));
 			}
 
-			if (type.equals("rust")) {
+			if (type.equals("rust") || BotManager.LIBFLOW) {
 				BotManager bm = (BotManager)BotBase.getBot("botmanager");
-				String homepath = bm.getProperty("rust_home");
-				String id = CODE.getString("rust");
+//				String homepath = bm.getProperty("rust_home");
+				String id = CODE.getString(type);
 				JSONObject jo = bm.getData(LIB, id).getJSONObject("data");
 				String ctl = jo.getString("ctl");
 				String cmd = jo.getString("cmd");
 
 				String[] sa = { "flow", LIB, ctl, cmd };
-				File home = new File(homepath);
+//				File home = new File(homepath);
 				ByteArrayInputStream bais = new ByteArrayInputStream(args.toString().getBytes());
-				Process bogoproc = Runtime.getRuntime().exec(sa, null, home);
+//				Process bogoproc = Runtime.getRuntime().exec(sa, null, home);
+				Process bogoproc = Runtime.getRuntime().exec(sa, null, null);
 				sa = bm.systemCall(bogoproc, bais);
 
 				if (!sa[1].equals("")) throw new Exception("ERROR: "+sa[1]);
@@ -407,7 +399,8 @@ public class Code
 		}
 
 		int n = list_in.size();
-		if (n == 0 && loop_out.size() == 0) evaluateOperation(cmd, in);
+		int loopn = loop_out.size();
+		if (n == 0 && loopn == 0) evaluateOperation(cmd, in);
 		else {
 			JSONObject out3 = new JSONObject();
 			for (int i = 0; i < list_out.size(); i++) out3.put((String) list_out.get(i), new JSONArray());
@@ -418,7 +411,17 @@ public class Code
 			}
 
 			int i = 0;
-			while (true) {
+			if (loopn == 0 && count == 0) {
+				cmd.put("done", true);
+/*
+				keys = out2.keys();
+				while (keys.hasNext()) {
+					String name = (String) keys.next();
+					if (!out3.has(name)) out3.put(name, new JSONObject());
+				}
+ */
+			}
+			else while (true) {
 				JSONObject in3 = new JSONObject();
 				Iterator<String> list = in.keys();
 				while (list.hasNext()) {
@@ -495,11 +498,21 @@ public class Code
 			if (type.equals("primitive")) out = ((Primitive) PRIMS.get(cmd.getString("name"))).execute(in);
 			else if (type.equals("local"))
 			{
-				JSONObject code = cmd.getJSONObject("localdata");
-				code = deepCopy(code); // Fixme - evaluating a local shouldn't break it for reuse.
-				Code c = new Code(code, LIB);
-				out = c.execute(in);
-				cmd.put("FINISHED", c.FINISHFLAG);
+				if (!cmd.has("localdata")) {
+					out = cmd.getJSONObject("out");
+					Iterator<String> i = out.keys();
+					while (i.hasNext()) {
+						String key = i.next();
+						out.put(key, (JSONObject)null);
+					}
+				}
+				else {
+					JSONObject code = cmd.getJSONObject("localdata");
+					code = deepCopy(code); // Fixme - evaluating a local shouldn't break it for reuse.
+					Code c = new Code(code, LIB);
+					out = c.execute(in);
+					cmd.put("FINISHED", c.FINISHFLAG);
+				}
 			}
 			else if (type.equals("command")) {
 				PeerBot pb = PeerBot.getPeerBot();

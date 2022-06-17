@@ -1,0 +1,10 @@
+[package]
+name = "newbound"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+flow = { path = "../../rust/flow" }
+ndata="0.1.3"
+#ndata = { path = "../../rust/ndata" }
+

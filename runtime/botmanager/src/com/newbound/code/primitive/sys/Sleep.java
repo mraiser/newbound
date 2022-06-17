@@ -12,7 +12,7 @@ public class Sleep extends Primitive {
     @Override
     public JSONObject execute(JSONObject query) {
         JSONObject jo = new JSONObject();
-        long millis = jo.getLong("a");
+        long millis = query.getLong("millis");
         try { Thread.sleep(millis); } catch (Exception x) {}
         return jo;
     }

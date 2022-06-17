@@ -234,3 +234,4 @@ dmypy.json
 /runtime/pushtotalk/
 /data/testflow
 /data/flowlang
+/Cargo.lock

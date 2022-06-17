@@ -6,10 +6,10 @@ import org.json.JSONObject;
 
 import com.newbound.code.primitive.Primitive;
 
-public class Insert extends Primitive 
+public class Push extends Primitive
 {
-	public Insert() throws JSONException {
-		super("{ in: { a: {}, b: {} }, out: { c: {} } }");
+	public Push() throws JSONException {
+		super("{ in: { a: {}, b: {} }, out: { a: {} } }");
 	}
 	
 	@Override
@@ -21,7 +21,7 @@ public class Insert extends Primitive
 			JSONArray a = in.getJSONArray("a");
 			Object b = in.get("b");
 			Object c = a.put(b);
-			out.put("c", c);
+			out.put("a", c);
 		}
 		catch (Exception x) { x.printStackTrace(); }
 

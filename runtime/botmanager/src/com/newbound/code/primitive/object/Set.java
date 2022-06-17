@@ -6,10 +6,10 @@ import org.json.JSONObject;
 
 import com.newbound.code.primitive.Primitive;
 
-public class Put extends Primitive 
+public class Set extends Primitive
 {
-	public Put() throws JSONException {
-		super("{ in: { a: {}, b: {}, c: {} }, out: { d: {} } }");
+	public Set() throws JSONException {
+		super("{ in: { object: {}, key: {}, value: {} }, out: { a: {} } }");
 	}
 	
 	@Override
@@ -18,20 +18,20 @@ public class Put extends Primitive
 		JSONObject out = new JSONObject();
 		try
 		{
-			Object a = in.get("a");
+			Object a = in.get("object");
 			if (a instanceof JSONArray)
 			{
-				Object b = in.get("b");
-				int c = in.getInt("c");
-				Object d = ((JSONArray)a).put(c, b);
-				out.put("d", d);
+				int b = in.getInt("key");
+				Object c = in.get("value");
+				Object d = ((JSONArray)a).put(b,c);
+				out.put("a", d);
 			}
 			else
 			{
-				String b = in.getString("b");
-				Object c = in.get("c");
+				String b = in.getString("key");
+				Object c = in.get("value");
 				Object d = ((JSONObject)a).put(b, c);
-				out.put("d", d);
+				out.put("a", d);
 			}
 		}
 		catch (Exception x) { x.printStackTrace(); }

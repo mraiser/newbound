@@ -23,13 +23,13 @@ public class Get extends Primitive
 			{
 				int b = in.getInt("b");
 				Object c = ((JSONArray)a).get(b);
-				out.put("c", c);
+				out.put("a", c);
 			}
 			else
 			{
 				String b = in.getString("b");
 				Object c = ((JSONObject)a).get(b);
-				out.put("c", c);
+				out.put("a", c);
 			}
 		}
 		catch (Exception x) { x.printStackTrace(); }
