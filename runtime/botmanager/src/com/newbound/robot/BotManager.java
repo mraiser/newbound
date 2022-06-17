@@ -1880,29 +1880,6 @@ public class BotManager extends BotBase
 		return news;
 	}
 
-	public String lookupCmdId(String lib, String ctl, String cmd) throws Exception {
-		JSONObject libjo = getData(lib, "controls").getJSONObject("data");
-		JSONArray ja = libjo.getJSONArray("list");
-		int i = ja.length();
-		while (i-->0) {
-			JSONObject ctljo = ja.getJSONObject(i);
-			if (ctl.equals(ctljo.getString("name"))) {
-				String ctlid = ctljo.getString("id");
-				ctljo = getData(lib, ctlid).getJSONObject("data");
-				ja = ctljo.getJSONArray("cmd");
-				i = ja.length();
-				while (i-->0) {
-					JSONObject cmdjo = ja.getJSONObject(i).getJSONObject("data");
-					if (cmd.equals(cmdjo.getString("name"))){
-						return cmdjo.getString("id");
-					}
-				}
-				break;
-			}
-		}
-		return null;
-	}
-
 	public Object handleExecute(String db, String id, JSONObject args, String sessionid) throws Exception
 	{
 		args.put("sessionid", sessionid);

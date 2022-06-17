@@ -6,11 +6,16 @@ import java.util.*;
 
 import com.newbound.code.primitive.NativePrimitive;
 import com.newbound.code.primitive.data.*;
+import com.newbound.code.primitive.file.FileExists;
+import com.newbound.code.primitive.file.FileReadAllString;
+import com.newbound.code.primitive.file.FileReadProperties;
 import com.newbound.code.primitive.math.*;
 import com.newbound.code.primitive.object.*;
 import com.newbound.code.primitive.object.Set;
 import com.newbound.code.primitive.string.Split;
+import com.newbound.code.primitive.string.Trim;
 import com.newbound.code.primitive.sys.*;
+import com.newbound.code.primitive.sys.Thread;
 import com.newbound.robot.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -49,6 +54,7 @@ public class Code
 				// STRING
 				PRIMS.put("split", new Split());
 				PRIMS.put("length", new Length());
+				PRIMS.put("trim", new Trim());
 
 				// OBJECT
 				PRIMS.put("get", new Get());
@@ -57,6 +63,8 @@ public class Code
 				PRIMS.put("length", new Length());
 				PRIMS.put("to_json", new ToJSON());
 				PRIMS.put("has", new Has());
+				PRIMS.put("index_of", new IndexOf());
+				PRIMS.put("keys", new Keys());
 
 				//ARRAY
 				PRIMS.put("push", new Push());
@@ -67,6 +75,7 @@ public class Code
 				PRIMS.put("execute_command", new Execute());
 				PRIMS.put("unique_session_id", new UniqueSessionID());
 				PRIMS.put("stdout", new StdOut());
+				PRIMS.put("thread", new Thread());
 
 				// DATA
 				PRIMS.put("library_exists", new LibraryExists());
@@ -74,6 +83,11 @@ public class Code
 				PRIMS.put("data_exists", new DataExists());
 				PRIMS.put("data_read", new DataRead());
 				PRIMS.put("data_write", new DataWrite());
+
+				// FILE
+				PRIMS.put("file_exists", new FileExists());
+				PRIMS.put("file_read_all_string", new FileReadAllString());
+				PRIMS.put("file_read_properties", new FileReadProperties());
 			}
 		}
 		catch (Exception x) { x.printStackTrace(); }
@@ -243,6 +257,7 @@ public class Code
 								con.put("done", true);
 								if (dest == -2) {
 									if (val != null) out.put(destname, val);
+									else out.put(destname, JSONObject.NULL);
 									if (DEBUG)
 										System.out.println("Value " + val + " passed to output node " + destname);
 								} else {
@@ -254,6 +269,7 @@ public class Code
 										JSONObject ins = cmd.getJSONObject("in");
 										JSONObject var = ins.getJSONObject(destname);
 										if (val != null) var.put("val", val);
+										else out.put(destname, JSONObject.NULL);
 										var.put("done", true);
 
 										Iterator it = ins.keys();
@@ -429,7 +445,10 @@ public class Code
 					if (!list_in.contains(k)) in3.put(k, in.get(k));
 					else {
 						JSONArray ja = (JSONArray) in.get(k);
-						in3.put(k, ja.get(i));
+						if (ja.length()>i)
+							in3.put(k, ja.get(i));
+						else
+							in3.put(k, JSONObject.NULL);
 					}
 				}
 
@@ -503,7 +522,7 @@ public class Code
 					Iterator<String> i = out.keys();
 					while (i.hasNext()) {
 						String key = i.next();
-						out.put(key, (JSONObject)null);
+						out.put(key, JSONObject.NULL);
 					}
 				}
 				else {

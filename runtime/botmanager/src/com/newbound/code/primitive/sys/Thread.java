@@ -7,9 +7,9 @@ import com.newbound.robot.MetaBot;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class Execute extends Primitive {
-    public Execute() throws JSONException {
-        super("{ in: { lib: {}, ctl: {}, cmd: {}, params: {}}, out: { a: {} } }");
+public class Thread extends Primitive {
+    public Thread() throws JSONException {
+        super("{ in: { lib: {}, ctl: {}, cmd: {}, params: {}}, out: {} }");
     }
 
     @Override
@@ -23,9 +23,20 @@ public class Execute extends Primitive {
             String id = mb.lookupCmdID(lib, ctl, cmd);
             JSONObject src = mb.getData(lib, id).getJSONObject("data");
             Code code = new Code(src, lib);
-            JSONObject jo2 = code.execute(params);
+            Runnable r = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        JSONObject jo2 = code.execute(params);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            };
+            new java.lang.Thread(r).start();
+
             JSONObject jo3 = new JSONObject();
-            jo3.put("a", jo2);
+            jo3.put("a", 1);
             return jo3;
         }
         catch (Exception x) { x.printStackTrace(); }

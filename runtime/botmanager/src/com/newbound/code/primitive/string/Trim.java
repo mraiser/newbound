@@ -1,12 +1,13 @@
-package com.newbound.code.primitive.object;
+package com.newbound.code.primitive.string;
 
 import com.newbound.code.primitive.Primitive;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class ToJSON extends Primitive
+public class Trim extends Primitive
 {
-	public ToJSON() throws JSONException {
+	public Trim() throws JSONException {
 		super("{ in: { a: {} }, out: { a: {} } }");
 	}
 	
@@ -16,8 +17,9 @@ public class ToJSON extends Primitive
 		JSONObject out = new JSONObject();
 		try
 		{
-			JSONObject a = in.getJSONObject("a");
-			out.put("a", a.toString());
+			String a = in.getString("a");
+			a = a.trim();
+			out.put("a", a);
 		}
 		catch (Exception x) { x.printStackTrace(); }
 
