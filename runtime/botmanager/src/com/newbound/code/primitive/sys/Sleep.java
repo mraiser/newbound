@@ -13,7 +13,7 @@ public class Sleep extends Primitive {
     public JSONObject execute(JSONObject query) {
         JSONObject jo = new JSONObject();
         long millis = query.getLong("millis");
-        try { Thread.sleep(millis); } catch (Exception x) {}
+        try { java.lang.Thread.sleep(millis); } catch (Exception x) {}
         return jo;
     }
 }
