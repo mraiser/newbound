@@ -10,7 +10,7 @@ fn main() {
   env::set_var("RUST_BACKTRACE", "1");
   {
     let args = DataObject::new();
-    let cmd = Command::lookup("test", "chuckme", "main");
+    let cmd = Command::lookup("botmanager", "startup", "main");
     let res = cmd.execute(args).unwrap();
     println!("{}", res.to_json());
   }
