@@ -1,7 +1,8 @@
 var me = this; 
 var ME = $('#'+me.UUID)[0];
 
-me.ready = function(){
+me.uiReady = function(ui){
+  me.ui = ui;
   json('../peerbot/getpeerinfo', null, function(result){
     me.my_uuid = result.id;
     if (!document.peers){
@@ -27,12 +28,13 @@ function buildTable(){
     if (p.connected){
       me.checking.push(uuid);
       newhtml += '<tr class="uprow r_'+uuid+'" data-peer="'+uuid+'">'
+        + '<td><label class="plaincheckbox"><input type="checkbox" class="peercheckbox"><span></span></label></td>'
         + '<td class="mdl-data-table__cell--non-numeric">'+p.name+'<br><div style="font-size:x-small;">'+uuid+'</div></td>'
         + '</tr>';
     }
   }
   if (newhtml != ''){
-    newhtml = '<table class="updateablepeerstable mdl-data-table mdl-js-data-table mdl-data-table--selectable mdl-shadow--2dp"><thead><tr><th class="mdl-data-table__cell--non-numeric">Peer</th></tr></thead><tbody>'
+    newhtml = '<table class="tablelist updateablepeerstable mdl-data-table mdl-js-data-table mdl-data-table--selectable mdl-shadow--2dp"><thead><tr><th><label class="plaincheckbox"><input type="checkbox" class="togglepeers"><span></span></label></th><th class="mdl-data-table__cell--non-numeric">Peer</th></tr></thead><tbody>'
       + newhtml
       + '</tbody></table>';
   }
@@ -42,8 +44,10 @@ function buildTable(){
   el.html(newhtml);
   
   $(ME).find('.rebootselectedbutton').css('display', 'inline-block');
-  
-  componentHandler.upgradeAllRegistered();
+  $(ME).find('.togglepeers').change(function(e){
+    $(ME).find('.peercheckbox').prop("checked", $(this).prop("checked"));
+  });
+//  componentHandler.upgradeAllRegistered();
 }
 
 function rebootNextPeer(){

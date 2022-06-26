@@ -13,6 +13,7 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.Vector;
 
+import com.newbound.code.LibFlow;
 import com.newbound.p2p.P2PPeer;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -1737,9 +1738,35 @@ public class BotManager extends BotBase
 		String ctl = jo.getString("ctl");
 		String cmdname = jo.getString("cmd");
 
-		String[] sa = { "flowb", db, ctl, cmdname };
+		if (!LIBFLOW) {
+			String[] sa = {"flowb", db, ctl, cmdname};
 //		File home = new File(homepath);
 //		Process bogoproc = Runtime.getRuntime().exec(sa, null, home);
+			Process bogoproc = Runtime.getRuntime().exec(sa, null, null);
+			sa = systemCall(bogoproc, (InputStream) null);
+
+			ByteArrayInputStream bais = new ByteArrayInputStream(sa[1].getBytes());
+			BufferedReader br = new BufferedReader(new InputStreamReader(bais));
+			String err = "";
+			String line;
+			while ((line = br.readLine()) != null) {
+				if (line.startsWith("thread 'main' panicked")) {
+					err += line + "\n";
+					while ((line = br.readLine()) != null) {
+						err += line + "\n";
+						if (line.equals("")) break;
+					}
+				}
+			}
+			if (!err.equals("")) throw new Exception(err);
+		}
+		else {
+			String result = LibFlow.build(db, ctl, cmdname);
+			if (!result.equals("OK")) throw new Exception(result);
+		}
+
+		String[] sa = new String[] {"cargo", "build", "--release" };
+//		bogoproc = Runtime.getRuntime().exec(sa, null, home);
 		Process bogoproc = Runtime.getRuntime().exec(sa, null, null);
 		sa = systemCall(bogoproc, (InputStream) null);
 
@@ -1747,29 +1774,6 @@ public class BotManager extends BotBase
 		BufferedReader br = new BufferedReader(new InputStreamReader(bais));
 		String err = "";
 		String line;
-		while ((line = br.readLine()) != null)
-		{
-			if (line.startsWith("thread 'main' panicked"))
-			{
-				err += line + "\n";
-				while ((line = br.readLine()) != null)
-				{
-					err += line + "\n";
-					if (line.equals("")) break;
-				}
-			}
-		}
-
-		if (!err.equals("")) throw new Exception(err);
-
-		sa = new String[] {"cargo", "build", "--release" };
-//		bogoproc = Runtime.getRuntime().exec(sa, null, home);
-		bogoproc = Runtime.getRuntime().exec(sa, null, null);
-		sa = systemCall(bogoproc, (InputStream) null);
-
-		bais = new ByteArrayInputStream(sa[1].getBytes());
-		br = new BufferedReader(new InputStreamReader(bais));
-		err = "";
 		while ((line = br.readLine()) != null)
 		{
 			if (line.startsWith("error"))

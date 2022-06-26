@@ -4,20 +4,23 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.util.*;
 
-import com.newbound.code.primitive.NativePrimitive;
+import com.newbound.code.LibFlow;
 import com.newbound.code.primitive.data.*;
 import com.newbound.code.primitive.file.FileExists;
 import com.newbound.code.primitive.file.FileReadAllString;
 import com.newbound.code.primitive.file.FileReadProperties;
+import com.newbound.code.primitive.file.FileVisit;
 import com.newbound.code.primitive.math.*;
 import com.newbound.code.primitive.object.*;
 import com.newbound.code.primitive.object.Set;
+import com.newbound.code.primitive.string.EndsWith;
 import com.newbound.code.primitive.string.Split;
 import com.newbound.code.primitive.string.Trim;
 import com.newbound.code.primitive.sys.*;
 import com.newbound.code.primitive.sys.Thread;
 import com.newbound.robot.*;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.newbound.code.primitive.Primitive;
@@ -38,7 +41,7 @@ public class Code
 	{
 		try {
 			if (BotManager.LIBFLOW) {
-				NativePrimitive.init(PRIMS);
+				LibFlow.init(PRIMS);
 			}
 			else {
 				// MATH
@@ -55,6 +58,7 @@ public class Code
 				PRIMS.put("split", new Split());
 				PRIMS.put("length", new Length());
 				PRIMS.put("trim", new Trim());
+				PRIMS.put("ends_with", new EndsWith());
 
 				// OBJECT
 				PRIMS.put("get", new Get());
@@ -88,6 +92,7 @@ public class Code
 				PRIMS.put("file_exists", new FileExists());
 				PRIMS.put("file_read_all_string", new FileReadAllString());
 				PRIMS.put("file_read_properties", new FileReadProperties());
+				PRIMS.put("file_visit", new FileVisit());
 			}
 		}
 		catch (Exception x) { x.printStackTrace(); }
@@ -151,15 +156,28 @@ public class Code
 				return evalCommandLine(PYTHON, cmd, args, new File(getRoot(py), py+".py"));
 			}
 
-			if (type.equals("rust") || BotManager.LIBFLOW) {
+			if (BotManager.LIBFLOW) {
 				BotManager bm = (BotManager)BotBase.getBot("botmanager");
 //				String homepath = bm.getProperty("rust_home");
 				String id = CODE.getString(type);
 				JSONObject jo = bm.getData(LIB, id).getJSONObject("data");
 				String ctl = jo.getString("ctl");
 				String cmd = jo.getString("cmd");
+				String result = LibFlow.call(LIB, ctl, cmd, args.toString());
+				try {
+					return new JSONObject(result);
+				}
+				catch(JSONException x) { throw new RuntimeException(result); }
 
-				String[] sa = { "flow", LIB, ctl, cmd };
+			}
+			else if (type.equals("rust")){
+				BotManager bm = (BotManager)BotBase.getBot("botmanager");
+//				String homepath = bm.getProperty("rust_home");
+				String id = CODE.getString(type);
+				JSONObject jo = bm.getData(LIB, id).getJSONObject("data");
+				String ctl = jo.getString("ctl");
+				String cmd = jo.getString("cmd");
+				String[] sa = { "target/release/newbound", LIB, ctl, cmd };
 //				File home = new File(homepath);
 				ByteArrayInputStream bais = new ByteArrayInputStream(args.toString().getBytes());
 //				Process bogoproc = Runtime.getRuntime().exec(sa, null, home);
@@ -167,6 +185,7 @@ public class Code
 				sa = bm.systemCall(bogoproc, bais);
 
 				if (!sa[1].equals("")) throw new Exception("ERROR: "+sa[1]);
+				if (!sa[0].startsWith("{")) throw new Exception("ERROR: "+sa[0]);
 
 				jo = new JSONObject(sa[0]);
 				return jo;

@@ -1331,7 +1331,7 @@ public abstract class MetaBot extends BotBase
 
 				publishData(lib, cid, tmpdir);
 				
-				String lang = cmd.has("lang") ? cmd.getString("lang") : "java";
+				String lang = cmd.has("lang") ? cmd.getString("lang") : cmd.has("type") ? cmd.getString("type") : "java";
 				String java = cmd.getString(lang);
 				JSONObject meta = publishData(lib, java, tmpdir);
 			}
