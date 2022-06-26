@@ -1739,7 +1739,7 @@ public class BotManager extends BotBase
 		String cmdname = jo.getString("cmd");
 
 		if (!LIBFLOW) {
-			String[] sa = {"flowb", db, ctl, cmdname};
+			String[] sa = {"target/release/newboundb", db, ctl, cmdname};
 //		File home = new File(homepath);
 //		Process bogoproc = Runtime.getRuntime().exec(sa, null, home);
 			Process bogoproc = Runtime.getRuntime().exec(sa, null, null);
