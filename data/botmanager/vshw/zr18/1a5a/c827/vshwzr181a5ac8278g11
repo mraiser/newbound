@@ -1,0 +1,1 @@
+{"data":{"import":"","lib":"botmanager","returntype":"JSONObject","ctl":"startup","cmd":"http_request","type":"flow","params":[{"name":"path","type":"String"},{"name":"params","type":"JSONObject"}],"attachmentkeynames":["flow"],"desc":""},"id":"vshwzr181a5ac8278g11","time":1656429926846,"addr":"/0:0:0:0:0:0:0:1:59572","username":"admin"}

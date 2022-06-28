@@ -1,34 +1,23 @@
 pub mod generated;
 
 use std::env;
-use std::io;
-use std::io::BufRead;
 use ndata::dataobject::*;
-
-use flow::datastore::*;
-use flow::command::*;
-
+use flowlang::datastore::*;
+use flowlang::command::*;
 use crate::generated::*;
 
 fn main() {
   DataStore::init("data");
+  flowlang::generated::Generated::init();
   Generated::init();
-  
+
   env::set_var("RUST_BACKTRACE", "1");
   {
-    let params: Vec<String> = env::args().collect();
-    let lib = &params[1];
-    let ctl = &params[2];
-    let cmd = &params[3];
-
-    let stdin = io::stdin();
-    let mut lines = stdin.lock().lines();
-    let mut s = "".to_string();
-    while let Some(line) = lines.next() {
-      s = s + &line.unwrap();
-    }
+    let lib = "botmanager";
+    let ctl = "startup";
+    let cmd = "main";
     
-    let args = DataObject::from_json(serde_json::from_str(&s).unwrap());
+    let args = DataObject::new();
     let cmd = Command::lookup(lib, ctl, cmd);
     let res = cmd.execute(args).unwrap();
     println!("{}", res.to_json());

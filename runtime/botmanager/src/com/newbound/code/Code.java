@@ -177,7 +177,7 @@ public class Code
 				JSONObject jo = bm.getData(LIB, id).getJSONObject("data");
 				String ctl = jo.getString("ctl");
 				String cmd = jo.getString("cmd");
-				String[] sa = { "target/release/newbound", LIB, ctl, cmd };
+				String[] sa = { "target/release/newboundx", LIB, ctl, cmd };
 //				File home = new File(homepath);
 				ByteArrayInputStream bais = new ByteArrayInputStream(args.toString().getBytes());
 //				Process bogoproc = Runtime.getRuntime().exec(sa, null, home);

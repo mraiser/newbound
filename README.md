@@ -55,3 +55,15 @@ cd src
 javac -d ../bin Startup.java
 java -cp ../bin Startup
 ```
+
+## Rust Support
+To enable support for the Rust language you will need to compile the Newbound rust binaries
+from inside the directory where you installed Newbound.
+
+    cargo build --release
+
+Alternatively, you can build the Flowlang crate (https://crates.io/crates/flowlang) and
+add the library (libflow.so on Mac and Linux) to your Java library path. This will enable 
+the rust environment to maintain state between calls, at the expense of having to restart 
+Newbound any time you change Rust code.
+

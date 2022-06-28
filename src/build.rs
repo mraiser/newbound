@@ -1,8 +1,8 @@
 use std::env;
 use std::io;
 use std::io::BufRead;
-use flow::buildrust::*;
-use flow::datastore::*;
+use flowlang::buildrust::*;
+use flowlang::datastore::*;
 
 fn main() {
   DataStore::init("data");
