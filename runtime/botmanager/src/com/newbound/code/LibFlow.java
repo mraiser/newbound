@@ -10,7 +10,7 @@ public class LibFlow {
 
     static
     {
-        System.loadLibrary("flow");
+        System.loadLibrary("flowlang");
     }
 
     public static void init(JSONObject prims) {
