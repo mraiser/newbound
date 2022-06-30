@@ -68,7 +68,7 @@ once.
     cargo build --release
 
 Alternatively, you can build the Flowlang crate (https://crates.io/crates/flowlang) and
-add the library (libflow.so on Mac and Linux) to your Java library path. This will enable 
+add the library (libflowlang.so on Mac and Linux) to your Java library path. This will enable 
 the rust environment to maintain state between calls, at the expense of having to restart 
 Newbound any time you change Rust code.
 
