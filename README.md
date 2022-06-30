@@ -32,20 +32,18 @@ To compile and execute from the Desktop, just clone or download this repository 
 Mac:<br>
 The first time you run it you will need to right-click on it to launch.
 ```
-Newbound Network.command
+Newbound.command
 ```
 
 Windows:<br>
 The first time you run it you will need to confirm that you actually 
 want to run it.
 ```
-NewboundNetwork.bat
+Newbound.bat
 ```
 Linux:<br>
-The first time you run it you will first need to change the permissions on it to executable.
 ```
-chmod a+x newboundnetwork.sh
-./newboundnetwork.sh
+./newbound.sh
 ```
 Any Platform:<br>
 To launch from the command line, navigate to the folder you extracted the Newbound software to and type:
@@ -53,12 +51,19 @@ To launch from the command line, navigate to the folder you extracted the Newbou
 mkdir bin
 cd src
 javac -d ../bin Startup.java
-java -cp ../bin Startup
+cd ../
+java -cp bin Startup
 ```
 
 ## Rust Support
+**NOTE:** Rust support in Newbound depends on  files that are generated the first time you 
+run Newbound, so compiling a fresh install will fail. **Run Newbound at least once before 
+trying to compile the Rust binaries.**
+
 To enable support for the Rust language you will need to compile the Newbound rust binaries
-from inside the directory where you installed Newbound.
+from inside the directory where you installed Newbound. Since Newbound automatically rebuilds the rust binaries when you save a Rust command in
+the MetaBot Command Editor, you should only need to manually compile the Newbound binaries
+once.
 
     cargo build --release
 
