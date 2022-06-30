@@ -8,7 +8,7 @@ __pycache__/
 
 # Newbound files
 bin/
-generated/
+/generated/
 
 # for mixed in Java files
 *.class
