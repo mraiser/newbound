@@ -55,6 +55,21 @@ cd ../
 java -cp bin Startup
 ```
 
+## Flow Support
+Newbound supports the use of the Flow language for back-end commands. While the Flow 
+language interpreter is fairly solid, the editor is still experimental and buggy. Save 
+often and then refresh the page. Support for the Flow language on the front-end is very 
+limited at this point (no primitives or persistents) and for now only available through 
+the 3D UI editor at this time.
+
+**Not documented anywhere else:**
+- To create a new operation in blank space, hold shift down while clicking. 
+- To add a node to an input or output bar, hold shift down when clicking.
+- To connect an input node to an output node, hold shift down while clicking on one node and drag to the other.
+- To delete a node or operation select it and press delete.
+- Object types are largely ignored except when defining the method signature for a command.
+- Node names must match parameter names or your code will fail cryptically.
+
 ## Rust Support
 **NOTE:** Rust support in Newbound depends on  files that are generated the first time you 
 run Newbound, so compiling a fresh install will fail. **Run Newbound at least once before 
