@@ -25,33 +25,32 @@ public class CORS
         PATHS = new Vector();
         MAP = new Hashtable();
 
-        byte[] ba = BotUtil.readFile(JSON);
-        JSONObject jo = new JSONObject(new String(ba));
-        Iterator<String> i = jo.keys();
-        while (i.hasNext())
-        {
-            String key = i.next();
-            PATHS.addElement(key);
-            Vector<String> v = new Vector();
-            JSONArray ja = jo.getJSONArray(key);
-            for (int j=0; j<ja.length(); j++) v.addElement(ja.getString(j));
-            MAP.put(key, v);
-        }
-        Collections.sort(PATHS, new Comparator<String>()
-        {
-            @Override
-            public int compare(String s, String t1)
-            {
-                return s.length() - t1.length();
+        if (JSON.exists()) {
+            byte[] ba = BotUtil.readFile(JSON);
+            JSONObject jo = new JSONObject(new String(ba));
+            Iterator<String> i = jo.keys();
+            while (i.hasNext()) {
+                String key = i.next();
+                PATHS.addElement(key);
+                Vector<String> v = new Vector();
+                JSONArray ja = jo.getJSONArray(key);
+                for (int j = 0; j < ja.length(); j++) v.addElement(ja.getString(j));
+                MAP.put(key, v);
             }
-        });
+            Collections.sort(PATHS, new Comparator<String>() {
+                @Override
+                public int compare(String s, String t1) {
+                    return s.length() - t1.length();
+                }
+            });
 
-        LASTMODIFIED = JSON.lastModified();
+            LASTMODIFIED = JSON.lastModified();
+        }
     }
 
     public String lookup(String path, String origin) throws Exception
     {
-        if (LASTMODIFIED < JSON.lastModified()) load();
+        if (JSON.exists() && LASTMODIFIED < JSON.lastModified()) load();
 
         path = "/"+path;
         int i = PATHS.size();
