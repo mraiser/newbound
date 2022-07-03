@@ -7,10 +7,10 @@
 }
 
 .localbrokers3{
-  position:absolute;
   display:none;
   width:600px;
   max-width: 90vw;
+  color:black;
 }
 
 .inlineselect{

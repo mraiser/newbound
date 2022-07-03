@@ -20,7 +20,7 @@ function build(){
       newhtml += '<div class="clickme"><div onclick="clickabroker(\''+i+'\', $(this).parent()[0]);">'+name+'='+result.brokers[i]+'</div></div>';
     }
     $(ME).find('.localbrokers4').html(newhtml);
-    $(ME).find('.localbrokers3').height((n*18)+144);
+    $(ME).find('.localbrokers3').height((n*18)+158);
     var el = $(ME).find('.localbrokers');
     el.text('Connection Brokers: '+n);
     el.click(function(){
@@ -49,11 +49,11 @@ clickabroker = function(id, div){
   var gid = me.gid = guid();
   var newhtml = "";
   newhtml += "<div class='inlineselect' id='"+gid+"'></div>";
-  newhtml += '<div class="inlinemed"><form action="#"><div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label"><input class="mdl-textfield__input" type="text" id="'+gid+'-a" value="'+addr+'"><label class="mdl-textfield__label" for="'+gid+'-a">IP Address</label></div></form></div>';
-  newhtml += '<div class="inlineshort"><form action="#"><div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label"><input class="mdl-textfield__input" type="number" id="'+gid+'-b" value="'+port+'"><label class="mdl-textfield__label" for="'+gid+'-b">Port</label></div></form></div>';
-  newhtml += '<button class="mdl-button mdl-js-button mdl-button--icon mdl-button--colored" onclick="savebroker(\''+id+'\');"><i class="material-icons">check</i></button>';
-  newhtml += '<button class="mdl-button mdl-js-button mdl-button--icon mdl-button--accent" onclick="cancelbroker(\''+id+'\');"><i class="material-icons">close</i></button>';
-  newhtml += '<button class="mdl-button mdl-js-button mdl-button--icon mdl-button--accent" onclick="deletebroker(\''+id+'\');"><i class="material-icons">delete</i></button>';
+  newhtml += '<div class="inlinemed"><form action="#"><div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label"><label class="textinputlabel" for="'+gid+'-a">IP Address</label><input class="textinput" type="text" id="'+gid+'-a" value="'+addr+'"></div></form></div>';
+  newhtml += '<div class="inlineshort"><form action="#"><div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label"><label class="textinputlabel" for="'+gid+'-b">Port</label><input class="textinput" type="number" id="'+gid+'-b" value="'+port+'"></div></form></div>';
+  newhtml += '<img class="roundbutton-small" onclick="savebroker(\''+id+'\');" src="../botmanager/asset/botmanager/check-green.png">';
+  newhtml += '<img class="roundbutton-small" onclick="cancelbroker(\''+id+'\');" src="../botmanager/asset/botmanager/close.png">';
+  newhtml += '<img class="roundbutton-small" onclick="deletebroker(\''+id+'\');" src="../botmanager/asset/botmanager/delete_icon.png">';
   $(div).html(newhtml).removeClass('clickme');
   
   function selectabroker(val){
@@ -116,6 +116,6 @@ deletebroker = function(id){
 function resizeCard(){
   var n = 0;
   for (var i in me.brokers) n++;
-  var h = (n*18)+144;
+  var h = (n*18)+158;
   $(ME).find('.localbrokers3').height(h).find('.dialog-card-wide').height(h);
 }

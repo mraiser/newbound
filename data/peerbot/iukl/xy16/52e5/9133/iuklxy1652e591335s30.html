@@ -1,17 +1,18 @@
 <div class='localbrokers'></div>
 <div class='localbrokers3'>
   <div class="mdl-card__title">
-    <h2 class="mdl-card__title-text">Connection Brokers</h2>
+    <div class="titlebar">
+      Connection Brokers
+      <img id='adconbackbutton' class='roundbutton-small floatright' src='../botmanager/asset/botmanager/close.png' onclick="$(this).closest('.localbrokers3').parent()[0].api.close();">
+    </div>
   </div>
-  <div class="mdl-card__supporting-text localbrokers4"></div>
+  <div class="padme localbrokers4"></div>
   <div class="mdl-card__actions mdl-card--border">
-    <a class="mdl-button mdl-button--colored mdl-js-button mdl-js-ripple-effect" onclick="addabroker();">
+  </div>
+  <div class="card-button-wrap">
+    <a class="clearbutton" onclick="addabroker();">
       Add
     </a>
-  </div>
-  <div class="mdl-card__menu">
-    <button class="mdl-button mdl-button--icon mdl-js-button mdl-js-ripple-effect" onclick="$(this).closest('.localbrokers3').parent()[0].api.close();">
-      <i class="material-icons popupclose">close</i>
-    </button>
+    <br>
   </div>
 </div>
