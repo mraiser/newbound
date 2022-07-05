@@ -13,9 +13,7 @@ import com.newbound.code.primitive.file.FileVisit;
 import com.newbound.code.primitive.math.*;
 import com.newbound.code.primitive.object.*;
 import com.newbound.code.primitive.object.Set;
-import com.newbound.code.primitive.string.EndsWith;
-import com.newbound.code.primitive.string.Split;
-import com.newbound.code.primitive.string.Trim;
+import com.newbound.code.primitive.string.*;
 import com.newbound.code.primitive.sys.*;
 import com.newbound.code.primitive.sys.Thread;
 import com.newbound.robot.*;
@@ -59,6 +57,10 @@ public class Code
 				PRIMS.put("length", new Length());
 				PRIMS.put("trim", new Trim());
 				PRIMS.put("ends_with", new EndsWith());
+				PRIMS.put("starts_with", new StartsWith());
+				PRIMS.put("string_left", new Left());
+				PRIMS.put("string_right", new Right());
+				PRIMS.put("substring", new Substring());
 
 				// OBJECT
 				PRIMS.put("get", new Get());

@@ -55,6 +55,7 @@ me.ready = function(){
     for (var name in me.prims) 
       if (typeof me.prims[name] != "string")
         list.push(name);
+    list.sort();
     var d = { 
       "list": list,
       "value": ME.DATA.name,
