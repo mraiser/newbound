@@ -6,10 +6,7 @@ import java.util.*;
 
 import com.newbound.code.LibFlow;
 import com.newbound.code.primitive.data.*;
-import com.newbound.code.primitive.file.FileExists;
-import com.newbound.code.primitive.file.FileReadAllString;
-import com.newbound.code.primitive.file.FileReadProperties;
-import com.newbound.code.primitive.file.FileVisit;
+import com.newbound.code.primitive.file.*;
 import com.newbound.code.primitive.math.*;
 import com.newbound.code.primitive.object.*;
 import com.newbound.code.primitive.object.Set;
@@ -95,6 +92,8 @@ public class Code
 				PRIMS.put("file_read_all_string", new FileReadAllString());
 				PRIMS.put("file_read_properties", new FileReadProperties());
 				PRIMS.put("file_visit", new FileVisit());
+				PRIMS.put("file_is_dir", new IsDir());
+				PRIMS.put("mime_type", new MIMEType());
 			}
 		}
 		catch (Exception x) { x.printStackTrace(); }

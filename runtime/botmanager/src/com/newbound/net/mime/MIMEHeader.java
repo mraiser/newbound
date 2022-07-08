@@ -166,6 +166,7 @@ public class MIMEHeader extends BotUtil
 		mMimeTypes.setProperty(".jpg", "image/jpeg");
 		mMimeTypes.setProperty(".jps", "image/x-jps");
 		mMimeTypes.setProperty(".js", "application/x-javascript");
+		mMimeTypes.setProperty(".json", "application/json");
 		mMimeTypes.setProperty(".jut", "image/jutvision");
 		mMimeTypes.setProperty(".kar", "audio/midi");
 		mMimeTypes.setProperty(".ksh", "application/x-ksh");
