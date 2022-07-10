@@ -4,7 +4,6 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.util.*;
 
-import com.newbound.code.LibFlow;
 import com.newbound.code.primitive.data.*;
 import com.newbound.code.primitive.file.*;
 import com.newbound.code.primitive.math.*;
@@ -339,13 +338,32 @@ public class Code
 		{
 			JSONTransform jt = null;
 			String oid = CODE.getString("id");
-	
+			File root = getRoot(oid);
+			File src = new File(root, oid+".java");
+
+			String jid = CODE.getString("java");
+			JSONObject cmd = ENV.getData(LIB, jid);
+			if (cmd.getLong("time")>src.lastModified())
+			{
+//				if (oid.equals("jhrggl1809f2b6735r1f"))
+//					System.out.println(cmd);
+				JSONArray readers = cmd.has("readers") ? cmd.getJSONArray("readers") : null;
+				JSONArray writers = cmd.has("writers") ? cmd.getJSONArray("writers") : null;
+				cmd = cmd.getJSONObject("data");
+				String java = cmd.getString("java");
+				String imports = cmd.getString("import");
+				String returntype = cmd.getString("returntype");
+				JSONArray params = cmd.getJSONArray("params");
+
+				buildJava(LIB, oid, jid, java, params, imports, returntype, readers, writers);
+			}
+
+
+
+
 			RO ro = EXT.get(oid);
 			if (ro != null && ro.timestamp == ro.file.lastModified()) return ro.trans;
 			
-			File root = getRoot(oid);
-			File src = new File(root, oid+".java");
-	
 			String id = BotUtil.uniqueSessionID();
 			File tmp = new File(root, id+".java");
 			try
@@ -377,6 +395,124 @@ public class Code
 			Object o = c.newInstance();
 			return (JSONTransform)o;
 		}
+	}
+
+	public static JSONObject buildJava(String db, String id, String cmd, String java, JSONArray p, String imports, String returntype, JSONArray readers, JSONArray writers) throws Exception
+	{
+		File root = getRootDir();
+		root.mkdirs();
+
+		if (returntype == null) returntype = "JSONObject";
+		if (imports == null) imports = "import org.json.*;\rimport com.newbound.robot.*;\rimport com.newbound.robot.published.*;\rimport com.newbound.util.*;\r";
+		else imports = imports.replace('\n', '\r');
+
+		int n = p.length();
+		int i;
+		String top = "";
+		String bottom = "";
+		String invoke = "";
+		String invoke2 = "";
+		for (i=0;i<n;i++)
+		{
+			if (!invoke.equals("")) invoke += ", ";
+
+			JSONObject o = p.getJSONObject(i);
+			String typ = o.getString("type");
+			String name = o.getString("name");
+			if (typ.equals("Data"))
+			{
+				String pdid = o.getString("id");
+				top += "JSONObject "+name+" = BotBase.getBot(\"botmanager\").getData(\""+db+"\", \""+pdid+"\").getJSONObject(\"data\");\r";
+				bottom += "BotBase.getBot(\"botmanager\").setData(\""+db+"\", \""+pdid+"\", "+name+", null, null);\r";
+				invoke += "JSONObject "+name;
+			}
+			else if (typ.equals("Bot"))
+			{
+				top += "BotBase "+name+" = BotBase.getBot(\""+name+"\");\r";
+				invoke += "BotBase "+name;
+			}
+			else
+			{
+				if (typ.equals("JSONObject")) top += "JSONObject "+name+" = !input.has(\""+name+"\") ? null : input.get(\""+name+"\") instanceof JSONObject ? input.getJSONObject(\""+name+"\") : new JSONObject(\"\"+input.get(\""+name+"\"));\r";
+				else if (typ.equals("JSONArray")) top += "JSONArray "+name+" = !input.has(\""+name+"\") ? null : input.get(\""+name+"\") instanceof JSONArray ? input.getJSONArray(\""+name+"\") : new JSONArray(\"\"+input.get(\""+name+"\"));\r";
+				else if (typ.equals("Integer")) top += "int "+name+" = !input.has(\""+name+"\") ? null : input.get(\""+name+"\") instanceof Integer ? input.getInt(\""+name+"\") : Integer.parseInt(\"\"+input.get(\""+name+"\"));\r";
+				else if (typ.equals("Long")) top += "long "+name+" = !input.has(\""+name+"\") ? null : input.get(\""+name+"\") instanceof Long ? input.getLong(\""+name+"\") : Long.parseLong(\"\"+input.get(\""+name+"\"));\r";
+				else if (typ.equals("Double")) top += "double "+name+" = !input.has(\""+name+"\") ? null : input.get(\""+name+"\") instanceof Double ? input.getDouble(\""+name+"\") : Double.parseDouble(\"\"+input.get(\""+name+"\"));\r";
+				else if (typ.equals("Float")) top += "float "+name+" = !input.has(\""+name+"\") ? null : input.get(\""+name+"\") instanceof Float ? input.getFloat(\""+name+"\") : Float.parseFloat(\"\"+input.get(\""+name+"\"));\r";
+				else if (typ.equals("Boolean")) top += "boolean "+name+" = !input.has(\""+name+"\") ? false : input.get(\""+name+"\") instanceof Boolean ? input.getBoolean(\""+name+"\") : Boolean.parseBoolean(\"\"+input.get(\""+name+"\"));\r";
+				else top += o.getString("type")+" "+name+" = !input.has(\""+name+"\") ? null : input.get"+typ+"(\""+name+"\");\r";
+				invoke += o.getString("type")+" "+name;
+			}
+
+			if (!invoke2.equals("")) invoke2 += ", ";
+			invoke2 += name;
+		}
+
+		if (returntype.equals("FLAT"))
+		{
+			top += "\rjo = doit("
+					+invoke2
+					+");\rif (!jo.has(\"status\")) jo.put(\"status\", \"ok\");\r"
+					+bottom
+					+"}catch (Exception x) { x.printStackTrace(); jo = new JSONObject(); try { jo.put(\"status\", \"err\"); jo.put(\"msg\", x.getMessage());} catch (Exception xx) {xx.printStackTrace();} }\rreturn jo;\r}\r\rprivate JSONObject doit("+invoke+") throws Exception {\r";
+		}
+		else top += "jo = new JSONObject();\rjo.put(\"data\",doit("
+				+invoke2
+				+"));\rjo.put(\"status\", \"ok\");\r"
+				+bottom
+				+"}catch (Exception x) { x.printStackTrace(); jo = new JSONObject(); try { jo.put(\"status\", \"err\"); jo.put(\"msg\", x.getMessage());} catch (Exception xx) {xx.printStackTrace();} }\rreturn jo;\r}\r\rprivate "
+				+returntype
+				+" doit("+invoke+") throws Exception {\r";
+
+		File f = new File(root, "com");
+		f = new File(f, "newbound");
+		f = new File(f, "robot");
+		f = new File(f, "published");
+		f = new File(f, db);
+//		f = new File(f, "code");
+		f.mkdirs();
+
+		f = new File(f, id+".java");
+		java = "package com.newbound.robot.published."+db+";"
+				+ "\r\r"+imports+"\r"
+				+ "public class "+id+" implements JSONTransform {\r"
+				+ "JSONObject ALLPARAMS;\r"
+				+ "public JSONObject execute(JSONObject input) {\r"
+				+ "ALLPARAMS = input;\r"
+				+ "JSONObject jo;\r\rtry{\r"
+				+ top
+				+ java.replace('\n', '\r')
+				+ "\r}"
+				// FIXME: id is the command id, not the control id.
+				+ "public JSONObject call(String cmd, JSONObject params) throws Exception\r{\rreturn call(\""+id+"\", cmd, params);\r}\r"
+				+ "public JSONObject call(String ctl, String cmd, JSONObject params) throws Exception\r{\rreturn call(\""+db+"\", ctl, cmd, params);\r}\r"
+				+ "public JSONObject call(String db, String ctl, String cmd, JSONObject params) throws Exception\r{\rreturn ((com.newbound.robot.MetaBot)BotBase.getBot(\"metabot\")).call(db, ctl, cmd, params);\r}\r"
+				+ "}";
+
+		BotUtil.writeFile(f, java.getBytes());
+
+		boolean dowrite = false;
+		JSONObject meta = new JSONObject();
+		JSONObject data = new JSONObject();
+		try
+		{
+			meta = ENV.getData(db, id);
+			data = meta.getJSONObject("data");
+			if (!data.getString("id").equals(id) || !data.getString("java").equals(cmd) || !data.getString("type").equals("java"))
+				throw new Exception("SAVEME");
+		}
+		catch (Exception x) {
+			data.put("type", "java");
+			data.put("id", id);
+			data.put("java", cmd);
+			dowrite = true;
+		}
+
+		if (dowrite) {
+			ENV.setData(db, id, data, readers, writers);
+		}
+		data.put("status", "ok");
+		return data;
 	}
 
 	private File getRoot(String oid) 

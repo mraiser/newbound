@@ -1,6 +1,7 @@
 package com.newbound.code;
 
 import com.newbound.robot.Storage;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.File;
 
@@ -42,6 +43,12 @@ public class RustEnv implements CodeEnv
     public JSONObject getData(String db, String id) throws Exception
     {
         return STORE.getData(db, id);
+    }
+
+    @Override
+    public boolean setData(String db, String id, JSONObject data, JSONArray readers, JSONArray writers) throws Exception
+    {
+        return STORE.setData(db, id, data, readers, writers);
     }
 
     public File getRootDir()

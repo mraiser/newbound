@@ -15,21 +15,15 @@ import java.util.Vector;
 
 import com.newbound.code.CodeEnv;
 import com.newbound.code.LibFlow;
-import com.newbound.code.RustEnv;
 import com.newbound.p2p.P2PPeer;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import com.newbound.code.Code;
 import com.newbound.crypto.SuperSimpleCipher;
-import com.newbound.net.service.App;
-import com.newbound.net.service.Container;
-import com.newbound.net.service.ServerSocket;
 import com.newbound.net.service.http.Exception404;
 import com.newbound.thread.PeriodicTask;
-import com.newbound.thread.ThreadHandler;
 import com.newbound.thread.Timer;
-import com.newbound.util.IsRunning;
 import com.newbound.util.NoDotFilter;
 
 public class BotManager extends BotBase implements CodeEnv
@@ -998,7 +992,7 @@ public class BotManager extends BotBase implements CodeEnv
 
 		JSONObject d = new JSONObject(data);
 		if (plaintext && d.has("attachmentkeynames")) // FIXME - HACK
-			saveAttachments(root, d, name);
+			STORE.saveAttachments(root, d, name);
 
 		JSONObject jo = new JSONObject();
 		jo.put("id", id);
@@ -1020,32 +1014,6 @@ public class BotManager extends BotBase implements CodeEnv
 		jo.put("id", id);
 		
 		return jo;
-	}
-
-	// FIXME - Doesn't work with encrypted libraries
-	private void saveAttachments(File root, JSONObject d, String name) throws IOException
-	{
-		JSONArray ja = d.getJSONArray("attachmentkeynames");
-		int i = ja.length();
-		while (i-->0)
-		{
-			String key = ja.getString(i);
-			File f = new File(root, name + "." + key);
-			writeFile(f, d.remove(key).toString().getBytes());
-		}
-	}
-
-	// FIXME - Doesn't work with encrypted libraries
-	private void deleteAttachments(File root, JSONObject d, String name) throws Exception
-	{
-		JSONArray ja = d.getJSONArray("attachmentkeynames"); // FIXME - HACK
-		int i = ja.length();
-		while (i-- > 0)
-		{
-			String key = ja.getString(i);
-			File f = new File(root, name + "." + key);
-			f.delete();
-		}
 	}
 
 	private JSONObject handleJSearch(String db, String id, String java, String imports, String json, String javascript, String readers, String writers, String deletex, String sessionid, String sessionlocation) throws Exception
@@ -1329,27 +1297,7 @@ public class BotManager extends BotBase implements CodeEnv
 
 	public boolean setData(String db, String id, JSONObject data, JSONArray readers, JSONArray writers) throws Exception
 	{
-		File root = getDB(db);
-		SuperSimpleCipher[] keys = getKeys(db);
-		boolean plaintext = keys.length == 0;
-		String name = plaintext ? id : toHexString(keys[1].encrypt(id.getBytes()));
-		root = getSubDir(root, name, 4, 4);
-		root.mkdirs();
-		File f = new File(root, name);
-
-		if (plaintext && data.has("attachmentkeynames")) // FIXME - HACK
-			saveAttachments(root, data, name);
-
-		JSONObject jo = new JSONObject();
-		jo.put("id", id);
-		jo.put("data", data);
-		jo.put("username", "system");
-		jo.put("time", System.currentTimeMillis());
-		if (readers != null) jo.put("readers", readers);
-		if (writers != null) jo.put("writers", writers);
-		
-		writeFile(f, plaintext ? jo.toString().getBytes() : keys[1].encrypt(jo.toString().getBytes()));
-		return true;
+		return STORE.setData(db, id, data, readers, writers);
 	}
 
 	public boolean hasData(String db, String id) throws Exception
@@ -1371,27 +1319,7 @@ public class BotManager extends BotBase implements CodeEnv
 
 	public JSONObject deleteData(String db, String id) throws Exception
 	{
-	  File f = getDB(db);
-	  SuperSimpleCipher[] keys = getKeys(db);
-      boolean plaintext = keys.length == 0;
-	  String name = plaintext ? id : toHexString(keys[1].encrypt(id.getBytes()));
-	  f = getSubDir(f, name, 4, 4);
-	  f = new File(f, name);
-	  
-	  if (!f.exists()) throw new Exception("No such record");
-
-	  if (plaintext) try
-	  {
-		  byte[] ba = readFile(f);
-		  JSONObject jo = new JSONObject(new String(plaintext ? ba : keys[0].decrypt(ba))); // FIXME - plaintext always true
-		  JSONObject d = jo.getJSONObject("data");
-		  if (d.has("attachmentkeynames")) // FIXME - HACK
-			  deleteAttachments(f.getParentFile(), d, id);
-	  }
-	  catch (Exception x) { x.printStackTrace(); }
-
-	  f.delete();
-	  
+	  STORE.deleteData(db, id);
 	  return newResponse();
 	}
 
@@ -1529,122 +1457,9 @@ public class BotManager extends BotBase implements CodeEnv
 	public JSONObject handleSaveJava(String db, String id, String cmd, String java, String params, String imports, String returntype, String readers, String writers, String sessionidx) throws Exception
 	{
 		JSONArray p = new JSONArray(params == null ? "[]" : params);
-		
-		File root = new File(getRootDir().getParentFile().getParentFile(), "generated");
-		root.mkdirs();
-		
-		if (returntype == null) returntype = "JSONObject";
-		if (imports == null) imports = "import org.json.*;\rimport com.newbound.robot.*;\rimport com.newbound.robot.published.*;\rimport com.newbound.util.*;\r";
-		else imports = imports.replace('\n', '\r');
-
-		int n = p.length();
-		int i;
-		String top = "";
-		String bottom = "";
-		String invoke = "";
-		String invoke2 = "";
-		for (i=0;i<n;i++)
-		{
-			if (!invoke.equals("")) invoke += ", ";
-
-			JSONObject o = p.getJSONObject(i);
-			String typ = o.getString("type");
-			String name = o.getString("name");
-			if (typ.equals("Data"))
-			{
-				String pdid = o.getString("id");
-				top += "JSONObject "+name+" = BotBase.getBot(\"botmanager\").getData(\""+db+"\", \""+pdid+"\").getJSONObject(\"data\");\r";
-				bottom += "BotBase.getBot(\"botmanager\").setData(\""+db+"\", \""+pdid+"\", "+name+", null, null);\r";
-				invoke += "JSONObject "+name;
-			}
-			else if (typ.equals("Bot"))
-			{
-				top += "BotBase "+name+" = BotBase.getBot(\""+name+"\");\r";
-				invoke += "BotBase "+name;
-			}
-			else 
-			{
-				if (typ.equals("JSONObject")) top += "JSONObject "+name+" = !input.has(\""+name+"\") ? null : input.get(\""+name+"\") instanceof JSONObject ? input.getJSONObject(\""+name+"\") : new JSONObject(\"\"+input.get(\""+name+"\"));\r";
-				else if (typ.equals("JSONArray")) top += "JSONArray "+name+" = !input.has(\""+name+"\") ? null : input.get(\""+name+"\") instanceof JSONArray ? input.getJSONArray(\""+name+"\") : new JSONArray(\"\"+input.get(\""+name+"\"));\r";
-				else if (typ.equals("Integer")) top += "int "+name+" = !input.has(\""+name+"\") ? null : input.get(\""+name+"\") instanceof Integer ? input.getInt(\""+name+"\") : Integer.parseInt(\"\"+input.get(\""+name+"\"));\r";
-				else if (typ.equals("Long")) top += "long "+name+" = !input.has(\""+name+"\") ? null : input.get(\""+name+"\") instanceof Long ? input.getLong(\""+name+"\") : Long.parseLong(\"\"+input.get(\""+name+"\"));\r";
-				else if (typ.equals("Double")) top += "double "+name+" = !input.has(\""+name+"\") ? null : input.get(\""+name+"\") instanceof Double ? input.getDouble(\""+name+"\") : Double.parseDouble(\"\"+input.get(\""+name+"\"));\r";
-				else if (typ.equals("Float")) top += "float "+name+" = !input.has(\""+name+"\") ? null : input.get(\""+name+"\") instanceof Float ? input.getFloat(\""+name+"\") : Float.parseFloat(\"\"+input.get(\""+name+"\"));\r";
-				else if (typ.equals("Boolean")) top += "boolean "+name+" = !input.has(\""+name+"\") ? false : input.get(\""+name+"\") instanceof Boolean ? input.getBoolean(\""+name+"\") : Boolean.parseBoolean(\"\"+input.get(\""+name+"\"));\r";
-				else top += o.getString("type")+" "+name+" = !input.has(\""+name+"\") ? null : input.get"+typ+"(\""+name+"\");\r";
-				invoke += o.getString("type")+" "+name;
-			}
-			
-			if (!invoke2.equals("")) invoke2 += ", ";
-			invoke2 += name;
-		}
-		
-		if (returntype.equals("FLAT"))
-		{
-			top += "\rjo = doit("
-				+invoke2
-				+");\rif (!jo.has(\"status\")) jo.put(\"status\", \"ok\");\r"
-				+bottom
-				+"}catch (Exception x) { x.printStackTrace(); jo = new JSONObject(); try { jo.put(\"status\", \"err\"); jo.put(\"msg\", x.getMessage());} catch (Exception xx) {xx.printStackTrace();} }\rreturn jo;\r}\r\rprivate JSONObject doit("+invoke+") throws Exception {\r";
-		}
-		else top += "jo = new JSONObject();\rjo.put(\"data\",doit("
-			+invoke2
-			+"));\rjo.put(\"status\", \"ok\");\r"
-			+bottom
-			+"}catch (Exception x) { x.printStackTrace(); jo = new JSONObject(); try { jo.put(\"status\", \"err\"); jo.put(\"msg\", x.getMessage());} catch (Exception xx) {xx.printStackTrace();} }\rreturn jo;\r}\r\rprivate "
-			+returntype
-			+" doit("+invoke+") throws Exception {\r";
-		
-		File f = new File(root, "com");
-		f = new File(f, "newbound");
-		f = new File(f, "robot");
-		f = new File(f, "published");
-		f = new File(f, db);
-//		f = new File(f, "code");
-		f.mkdirs();
-
-		f = new File(f, id+".java");
-		java = "package com.newbound.robot.published."+db+";"
-		    + "\r\r"+imports+"\r"
-		    + "public class "+id+" implements JSONTransform {\r"
-		    + "JSONObject ALLPARAMS;\r"
-		    + "public JSONObject execute(JSONObject input) {\r"
-		    + "ALLPARAMS = input;\r"
-		    + "JSONObject jo;\r\rtry{\r"
-		    + top
-		    + java.replace('\n', '\r')
-		    + "\r}"
-				// FIXME: id is the command id, not the control id.
-		    + "public JSONObject call(String cmd, JSONObject params) throws Exception\r{\rreturn call(\""+id+"\", cmd, params);\r}\r"
-		    + "public JSONObject call(String ctl, String cmd, JSONObject params) throws Exception\r{\rreturn call(\""+db+"\", ctl, cmd, params);\r}\r"
-		    + "public JSONObject call(String db, String ctl, String cmd, JSONObject params) throws Exception\r{\rreturn ((com.newbound.robot.MetaBot)BotBase.getBot(\"metabot\")).call(db, ctl, cmd, params);\r}\r"
-		    + "}";
-		  
-		writeFile(f, java.getBytes());
-
-		boolean dowrite = false;
-		JSONObject meta = new JSONObject();
-		JSONObject data = new JSONObject();
-		try
-		{
-			meta = getData(db, id);
-			data = meta.getJSONObject("data");
-			if (!data.getString("id").equals(id) || !data.getString("java").equals(cmd) || !data.getString("type").equals("java"))
-				throw new Exception("SAVEME");
-		}
-		catch (Exception x) {
-			data.put("type", "java");
-			data.put("id", id);
-			data.put("java", cmd);
-			dowrite = true;
-		}
-
-		if (dowrite) {
-			JSONArray rs = readers == null ? null : new JSONArray(readers);
-			setData(db, id, data, rs, writers == null ? null : new JSONArray(writers));
-		}
-		data.put("status", "ok");
-		return data;
+		JSONArray rs = readers == null ? null : new JSONArray(readers);
+		JSONArray ws = writers == null ? null : new JSONArray(writers);
+		return Code.buildJava(db, id, cmd, java, p, imports, returntype, rs, ws);
 	}
 	
 	public JSONObject handleCompile(String db, String id, String cmd, String java, String python, String js, String flow, String rust, String params, String imports, String returntype, String readers, String writers, String sessionidx) throws Exception
