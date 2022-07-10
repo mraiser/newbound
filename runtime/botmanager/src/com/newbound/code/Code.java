@@ -13,7 +13,10 @@ import com.newbound.code.primitive.object.Set;
 import com.newbound.code.primitive.string.*;
 import com.newbound.code.primitive.sys.*;
 import com.newbound.code.primitive.sys.Thread;
-import com.newbound.robot.*;
+import com.newbound.robot.BotUtil;
+import com.newbound.robot.Global;
+import com.newbound.robot.JSONTransform;
+import com.newbound.robot.SYS;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -25,6 +28,7 @@ public class Code
 {
 	private static final boolean DEBUG = false;
 	private static File ROOT = null;
+	private static CodeEnv ENV = null;
 	private boolean FINISHFLAG = false;
 	public static JSONObject PRIMS = new JSONObject();
 	public static String PYTHON = "python3"; //"/Library/Frameworks/Python.framework/Versions/3.6/bin/python3";
@@ -35,7 +39,7 @@ public class Code
 	static
 	{
 		try {
-			if (BotManager.LIBFLOW) {
+			if (BotUtil.LIBFLOW) {
 				LibFlow.init(PRIMS);
 			}
 			else {
@@ -114,6 +118,11 @@ public class Code
 	}
 	
 	private static final Hashtable<String,RO> EXT = new Hashtable();
+
+	public static void init(CodeEnv env)
+	{
+		ENV = env;
+	}
 	
 	public Code(JSONObject code, String lib) 
 	{
@@ -122,8 +131,8 @@ public class Code
 
 		//FIXME - Total hack
 		try {
-			if (!BotManager.LIBFLOW && CODE.has("type") && CODE.get("type").equals("flow") && CODE.has("flow"))
-				CODE = BotBase.getBot("botmanager").getData(LIB, CODE.getString("flow")).getJSONObject("data").getJSONObject("flow");
+			if (!BotUtil.LIBFLOW && CODE.has("type") && CODE.get("type").equals("flow") && CODE.has("flow"))
+				CODE = ENV.getData(LIB, CODE.getString("flow")).getJSONObject("data").getJSONObject("flow");
 		}
 		catch (Exception x) { x.printStackTrace(); }
 	}
@@ -149,19 +158,16 @@ public class Code
 			
 			if (type.equals("python"))
 			{
-				BotBase bb = BotBase.getBot("botmanager");
-
 				String py = CODE.getString("id");
 				String pyid = CODE.has("python") ? CODE.getString("python") : CODE.getString("cmd");
-				JSONObject cmd = bb.getData(LIB, pyid).getJSONObject("data");
+				JSONObject cmd = ENV.getData(LIB, pyid).getJSONObject("data");
 				return evalCommandLine(PYTHON, cmd, args, new File(getRoot(py), py+".py"));
 			}
 
-			if (BotManager.LIBFLOW) {
-				BotManager bm = (BotManager)BotBase.getBot("botmanager");
+			if (BotUtil.LIBFLOW) {
 //				String homepath = bm.getProperty("rust_home");
 				String id = CODE.getString(type);
-				JSONObject jo = bm.getData(LIB, id).getJSONObject("data");
+				JSONObject jo = ENV.getData(LIB, id).getJSONObject("data");
 				String ctl = jo.getString("ctl");
 				String cmd = jo.getString("cmd");
 				String result = LibFlow.call(LIB, ctl, cmd, args.toString());
@@ -172,10 +178,9 @@ public class Code
 
 			}
 			else if (type.equals("rust")){
-				BotManager bm = (BotManager)BotBase.getBot("botmanager");
 //				String homepath = bm.getProperty("rust_home");
 				String id = CODE.getString(type);
-				JSONObject jo = bm.getData(LIB, id).getJSONObject("data");
+				JSONObject jo = ENV.getData(LIB, id).getJSONObject("data");
 				String ctl = jo.getString("ctl");
 				String cmd = jo.getString("cmd");
 				String[] sa = { "target/release/newboundx", LIB, ctl, cmd };
@@ -183,7 +188,7 @@ public class Code
 				ByteArrayInputStream bais = new ByteArrayInputStream(args.toString().getBytes());
 //				Process bogoproc = Runtime.getRuntime().exec(sa, null, home);
 				Process bogoproc = Runtime.getRuntime().exec(sa, null, null);
-				sa = bm.systemCall(bogoproc, bais);
+				sa = BotUtil.systemCall(bogoproc, bais);
 
 				if (!sa[1].equals("")) throw new Exception("ERROR: "+sa[1]);
 				if (!sa[0].startsWith("{")) throw new Exception("ERROR: "+sa[0]);
@@ -387,7 +392,7 @@ public class Code
 
 	private static File getRootDir()
 	{
-		if (ROOT == null) ROOT = new File(BotBase.getBot("botmanager").getRootDir().getParentFile().getParentFile(), "generated");
+		if (ROOT == null) ROOT = new File(ENV.getRootDir().getParentFile().getParentFile(), "generated");
 		return ROOT;
 	}
 
@@ -554,7 +559,6 @@ public class Code
 				}
 			}
 			else if (type.equals("command")) {
-				PeerBot pb = PeerBot.getPeerBot();
 				String[] sa = cmd.getString("cmd").split(":");
 				String lib = sa[0];
 				String ctl = sa[1];
@@ -575,7 +579,7 @@ public class Code
 				} else {
 					String key = cmd.getJSONObject("out").keys().next().toString();
 					out = new JSONObject();
-					JSONObject src = BotBase.getBot("botmanager").getData(lib, cmdname).getJSONObject("data");
+					JSONObject src = ENV.getData(lib, cmdname).getJSONObject("data");
 					Code code = new Code(src, lib);
 					JSONObject val = code.execute(params);
 					if (val.has("data")) {
@@ -616,14 +620,13 @@ public class Code
 			else if (type.equals("persistent"))
 			{
 				String key = cmd.getString("name");
-				MetaBot mb = MetaBot.getMetaBot();
 				if (in.length()>0) {
 					Object a = in.get((String) in.keys().next());
-					mb.global(key, a);
+					Global.put(key, a);
 				}
 				out = cmd.getJSONObject("out");
 				Iterator<String> i = out.keys();
-				Object val = mb.global(key);
+				Object val = Global.get(key);
 				while (i.hasNext()) {
 					key = i.next();
 					out.put(key, val);

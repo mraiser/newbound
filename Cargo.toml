@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-flowlang = "0.1.4"
+flowlang = "0.1.5"
 #flowlang = { path = "../../rust/flow" }
 ndata="0.1.4"
 #ndata = { path = "../../rust/ndata" }

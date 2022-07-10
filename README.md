@@ -75,15 +75,24 @@ the 3D UI editor at this time.
 run Newbound, so compiling a fresh install will fail. **Run Newbound at least once before 
 trying to compile the Rust binaries.**
 
+    ./newbound.sh
+
+### Option 1:
 To enable support for the Rust language you will need to compile the Newbound rust binaries
-from inside the directory where you installed Newbound. Since Newbound automatically rebuilds the rust binaries when you save a Rust command in
-the MetaBot Command Editor, you should only need to manually compile the Newbound binaries
-once.
+from inside the directory where you installed Newbound. Since Newbound automatically rebuilds the rust binaries 
+when you save a Rust command in the MetaBot Command Editor, you should only need to manually compile the Newbound 
+binaries once.
 
     cargo build --release
 
-Alternatively, you can build the Flowlang crate (https://crates.io/crates/flowlang) and
-add the library (libflowlang.so on Mac and Linux) to your Java library path. This will enable 
+### Option 2:
+Alternatively, you can build the Flow repo (https://github.com/mraiser/flow) and
+add the library (libflowlang.so on Linux) to your Java library path. This will enable 
 the rust environment to maintain state between calls, at the expense of having to restart 
-Newbound any time you change Rust code.
+Newbound any time you change Rust code. You will need to add the following line to the file 
+runtime/botmanager/botd.properties:
 
+    libflow=true
+
+**NOTE:** Enabling libflow will execute all *flow code* using the native library as well. That means if your 
+flow code calls commands written in Java, they will be executed *in a separate JVM*.

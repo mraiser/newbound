@@ -39,6 +39,7 @@ import com.newbound.util.NoDotFilter;
 
 public class BotUtil 
 {
+	public static boolean LIBFLOW = false;
 	private static final String nonhexchars = "ghijklmnopqrstuvwxyz";
 	
     public static boolean[] okChars = new boolean[256];

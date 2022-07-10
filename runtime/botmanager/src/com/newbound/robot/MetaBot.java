@@ -14,8 +14,7 @@ import org.json.*;
 
 public abstract class MetaBot extends BotBase
 {
-	protected static final Hashtable<String, Object> GLOBAL = new Hashtable(); 
-	protected final Hashtable<String, Object> RUNTIME = new Hashtable(); 
+	protected final Hashtable<String, Object> RUNTIME = new Hashtable();
 	
 	private static final int NUMMETABOTTHREADS = 5;
 	private static Runnable UPDATETHREAD = null;
@@ -1867,8 +1866,8 @@ public abstract class MetaBot extends BotBase
 	public Object runtime(String name) { return RUNTIME.get(name); }
 	public void runtime(String name, Object val) { RUNTIME.put(name, val); }
 	
-	public Object global(String name) { return GLOBAL.get(name); }
-	public void global(String name, Object val) { GLOBAL.put(name, val); }
+	public Object global(String name) { return Global.get(name); }
+	public void global(String name, Object val) { Global.put(name, val); }
 
 	public String getReturnType(String db, String ctl, String cmd) throws Exception
 	{

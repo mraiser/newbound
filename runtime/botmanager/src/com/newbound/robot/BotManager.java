@@ -13,7 +13,9 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.Vector;
 
+import com.newbound.code.CodeEnv;
 import com.newbound.code.LibFlow;
+import com.newbound.code.RustEnv;
 import com.newbound.p2p.P2PPeer;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -30,15 +32,14 @@ import com.newbound.thread.Timer;
 import com.newbound.util.IsRunning;
 import com.newbound.util.NoDotFilter;
 
-public class BotManager extends BotBase 
+public class BotManager extends BotBase implements CodeEnv
 {
 	private DiscoveryService DISCOVERY = null;
 	private Hashtable<String, JSONObject> mEvents = new Hashtable();
+	private Storage STORE = null;
 //	protected ThreadHandler mThreadHandler = null;
 	protected Timer mTimer = new Timer();
 	protected String mSystemSessionID = null;
-
-	public static boolean LIBFLOW = false;
 
 	public BotManager(File root)
 	{
@@ -58,6 +59,9 @@ public class BotManager extends BotBase
 		String libflow = PROPERTIES.getProperty("libflow");
 		if (libflow != null && libflow.equals("true"))
 			LIBFLOW = true;
+
+		STORE = new Storage(getRootDir());
+		Code.init(this);
 
 		addNumThreads(100); // For timer task execution and general availability
 /*		
@@ -884,7 +888,7 @@ public class BotManager extends BotBase
 		f.renameTo(f4);
 		f2.renameTo(f);
 		
-		KEYS.put(db, ssca);
+		STORE.KEYS.put(db, ssca);
 		
 		return "Old version moved to: "+f4.getCanonicalPath();
 	}
@@ -964,7 +968,7 @@ public class BotManager extends BotBase
 			ssca[1] = sscw;
 		}
 		
-		KEYS.put(db, ssca);
+		STORE.KEYS.put(db, ssca);
 		
 		fireEvent("newdb", meta);
 		
@@ -1028,24 +1032,6 @@ public class BotManager extends BotBase
 			String key = ja.getString(i);
 			File f = new File(root, name + "." + key);
 			writeFile(f, d.remove(key).toString().getBytes());
-		}
-	}
-
-	// FIXME - Doesn't work with encrypted libraries
-	private void loadAttachments(File root, JSONObject d, String name) throws Exception
-	{
-		JSONArray ja = d.getJSONArray("attachmentkeynames");
-		int i = ja.length();
-		while (i-- > 0)
-		{
-			String key = ja.getString(i);
-			File f = new File(root, name + "." + key);
-			String s = new String(BotUtil.readFile(f));
-			String ss = s.trim();
-			if (ss.startsWith("{") && ss.endsWith("}")) // FIXME - HACK
-				d.put(key, new JSONObject(ss));
-			else
-				d.put(key, s);
 		}
 	}
 
@@ -1164,8 +1150,6 @@ public class BotManager extends BotBase
 		return jo;
 	}
 
-	private Hashtable<String,SuperSimpleCipher[]> KEYS = new Hashtable();
-	
 	private boolean checkAuth(String db, String sessionid, boolean iswrite) throws Exception
 	{
 	  File f = getDB(db);
@@ -1239,37 +1223,12 @@ public class BotManager extends BotBase
 	
 	public File getDB(String id)
 	{
-//	  File f = new File(getRootDir(), "data");
-	  File f = new File(getRootDir().getParentFile().getParentFile(), "data");
-	  f = new File(f, id);
-	  return f;
+	  return STORE.getDB(id);
 	}
 	
 	protected SuperSimpleCipher[] getKeys(String db) throws Exception
 	{
-	  SuperSimpleCipher[] ssca = KEYS.get(db);
-	  
-	  if (ssca == null) 
-	  {
-		File f = new File(getDB(db), "meta.json");
-		byte[] ba = readFile(f);
-		JSONObject jo = new JSONObject(new String(ba));
-		if (jo.has("crypt"))
-		{
-			byte[] writekey = fromHexString(jo.getString("crypt"));
-		  
-			SuperSimpleCipher sscw = new SuperSimpleCipher(writekey, true);
-			SuperSimpleCipher sscr = new SuperSimpleCipher(writekey, false);
-			ssca = new SuperSimpleCipher[2];
-			ssca[0] = sscr;
-			ssca[1] = sscw;
-		}
-		else ssca = new SuperSimpleCipher[0];
-		
-		KEYS.put(db, ssca);
-	  }
-	  
-	  return ssca;
+	  return STORE.getKeys(db);
 	}
 	
 	public JSONArray listDataIDs(String db) throws Exception
@@ -1402,34 +1361,12 @@ public class BotManager extends BotBase
 
 	public JSONObject getData(String db, String id) throws Exception
 	{
-		SuperSimpleCipher[] keys = getKeys(db);
-		boolean plaintext = keys.length == 0;
-		File f = getDataFile(db, id, keys);
-
-		if (!f.exists())
-			throw new Exception("No such record "+db+"/"+id);
-
-		byte[] ba = readFile(f);
-		JSONObject jo = new JSONObject(new String(plaintext ? ba : keys[0].decrypt(ba)));
-
-		JSONObject d = jo.getJSONObject("data");
-		if (plaintext && d.has("attachmentkeynames")) // FIXME - HACK
-			loadAttachments(f.getParentFile(), d, id);
-
-		return jo;
+		return STORE.getData(db, id);
 	}
 
 	protected File getDataFile(String db, String id, SuperSimpleCipher[] keys) throws Exception
 	{
-		File f = getDB(db);
-		try {
-		String name = keys.length == 0 ? id : toHexString(keys[1].encrypt(id.getBytes()));
-		f = getSubDir(f, name, 4, 4);
-		f = new File(f, name);
-		}catch(Exception x) {
-			System.out.println(x);
-		}
-		return f;
+		return STORE.getDataFile(db, id, keys);
 	}
 
 	public JSONObject deleteData(String db, String id) throws Exception

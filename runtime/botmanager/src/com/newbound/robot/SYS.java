@@ -25,13 +25,13 @@ public class SYS
 	{
 		String pkg = "com.newbound.robot.system.";
 		
-		try { sys = (OperatingSystem)Class.forName(pkg+"JDK").newInstance(); System.out.println("!!!!!!!!!! OS = JDK !!!!!!!!!!"); }
+		try { sys = (OperatingSystem)Class.forName(pkg+"JDK").newInstance(); }
 		catch (Exception i1)
 		{
-			try { sys = (OperatingSystem)Class.forName(pkg+"IOS").newInstance(); System.out.println("!!!!!!!!!! OS = IOS !!!!!!!!!!"); }
+			try { sys = (OperatingSystem)Class.forName(pkg+"IOS").newInstance(); }
 			catch (Exception i2)
 			{
-				try { sys = (OperatingSystem)Class.forName(pkg+"Android").newInstance(); System.out.println("!!!!!!!!!! OS = ANDROID !!!!!!!!!!"); }
+				try { sys = (OperatingSystem)Class.forName(pkg+"Android").newInstance(); }
 				catch (Exception i3)
 				{
 					System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");

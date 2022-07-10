@@ -158,7 +158,7 @@ public class CompilingClassLoader extends ClassLoader
 		File classFile = new File( classFilename );
 		if (javaFile.exists() && (!classFile.exists() || javaFile.lastModified() > classFile.lastModified())) 
 		{
-			System.out.println("COMPILING CLASS: "+name);
+//			System.out.println("COMPILING CLASS: "+name);
 			String s = compileClass(name);
 			if (s.length() > 0 || !classFile.exists()) 
 			{
@@ -177,7 +177,7 @@ public class CompilingClassLoader extends ClassLoader
 			byte raw[] = getBytes( classFilename );
 			clas = defineClass( name, raw, 0, raw.length );
 			mCache.put(classFile,  clas);
-			System.out.println("LOADED CLASS: "+name);
+//			System.out.println("LOADED CLASS: "+name);
 			return clas;
 		} 
 		catch(Throwable ie ) 
@@ -328,7 +328,7 @@ public class CompilingClassLoader extends ClassLoader
 		String sourcepath = null;
 		i = mRoot.size();
 		while (i-->0) sourcepath = (sourcepath == null ? "" : sourcepath + cc) + mRoot.elementAt(i).getCanonicalPath();
-		System.out.println(sourcepath);
+//		System.out.println(sourcepath);
 		
 //		String[] commandLine =  {"-source", version, "-target", version, "-cp", path, "-sourcepath", sourcepath, "-Xlint:none", "-Xlint:-unchecked", "-proc:none" };
 		String[] commandLine =  {"-cp", path, "-sourcepath", sourcepath, "-Xlint:none", "-Xlint:-unchecked", "-proc:none" };
