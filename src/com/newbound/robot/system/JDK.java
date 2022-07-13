@@ -25,7 +25,7 @@ import com.newbound.robot.system.OperatingSystem;
 public class JDK implements OperatingSystem
 {
 	private static String DEFAULTBOTS = "com.newbound.robot.PeerBot,com.newbound.robot.SecurityBot,com.newbound.robot.published.MetaBot";
-	private static ScriptEngine engine = new ScriptEngineManager().getEngineByName("JavaScript");
+	private static ScriptEngine engine = null;
 	private static Hashtable<String, Integer> jsfunctions = new Hashtable();
 
 	public boolean isHeadless()
@@ -123,6 +123,8 @@ public class JDK implements OperatingSystem
 
 	public JSONObject evalJS(String lib, String ctl, String cmd, String js, JSONObject args)
 	{
+		if (engine == null) engine = new ScriptEngineManager().getEngineByName("JavaScript");
+
 		JSONObject jo = new JSONObject();
 		String cmdname = "NNAPI."+lib+"."+ctl+"."+cmd;
 

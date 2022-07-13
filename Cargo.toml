@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-flowlang = "0.1.6"
-#flowlang = { path = "../../rust/flow" }
+flowlang = { version = "0.1.6", features = ["java_runtime"] }
+#flowlang = { path = "../../rust/flow", features = ["java_runtime"] }
 ndata="0.1.5"
 #ndata = { path = "../../rust/ndata" }
 state="0.5.3"
