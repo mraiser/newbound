@@ -27,7 +27,7 @@ public class Stub implements OperatingSystem
 
 	public String compileClass(File file, String classname) { return null; }
 
-	public JSONObject evalJS(String js) { return null; }
+	public JSONObject evalJS(String lib, String ctl, String cmd, String js, JSONObject args) { return null; }
 
 	public void restart() {}
 

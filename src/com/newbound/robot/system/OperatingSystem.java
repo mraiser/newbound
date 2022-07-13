@@ -19,7 +19,7 @@ public interface OperatingSystem
 	public String compileClass(File file, String classname);
 	public String defaultBots();
 	public String defaultBot();
-	public JSONObject evalJS(String js);
+	public JSONObject evalJS(String lib, String ctl, String cmd, String js, JSONObject args);
 	public boolean isHeadless();
 	public void notification(String subject, String msg, int hashCode);
 	public boolean requirePassword();

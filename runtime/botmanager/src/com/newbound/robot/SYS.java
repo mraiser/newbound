@@ -49,7 +49,7 @@ public class SYS
 	public static String compileClass(File file, String classname) { return sys.compileClass(file, classname); }
 	public static String defaultBots() { return sys.defaultBots(); }
 	public static String defaultBot() { return sys.defaultBot(); }
-	public static JSONObject evalJS(String js) { return sys.evalJS(js); }
+	public static JSONObject evalJS(String lib, String ctl, String cmd, String js, JSONObject args) { return sys.evalJS(lib, ctl, cmd, js, args); }
 	public static boolean isHeadless() { return sys.isHeadless(); }
 	public static void notification(String subject, String msg, int hashCode) { sys.notification(subject, msg, hashCode); }
 	public static boolean requirePassword() { return sys.requirePassword(); }

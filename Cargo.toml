@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-flowlang = "0.1.5"
+flowlang = "0.1.6"
 #flowlang = { path = "../../rust/flow" }
-ndata="0.1.4"
+ndata="0.1.5"
 #ndata = { path = "../../rust/ndata" }
 state="0.5.3"
 serde = { version = "1.0.136", features = ["derive"] }

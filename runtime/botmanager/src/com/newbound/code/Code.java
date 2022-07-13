@@ -151,8 +151,12 @@ public class Code
 			
 			if (type.equals("js"))
 			{
-				String js = CODE.getString("script");
-				return SYS.evalJS(js);
+				String id = CODE.getString("js");
+				String name = CODE.getString("name");
+				JSONObject cmd = ENV.getData(LIB, id).getJSONObject("data");
+				String js = cmd.getString("js");
+				String ctl = cmd.getString("ctl");
+				return SYS.evalJS(LIB, ctl, name, js, args);
 			}
 			
 			if (type.equals("python"))

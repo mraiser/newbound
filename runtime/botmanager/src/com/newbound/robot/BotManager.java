@@ -1549,8 +1549,7 @@ public class BotManager extends BotBase implements CodeEnv
 	}
 
 	private JSONObject handleSaveJavascript(String db, String id, String cmd, String code, String params, String imports, String returntype, String readers, String writers, String sessionidx) {
-		// TODO Auto-generated method stub
-		return null;
+		return newResponse();
 	}
 
 	private JSONObject handleSavePython(String db, String id, String cmd, String python, String params, String imports, String returntype, String readers, String writers, String sessionidx) throws Exception

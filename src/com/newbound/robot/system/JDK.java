@@ -12,6 +12,7 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.URI;
 import java.util.Hashtable;
+import java.util.Iterator;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
@@ -24,6 +25,8 @@ import com.newbound.robot.system.OperatingSystem;
 public class JDK implements OperatingSystem
 {
 	private static String DEFAULTBOTS = "com.newbound.robot.PeerBot,com.newbound.robot.SecurityBot,com.newbound.robot.published.MetaBot";
+	private static ScriptEngine engine = new ScriptEngineManager().getEngineByName("JavaScript");
+	private static Hashtable<String, Integer> jsfunctions = new Hashtable();
 
 	public boolean isHeadless()
 	{
@@ -118,15 +121,52 @@ public class JDK implements OperatingSystem
 		
 	}
 
-	public JSONObject evalJS(String js) 
+	public JSONObject evalJS(String lib, String ctl, String cmd, String js, JSONObject args)
 	{
 		JSONObject jo = new JSONObject();
-		
-		ScriptEngineManager factory = new ScriptEngineManager();
-	    ScriptEngine engine = factory.getEngineByName("JavaScript");
-	    try 
-	    { 
-	    	jo.put("data", engine.eval("function doathing() { "+js+" } doathing();")); 
+		String cmdname = "NNAPI."+lib+"."+ctl+"."+cmd;
+
+		Integer h1 = js.hashCode();
+		Integer h2 = jsfunctions.get(cmdname);
+
+	    try
+	    {
+			if (h2 == null || !h1.equals(h2))
+			{
+				engine.eval("if (typeof NNAPI == 'undefined') NNAPI = {};");
+				engine.eval("if (typeof NNAPI."+lib+" == 'undefined') NNAPI."+lib+" = {};");
+				engine.eval("if (typeof NNAPI."+lib+"."+ctl+" == 'undefined') NNAPI."+lib+"."+ctl+" = {};");
+
+				String newjs = cmdname+" = function(";
+				Iterator<String> i = args.keys();
+				boolean b = false;
+				while (i.hasNext()) {
+					String key = i.next();
+					if (b) newjs += ",";
+					newjs += key;
+					b = true;
+				}
+				newjs += "){"+js+"};";
+				engine.eval(newjs);
+				jsfunctions.put(cmdname, h1);
+//				System.out.println(newjs);
+			}
+
+			String var = (h1<0?"x":"y")+Math.abs(h1);
+			String newjs = "var "+var+" = "+args.toString()+"; "+cmdname+"(";
+
+			Iterator<String> i = args.keys();
+			boolean b = false;
+			while (i.hasNext()) {
+				String key = i.next();
+				if (b) newjs += ",";
+				newjs += var+"."+key;
+				b = true;
+			}
+			newjs += ");";
+//			System.out.println(newjs);
+	    	jo.put("data", engine.eval(newjs));
+			engine.eval(var+" = undefined;");
 	    	jo.put("status", "ok");
 	    }
 	    catch (Exception x) 
@@ -264,5 +304,15 @@ public class JDK implements OperatingSystem
 			os.close();
 			is.close();
 		}
+	}
+
+	public static void main(String[] argsx)
+	{
+		String script = "return 'something: '+a.b;";
+		JSONObject args = new JSONObject();
+		JSONObject a = new JSONObject();
+		a.put("b", "yyy");
+		args.put("a", a);
+		System.out.println(new JDK().evalJS("test", "chuckme", "test_javascript", script, args));
 	}
 }

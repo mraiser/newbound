@@ -221,7 +221,7 @@ me.ready = function(){
       if (lang != 'flow') c.cm = CodeMirror.fromTextArea(c, conf);
       
       if (!ME.DATA.cmd[lang]){
-        var code = lang == 'java' ? 'return null;' : lang == 'python' ? "return 'something'" : lang == 'js' ? "return 'something';" : "{\"cons\":[], \"cmds\":[], \"input\":{}, \"output\":{}}";
+        var code = lang == 'java' ? 'return null;' : lang == 'python' ? "return 'something'" : lang == 'rust' ? "DataObject::new()" : lang == 'js' ? "return 'something';" : "{\"cons\":[], \"cmds\":[], \"input\":{}, \"output\":{}}";
         if (lang != 'flow'){
           c.cm.setValue(code);
           me.cmddata[lang] = code;
