@@ -162,9 +162,9 @@ public class Code
 			if (type.equals("python"))
 			{
 				String py = CODE.getString("id");
-				String pyid = CODE.has("python") ? CODE.getString("python") : CODE.getString("cmd");
-				JSONObject cmd = ENV.getData(LIB, pyid).getJSONObject("data");
-				return evalCommandLine(PYTHON, cmd, args, new File(getRoot(py), py+".py"));
+//				String pyid = CODE.has("python") ? CODE.getString("python") : CODE.getString("cmd");
+//				JSONObject cmd = ENV.getData(LIB, pyid).getJSONObject("data");
+				return evalCommandLine(PYTHON, args, new File(getRoot(py), py+".py"));
 			}
 
 			if (BotUtil.LIBFLOW) {
@@ -853,10 +853,10 @@ public class Code
 	}
 
 	// FIXME - Move to SYS
-	public JSONObject evalCommandLine(String app, JSONObject cmd, JSONObject args, File py) throws Exception 
+	public JSONObject evalCommandLine(String app, JSONObject args, File py) throws Exception
 	{
-		JSONArray params = cmd.getJSONArray("params");
-		int i = params.length();
+//		JSONArray params = cmd.getJSONArray("params");
+//		int i = params.length();
 		String[] call = new String[2]; //[i+2];
 		call[0] = app;
 		call[1] = py.getCanonicalPath();
