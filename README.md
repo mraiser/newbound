@@ -55,27 +55,45 @@ cd ../
 java -cp bin Startup
 ```
 
-## Flow Support
-Newbound supports the use of the Flow language for back-end commands. While the Flow 
-language interpreter is fairly solid, the editor is still experimental and buggy. Save 
-often and then refresh the page. Support for the Flow language on the front-end is very 
-limited at this point (no primitives or persistents) and for now only available through 
-the 3D UI editor at this time.
+# Support for commands in multiple languages
+Newbound back-end commands can be written in Java, Python, Rust, Javascript, or Flow. All languages except Python 
+maintain state between calls. Maintaining state in Rust requires the flowlang native library 
+(https://github.com/mraiser/flow). When developing Flow code using Newbound, the IDE automatically builds, compiles, 
+and runs any files needed.
 
-**Not documented anywhere else:**
-- To create a new operation in blank space, hold shift down while clicking. 
-- To add a node to an input or output bar, hold shift down when clicking.
-- To connect an input node to an output node, hold shift down while clicking on one node and drag to the other.
-- To delete a node or operation select it and press delete.
-- Object types are largely ignored except when defining the method signature for a command.
-- Node names must match parameter names or your code will fail cryptically.
+## Java Support
+Java support is enabled by default and requires no additional configuration.
+
+## JavaScript Support
+JavaScript support is enabled by default and requires no additional configuration.
+
+## Python Support
+Python support is enabled by default. You must install Python3 in the local environment first.
 
 ## Rust Support
 **NOTE:** Rust support in Newbound depends on  files that are generated the first time you 
 run Newbound, so compiling a fresh install will fail. **Run Newbound at least once before 
-trying to compile the Rust binaries.**
+trying to compile the Rust binaries.**  Maintaining state in Rust requires the flowlang native library. 
+If you would like to maintain state between call, follow the directions below for "Flow Support" and choose 
+"Option 2".
 
     ./newbound.sh
+
+## Flow Support
+Newbound supports the use of the Flow language for back-end commands. While the Flow
+language interpreter is fairly solid, the editor is still experimental and buggy. Save
+often and then refresh the page. Support for the Flow language on the front-end is very
+limited at this point (no primitives or persistents) and only available through
+the 3D UI editor at this time.
+
+**Flow Language Editor**
+- To create a new operation in blank space, hold shift down while clicking.
+- To open a Local, double-click on it.
+- To add a node to an input or output bar, hold shift down when clicking.
+- To connect an input node to an output node, hold shift down while clicking on one node and drag to the other.
+- To delete a node or operation select it and press delete.
+- Object types are largely ignored except when defining the method signature for a command.
+- Node names must match the command signature or your code will fail cryptically.
 
 ### Option 1:
 To enable support for the Rust language you will need to compile the Newbound rust binaries
@@ -94,5 +112,5 @@ runtime/botmanager/botd.properties:
 
     libflow=true
 
-**NOTE:** Enabling libflow will execute all *flow code* using the native library as well. That means if your 
-flow code calls commands written in Java, they will be executed *in a separate JVM*.
+**NOTE:** Enabling libflow will execute all *flow code* using the native library as well as all Rust commands. 
+That means if your flow code calls commands written in Java, they will be executed *in a separate JVM*.
