@@ -523,7 +523,7 @@ public class PeerBot extends BotBase
 			results.put("msg", "ERROR: "+x.getMessage());
 		}
 		
-		else			
+		else if (id == null)
 		{
 			String[] sa = ids.split(" ");
 			int i = sa.length;
@@ -533,7 +533,7 @@ public class PeerBot extends BotBase
 				if (mP2PManager.hasPeer(id))
 				{
 					params.put("uuid", id);
-					JSONObject peerdata = new JSONObject(mP2PManager.getPeer(id).toString());
+					JSONObject peerdata = (JSONObject)handleLookUp(params);
 					if (peerdata.getString("status").equals("ok"))
 						results.put(id, peerdata);
 				}
