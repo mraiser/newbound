@@ -533,7 +533,7 @@ public class PeerBot extends BotBase
 				if (mP2PManager.hasPeer(id))
 				{
 					params.put("uuid", id);
-					JSONObject peerdata = (JSONObject)handleLookUp(params);
+					JSONObject peerdata = new JSONObject(mP2PManager.getPeer(id).toString());
 					if (peerdata.getString("status").equals("ok"))
 						results.put(id, peerdata);
 				}
