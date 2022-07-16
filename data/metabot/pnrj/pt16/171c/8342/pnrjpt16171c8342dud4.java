@@ -1,1 +1,1 @@
-return ((com.newbound.robot.MetaBot)metabot).libStatus(lib);
+return metabot.libStatus(lib);

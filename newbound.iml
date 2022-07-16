@@ -9,6 +9,27 @@
       <sourceFolder url="file://$MODULE_DIR$/runtime/discord/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/runtime/filebot/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/runtime/feedbot/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/generated" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/blockchain/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/blog/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/calcpose/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/cinema/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/commerce/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/documentation/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/ds18b20/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/footer/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/macguffin/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/mcp3008/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/nebula/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/newboundpowerstrip/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/portforwarding/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/protocol/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/pushtotalk/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/raise/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/services/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/site/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/toolbar/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/runtime/vpn/src" isTestSource="false" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

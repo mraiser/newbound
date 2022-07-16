@@ -1,1 +1,1 @@
-return ((com.newbound.robot.MetaBot)metabot).sendLib(lib, peer);
+return metabot.sendLib(lib, peer);

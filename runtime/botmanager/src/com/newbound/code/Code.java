@@ -490,7 +490,7 @@ public class Code
 				// FIXME: id is the command id, not the control id.
 				+ "public JSONObject call(String cmd, JSONObject params) throws Exception\r{\rreturn call(\""+id+"\", cmd, params);\r}\r"
 				+ "public JSONObject call(String ctl, String cmd, JSONObject params) throws Exception\r{\rreturn call(\""+db+"\", ctl, cmd, params);\r}\r"
-				+ "public JSONObject call(String db, String ctl, String cmd, JSONObject params) throws Exception\r{\rreturn ((com.newbound.robot.MetaBot)BotBase.getBot(\"metabot\")).call(db, ctl, cmd, params);\r}\r"
+				+ "public JSONObject call(String db, String ctl, String cmd, JSONObject params) throws Exception\r{\rreturn BotBase.getBot(\"metabot\").call(db, ctl, cmd, params);\r}\r"
 				+ "}";
 
 		BotUtil.writeFile(f, java.getBytes());

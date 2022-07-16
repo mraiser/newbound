@@ -33,8 +33,11 @@ import com.newbound.p2p.P2PPeer;
 import com.newbound.thread.PeriodicTask;
 import com.newbound.util.NoDotFilter;
 
-public class PeerBot extends MetaBot
+public class PeerBot extends BotBase
 {
+	public String DB() { return "peerbot"; }
+	public String ID() { return "owprhu15d3252a0b8o6"; }
+
 	private static final int NUMPEERBOTTHREADS = 103;
 	
 	private static P2PManager mP2PManager = null;

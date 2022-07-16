@@ -1,4 +1,4 @@
-((com.newbound.robot.MetaBot)metabot).checkForUpdates(null, sessionid);
+metabot.checkForUpdates(null, sessionid);
 
 File root = metabot.getRootDir().getParentFile();
 File zip = new File(root, "botmanager");

@@ -28,6 +28,9 @@ import com.newbound.util.NoDotFilter;
 
 public class BotManager extends BotBase implements CodeEnv
 {
+	public String DB() { return "botmanager"; }
+	public String ID() { return "rjvxkn1594bc321c2r2"; }
+
 	private DiscoveryService DISCOVERY = null;
 	private Hashtable<String, JSONObject> mEvents = new Hashtable();
 	private Storage STORE = null;
@@ -48,17 +51,17 @@ public class BotManager extends BotBase implements CodeEnv
 
 	public void init() throws Exception
 	{
+		STORE = new Storage(getRootDir());
+
 		super.init();
 
 		String libflow = PROPERTIES.getProperty("libflow");
 		if (libflow != null && libflow.equals("true"))
 			LIBFLOW = true;
-
-		STORE = new Storage(getRootDir());
 		Code.init(this);
 
 		addNumThreads(100); // For timer task execution and general availability
-/*		
+/*
 		File old = new File(getRootDir(), "data");
 		if (old.exists())
 		{
@@ -277,7 +280,7 @@ public class BotManager extends BotBase implements CodeEnv
 		throw new Exception404("UNKNOWN COMMAND: "+cmd);
 	}
 
-	public JSONObject getCommands() throws Exception
+	public JSONObject getCommands()
 	{
 		JSONObject commands = new JSONObject();
 		JSONObject cmd;

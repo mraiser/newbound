@@ -270,8 +270,8 @@ function inputchange(e){
   $('#savecommandbutton').removeClass('bggray').addClass('bggreen');
 }
 
-var hackfixnames1 = [ 'jsonobject', 'jsonarray', 'string', 'integer', 'float', 'boolean', 'any', 'inputstream', 'flat' ];
-var hackfixnames2 = [ 'JSONObject', 'JSONArray', 'String', 'Integer', 'Float', 'Boolean', 'Any', 'InputStream', 'FLAT' ];
+var hackfixnames1 = [ 'jsonobject', 'jsonarray', 'string', 'integer', 'float', 'boolean', 'any', 'file', 'inputstream', 'flat' ];
+var hackfixnames2 = [ 'JSONObject', 'JSONArray', 'String', 'Integer', 'Float', 'Boolean', 'Any', 'File', 'InputStream', 'FLAT' ];
 
 function hackFix(name){
   return hackfixnames2[hackfixnames1.indexOf(name)];

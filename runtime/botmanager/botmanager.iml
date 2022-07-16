@@ -9,5 +9,6 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="newbound" />
     <orderEntry type="module" module-name="peerbot" />
+    <orderEntry type="module" module-name="metabot" />
   </component>
 </module>

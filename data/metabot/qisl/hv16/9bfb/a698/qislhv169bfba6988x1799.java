@@ -1,2 +1,2 @@
-((MetaBot)BotBase.getBot("metabot")).compileAll(); 
+BotBase.getBot("metabot").compileAll();
 return "OK";

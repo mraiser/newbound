@@ -1,0 +1,39 @@
+package com.newbound.robot;
+
+import java.io.*;
+import java.security.KeyPair;
+import java.util.*;
+
+import com.newbound.code.Code;
+import com.newbound.crypto.SuperSimpleCipher;
+import com.newbound.net.service.http.Exception404;
+import com.newbound.p2p.P2PConnection;
+import com.newbound.p2p.P2PPeer;
+
+import org.json.*;
+
+public abstract class MetaBot extends BotBase
+{
+	public String getServiceName()
+	{
+		return "metabot";
+	}
+
+	public void init() throws Exception 
+	{
+		super.init();
+/*		
+		if (UPDATETHREAD == null) 
+		{
+			addNumThreads(NUMMETABOTTHREADS);
+
+			UPDATETHREAD = buildUpdaterx();
+			addPeriodicTask(UPDATETHREAD, UPDATEMILLIS, "AUTOUPDATE", new IsRunning() { public boolean isRunning() { return mMasterBot.isRunning(); } });
+			setTimeout(UPDATETHREAD, "METABOT UPDATER", 20000l);
+		}
+		else
+*/ 
+
+	}
+}
+

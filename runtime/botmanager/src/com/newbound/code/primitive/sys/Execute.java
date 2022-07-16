@@ -3,7 +3,7 @@ package com.newbound.code.primitive.sys;
 import com.newbound.code.Code;
 import com.newbound.code.primitive.Primitive;
 import com.newbound.robot.BotBase;
-import com.newbound.robot.MetaBot;
+import com.newbound.robot.published.MetaBot;
 import org.json.JSONException;
 import org.json.JSONObject;
 

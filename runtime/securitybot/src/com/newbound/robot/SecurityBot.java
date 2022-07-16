@@ -18,7 +18,10 @@ import com.newbound.robot.BotBase;
 
 public class SecurityBot extends BotBase 
 {
-	public Object handleCommand(String cmd, Hashtable params) throws Exception 
+	public String DB() { return "securitybot"; }
+	public String ID() { return "gsiyox15d328c87f0y7"; }
+
+	public Object handleCommand(String cmd, Hashtable params) throws Exception
 	{
 		if (cmd.equals("deviceinfo")) return handleGetSettings(params, 1);
 		if (cmd.equals("listusers")) return handleListUsers(params);
@@ -33,7 +36,7 @@ public class SecurityBot extends BotBase
 		throw new Exception("No such command: "+cmd);
 	}
 
-	public JSONObject getCommands() throws Exception
+	public JSONObject getCommands()
 	{
 		JSONObject commands = new JSONObject();
 		JSONObject cmd;

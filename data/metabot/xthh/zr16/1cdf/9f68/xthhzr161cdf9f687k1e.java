@@ -1,1 +1,1 @@
-return ((MetaBot)BotBase.getBot("metabot")).buildJSAPI(lib, id);
+return BotBase.getBot("metabot").buildJSAPI(lib, id);

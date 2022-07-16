@@ -1,4 +1,4 @@
-//return ((com.newbound.robot.MetaBot)BotBase.getBot("metabot")).apps();
+//return BotBase.getBot("metabot").apps();
 
 BotManager bm = (BotManager)botmanager;
 JSONObject apps = new JSONObject();

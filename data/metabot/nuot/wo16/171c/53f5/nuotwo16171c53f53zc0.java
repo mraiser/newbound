@@ -1,1 +1,1 @@
-return ((com.newbound.robot.published.MetaBot)metabot).publishLibrary(lib);
+return metabot.publishLibrary(lib);
