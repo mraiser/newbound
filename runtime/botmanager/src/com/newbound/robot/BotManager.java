@@ -1654,7 +1654,23 @@ public class BotManager extends BotBase implements CodeEnv
 		JSONObject src = handleRead(db, id, sessionid).getJSONObject("data");
 		Code code = new Code(src, db);
 		JSONObject jo = code.execute(args);
-		if (jo.has("data"))
+		if (code.TYPE.equals("flow") || code.TYPE.equals("rust"))
+		{
+			if (code.RETURNTYPE.equals("FLAT"))
+			{
+				if (!jo.has("status")) jo.put("status", "ok");
+			}
+			else if (code.RETURNTYPE.equals("JSONObject"))
+			{
+				JSONObject jo2 = newResponse();
+				Object o = jo.get("a");
+				if (o instanceof JSONObject) jo2.put("data", o);
+				else jo2.put("data", new JSONObject(o));
+				return jo2;
+			}
+			else return jo.get("a");
+		}
+		else if (jo.has("data"))
 		{
 			Object o = jo.get("data");
 			if (o instanceof File || o instanceof InputStream || o instanceof String) return o;

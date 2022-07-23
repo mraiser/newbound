@@ -35,6 +35,9 @@ public class Code
 	public JSONObject CODE;
 	public String LIB;
 
+	public String TYPE;
+	public String RETURNTYPE;
+
 	static
 	{
 		try {
@@ -130,8 +133,11 @@ public class Code
 
 		//FIXME - Total hack
 		try {
-			if (!BotUtil.LIBFLOW && CODE.has("type") && CODE.get("type").equals("flow") && CODE.has("flow"))
-				CODE = ENV.getData(LIB, CODE.getString("flow")).getJSONObject("data").getJSONObject("flow");
+			if (!BotUtil.LIBFLOW && CODE.has("type") && CODE.get("type").equals("flow") && CODE.has("flow")) {
+				JSONObject jo = ENV.getData(LIB, CODE.getString("flow")).getJSONObject("data");
+				RETURNTYPE = jo.getString("returntype");
+				CODE = jo.getJSONObject("flow");
+			}
 		}
 		catch (Exception x) { x.printStackTrace(); }
 	}
@@ -141,7 +147,9 @@ public class Code
 			if (DEBUG) System.out.println("Evaluating code: "+CODE);
 
 			//String type = !CODE.has("type") ? "flow" : CODE.getString("type");
+			// FIXME - Should always be type
 			String type = CODE.has("type") ? CODE.getString("type") : CODE.has("lang") ? CODE.getString("lang") :CODE.has("java") ?"java" : CODE.has("python") ? "python" : "flow";
+			TYPE = type;
 
 			if (type.equals("java"))
 			{
@@ -154,15 +162,26 @@ public class Code
 				String id = CODE.getString("js");
 				String name = CODE.getString("name");
 				JSONObject cmd = ENV.getData(LIB, id).getJSONObject("data");
+				RETURNTYPE = cmd.getString("returntype");
 				String js = cmd.getString("js");
 				String ctl = cmd.getString("ctl");
-				return SYS.evalJS(LIB, ctl, name, js, args);
+				JSONArray ja = cmd.getJSONArray("params");
+				JSONObject jo = new JSONObject();
+				int n = ja.length();
+				int i = 0;
+				for (i=0;i<n;i++)
+				{
+					String pname = ja.getJSONObject(i).getString("name");
+					jo.put(pname, args.get(pname));
+				}
+				return SYS.evalJS(LIB, ctl, name, js, jo);
 			}
 			
 			if (BotUtil.LIBFLOW) {
 //				String homepath = bm.getProperty("rust_home");
 				String id = CODE.getString(type);
 				JSONObject jo = ENV.getData(LIB, id).getJSONObject("data");
+				RETURNTYPE = jo.getString("returntype");
 				String ctl = jo.getString("ctl");
 				String cmd = jo.getString("cmd");
 				String result = LibFlow.call(LIB, ctl, cmd, args.toString());
@@ -176,8 +195,9 @@ public class Code
 			if (type.equals("python"))
 			{
 				String py = CODE.getString("id");
-	//				String pyid = CODE.has("python") ? CODE.getString("python") : CODE.getString("cmd");
-	//				JSONObject cmd = ENV.getData(LIB, pyid).getJSONObject("data");
+				String pyid = CODE.has("python") ? CODE.getString("python") : CODE.getString("cmd");
+				JSONObject cmd = ENV.getData(LIB, pyid).getJSONObject("data");
+				RETURNTYPE = cmd.getString("returntype");
 				return evalCommandLine(PYTHON, args, new File(getRoot(py), py+".py"));
 			}
 
@@ -185,6 +205,7 @@ public class Code
 //				String homepath = bm.getProperty("rust_home");
 				String id = CODE.getString(type);
 				JSONObject jo = ENV.getData(LIB, id).getJSONObject("data");
+				RETURNTYPE = jo.getString("returntype");
 				String ctl = jo.getString("ctl");
 				String cmd = jo.getString("cmd");
 				String[] sa = { "target/debug/newboundx", LIB, ctl, cmd };
@@ -348,6 +369,7 @@ public class Code
 
 			String jid = CODE.getString("java");
 			JSONObject cmd = ENV.getData(LIB, jid);
+
 			if (cmd.getLong("time")>src.lastModified())
 			{
 //				if (oid.equals("jhrggl1809f2b6735r1f"))
@@ -362,9 +384,8 @@ public class Code
 
 				buildJava(LIB, oid, jid, java, params, imports, returntype, readers, writers);
 			}
-
-
-
+			else cmd = cmd.getJSONObject("data");
+			RETURNTYPE = cmd.getString("returntype");
 
 			RO ro = EXT.get(oid);
 			if (ro != null && ro.timestamp == ro.file.lastModified()) return ro.trans;
@@ -723,7 +744,21 @@ public class Code
 					JSONObject src = ENV.getData(lib, cmdname).getJSONObject("data");
 					Code code = new Code(src, lib);
 					JSONObject val = code.execute(params);
-					if (val.has("data")) {
+					if (code.TYPE.equals("flow") || code.TYPE.equals("rust"))
+					{
+						if (code.RETURNTYPE.equals("FLAT")) out.put(key, val);
+						else
+						{
+							Object o = val.get("a");
+							if (code.RETURNTYPE.equals("JSONObject"))
+							{
+								if (o instanceof JSONObject) out.put(key, o);
+								else out.put(key, new JSONObject(o));
+							}
+							else out.put(key, o);
+						}
+					}
+					else if (val.has("data")) {
 						Object o = val.get("data");
 						//					if (o instanceof File || o instanceof InputStream || o instanceof String)
 						out.put(key, o);

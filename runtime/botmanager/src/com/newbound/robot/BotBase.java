@@ -1033,10 +1033,15 @@ public abstract class BotBase extends BotUtil implements Container, App //Channe
 						validateRequest(getBot(bot), cmd, params);
 						Object o = getBot(bot).handleCommand(cmd, params);
 						if (o instanceof JSONObject) jo2 = (JSONObject)o;
-						else
+						else if (o instanceof String)
 						{
 							jo2 = newResponse();
 							jo2.put("msg", o);
+						}
+						else
+						{
+							jo2 = newResponse();
+							jo2.put("data", o);
 						}
 					}
 					catch (Exception x)
@@ -3364,6 +3369,22 @@ public abstract class BotBase extends BotUtil implements Container, App //Channe
 		Code code = new Code(src, db);
 		params.put("sessionid", sid);
 		JSONObject jo = code.execute(params);
+
+		if (code.TYPE.equals("flow") || code.TYPE.equals("rust"))
+		{
+			if (code.RETURNTYPE.equals("FLAT"))
+			{
+				if (!jo.has("status")) jo.put("status", "ok");
+			}
+			else  {
+				JSONObject jo2 = newResponse();
+				if (code.RETURNTYPE.equals("String")) jo2.put("msg", jo.get("a"));
+				else jo2.put("data", jo.get("a"));
+				jo = jo2;
+			}
+		}
+
+
 		return jo;
 	}
 

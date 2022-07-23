@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-#flowlang = { version = "0.1.8" }
-flowlang = { path = "../../rust/flow" }
+flowlang = { version = "0.1.8", features = ["python_runtime"] }
+#flowlang = { path = "../../rust/flow", features = ["python_runtime"] }
 ndata="0.1.5"
 #ndata = { path = "../../rust/ndata" }
 state="0.5.3"

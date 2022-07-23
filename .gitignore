@@ -235,3 +235,4 @@ dmypy.json
 /data/testflow
 /data/flowlang
 /Cargo.lock
+/src/generated/

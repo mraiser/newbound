@@ -1,0 +1,1 @@
+{"data":{"import":"","lib":"botmanager","returntype":"FLAT","ctl":"botmanager","cmd":"read","type":"flow","params":[{"name":"db","type":"String"},{"name":"id","type":"String"},{"name":"sessionid","type":"String"}],"attachmentkeynames":["flow"],"desc":""},"id":"mkwphu1821212e7dbq18","time":1658167537136,"addr":"/0:0:0:0:0:0:0:1:34552","username":"admin"}

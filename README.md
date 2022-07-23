@@ -1,9 +1,7 @@
 # Newbound
 
-The Newbound software is an HTML5 app framework for connecting devices 
-like computers, smartphones, tablets and devices on the Internet of 
-Things (IoT) directly and securely with one another. Newbound apps can 
-be written in Rust, Java, JavaScript or Python. The software 
+Newbound is an Integrated Development Environment (IDE) for building headless or 
+HTML5 apps in Rust, Java, JavaScript, Python and/or Flow. The software 
 includes a local web service and a set of default apps that provide the 
 core functionality, including P2P communication, security, encryption, 
 data storage, app publishing and much more. Makers and developers can 
@@ -69,16 +67,26 @@ Java support is enabled by default and requires no additional configuration.
 JavaScript support is enabled by default and requires no additional configuration.
 
 ## Python Support
-Python support is enabled by default. You must install Python3 in the local environment first.
-
-## Rust Support
-**NOTE:** Rust support in Newbound depends on  files that are generated the first time you 
-run Newbound, so compiling a fresh install will fail. **Run Newbound at least once before 
-trying to compile the Rust binaries.**  Maintaining state in Rust requires the flowlang native library. 
-If you would like to maintain state between call, follow the directions below for "Flow Support" and choose 
+Python support is enabled by default. You must install Python3 in the local environment 
+first. Maintaining state in Python requires the flowlang native library.
+If you would like to maintain state between call, follow the directions below for "Flow Support" and choose
 "Option 2".
 
+## Rust Support
+**NOTE:** Rust support in Newbound depends on  files that are generated the first time you
+run Newbound, so compiling a fresh install will fail. **Run Newbound at least once before
+trying to compile the Rust binaries.**
+
     ./newbound.sh
+
+To enable support for the Rust language you will need to compile the Newbound rust binaries
+from inside the directory where you installed Newbound.
+
+    cargo build --release
+
+Maintaining state in Rust requires the flowlang native library. If you would like to 
+maintain state between calls, follow the directions below for "Flow Support" and choose
+"Option 2".
 
 ## Flow Support
 Newbound supports the use of the Flow language for back-end commands. While the Flow
@@ -96,22 +104,31 @@ the 3D UI editor at this time.
 - Object types are largely ignored except when defining the method signature for a command.
 - Node names must match the command signature or your code will fail cryptically.
 
-### Option 1:
-To enable support for the Rust language you will need to compile the Newbound rust binaries
-from inside the directory where you installed Newbound. Since Newbound automatically rebuilds the rust binaries 
-when you save a Rust command in the MetaBot Command Editor, you should only need to manually compile the Newbound 
-binaries once.
-
-    cargo build --release
+### Option 1 (default):
+Flow code is run using the Java-based Flow interpreter. Commands written in Rust or 
+Python will be executed using system calls.
 
 ### Option 2:
-Alternatively, you can build the Flow repo (https://github.com/mraiser/flow) and
-add the library (libflowlang.so on Linux) to your Java library path. This will enable 
-the rust environment to maintain state between calls, at the expense of having to restart 
-Newbound any time you change Rust code. You will need to add the following line to the file 
-runtime/botmanager/botd.properties:
+Alternatively, you can add the native library (libflow.so on Linux) to your Java 
+library path. This will enable the rust environment to maintain state between calls to 
+Rust or Python, at the expense of having to restart Newbound any time you change Rust 
+code. This requires Rust to be installed locally.
+
+    cargo build
+    mypath=$(pwd)
+    cd /usr/lib/jni
+    sudo ln -s $mypath/target/debug/libflow.so libflow.so
+    cd -
+
+You will need to add the following line to the file runtime/botmanager/botd.properties:
 
     libflow=true
 
-**NOTE:** Enabling libflow will execute all *flow code* using the native library as well as all Rust commands. 
-That means if your flow code calls commands written in Java, they will be executed *in a separate JVM*.
+**NOTE:** Enabling libflow will execute all *Flow, Python, and Rust code* using the native 
+library. That means if your flow code calls commands written in Java, they will fail 
+unless you change the flowlang dependency in Cargo.toml to:
+
+    flowlang = { path = "../../rust/flow", features = ["java_runtime,python_runtime"] }
+
+In this case, commands written in Java will be executed *in a separate JVM* when called 
+from flow.
