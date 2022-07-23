@@ -146,7 +146,7 @@ public class HTTPService extends Service
 			key += "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 			  
 			String in = key;
-			while (in.length() < 20) in += " ";
+//			while (in.length() < 20) in += " ";
 			MessageDigest md5 = MessageDigest.getInstance("SHA-1");
 			md5.reset();
 			md5.update(in.getBytes());

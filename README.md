@@ -2,13 +2,13 @@
 
 The Newbound software is an HTML5 app framework for connecting devices 
 like computers, smartphones, tablets and devices on the Internet of 
-Things (IoT) directly and securely with one another. The software 
+Things (IoT) directly and securely with one another. Newbound apps can 
+be written in Rust, Java, JavaScript or Python. The software 
 includes a local web service and a set of default apps that provide the 
 core functionality, including P2P communication, security, encryption, 
-data storage, file transfer, port-forwarding, app publishing and much 
-more. Makers and developers can easily incorporate the Newbound software 
-into their own apps and "smart-things" to extend their creation's 
-functionality with our easy to use 
+data storage, app publishing and much more. Makers and developers can 
+easily incorporate the Newbound software into their own apps and 
+"smart-things" to extend their creation's functionality with our easy to use 
 [API](https://www.newbound.io/documentation/reference.html).
 
 [Documentation](https://www.newbound.io/documentation/index.html)
@@ -56,7 +56,8 @@ java -cp bin Startup
 ```
 
 # Support for commands in multiple languages
-Newbound back-end commands can be written in Java, Python, Rust, Javascript, or Flow. All languages except Python 
+Newbound back-end commands can be written in Java, Python, Rust, Javascript, or Flow. All 
+languages except Python 
 maintain state between calls. Maintaining state in Rust requires the flowlang native library 
 (https://github.com/mraiser/flow). When developing Flow code using Newbound, the IDE automatically builds, compiles, 
 and runs any files needed.

@@ -1494,7 +1494,7 @@ public class BotManager extends BotBase implements CodeEnv
 		String cmdname = jo.getString("cmd");
 
 		if (!LIBFLOW) {
-			String[] sa = {"target/release/newboundb", db, ctl, cmdname};
+			String[] sa = {"target/debug/newboundb", db, ctl, cmdname};
 //		File home = new File(homepath);
 //		Process bogoproc = Runtime.getRuntime().exec(sa, null, home);
 			Process bogoproc = Runtime.getRuntime().exec(sa, null, null);
@@ -1520,7 +1520,7 @@ public class BotManager extends BotBase implements CodeEnv
 			if (!result.equals("OK")) throw new Exception(result);
 		}
 
-		String[] sa = new String[] {"cargo", "build", "--release" };
+		String[] sa = new String[] {"cargo", "build" };
 //		bogoproc = Runtime.getRuntime().exec(sa, null, home);
 		Process bogoproc = Runtime.getRuntime().exec(sa, null, null);
 		sa = systemCall(bogoproc, (InputStream) null);
@@ -1598,6 +1598,7 @@ public class BotManager extends BotBase implements CodeEnv
 //		f = new File(f, "code");
 		f.mkdirs();
 
+		File f2 = new File(f, id+"-f.py");
 		f = new File(f, id+".py");
 
 		String loadpath = "import sys\rsys.path.append(\""+PYTHONPATH+"\")\r\r";
@@ -1612,7 +1613,16 @@ public class BotManager extends BotBase implements CodeEnv
 			+ id+"("+invoke+") }\rprint(json.dumps(val))\r";
 
 		writeFile(f, code.getBytes());
-		
+
+		code =
+			loadpath
+			+ imports
+			+ "\rdef execute(args):\r  return "+id+"(**args)\r"
+			+ "\rdef "+id+"("+invoke3+"):\r"
+			+ indent(python, 2)+"\r";
+
+		writeFile(f2, code.getBytes());
+
 		JSONObject data = new JSONObject();
 		try  { data = getData(db, id).getJSONObject("data"); } catch (Exception x) {}
 		int hash = data.toString().hashCode();

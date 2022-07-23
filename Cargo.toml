@@ -4,13 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-flowlang = { version = "0.1.7", features = ["java_runtime"] }
-#flowlang = { path = "../../rust/flow", features = ["java_runtime"] }
+#flowlang = { version = "0.1.8" }
+flowlang = { path = "../../rust/flow" }
 ndata="0.1.5"
 #ndata = { path = "../../rust/ndata" }
 state="0.5.3"
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = "1.0.79"
+jni = { version = "0.19.0" }
 
 [[bin]]
 name = "newbound"
@@ -23,3 +24,9 @@ path = "src/execute.rs"
 [[bin]]
 name = "newboundb"
 path = "src/build.rs"
+
+[lib]
+crate_type = ["lib","cdylib"]
+name = "flow"
+path = "src/libflowlang.rs"
+

@@ -9,7 +9,6 @@
       <sourceFolder url="file://$MODULE_DIR$/runtime/discord/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/runtime/filebot/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/runtime/feedbot/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/generated" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/runtime/blockchain/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/runtime/blog/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/runtime/calcpose/src" isTestSource="false" />

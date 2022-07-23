@@ -159,14 +159,6 @@ public class Code
 				return SYS.evalJS(LIB, ctl, name, js, args);
 			}
 			
-			if (type.equals("python"))
-			{
-				String py = CODE.getString("id");
-//				String pyid = CODE.has("python") ? CODE.getString("python") : CODE.getString("cmd");
-//				JSONObject cmd = ENV.getData(LIB, pyid).getJSONObject("data");
-				return evalCommandLine(PYTHON, args, new File(getRoot(py), py+".py"));
-			}
-
 			if (BotUtil.LIBFLOW) {
 //				String homepath = bm.getProperty("rust_home");
 				String id = CODE.getString(type);
@@ -180,13 +172,22 @@ public class Code
 				catch(JSONException x) { throw new RuntimeException(result); }
 
 			}
-			else if (type.equals("rust")){
+
+			if (type.equals("python"))
+			{
+				String py = CODE.getString("id");
+	//				String pyid = CODE.has("python") ? CODE.getString("python") : CODE.getString("cmd");
+	//				JSONObject cmd = ENV.getData(LIB, pyid).getJSONObject("data");
+				return evalCommandLine(PYTHON, args, new File(getRoot(py), py+".py"));
+			}
+
+			if (type.equals("rust")){
 //				String homepath = bm.getProperty("rust_home");
 				String id = CODE.getString(type);
 				JSONObject jo = ENV.getData(LIB, id).getJSONObject("data");
 				String ctl = jo.getString("ctl");
 				String cmd = jo.getString("cmd");
-				String[] sa = { "target/release/newboundx", LIB, ctl, cmd };
+				String[] sa = { "target/debug/newboundx", LIB, ctl, cmd };
 //				File home = new File(homepath);
 				ByteArrayInputStream bais = new ByteArrayInputStream(args.toString().getBytes());
 //				Process bogoproc = Runtime.getRuntime().exec(sa, null, home);
