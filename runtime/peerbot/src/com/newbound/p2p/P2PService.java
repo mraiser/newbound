@@ -213,6 +213,7 @@ public class P2PService extends Service
 			{
 				if (p.getPublicKey() != null && p.getReadKey() != null)
 				{
+					if (sock.getClaimedPort() != -1) p.setPort(sock.getClaimedPort());
 					sock.CONNECTING = false;
 					p.setConnected(true);
 					return true;
@@ -231,6 +232,7 @@ public class P2PService extends Service
 						sock.PARSER.send(new P2PResponse(Codes.SEND_READKEY, "".getBytes()));
 					}
 					else {
+						if (sock.getClaimedPort() != -1) p.setPort(sock.getClaimedPort());
 						p.setConnected(true);
 						return true;
 					}

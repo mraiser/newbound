@@ -27,7 +27,8 @@ public class P2PSocket implements Socket
 	protected Socket SOCK;
 	protected InputStream IS;
 	protected OutputStream OS;
-	
+	private int mClaimedPort = -1;
+
 	public P2PSocket(P2PService p2p, String localid, int localport, Socket sock) throws IOException 
 	{
 		P2P = p2p;
@@ -124,4 +125,11 @@ public class P2PSocket implements Socket
 	}
 
 
+    public void setClaimedPort(int remoteport) {
+		mClaimedPort = remoteport;
+    }
+
+	public int getClaimedPort() {
+		return mClaimedPort;
+	}
 }
