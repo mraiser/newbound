@@ -116,6 +116,7 @@ code. This requires Rust to be installed locally.
 
     cargo build
     mypath=$(pwd)
+    mkdir /usr/lib/jni
     cd /usr/lib/jni
     sudo ln -s $mypath/target/debug/libflow.so libflow.so
     cd -

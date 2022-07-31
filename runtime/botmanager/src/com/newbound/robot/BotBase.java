@@ -182,7 +182,7 @@ public abstract class BotBase extends BotUtil implements Container, App //Channe
 		catch (Exception x) { x.printStackTrace(); }
 
 		// Originally from MetaBot
-		addNumThreads(1); // Everybody gets one
+		addNumThreads(10); // Everybody gets ten
 
 		File tempdir = newTempFile();
 
@@ -3348,6 +3348,7 @@ public abstract class BotBase extends BotUtil implements Container, App //Channe
 
 	public JSONObject call(String cmd, JSONObject params) throws Exception
 	{
+		params.put("nn-castparams", true);
 		return call(ID(), cmd, params);
 	}
 

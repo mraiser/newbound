@@ -503,7 +503,8 @@ public class HTTPService extends Service
 		{
 			JSONObject jo = new JSONObject();
 			jo.put("status", result[0]);
-			jo.put("msg", result[1]);
+			if (result[1] instanceof String) jo.put("msg", result[1]);
+			else jo.put("data", result[1]);
 			s1 += jo.toString();
 		}
 		catch (Exception x) { x.printStackTrace(); }

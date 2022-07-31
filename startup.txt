@@ -1,1 +1,1 @@
-botmanager,securitybot,peerbot,metabot
+botmanager,testflow

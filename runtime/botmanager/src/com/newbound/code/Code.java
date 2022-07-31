@@ -104,7 +104,25 @@ public class Code
 		}
 		catch (Exception x) { x.printStackTrace(); }
 	}
-	
+
+	public JSONObject castParams(JSONObject args, JSONObject cmddata) {
+		JSONArray params = cmddata.getJSONArray("params");
+		int i = params.length();
+		while (i-->0)
+		{
+			JSONObject jo = params.getJSONObject(i);
+			String name = jo.getString("name");
+			String type = jo.getString("type");
+
+			try { args.put(name, forceType(type, args.get(name))); }
+			catch (Exception x)
+			{
+				x.printStackTrace();
+			}
+		}
+		return args;
+	}
+
 	class RO
 	{
 		long timestamp;
@@ -130,235 +148,227 @@ public class Code
 	{
 		CODE = code;
 		LIB = lib;
-
-		//FIXME - Total hack
-		try {
-			if (!BotUtil.LIBFLOW && CODE.has("type") && CODE.get("type").equals("flow") && CODE.has("flow")) {
-				JSONObject jo = ENV.getData(LIB, CODE.getString("flow")).getJSONObject("data");
-				RETURNTYPE = jo.getString("returntype");
-				CODE = jo.getJSONObject("flow");
-			}
-		}
-		catch (Exception x) { x.printStackTrace(); }
 	}
 
 	public JSONObject execute(JSONObject args) throws Exception
 	{
-			if (DEBUG) System.out.println("Evaluating code: "+CODE);
+		if (DEBUG) System.out.println("Evaluating code: "+CODE);
 
-			//String type = !CODE.has("type") ? "flow" : CODE.getString("type");
-			// FIXME - Should always be type
-			String type = CODE.has("type") ? CODE.getString("type") : CODE.has("lang") ? CODE.getString("lang") :CODE.has("java") ?"java" : CODE.has("python") ? "python" : "flow";
-			TYPE = type;
+		// FIXME - Flow operations that call another flow operation instantiate code with the localdata instead of
+		//  a control that points to a control containing the localdata
+		boolean bb = CODE.has("type");
+		String type = bb ? CODE.getString("type") : "flow";
+		String idx = bb ? CODE.getString(type) : null;
+		JSONObject cmdwrap = bb ? ENV.getData(LIB, idx) : null;
+		JSONObject cmddata = bb ? cmdwrap.getJSONObject("data") : CODE;
+		RETURNTYPE = bb ? cmddata.getString("returntype") : null;
 
-			if (type.equals("java"))
+		TYPE = type;
+
+		if (args.has("nn-castparams"))
+		{
+			args = castParams(args, cmddata);
+		}
+
+		if (type.equals("java"))
+		{
+			JSONTransform jt = precompile(cmdwrap);
+			return jt.execute(args);
+		}
+
+		if (type.equals("js"))
+		{
+			String name = CODE.getString("name");
+			String js = cmddata.getString("js");
+			String ctl = cmddata.getString("ctl");
+			JSONArray ja = cmddata.getJSONArray("params");
+			JSONObject jo = new JSONObject();
+			int n = ja.length();
+			int i = 0;
+			for (i=0;i<n;i++)
 			{
-				JSONTransform jt = precompile();
-			    return jt.execute(args);
+				String pname = ja.getJSONObject(i).getString("name");
+				jo.put(pname, args.get(pname));
 			}
-			
-			if (type.equals("js"))
-			{
-				String id = CODE.getString("js");
-				String name = CODE.getString("name");
-				JSONObject cmd = ENV.getData(LIB, id).getJSONObject("data");
-				RETURNTYPE = cmd.getString("returntype");
-				String js = cmd.getString("js");
-				String ctl = cmd.getString("ctl");
-				JSONArray ja = cmd.getJSONArray("params");
-				JSONObject jo = new JSONObject();
-				int n = ja.length();
-				int i = 0;
-				for (i=0;i<n;i++)
-				{
-					String pname = ja.getJSONObject(i).getString("name");
-					jo.put(pname, args.get(pname));
-				}
-				return SYS.evalJS(LIB, ctl, name, js, jo);
-			}
-			
-			if (BotUtil.LIBFLOW) {
+			return SYS.evalJS(LIB, ctl, name, js, jo);
+		}
+
+		if (BotUtil.LIBFLOW) {
 //				String homepath = bm.getProperty("rust_home");
-				String id = CODE.getString(type);
-				JSONObject jo = ENV.getData(LIB, id).getJSONObject("data");
-				RETURNTYPE = jo.getString("returntype");
-				String ctl = jo.getString("ctl");
-				String cmd = jo.getString("cmd");
-				String result = LibFlow.call(LIB, ctl, cmd, args.toString());
-				try {
-					return new JSONObject(result);
-				}
-				catch(JSONException x) { throw new RuntimeException(result); }
-
+			String ctl = cmddata.getString("ctl");
+			String cmdname = cmddata.getString("cmd");
+			String result = LibFlow.call(LIB, ctl, cmdname, args.toString());
+			try {
+				return new JSONObject(result);
 			}
+			catch(JSONException x) { throw new RuntimeException(result); }
 
-			if (type.equals("python"))
-			{
-				String py = CODE.getString("id");
-				String pyid = CODE.has("python") ? CODE.getString("python") : CODE.getString("cmd");
-				JSONObject cmd = ENV.getData(LIB, pyid).getJSONObject("data");
-				RETURNTYPE = cmd.getString("returntype");
-				return evalCommandLine(PYTHON, args, new File(getRoot(py), py+".py"));
-			}
+		}
 
-			if (type.equals("rust")){
+		if (type.equals("python"))
+		{
+			String py = CODE.getString("id");
+			return evalCommandLine(PYTHON, args, new File(getRoot(py), py+".py"));
+		}
+
+		if (type.equals("rust")){
 //				String homepath = bm.getProperty("rust_home");
-				String id = CODE.getString(type);
-				JSONObject jo = ENV.getData(LIB, id).getJSONObject("data");
-				RETURNTYPE = jo.getString("returntype");
-				String ctl = jo.getString("ctl");
-				String cmd = jo.getString("cmd");
-				String[] sa = { "target/debug/newboundx", LIB, ctl, cmd };
+			String ctl = cmddata.getString("ctl");
+			String cmdname = cmddata.getString("cmd");
+			String[] sa = { "target/debug/newboundx", LIB, ctl, cmdname };
 //				File home = new File(homepath);
-				ByteArrayInputStream bais = new ByteArrayInputStream(args.toString().getBytes());
+			ByteArrayInputStream bais = new ByteArrayInputStream(args.toString().getBytes());
 //				Process bogoproc = Runtime.getRuntime().exec(sa, null, home);
-				Process bogoproc = Runtime.getRuntime().exec(sa, null, null);
-				sa = BotUtil.systemCall(bogoproc, bais);
+			Process bogoproc = Runtime.getRuntime().exec(sa, null, null);
+			sa = BotUtil.systemCall(bogoproc, bais);
 
-				if (!sa[1].equals("")) throw new Exception("ERROR: "+sa[1]);
-				if (!sa[0].startsWith("{")) throw new Exception("ERROR: "+sa[0]);
+			if (!sa[1].equals("")) throw new Exception("ERROR: "+sa[1]);
+			if (!sa[0].startsWith("{")) throw new Exception("ERROR: "+sa[0]);
 
-				jo = new JSONObject(sa[0]);
-				return jo;
-			}
+			JSONObject jo = new JSONObject(sa[0]);
+			return jo;
+		}
 
-			int i;
-			boolean done = false;
-			
-			JSONObject out = new JSONObject();
-			CODE.put("out", out);
-			
-			FINISHFLAG = false;
-			JSONObject currentcase = CODE;
-			while (true) try
+		//FIXME - Total hack
+		if (bb) CODE = cmddata.getJSONObject("flow");
+
+		int i;
+		boolean done = false;
+
+		JSONObject out = new JSONObject();
+		CODE.put("out", out);
+
+		FINISHFLAG = false;
+		JSONObject currentcase = CODE;
+		while (true) try
+		{
+			JSONArray cmds = currentcase.getJSONArray("cmds");
+			JSONArray cons = currentcase.getJSONArray("cons");
+
+			int n = cons.length();
+			int n2 = cmds.length();
+
+			for (i=0;i<n2;i++)
 			{
-				JSONArray cmds = currentcase.getJSONArray("cmds");
-				JSONArray cons = currentcase.getJSONArray("cons");
-
-				int n = cons.length();
-				int n2 = cmds.length();
-
-				for (i=0;i<n2;i++)
+				JSONObject cmd = cmds.getJSONObject(i);
+				if (DEBUG) System.out.println("pre-processing cmd "+i+": "+cmd);
+				if (!cmd.has("done") || !cmd.getBoolean("done"))
 				{
-					JSONObject cmd = cmds.getJSONObject(i);
-					if (DEBUG) System.out.println("pre-processing cmd "+i+": "+cmd);
-					if (!cmd.has("done") || !cmd.getBoolean("done"))
+					JSONObject in = cmd.getJSONObject("in");
+					Iterator<String> it = in.keys();
+					if (DEBUG) System.out.println(it.hasNext() ? "Analyzing inputs" : "No inputs, evaluating cmd");
+					if (!it.hasNext()) evaluate(cmd);
+					else
 					{
-						JSONObject in = cmd.getJSONObject("in");
-						Iterator<String> it = in.keys();
-						if (DEBUG) System.out.println(it.hasNext() ? "Analyzing inputs" : "No inputs, evaluating cmd");
-						if (!it.hasNext()) evaluate(cmd);
-						else
+						boolean b = true;
+
+						while (it.hasNext())
 						{
-							boolean b = true;
-
-							while (it.hasNext())
-							{
-								String key = it.next();
-								in.getJSONObject(key).put("done", false); // FIXME - why does this work? It breaks JS interpreter
-								JSONObject con = lookupConnection(i, key, "in");
-								if (con == null)
-									in.getJSONObject(key).put("done", true);
-								else b = false; //b && (in.has("done") && in.getBoolean("done"));
-							}
-
-							if (DEBUG) System.out.println(b ? "No connections to any inputs, evaluating cmd" : "Command requires input to evaluate");
-							if (b) evaluate(cmd);
+							String key = it.next();
+							in.getJSONObject(key).put("done", false); // FIXME - why does this work? It breaks JS interpreter
+							JSONObject con = lookupConnection(i, key, "in");
+							if (con == null)
+								in.getJSONObject(key).put("done", true);
+							else b = false; //b && (in.has("done") && in.getBoolean("done"));
 						}
+
+						if (DEBUG) System.out.println(b ? "No connections to any inputs, evaluating cmd" : "Command requires input to evaluate");
+						if (b) evaluate(cmd);
 					}
 				}
+			}
 
-				while (!done) {
-					if (DEBUG) System.out.println("Evaluating connections...");
-					boolean c = true;
+			while (!done) {
+				if (DEBUG) System.out.println("Evaluating connections...");
+				boolean c = true;
 
-					for (i = 0; i < n; i++) {
-						JSONObject con = cons.getJSONObject(i);
-						if (DEBUG) System.out.println("Evaluating connection " + i + ": " + con);
-						if (!con.has("done") || !con.getBoolean("done")) {
-							c = false;
-							JSONArray ja = con.getJSONArray("src");
-							int src = ja.getInt(0);
-							String srcname = ja.getString(1);
-							ja = con.getJSONArray("dest");
-							int dest = ja.getInt(0);
-							String destname = ja.getString(1);
+				for (i = 0; i < n; i++) {
+					JSONObject con = cons.getJSONObject(i);
+					if (DEBUG) System.out.println("Evaluating connection " + i + ": " + con);
+					if (!con.has("done") || !con.getBoolean("done")) {
+						c = false;
+						JSONArray ja = con.getJSONArray("src");
+						int src = ja.getInt(0);
+						String srcname = ja.getString(1);
+						ja = con.getJSONArray("dest");
+						int dest = ja.getInt(0);
+						String destname = ja.getString(1);
 
-							boolean b = false;
-							Object val = null;
-							if (src == -1) {
-								val = args.has(srcname) ? args.get(srcname) : null;
+						boolean b = false;
+						Object val = null;
+						if (src == -1) {
+							val = args.has(srcname) ? args.get(srcname) : null;
+							b = true;
+							if (DEBUG) System.out.println("Value from input bar node " + srcname + " is " + val);
+						} else {
+							JSONObject cmd = cmds.getJSONObject(src);
+							if (cmd.has("done") && cmd.getBoolean("done")) {
+								JSONObject vals = cmd.getJSONObject("out");
+								val = vals.has(srcname) ? vals.get(srcname) : null;
 								b = true;
-								if (DEBUG) System.out.println("Value from input bar node " + srcname + " is " + val);
+								if (DEBUG)
+									System.out.println("Value from command " + src + " output node " + srcname + " is " + val);
+							} else if (DEBUG)
+								System.out.println("Value from command " + src + " output node " + srcname + " is not ready yet");
+						}
+
+						if (b) {
+							if (DEBUG) System.out.println("Connection " + i + " is done");
+							con.put("done", true);
+							if (dest == -2) {
+								if (val != null) out.put(destname, val);
+								else out.put(destname, JSONObject.NULL);
+								if (DEBUG)
+									System.out.println("Value " + val + " passed to output node " + destname);
 							} else {
-								JSONObject cmd = cmds.getJSONObject(src);
-								if (cmd.has("done") && cmd.getBoolean("done")) {
-									JSONObject vals = cmd.getJSONObject("out");
-									val = vals.has(srcname) ? vals.get(srcname) : null;
-									b = true;
-									if (DEBUG)
-										System.out.println("Value from command " + src + " output node " + srcname + " is " + val);
-								} else if (DEBUG)
-									System.out.println("Value from command " + src + " output node " + srcname + " is not ready yet");
-							}
-
-							if (b) {
-								if (DEBUG) System.out.println("Connection " + i + " is done");
-								con.put("done", true);
-								if (dest == -2) {
-									if (val != null) out.put(destname, val);
-									else out.put(destname, JSONObject.NULL);
-									if (DEBUG)
-										System.out.println("Value " + val + " passed to output node " + destname);
+								JSONObject cmd = cmds.getJSONObject(dest);
+								if (cmd.getString("type").equals("undefined")) {
+									cmd.put("done", true);
+									if (DEBUG) System.out.println("Marking undefined command as done");
 								} else {
-									JSONObject cmd = cmds.getJSONObject(dest);
-									if (cmd.getString("type").equals("undefined")) {
-										cmd.put("done", true);
-										if (DEBUG) System.out.println("Marking undefined command as done");
-									} else {
-										JSONObject ins = cmd.getJSONObject("in");
-										JSONObject var = ins.getJSONObject(destname);
-										if (val != null) var.put("val", val);
-										else out.put(destname, JSONObject.NULL);
-										var.put("done", true);
+									JSONObject ins = cmd.getJSONObject("in");
+									JSONObject var = ins.getJSONObject(destname);
+									if (val != null) var.put("val", val);
+									else out.put(destname, JSONObject.NULL);
+									var.put("done", true);
 
-										Iterator it = ins.keys();
-										while (it.hasNext() && b) {
-											JSONObject in = ins.getJSONObject((String) it.next());
-											b = b && in.has("done") && in.getBoolean("done");
-										}
-
-										if (DEBUG)
-											System.out.println(b ? "All inputs to dest cmd done, evaluating" : "Not all inputs to cmd done yet");
-										if (b)
-											evaluate(cmd);
+									Iterator it = ins.keys();
+									while (it.hasNext() && b) {
+										JSONObject in = ins.getJSONObject((String) it.next());
+										b = b && in.has("done") && in.getBoolean("done");
 									}
+
+									if (DEBUG)
+										System.out.println(b ? "All inputs to dest cmd done, evaluating" : "Not all inputs to cmd done yet");
+									if (b)
+										evaluate(cmd);
 								}
 							}
-						} else if (DEBUG) System.out.println("Connection " + i + " is done");
+						}
+					} else if (DEBUG) System.out.println("Connection " + i + " is done");
 
-					}
-
-					if (DEBUG)
-						System.out.println(c ? "All connections had already fired. We must be done" : "One or more connections fired. Check all the commands");
-
-					if (c) done = true;
 				}
-				break;
-			}
-			catch (NextCaseException x)
-			{
-				currentcase = currentcase.getJSONObject("nextcase");
-			}
-			catch (TerminateCaseException x)
-			{
-				break;
-			}
 
-			return out;
+				if (DEBUG)
+					System.out.println(c ? "All connections had already fired. We must be done" : "One or more connections fired. Check all the commands");
+
+				if (c) done = true;
+			}
+			break;
+		}
+		catch (NextCaseException x)
+		{
+			currentcase = currentcase.getJSONObject("nextcase");
+		}
+		catch (TerminateCaseException x)
+		{
+			break;
+		}
+
+		return out;
 	}
 	
-	public JSONTransform precompile() throws Exception 
+	public JSONTransform precompile(JSONObject cmd) throws Exception
 	{
 		try
 		{
@@ -368,7 +378,6 @@ public class Code
 			File src = new File(root, oid+".java");
 
 			String jid = CODE.getString("java");
-			JSONObject cmd = ENV.getData(LIB, jid);
 
 			if (cmd.getLong("time")>src.lastModified())
 			{
@@ -385,7 +394,6 @@ public class Code
 				buildJava(LIB, oid, jid, java, params, imports, returntype, readers, writers);
 			}
 			else cmd = cmd.getJSONObject("data");
-			RETURNTYPE = cmd.getString("returntype");
 
 			RO ro = EXT.get(oid);
 			if (ro != null && ro.timestamp == ro.file.lastModified()) return ro.trans;
@@ -843,28 +851,28 @@ public class Code
 
 	private Object forceType(String atype, Object val) throws Exception
 	{
-		if (atype.equals("int"))
+		if (atype.equals("int") || atype.equals("Integer"))
 		{
 			if (val instanceof Number) return (Integer)val;
 			return Integer.parseInt(val.toString());
 		}
-		if (atype.equals("decimal"))
+		if (atype.equals("decimal") || atype.equals("Float"))
 		{
 			if (val instanceof Number) return (Double)val;
 			return Double.parseDouble(val.toString());
 		}
-		if (atype.equals("boolean"))
+		if (atype.equals("boolean") || atype.equals("Boolean"))
 		{
 			if (val instanceof Boolean) return (Boolean)val;
 			return Boolean.parseBoolean(val.toString());
 		}
-		if (atype.equals("string")) return val.toString();
-		if (atype.equals("object"))
+		if (atype.equals("string") || atype.equals("String")) return val.toString();
+		if (atype.equals("object") || atype.equals("JSONObject"))
 		{
 			if (val instanceof JSONObject) return (JSONObject)val;
 			return new JSONObject(val.toString());
 		}
-		if (atype.equals("array"))
+		if (atype.equals("array") || atype.equals("JSONArray"))
 		{
 			if (val instanceof JSONArray) return (JSONArray)val;
 			return new JSONArray(val.toString());

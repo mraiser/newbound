@@ -1475,7 +1475,7 @@ public class BotManager extends BotBase implements CodeEnv
 		if (java != null)
 		{
 			jo = handleSaveJava(db, id, cmd, java, params, imports, returntype, readers, writers, sessionidx);
-			new Code(jo, db).precompile();
+			new Code(jo, db).precompile(getData(db, cmd));
 		}
 
 		if (jo == null) throw new Exception("No readable code");
