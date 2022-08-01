@@ -114,7 +114,7 @@ public class Code
 			String name = jo.getString("name");
 			String type = jo.getString("type");
 
-			try { args.put(name, forceType(type, args.get(name))); }
+			if (args.has(name)) try { args.put(name, forceType(type, args.get(name))); }
 			catch (Exception x)
 			{
 				x.printStackTrace();
