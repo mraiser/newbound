@@ -84,7 +84,7 @@ trying to compile the Rust binaries.**
 To enable support for the Rust language you will need to compile the Newbound rust binaries
 from inside the directory where you installed Newbound.
 
-    cargo build --release
+    cargo build
 
 Maintaining state in Rust requires the flowlang native library. If you would like to 
 maintain state between calls, follow the directions below for "Flow Support" and choose
