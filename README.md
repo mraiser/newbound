@@ -69,7 +69,7 @@ JavaScript support is enabled by default and requires no additional configuratio
 ## Python Support
 Python support is enabled by default. You must install Python3 in the local environment 
 first. Maintaining state in Python requires the flowlang native library.
-If you would like to maintain state between call, follow the directions below for "Flow Support" and choose
+If you would like to maintain state between calls, follow the directions below for "Flow Support" and choose
 "Option 2". Further, you must enable the `python_runtime` feature like so:
 
     cargo build --features=python_runtime
