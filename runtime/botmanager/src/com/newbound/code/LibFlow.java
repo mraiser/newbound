@@ -7,6 +7,9 @@ public class LibFlow {
     public static native String call(String lib, String ctl, String cmd, String args);
     public static native String list();
     public static native String build(String lib, String ctl, String cmd);
+    public static native boolean hasJava();
+    public static native boolean hasJavascript();
+    public static native boolean hasPython();
 
     static
     {

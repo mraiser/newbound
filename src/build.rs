@@ -1,6 +1,4 @@
 use std::env;
-use std::io;
-use std::io::BufRead;
 use flowlang::buildrust::*;
 use flowlang::datastore::*;
 
@@ -12,7 +10,7 @@ fn main() {
     let params: Vec<String> = env::args().collect();
     let lib = &params[1];
     if lib == "all" {
-      buildAll();
+      build_all();
     }
     else {
       let ctl = &params[2];

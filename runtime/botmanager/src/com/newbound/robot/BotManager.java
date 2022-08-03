@@ -1520,10 +1520,27 @@ public class BotManager extends BotBase implements CodeEnv
 			if (!result.equals("OK")) throw new Exception(result);
 		}
 
-		String[] sa = new String[] {"cargo", "build" };
+		String features = "";
+		if (LIBFLOW)
+		{
+			if (LibFlow.hasJava()) features += "java_runtime";
+			if (LibFlow.hasJavascript())
+			{
+				if (!features.equals("")) features += ",";
+				features += "javascript_runtime";
+			}
+			if (LibFlow.hasPython())
+			{
+				if (!features.equals("")) features += ",";
+				features += "python_runtime";
+			}
+			if (!features.equals("")) features = " --features=" + features;
+		}
+		String s = "cargo build"+features;
+
 //		bogoproc = Runtime.getRuntime().exec(sa, null, home);
-		Process bogoproc = Runtime.getRuntime().exec(sa, null, null);
-		sa = systemCall(bogoproc, (InputStream) null);
+		Process bogoproc = Runtime.getRuntime().exec(s, null, null);
+		String[] sa = systemCall(bogoproc, (InputStream) null);
 
 		ByteArrayInputStream bais = new ByteArrayInputStream(sa[1].getBytes());
 		BufferedReader br = new BufferedReader(new InputStreamReader(bais));

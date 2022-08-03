@@ -1,6 +1,7 @@
 use jni::JNIEnv;
 use jni::objects::{JClass, JString};
 use jni::sys::jstring;
+use jni::sys::jboolean;
 use std::sync::Once;
 use std::env;
 use ndata::dataobject::*;
@@ -10,7 +11,6 @@ use ::flowlang::command::*;
 use ::flowlang::datastore::*;
 use ::flowlang::primitives::*;
 use ::flowlang::buildrust::*;
-use ::flowlang::datastore::*;
 use ::flowlang::generated::Generated as Fgen;
 
 pub mod generated;
@@ -20,7 +20,7 @@ static START: Once = Once::new();
 
 #[no_mangle]
 pub extern "system" fn Java_com_newbound_code_LibFlow_call(env: JNIEnv,
-                                             class: JClass,
+                                             _class: JClass,
                                              lib: JString,
                                              ctl: JString,
                                              cmd: JString,
@@ -75,7 +75,7 @@ pub extern "system" fn Java_com_newbound_code_LibFlow_call(env: JNIEnv,
 
 #[no_mangle]
 pub extern "system" fn Java_com_newbound_code_LibFlow_build(env: JNIEnv,
-                                             class: JClass,
+                                             _class: JClass,
                                              lib: JString,
                                              ctl: JString,
                                              cmd: JString)
@@ -120,7 +120,7 @@ pub extern "system" fn Java_com_newbound_code_LibFlow_build(env: JNIEnv,
 
 #[no_mangle]
 pub extern "system" fn Java_com_newbound_code_LibFlow_list(env: JNIEnv,
-                                             class: JClass)
+                                             _class: JClass)
                                              -> jstring {
   START.call_once(|| {
     DataStore::init("data");
@@ -135,3 +135,41 @@ pub extern "system" fn Java_com_newbound_code_LibFlow_list(env: JNIEnv,
   return output.into_inner();
 }
 
+#[allow(dead_code)]
+#[no_mangle]
+pub extern "system" fn Java_com_newbound_code_LibFlow_hasJava(_env: JNIEnv,
+                                             _class: JClass)
+                                             -> jboolean {
+  #[cfg(feature="java_runtime")]
+  return 1;
+  #[allow(unreachable_code)]
+  {
+    return 0;
+  }
+}
+
+#[allow(dead_code)]
+#[no_mangle]
+pub extern "system" fn Java_com_newbound_code_LibFlow_hasJavascript(_env: JNIEnv,
+                                             _class: JClass)
+                                             -> jboolean {
+  #[cfg(feature="javascript_runtime")]
+  return 1;
+  #[allow(unreachable_code)]
+  {
+    return 0;
+  }
+}
+
+#[allow(dead_code)]
+#[no_mangle]
+pub extern "system" fn Java_com_newbound_code_LibFlow_hasPython(_env: JNIEnv,
+                                             _class: JClass)
+                                             -> jboolean {
+  #[cfg(feature="python_runtime")]
+  return 1;
+  #[allow(unreachable_code)]
+  {
+    return 0;
+  }
+}
