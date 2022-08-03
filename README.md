@@ -75,12 +75,6 @@ If you would like to maintain state between calls, follow the directions below f
     cargo build --features=python_runtime
 
 ## Rust Support
-**NOTE:** Rust support in Newbound depends on  files that are generated the first time you
-run Newbound, so compiling a fresh install will fail. **Run Newbound at least once before
-trying to compile the Rust binaries.**
-
-    ./newbound.sh
-
 To enable support for the Rust language you will need to compile the Newbound rust binaries
 from inside the directory where you installed Newbound.
 
