@@ -72,7 +72,7 @@ first. Maintaining state in Python requires the flowlang native library.
 If you would like to maintain state between call, follow the directions below for "Flow Support" and choose
 "Option 2". Further, you must enable the `python_runtime` feature like so:
 
-    cargo run --bin newboundx --features=python_runtime testflow testflow test_python <<< "{\"a\":\"world\"}"
+    cargo build --features=python_runtime
 
 ## Rust Support
 **NOTE:** Rust support in Newbound depends on  files that are generated the first time you
@@ -133,7 +133,10 @@ library.
 If your flow code calls commands written in Java, Javascript, or Python they will fail 
 unless you compile with the appropriate feature flag enabled. For example, with Java:
 
-    cargo run --bin newboundx --features=java_runtime testflow testflow test_java <<< "{\"a\":\"world\"}"
+    cargo build --features=java_runtime
 
 In this case, commands written in Java will be executed *in a separate JVM* when called 
-from flow.
+from flow. The native library will not be able to load a JVM unless you add libjvm to the library path:
+    
+    export LD_LIBRARY_PATH=/usr/lib/jvm/java-11-openjdk-amd64/lib/server/
+
