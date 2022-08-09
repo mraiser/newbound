@@ -21,6 +21,15 @@ public class RustEnv implements CodeEnv
             JSONObject src = getData(lib, id).getJSONObject("data");
             Code code = new Code(src, lib);
             JSONObject jo = code.execute(new JSONObject(args));
+            if (jo.has("data")) // FIXME - TOTAL HACK
+            {
+                Object o = jo.get("data");
+                if (o instanceof String)
+                {
+                    jo.remove("data");
+                    jo.put("msg", o);
+                }
+            }
             return jo.toString();
         }
         catch (Exception x)
