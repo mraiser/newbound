@@ -9,7 +9,7 @@ python_runtime = ["flowlang/python_runtime"]
 javascript_runtime = ["flowlang/javascript_runtime"]
 
 [dependencies]
-flowlang = { version = "0.1.11" }
+flowlang = { version = "0.1.12" }
 #flowlang = { path = "../../rust/flow" }
 ndata="0.1.5"
 #ndata = { path = "../../rust/ndata" }
