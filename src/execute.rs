@@ -28,9 +28,9 @@ fn main() {
       s = s + &line.unwrap();
     }
     
-    let args = DataObject::from_json(serde_json::from_str(&s).unwrap());
+    let args = DataObject::from_string(&s);
     let cmd = Command::lookup(lib, ctl, cmd);
     let res = cmd.execute(args).unwrap();
-    println!("{}", res.to_json());
+    println!("{}", res.to_string());
   }
 }

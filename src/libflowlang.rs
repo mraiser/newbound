@@ -42,13 +42,12 @@ pub extern "system" fn Java_com_newbound_code_LibFlow_call(env: JNIEnv,
         let ctl: String = env.get_string(ctl).expect("Couldn't get java string!").into();
         let cmd: String = env.get_string(cmd).expect("Couldn't get java string!").into();
         let args: String = env.get_string(args).expect("Couldn't get java string!").into();
-        let args = serde_json::from_str(&args).unwrap();
-        let args = DataObject::from_json(args);
+        let args = DataObject::from_string(&args);
         
         let cmd = Command::lookup(&lib, &ctl, &cmd);
         let result = cmd.execute(args).unwrap();
         
-        let output = result.to_json().to_string();
+        let output = result.to_string();
         let mut hold = DataObject::get(hold.data_ref);
         hold.put_str("result", &output);
       });
@@ -129,7 +128,7 @@ pub extern "system" fn Java_com_newbound_code_LibFlow_list(env: JNIEnv,
   let output:JString;
   {
     let result = Primitive::list();
-    output = env.new_string(&result.to_json().to_string()).expect("Couldn't create java string!");
+    output = env.new_string(&result.to_string()).expect("Couldn't create java string!");
   }
   DataStore::gc();
   return output.into_inner();

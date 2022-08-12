@@ -20,6 +20,6 @@ fn main() {
     let args = DataObject::new();
     let cmd = Command::lookup(lib, ctl, cmd);
     let res = cmd.execute(args).unwrap();
-    println!("{}", res.to_json());
+    println!("{}", res.to_string());
   }
 }
