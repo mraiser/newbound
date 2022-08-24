@@ -169,7 +169,7 @@ function installControl(el, db, id, cb, data) {
 
 	  function handlectlmeta(db, id, result){
 if (!result.data){
-  if (result.status == 'err' && result.msg == 'UNAUTHORIZED' && el == document.body)
+  if (result.status == 'err' && result.msg.indexOf('UNAUTHORIZED') != -1 && el == document.body)
     window.location.href = '../botmanager/login.html'
   console.log("NO DATA FOR "+db+'/'+id);
   console.log(JSON.stringify(result));

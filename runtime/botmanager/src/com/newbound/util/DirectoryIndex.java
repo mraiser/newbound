@@ -130,7 +130,15 @@ public class DirectoryIndex
         else
         {
             String type = MIMEHeader.lookupMimeType(f.getName());
-            if (INDEXCONTENT && f.length()<MAXFILESIZE && (type == null || type.equals("application/x-javascript") || (!type.startsWith("audio") && !type.startsWith("video") && !type.startsWith("image") && !type.startsWith("application"))))
+            if (INDEXCONTENT &&
+                f.length()<MAXFILESIZE && (
+                    type == null ||
+                    type.equals("application/x-javascript") ||
+                    type.equals("application/json") || (
+                        !type.startsWith("audio") &&
+                        !type.startsWith("video") &&
+                        !type.startsWith("image") &&
+                        !type.startsWith("application"))))
             {
                 try
                 {
