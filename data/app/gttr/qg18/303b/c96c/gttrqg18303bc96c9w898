@@ -1,0 +1,1 @@
+{"data":{"import":"use std::fs;\nuse flowlang::datastore::DataStore;\n","lib":"app","returntype":"String","ctl":"app","cmd":"uninstall","type":"rust","params":[{"name":"app","type":"String"}],"attachmentkeynames":["rs"],"desc":""},"id":"gttrqg18303bc96c9w898","time":1662215845974,"addr":"/0:0:0:0:0:0:0:1:41094","username":"admin"}

@@ -911,19 +911,22 @@ public class BotManager extends BotBase implements CodeEnv
 
 	private void convertfile(File f3, File dest, SuperSimpleCipher[] keys1, SuperSimpleCipher[] keys2) throws Exception
 	{
-		String idx = f3.getName();
-		String name = keys1.length == 0 ? idx : new String(keys1[0].decrypt(fromHexString(idx)));
-		name = keys2.length == 0 ? name : toHexString(keys2[1].encrypt(name.getBytes()));
-		
-		File f4 = getSubDir(dest, name, 4, 4);
-		f4.mkdirs();
-		f4 = new File(f4, name);
-		
-		byte[] ba = readFile(f3);
-		
-		ba = keys1.length == 0 ? ba : keys1[0].decrypt(ba);
-		
-		writeFile(f4, keys2.length == 0 ? ba : keys2[1].encrypt(ba));
+		try {
+			String idx = f3.getName();
+			String name = keys1.length == 0 ? idx : new String(keys1[0].decrypt(fromHexString(idx)));
+			name = keys2.length == 0 ? name : toHexString(keys2[1].encrypt(name.getBytes()));
+
+			File f4 = getSubDir(dest, name, 4, 4);
+			f4.mkdirs();
+			f4 = new File(f4, name);
+
+			byte[] ba = readFile(f3);
+
+			ba = keys1.length == 0 ? ba : keys1[0].decrypt(ba);
+
+			writeFile(f4, keys2.length == 0 ? ba : keys2[1].encrypt(ba));
+		}
+		catch (Exception x) { x.printStackTrace(); }
 	}
 
 	public Object handleNewdb(String db, String readers, String writers, String encryption, String sessionid) throws Exception

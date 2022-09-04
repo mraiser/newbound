@@ -1,0 +1,69 @@
+<div class='data-control' data-control='app:ui:{}'></div>
+<div class='background'></div>
+<div class='wrap' style='display:none;'>
+  <div class='titlebar'>
+    <a href='../app/index.html'><img src='../app/asset/app/menu_icon.png' class='menuicon'></a>
+    Applications
+    <div class='upper-right'>
+      <div class='card modal system-settings'>
+        <div class='appinfo-header padme'>
+          Settings
+          <img src='../app/asset/app/close-white.png' class='upper-right close-system-settings roundbutton-small out10'>
+        </div>
+        <div class='padme'>
+          <div class='textinputlabel'>Device Name</div>
+          <input type='text' class='textinput' placeholder='Name of this device' id='devicename'>
+          <br><br>
+          <div class='textinputlabel'>IP Address</div>
+          <input type='text' class='textinput' placeholder='IP Address for HTTP' id='ipaddr'>
+          <br><br>
+          <div class='textinputlabel'>Port Number</div>
+          <input type='number' class='textinput' placeholder='Port for HTTP' id='portnum'>
+          <br><br>
+          <div class='textinputlabel'>Default App</div>
+          <select name='defaultbot' class='textinput' id='defaultbot'></select> 
+          <br><br>
+          <i style='color:#0008;'>Changes require restart</i>
+        </div>
+        <div class="card-button-wrap">
+          <a class="clearbutton button-text-green save-system-settings close-system-settings">save</a>
+          <!-- a class="clearbutton save-and-restart">save and restart</a -->
+        </div>
+      </div>
+      <img src='../app/asset/app/more_icon.png' class='open-system-settings roundbutton-small popupmenu' data-popup='{"selector":".system-settings", "closeselector":".close-system-settings", "modal":true}'>
+    </div>
+  </div>
+  <div class='padme'>
+    <table class='applist-filters'>
+      <tr>
+        <td>
+          <form action="#">
+            <div class="switch">
+              <input id="appfilter-inactive" type="checkbox" class="switch-input" />
+              <label for="appfilter-inactive" class="switch-label">Inactive</label>
+            </div>
+            Inactive
+          </form>
+        </td>
+        <td width="100px"></td>
+        <td>
+          <form action="#">
+            <div class="switch">
+              <input id="appfilter-available" type="checkbox" class="switch-input" />
+              <label for="appfilter-available" class="switch-label">Available</label>
+            </div>
+            Available
+          </form>
+        </td>
+      </tr>
+    </table>
+    <div class='applist'></div>
+  </div>
+  <div class='card hideme app-settings dialog-wide' id='app-settings'>
+    <div class='appinfo-header padme'>
+      <span class='appname'>Application Name</span>
+      <img src='../app/asset/app/close-white.png' class='upper-right close-app-settings roundbutton-small out10'>
+    </div>
+    <div class='padme appinfo'></div>
+  </div>  
+</div>

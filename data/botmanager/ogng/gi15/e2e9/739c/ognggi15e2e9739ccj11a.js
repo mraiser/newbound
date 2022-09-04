@@ -3,18 +3,19 @@ var ME = $('#'+me.UUID)[0];
 
 me.ready = function(){
   sendGetSettings(null, null, null, function(result) {
-	  if (result.status == 'ok') {
-//		result = JSON.parse('{ "msg": "'+result.msg+'" }');
-	    $('#devicename').val(result.machineid);
-	    $('#portnum').val(result.portnum);
-        populateBotList(result.defaultbot);
-	  }
-	  else {
-		  $('#hidesettings').css('display', 'none');
-		  $('#settingserror').css('display', 'block');
-		  $('#settingserror').html('<b>ERROR: '+result.msg+'</b>');
-		  window.location = 'login.html';
-	  }
+    if (result.status == 'ok') {
+      //		result = JSON.parse('{ "msg": "'+result.msg+'" }');
+      $('#devicename').val(result.machineid);
+      $('#portnum').val(result.portnum);
+      populateBotList(result.defaultbot);
+    }
+    else if (result.msg.indexOf("UNAUTHORIZED") != -1) {
+      $('#hidesettings').css('display', 'none');
+      $('#settingserror').css('display', 'block');
+      $('#settingserror').html('<b>ERROR: '+result.msg+'</b>');
+      window.location = 'login.html';
+    }
+    else alert(result.msg);
   });
 };
 

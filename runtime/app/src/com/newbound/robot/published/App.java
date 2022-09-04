@@ -1,0 +1,1 @@
+package com.newbound.robot.published;public class App extends com.newbound.robot.BotBase {	public App()	{		super();	}		public String DB() { return "app"; }	public String ID() { return "gszzjo182e9e911adz9f"; }		public String getServiceName() 	{		return "app";	}}

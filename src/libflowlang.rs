@@ -14,6 +14,7 @@ use ::flowlang::buildrust::*;
 use ::flowlang::generated::Generated as Fgen;
 
 pub mod generated;
+pub mod appserver;
 use crate::generated::*;
 
 static START: Once = Once::new();

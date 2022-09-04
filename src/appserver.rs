@@ -8,6 +8,7 @@ use std::path::Path;
 use std::fs::metadata;
 use ndata::dataarray::*;
 use std::net::TcpStream;
+use std::time::Duration;
 use ndata::data::Data;
 
 use flowlang::command::*;
@@ -18,12 +19,30 @@ use flowlang::base64::*;
 
 use flowlang::generated::flowlang::http::hex_decode::hex_decode;
 use flowlang::generated::flowlang::system::time::time;
-use flowlang::generated::flowlang::file::mime_type::*;
-use flowlang::generated::flowlang::system::unique_session_id::*;
+use flowlang::generated::flowlang::file::mime_type::mime_type;
+use flowlang::generated::flowlang::system::unique_session_id::unique_session_id;
+use flowlang::generated::flowlang::object::index_of::index_of;
+use flowlang::generated::flowlang::file::read_properties::read_properties;
+
+pub fn run() {
+  let _system = init_globals();
+  
+  // Start Timers
+  thread::spawn(timer_loop);
+  
+  // Start HTTP
+  thread::spawn(http_listen);
+  
+  // FIXME - Check sessions
+  loop {
+    let dur = Duration::from_millis(5000);
+    thread::sleep(dur);
+  }
+}
 
 pub fn http_listen() {
   let system = DataStore::globals().get_object("system");
-  let socket_address = system.get_string("socket_address");
+  let socket_address = system.get_object("config").get_string("socket_address");
 
   let listener = TcpListener::bind(socket_address).unwrap();
   for stream in listener.incoming() {
@@ -201,7 +220,9 @@ pub fn http_listen() {
         request.put_str("querystring", &querystring);
         request.put_object("headers", headers.duplicate());
         request.put_object("params", params);
-        request.put_i64("timestamp", time());
+        
+        let now = time();
+        request.put_i64("timestamp", now);
 
         // FIXME
     //		CONTAINER.getDefault().fireEvent("HTTP_BEGIN", log);
@@ -228,7 +249,7 @@ pub fn http_listen() {
 
         let result = panic::catch_unwind(|| {
           let mut p = DataObject::get(dataref);
-          let o = handle_request(request, stream.try_clone().unwrap());
+          let o = handle_request(request.duplicate(), stream.try_clone().unwrap());
           p.put_object("a", o);
         });
         
@@ -296,7 +317,7 @@ pub fn http_listen() {
     //		if (range[1] != -1) len = range[1] - range[0] + 1;
     //		String res = range[0] == -1 ? "200 OK" : "206 Partial Content";
 
-          let date = RFC2822Date::now().to_string();
+          let date = RFC2822Date::new(now).to_string();
 
           headers.put_str("Date", &date);
           headers.put_str("Content-Type", &mimetype);
@@ -306,9 +327,10 @@ pub fn http_listen() {
     //      if (range != null && range[0] != -1) h.put("Content-Range","bytes "+range[0]+"-"+range[1]+"/"+range[2]);
     //      if (expires != -1) h.put("Expires", toHTTPDate(new Date(expires)));
 
-    //      let later = now.add(Duration::weeks(52));
-    //      let cookie = "sessionid=".to_string()+&sid+"; Path=/; Expires="+&later.to_rfc2822();
-    //      headers.put_str("Set-Cookie", &cookie);
+          let session_id = request.get_object("session").get_string("id");
+          let later = now + 31536000000; //system.get_object("config").get_i64("sessiontimeoutmillis");
+          let cookie = "sessionid=".to_string()+&session_id+"; Path=/; Expires="+&RFC2822Date::new(later).to_string();
+          headers.put_str("Set-Cookie", &cookie);
 
           // FIXME
     //		if (origin != null)
@@ -377,34 +399,50 @@ fn handle_request(mut request: DataObject, mut stream: TcpStream) -> DataObject 
     }
   }
   if session_id == "" { session_id = unique_session_id(); }
-  
+//  println!("{}", session_id);
   let mut sessions = system.get_object("sessions");
   let mut session;
   if !sessions.has(&session_id) {
     session = DataObject::new();
     session.put_i64("count", 0);
     session.put_str("id", &session_id);
+
+    let file = DataStore::new().root
+                .parent().unwrap()
+                .join("runtime")
+                .join("securitybot")
+                .join("session.properties");
+    let mut b = false;
+    if file.exists() {
+      let p = read_properties(file.to_owned().into_os_string().into_string().unwrap());
+      if p.has(&session_id) { 
+        let r = p.get_string(&session_id); 
+        let user = get_user(&r);
+        if user.is_some(){
+          let user = user.unwrap();
+          session.put_str("username", &r);
+          session.put_object("user", user);
+          b = true;
+        }
+      }
+    }
+    
+    if !b {
+      let mut user = DataObject::new();
+      user.put_str("displayname", "Anonymous");
+      user.put_array("groups", DataArray::new());
+      user.put_str("username", "anonymous");
+      session.put_str("username", "anonymous");
+      session.put_object("user", user);
+    }
+    
     sessions.put_object(&session_id, session.duplicate());
   }
   else {
     session = sessions.get_object(&session_id);
   }
   
-  let session_timeout;
-  if system.has("sessiontimeoutmillis") { 
-    let d = system.get_property("sessiontimeoutmillis");
-    if d.is_int() { session_timeout = d.int(); }
-    else { 
-      session_timeout = d.string().parse::<i64>().unwrap(); 
-      system.duplicate().put_i64("sessiontimeoutmillis", session_timeout);
-    }
-  }
-  else { 
-    session_timeout = 900000; 
-    system.duplicate().put_i64("sessiontimeoutmillis", session_timeout);
-  }
-  
-  let expire = time() + session_timeout;
+  let expire = time() + system.get_object("config").get_i64("sessiontimeoutmillis");
   session.put_i64("expire", expire);
   
   let count = session.get_i64("count") + 1;
@@ -412,8 +450,8 @@ fn handle_request(mut request: DataObject, mut stream: TcpStream) -> DataObject 
   
   if session.has("user") {
     headers.put_str("nn-username", &session.get_string("username"));
-    let groups = session.get_object("user").get_string("groups");
-    headers.put_str("nn-groups", &groups);
+    let groups = session.get_object("user").get_array("groups");
+    headers.put_array("nn-groups", groups);
   }
   else {
     headers.put_str("nn-username", "anonymous");
@@ -421,6 +459,7 @@ fn handle_request(mut request: DataObject, mut stream: TcpStream) -> DataObject 
   }
   
   request.put_object("session", session);
+  request.put_str("sessionid", &session_id);
   
   let mut res = DataObject::new();
   
@@ -570,6 +609,7 @@ fn handle_request(mut request: DataObject, mut stream: TcpStream) -> DataObject 
         let mut stream = stream.try_clone().unwrap();
         let request = request.duplicate();
         
+        let sid = session_id.to_owned();
         thread::spawn(move || {
           if msg.starts_with("cmd ") {
             let msg = &msg[4..];
@@ -581,7 +621,7 @@ fn handle_request(mut request: DataObject, mut stream: TcpStream) -> DataObject 
             
             for (k,v) in request.objects() {
               if k != "params" {
-                params.set_property(&("nn-".to_string()+&k), v);
+                params.set_property(&("nn_".to_string()+&k), v);
               }
             }
             
@@ -590,13 +630,42 @@ fn handle_request(mut request: DataObject, mut stream: TcpStream) -> DataObject 
             let mut o;
             if b {
               let command = Command::new(&ctldb, &id);
-              o = command.execute(params).unwrap();
-              o = format_result(command, o);
+              if check_security(&command, &sid) {
+                command.cast_params(params.duplicate());
+                
+                let response = DataObject::new();
+                let dataref = response.data_ref;
+
+                let result = panic::catch_unwind(|| {
+                  let mut p = DataObject::get(dataref);
+                  let o = command.execute(params).unwrap();
+                  p.put_object("a", o);
+                });
+                
+                match result {
+                  Ok(_x) => {
+                    let oo = response.get_object("a");
+                    o = format_result(command, oo);
+                  },
+                  Err(e) => {
+                    let msg = format!("{:?}", e);
+                    o = DataObject::new();
+                    o.put_str("status", "err");
+                    o.put_str("msg", &msg);
+                  },
+                }
+              }
+              else {
+                o = DataObject::new();
+                o.put_str("status", "err");
+                let err = format!("UNAUTHORIZED: {}", &cmd);
+                o.put_str("msg", &err);
+              }
             }
             else {
               o = DataObject::new();
               o.put_str("status", "err");
-              let err = format!("Unknown websocket command; {}", &cmd);
+              let err = format!("Unknown websocket command: {}", &cmd);
               o.put_str("msg", &err);
             }
             
@@ -703,29 +772,40 @@ fn handle_request(mut request: DataObject, mut stream: TcpStream) -> DataObject 
               b = true;
               
               let command = Command::new(&ctldb, &id);
-              command.cast_params(params.duplicate());
               for (k,v) in request.objects() {
                 if k != "params" {
-                  params.set_property(&("nn-".to_string()+&k), v);
+                  params.set_property(&("nn_".to_string()+&k), v);
                 }
               }
+              //println!("{}", params.to_string());
+              command.cast_params(params.duplicate());
               
-              let r = command.return_type.to_owned();
-              let o = command.execute(params.duplicate()).unwrap();
-              let d = format_result(command, o);
-              if r == "File" {
-                res.put_str("file", &d.get_string("data"));
-                res.put_str("mimetype", &mime_type(p));
-              }
-              else {
-                let s;
-                if params.has("callback") {
-                  s = params.get_string("callback") + "(" + &d.to_string() + ")";
+              if check_security(&command, &(session_id.to_owned())) {
+                let r = command.return_type.to_owned();
+                let o = command.execute(params.duplicate()).unwrap();
+                let d = format_result(command, o);
+                if r == "File" {
+                  res.put_str("file", &d.get_string("data"));
+                  res.put_str("mimetype", &mime_type(p));
                 }
                 else {
-                  s = d.to_string();
+                  let s;
+                  if params.has("callback") {
+                    s = params.get_string("callback") + "(" + &d.to_string() + ")";
+                  }
+                  else {
+                    s = d.to_string();
+                  }
+                  res.put_str("body", &s);
+                  res.put_str("mimetype", "application/json");
                 }
-                res.put_str("body", &s);
+              }
+              else {
+                let mut o = DataObject::new();
+                o.put_str("status", "err");
+                let err = format!("UNAUTHORIZED: {}", &cmd);
+                o.put_str("msg", &err);
+                res.put_str("body", &o.to_string());
                 res.put_str("mimetype", "application/json");
               }
             }
@@ -749,7 +829,412 @@ fn handle_request(mut request: DataObject, mut stream: TcpStream) -> DataObject 
   res
 }
 
-fn format_result(command:Command, o:DataObject) -> DataObject {
+pub fn check_auth(lib:&str, id:&str, session_id:&str, write:bool) -> bool {
+  let system = DataStore::globals().get_object("system");
+  let libdata = system.get_object("libraries").get_object(lib);
+  let libgroups = libdata.get_property("readers");
+  
+  let which;
+  if write { which = "writers"; }
+  else { which = "readers"; }
+  let data = DataStore::new().get_data(lib, id);
+  let o;
+  if data.has(which) { o = data.get_array(which); }
+  else { o = DataArray::new(); }
+  let ogroups = Data::DArray(o.data_ref);
+  
+  if index_of(libgroups.clone(), Data::DString("anonymous".to_string())) != -1 {
+    if index_of(ogroups.clone(), Data::DString("anonymous".to_string())) != -1 {
+      return true;
+    }
+  }
+
+  let sessions = system.get_object("sessions");
+  let groups;
+  if sessions.has(session_id) {
+    let session = sessions.get_object(session_id);
+    let user = session.get_object("user");
+    groups = user.get_array("groups");
+  }
+  else { groups = DataArray::new(); }
+  
+  if index_of(Data::DArray(groups.data_ref), Data::DString("admin".to_string())) != -1 {
+    return true;
+  }
+  
+  for g in groups.objects() {
+    if index_of(libgroups.clone(), g.clone()) != -1 {
+      if index_of(ogroups.clone(), g.clone()) != -1 {
+        return true;
+      }
+    }
+  }
+    
+  false
+}
+
+pub fn check_security(command:&Command, session_id:&str) -> bool {
+//  println!("session id: {}", session_id);
+  let system = DataStore::globals().get_object("system");
+  let lib = system.get_object("libraries").get_object(&command.lib);
+  
+  let libgroups = lib.get_property("readers");
+  let cmdgroups = &command.readers;
+  if index_of(libgroups.clone(), Data::DString("anonymous".to_string())) != -1 {
+    if cmdgroups.iter().position(|r| r == "anonymous").is_some() {
+      return true;
+    }
+  }
+  
+  let sessions = system.get_object("sessions");
+  let groups;
+  if sessions.has(session_id) {
+    let session = sessions.get_object(session_id);
+    let user = session.get_object("user");
+    groups = user.get_array("groups");
+  }
+  else { groups = DataArray::new(); }
+  
+  if index_of(Data::DArray(groups.data_ref), Data::DString("admin".to_string())) != -1 {
+    return true;
+  }
+  
+  for g in groups.objects() {
+    if index_of(libgroups.clone(), g.clone()) != -1 {
+      if cmdgroups.iter().position(|r| r == &(g.string())).is_some() {
+        return true;
+      }
+    }
+  }
+    
+  false
+}
+
+pub fn log_in(sessionid:&str, username:&str, password:&str) -> bool {
+  let user = get_user(username);
+  let mut e = DataObject::new();
+  e.put_str("user", username);
+  e.put_str("sessionid", sessionid);
+  if user.is_some() {
+    let user = user.unwrap();
+    if user.get_string("password") == password {
+      let system = DataStore::globals().get_object("system");
+      let sessions = system.get_object("sessions");
+      let mut session = sessions.get_object(sessionid);
+      session.put_str("username", username);
+      session.put_object("user", user);
+      
+      fire_event("securitybot", "LOGIN", e);
+
+      return true;
+    }
+  }
+
+  fire_event("securitybot", "LOGIN_FAIL", e);
+  
+  false
+}
+
+pub fn get_user(username:&str) -> Option<DataObject> {
+  let file = DataStore::new().root
+              .parent().unwrap()
+              .join("runtime")
+              .join("securitybot")
+              .join("users")
+              .join(&(username.to_string()+".properties"));
+  if file.exists() {
+    let mut user = read_properties(file.into_os_string().into_string().unwrap());
+    let mut groups = DataArray::new();
+    for g in user.get_string("groups").split(",") {
+      groups.push_str(g);
+    }
+    user.put_array("groups", groups);
+    user.put_str("username", username);
+    return Some(user);
+  }
+  None
+}
+
+pub fn add_timer(tid:&str, mut tdata:DataObject) {
+  let system = DataStore::globals().get_object("system");
+  let mut timers = system.get_object("timers");    
+  let start = tdata.get_i64("start");
+  let start = to_millis(start, tdata.get_string("startunit"));
+  let interval = tdata.get_i64("interval");
+  let interval = to_millis(interval, tdata.get_string("intervalunit"));
+  tdata.put_i64("startmillis", start);
+  tdata.put_i64("intervalmillis", interval);
+  timers.put_object(&tid, tdata);
+}
+
+pub fn add_event_listener(id:&str, ebot:&str, event:&str, cmdlib:&str, cmdid:&str) {
+  let system = DataStore::globals().get_object("system");
+  let mut events = system.get_object("events");
+  let mut bot;
+  let mut list;
+  if events.has(ebot) {
+    bot = events.get_object(ebot);
+  }
+  else {
+    bot = DataObject::new();
+    events.put_object(ebot, bot.duplicate());
+  }
+  if bot.has(event) {
+    list = bot.get_object(event);
+  }
+  else {
+    list = DataObject::new();
+    bot.put_object(event, list.duplicate());
+  }
+  let mut cmd = DataObject::new();
+  cmd.put_str("lib", cmdlib);
+  cmd.put_str("cmd", cmdid);
+  list.put_object(id, cmd);
+}
+
+pub fn fire_event(ebot:&str, event:&str, data:DataObject) {
+  let system = DataStore::globals().get_object("system");
+  let events = system.get_object("events");
+  if events.has(ebot) {
+    let bot = events.get_object(ebot);
+    if bot.has(event) {
+      let list = bot.get_object(event);
+      for (_, e) in list.objects() {
+        let e = e.object();
+        let lib = e.get_string("lib");
+        let id = e.get_string("cmd");
+        let command = Command::new(&lib, &id);
+        let  _ = command.execute(data.duplicate());
+      }
+    }
+  }
+  
+}
+
+fn timer_loop() {
+  let system = DataStore::globals().get_object("system");
+  loop {
+    if system.get_bool("running") {
+      let now = time();
+      let mut timers = system.get_object("timers");
+      for (id, timer) in timers.objects() {
+        let mut timer = timer.object();
+        let when = timer.get_i64("startmillis");
+        if when <= now {
+          timers.remove_property(&id);
+          let cmdid = timer.get_string("cmd");
+          let params = timer.get_object("params");
+          let repeat = timer.get_bool("repeat");
+          let db = timer.get_string("cmddb");
+          let mut ts = timers.duplicate();
+          thread::spawn(move || {
+            let cmd = Command::new(&db, &cmdid);
+            let _x = cmd.execute(params).unwrap();
+            
+            if repeat {
+              let next = now + timer.get_i64("intervalmillis");
+              timer.put_i64("startmillis", next);
+              ts.put_object(&id, timer);
+            }
+          });
+        }
+      }
+    }
+    else {
+      break;
+    }
+
+    let dur = Duration::from_millis(1000);
+    thread::sleep(dur);
+  }
+}
+
+fn load_library(j:&str) {
+  let store = DataStore::new();
+  let system = DataStore::globals().get_object("system");
+  let path = store.root.join(j).join("meta.json");
+  let s = fs::read_to_string(&path).unwrap();
+  let mut o2 = DataObject::from_string(&s);
+  
+  let mut readers = DataArray::new();
+  let mut writers = DataArray::new();
+  if o2.has("readers") { 
+    for r in o2.get_array("readers").objects() { readers.push_str(&(r.string())); }
+  }
+  if o2.has("writers") { 
+    for w in o2.get_array("writers").objects() { writers.push_str(&(w.string())); }
+  }
+  o2.put_array("readers", readers);
+  o2.put_array("writers", writers);
+  o2.put_str("id", j);
+
+  let mut libraries = system.get_object("libraries");
+  libraries.put_object(j, o2);
+}
+
+pub fn load_config() -> DataObject {
+  let mut config;
+  if Path::new("config.properties").exists() {
+    config = read_properties("config.properties".to_string());
+  }
+  else { config = DataObject::new(); }
+  
+  if !config.has("socket_address") {
+    if !config.has("http_address") { config.put_str("http_address", "127.0.0.1"); }
+    if !config.has("http_port") { config.put_str("http_port", "5774"); }
+    
+    let ip = config.get_string("http_address");
+    let port = config.get_string("http_port");
+
+    let socket_address = ip+":"+&port;
+    config.put_str("socket_address", &socket_address);
+  }
+  
+  if config.has("sessiontimeoutmillis") { 
+    let d = config.get_property("sessiontimeoutmillis");
+    if !d.is_int() { 
+      let session_timeout = d.string().parse::<i64>().unwrap(); 
+      config.duplicate().put_i64("sessiontimeoutmillis", session_timeout);
+    }
+  }
+  else { 
+    let session_timeout = 900000; 
+    config.duplicate().put_i64("sessiontimeoutmillis", session_timeout);
+  }
+  
+  if !config.has("apps") {
+    config.put_str("apps", "app,lib");
+  }
+  
+  if !config.has("default_app") {
+    config.put_str("default_app", "app");
+  }
+  
+  if !config.has("machineid") {
+    config.put_str("machineid", "MY_DEVICE");
+  }
+  
+  let mut system = DataStore::globals().get_object("system");
+  system.put_object("config", config.duplicate());
+  config
+}
+
+pub fn init_globals() -> DataObject {
+  let mut globals = DataStore::globals();
+  
+  let mut system;
+  if globals.has("system") { system = globals.get_object("system"); }
+  else {
+    system = DataObject::new();
+    globals.put_object("system", system.duplicate());
+  }
+
+  let config = load_config();
+  
+  system.put_object("timers", DataObject::new());
+  system.put_object("events", DataObject::new());
+    
+  let s = config.get_string("apps");
+  let s = s.trim().to_string();
+  let sa = s.split(",");
+  
+  let mut apps = DataObject::new();
+  let default_app;
+  if config.has("default_app") { default_app = config.get_string("default_app"); }
+  else { default_app = sa.to_owned().nth(0).unwrap().to_string(); }
+  
+  let libraries = DataObject::new();
+  system.put_object("libraries", libraries.duplicate());
+  
+  for i in sa {
+    let mut o = DataObject::new();
+    o.put_str("id", i);
+    let path_base = "runtime/".to_string()+i+"/";
+    let path = path_base.to_owned()+"botd.properties";
+    let p = read_properties(path);
+    o.put_object("runtime", p);
+    let path = path_base+"app.properties";
+    let p = read_properties(path);
+    o.put_object("app", p.duplicate());
+    apps.put_object(i, o);
+    
+    let s = p.get_string("libraries");
+    let sa2 = s.split(",");
+    for j in sa2 {
+      if !libraries.has(j) { load_library(j); }
+    }
+  }
+  
+  system.put_str("default_app", &default_app);
+  system.put_object("apps", apps);
+  system.put_object("sessions", DataObject::new());
+  system.put_bool("running", true);
+  
+  let store = DataStore::new();
+
+  // Init Timers and Events
+  for lib in libraries.duplicate().keys() {
+    let controls = store.get_data(&lib, "controls").get_object("data").get_array("list");
+    for ctldata in controls.objects() {
+      let ctldata = ctldata.object();
+      let ctlid = ctldata.get_string("id");
+      let ctlname = ctldata.get_string("name");
+      let ctl = store.get_data(&lib, &ctlid).get_object("data");
+      if ctl.has("timer") {
+        let ctimers = ctl.get_array("timer");
+        for timer in ctimers.objects() {
+          let timer = timer.object();
+          let tname = timer.get_string("name");
+          let tid = timer.get_string("id");
+          let mut tdata = store.get_data(&lib, &tid).get_object("data");
+          tdata.put_str("ctlname", &ctlname);
+          tdata.put_str("name", &tname);
+          add_timer(&tid, tdata);
+        }
+      }
+      else if ctl.has("event") {
+        let cevents = ctl.get_array("event");
+        for event in cevents.objects() {
+          let event = event.object();
+          let eid = event.get_string("id");
+          let edata = store.get_data(&lib, &eid).get_object("data");
+          let ebot = edata.get_string("bot");
+          let ename = edata.get_string("event");
+          let cmddb = edata.get_string("cmddb");
+          let cmdid = edata.get_string("cmd");
+          add_event_listener(&eid, &ebot, &ename, &cmddb, &cmdid);
+        }
+      }
+    }
+  }
+  
+  let p = store.root;
+  for file in fs::read_dir(&p).unwrap() {
+    let path = file.unwrap().path();
+    if path.is_dir() {
+      let name:String = path.file_name().unwrap().to_str().unwrap().to_string();
+      if !libraries.has(&name) { load_library(&name); }
+    }  
+  }
+  
+  system
+}
+
+fn to_millis(i:i64, s:String) -> i64 {
+  if s == "milliseconds" { return i; }
+  let i = i * 1000;
+  if s == "seconds" { return i; }
+  let i = i * 60;
+  if s == "minutes" { return i; }
+  let i = i * 60;
+  if s == "hours" { return i; }
+  let i = i * 24;
+  if s != "days" { panic!("Unknown time unit for timer ({})", &s); }
+  
+  i
+}
+
+pub fn format_result(command:Command, o:DataObject) -> DataObject {
   let mut d;
                 
   if command.return_type == "FLAT" { 
@@ -792,16 +1277,19 @@ fn lookup_command_id(system: DataObject, app:String, cmd: String) -> (bool, Stri
     ctldb = appdata.get_string("ctldb");
     let ctlid = appdata.get_string("ctlid");
     let store = DataStore::new();
-    let ctllist = store.get_data(&ctldb, &ctlid).get_object("data").get_array("cmd");
-    for ctl in ctllist.objects() {
-      let ctl = ctl.object();
-      let name = ctl.get_string("name");
-      if name == cmd {
-        b = true;
-        id = ctl.get_string("id");
-        break;
+    let ctllist = store.get_data(&ctldb, &ctlid).get_object("data");
+    if ctllist.has("cmd") {
+      let ctllist = ctllist.get_array("cmd");
+      for ctl in ctllist.objects() {
+        let ctl = ctl.object();
+        let name = ctl.get_string("name");
+        if name == cmd {
+          b = true;
+          id = ctl.get_string("id");
+          break;
+        }
       }
-    }
+      }
   }
   (b, ctldb, id)
 }

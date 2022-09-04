@@ -1,0 +1,97 @@
+<div class='data-control' data-control='app:ui:{}'></div>
+<div class='background'></div>
+<div class='wrap' style='display:none;'>
+  <div class='titlebar'>
+    <a href='../app/index.html'><img src='../app/asset/app/menu_icon.png' class='menuicon'></a>
+    Application Name
+    <div class='upper-right'>
+      <div class='card popupcard left-sided mini mypopupname1 padme'>
+        POPUP MENU
+        <img src='../app/asset/app/close.png' class='popupcard-close roundbutton-small'>
+        <img src='../app/asset/app/corner-left.png' class='popupcard-pointer'>
+      </div>
+      <img src='../app/asset/app/more_icon.png' class='roundbutton-small popupmenu' data-id='mypopupname1'>
+    </div>
+  </div>
+  <div class='navbar'>
+    <div class='navbar-tab selected' data-id='tab1'>Tab1</div>
+    <div class='navbar-tab' data-id='tab2'>Tab2</div>
+    <div class='navbar-tab' data-id='tab3'>Tab3</div>
+    <div class='navbar-tab' data-id='tab4'>Tab4</div>
+  </div>
+  <div class='main'>
+    <div class='tab-content tab1 selected'>
+      TAB 1
+      <br><br>
+      <span class='chip'>Chip<img src="../app/asset/app/close-white.png" class="roundbutton-small groupdelete mdl-chip__action chipbutton"></span>
+      <br><br>
+      <label class="plaincheckbox">
+        <input type='checkbox' id='usercardgroupcheckbox1'>
+        <span>Checkbox</span>
+      </label>
+      <br><br>
+      <form action="#">
+        <div class="switch">
+          <input id="appfilter-switch-1" type="checkbox" class="switch-input" />
+          <label for="appfilter-switch-1" class="switch-label">Switch</label>
+        </div>
+        Switch
+      </form>
+      <div class='progressbar myprogress'></div>
+      <label class="plainradio">
+        <input type='radio' id='usercardgroupradio1' name='usercardgroupradio' checked>
+        <span>No Progress</span>
+      </label>
+      <label class="plainradio">
+        <input type='radio' id='usercardgroupradio2' name='usercardgroupradio'>
+        <span>25%</span>
+      </label>
+      <label class="plainradio">
+        <input type='radio' id='usercardgroupradio3' name='usercardgroupradio'>
+        <span>100%</span>
+      </label>
+      <label class="plainradio">
+        <input type='radio' id='usercardgroupradio4' name='usercardgroupradio'>
+        <span>Indeterminate</span>
+      </label>
+      <br><br>
+      <button class='regularbutton snackbarbutton'>Snackbar</button>
+      <button class='accentbutton popupmenu' data-popup='{"selector":".mydialog","closeselector":".mydialog-close","modal":true}'>dialog</button>
+      <button class='coloredbutton tooltip' data-tooltip='{"message":"This is a tooltip!"}'>Tooltip</button>
+      <img src='../app/asset/app/more_icon.png' class='roundbutton popupmenu' data-popup='{"selector":".mypopupname2","closeselector":".popupcard-close","popup":true}'>
+      <div class='card popupcard right-sided mypopupname2 padme'>
+        POPUP MENU
+        <img src='../app/asset/app/close.png' class='popupcard-close roundbutton-small'>
+        <img src='../app/asset/app/corner.png' class='popupcard-pointer'>
+      </div>
+      <div class='card modal mydialog'>
+        <h2 class="card-header">Title</h2>
+        <div class='pad16'>
+          <label class="textinputlabel" for="sample3">Text...</label>
+          <input class="textinput" type="text" id="sample3">
+        </div>
+        <div class="card-description pad16">Card description goes here.</div>
+        <div class="card-button-wrap">
+          <a class="clearbutton card-button-right">continue</a>
+          <a class="clearbutton mydialog-close">cancel</a>
+        </div>
+      </div>
+      <br><br>
+      <div class='textinputlabel'>Text Field</div>
+      <input type='text' class='textinput' placeholder='Placeholder Text'>
+      <br><br>
+      <div class='textinputlabel'>Select</div>
+      <select name='defaultbot' class='textinput' id='defaultbot'>
+        <option>Apples</option>
+        <option>Oranges</option>
+        <option>Bananas</option>
+      </select> 
+      <br><br>
+      <div class='textinputlabel'>Slider</div>
+      <input class="myslider plainslider" min="0" max="60" type="range" value="30" />
+    </div>
+    <div class='tab-content tab2'>TAB 2</div>
+    <div class='tab-content tab3'>TAB 3</div>
+    <div class='tab-content tab4'>TAB 4</div>
+  </div>
+</div>

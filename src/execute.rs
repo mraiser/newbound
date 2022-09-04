@@ -1,5 +1,5 @@
 pub mod generated;
-
+pub mod appserver;
 use std::env;
 use std::io;
 use std::io::BufRead;
