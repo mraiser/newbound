@@ -238,3 +238,4 @@ dmypy.json
 /src/generated/
 /runtime/testflow/
 /runtime/dvr/
+/config.properties
