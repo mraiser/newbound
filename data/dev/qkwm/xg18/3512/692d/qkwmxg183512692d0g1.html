@@ -1,0 +1,45 @@
+<div class='section-title' id='timer_edit'>Edit Timer: <span class='timer_edit_name'></span></div>
+<br>
+<div class='textinputlabel'>Fire Command</div>
+<select name='timer_edit_task' class='darkselect textinput edittimerselect cmdselect' id='timer_edit_task'></select> 
+<br><br>
+<label class="plainradio">
+  <input type='radio' id='timer_edit_start-1' name='timer_edit_start' checked>
+  <span>At Startup</span>
+</label>
+<br>
+<label class="plainradio">
+  <input type='radio' id='timer_edit_start-2' name='timer_edit_start'>
+  <span><select id='tes2-1' data-role='none' class='darkselect digitselect'></select><select id='tes2-2' data-role='none' class='darkselect digitselect'></select>
+  <select id='tes2-unit' data-role='none' class='darkselect timeunitselect'></select>
+  After Startup</span>
+</label>
+<br>
+<label class="plainradio">
+  <input type='radio' id='timer_edit_start-3' name='timer_edit_start'>
+  <span>At a specific time:
+    <br>
+    <select id='tes3-h1' data-role='none' class='darkselect h1select'></select><select id='tes3-h2' data-role='none' class='darkselect digitselect'></select> : 
+    <select id='tes3-m1' data-role='none' class='darkselect m1select'></select><select id='tes3-m2' data-role='none' class='darkselect digitselect'></select> 
+    <select id='tes3-ampm' data-role='none' class='darkselect hideme'><option>AM</option><option>PM</option></select> 
+    On 
+    <select id='tes3-m' data-role='none' class='darkselect monthselect'></select>
+    <select id='tes3-d1' data-role='none' class='darkselect d1select'></select><select id='tes3-d2' data-role='none' class='darkselect digitselect'></select> , 
+    <select id='tes3-y' data-role='none' class='darkselect yearselect'></select>
+  </span>
+</label>
+<br><br>
+<label class="plaincheckbox">
+  <input type='checkbox' id='timer_edit_repeat'>
+  <span>Repeat</span>
+  <span id='timer_edit_repeat_data' style='display:none;'>
+    Every 
+    <select id='timer_edit_repeat1' data-role='none' class='darkselect digitselect' onclick='event.stopPropagation();'></select><select id='timer_edit_repeat2' data-role='none' class='darkselect digitselect' onclick='event.stopPropagation();'></select>
+    <select id='timer_edit_repeat_unit' data-role='none' class='darkselect timeunitselect' onclick='event.stopPropagation();'></select>
+  </span>
+</label>
+<br><br>
+<button class='coloredbutton' id='savethetimerbutton'>Save</button>
+<button class='regularbutton' id='cancelthetimerbutton'>Cancel</button>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<button class='accentbutton' id='deletethetimerbutton'>Delete</button>

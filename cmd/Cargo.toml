@@ -1,0 +1,18 @@
+[package]
+name = "cmd"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["rlib", "dylib"]
+
+[dependencies]
+#flowlang = { version = "0.1.16" }
+flowlang = { path = "../../../rust/flow" }
+#ndata="0.2.2"
+ndata = { path = "../../../rust/ndata" }
+state="0.5.3"
+zip = { version="0.6.2", features=["deflate-miniz"] }
+walkdir = "2.3.2"
+openssl = "0.10.41"
+

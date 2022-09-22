@@ -95,23 +95,17 @@ me.initTooltips = function(el){
 };
 
 me.initPopups = function(el){
-  var data = $(el).find('.popupmenu').data('popup');
   $(el).find('.popupmenu').click(function(event){
+    var data = $(this).data('popup');
     data.clientX = event.clientX;
     data.clientY = event.clientY;
     me.popup(data);
   });
-
-  var selector = data.closeselector ? data.closeselector : '.popupcard-close';
-  var el2 = $(data.selector);
-  el2.find(selector).click(function(){
-    me.closePopup(data);
-  });
 };
 
 me.closePopup = function(data, cb){
+  var el2 = $(data.selector);
   if (data && data.modal){
-    var el2 = $(data.selector);
     var w = el2.width();
     var h = el2.height();
     el2.animate({left:data.clientX+'px',top:data.clientY+'px',width:'0px',height:'0px'}, 500, function(){
@@ -119,9 +113,14 @@ me.closePopup = function(data, cb){
       el2.css('width', w+'px');
       el2.css('height', h+'px');
       if (cb) cb();
+      if (data.close) data.close();
     });
   }
-  else el2.css('display', 'none');
+  else {
+    el2.css('display', 'none');
+    if (data.close) data.close();
+  }
+  
   if (data.bg) {
     data.bg.css('display', 'none');
     data.bg.remove();
@@ -152,6 +151,57 @@ me.popup = function(data, cb){
     });
   }
   else el2.css('display', 'inline-block');
+  
+  var selector = data.closeselector ? data.closeselector : '.popupcard-close';
+  el2.find(selector).click(function(){
+    me.closePopup(data);
+  });
+};
+
+me.prompt = function(d) {
+  var val = d.value ? d.value : "";
+  var sub = d.subtext ? d.subtext : "";
+  var ok = d.ok ? d.ok : "ok";
+  
+  var el = $('<div class="fixed-wrap"><div class="card modal mydialog"><div class="padme card-header dialog-header"><span class="title">'+d.title+'</span><img src="../app/asset/app/close-white.png" class="upper-right close-prompt-dialog roundbutton-small out10"></div><div class="pad16"><label class="textinputlabel" for="sample3">'+d.text+'</label><input class="textinput" type="text" id="sample3" value="'+val+'"></div><div class="subtext card-description pad16">'+sub+'</div><div class="card-button-wrap"><a class="continuebutton clearbutton button-text-green">'+ok+'</a></div></div></div>');
+  $(document.body).append(el);
+  d.selector = el.find('.card')[0];
+  d.closeselector = el.find('.close-prompt-dialog')[0];
+  d.modal = true;
+  d.close = function(){ el.remove(); };
+  me.popup(d);
+  el.find('.continuebutton').click(function(){
+    var val = el.find('#sample3').val();
+    if (d.validate) {
+      if (d.validate(val)) {
+        d.cb(val);
+        me.closePopup(d);
+      }
+      else el.find('.subtext').css("color","red");
+    }
+    else {
+      d.cb(val);
+      me.closePopup(d);
+    }
+  });
+};
+
+me.confirm = function(d) {
+  var val = d.value ? d.value : "";
+  var text = d.text ? d.text : "";
+  var ok = d.ok ? d.ok : "ok";
+  
+  var el = $('<div class="fixed-wrap"><div class="card modal mydialog"><div class="padme card-header dialog-header"><span class="title">'+d.title+'</span><img src="../app/asset/app/close-white.png" class="upper-right close-prompt-dialog roundbutton-small out10"></div><div class="subtext card-description pad16">'+text+'</div><div class="card-button-wrap"><a class="continuebutton clearbutton button-text-green">'+ok+'</a></div></div></div>');
+  $(document.body).append(el);
+  d.selector = el.find('.card')[0];
+  d.closeselector = el.find('.close-prompt-dialog')[0];
+  d.modal = true;
+  d.close = function(){ el.remove(); };
+  me.popup(d);
+  el.find('.continuebutton').click(function(){
+    d.cb();
+    me.closePopup(d);
+  });
 };
 
 me.initProgress = function(el){

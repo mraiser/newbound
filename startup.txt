@@ -1,1 +1,0 @@
-botmanager,metabot,peerbot,securitybot

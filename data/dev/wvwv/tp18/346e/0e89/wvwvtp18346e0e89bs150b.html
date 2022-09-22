@@ -1,0 +1,113 @@
+<div class='section-title'>Edit Command: <span class='ecmd-name'></span> (<span class='editcommandiddisplay'></span>)</div>
+<button class="cancelcommandbutton accentbutton">close</button>
+<br>
+<div class='card ctlinfo'>
+  <div class='padme dialog-header'>
+    Command Overview
+  </div>
+  <div class='padme'>
+    <button class='langbutton lbselected' id='lang_java'>Java</button>
+    <button class='langbutton' id='lang_python'>Python</button>
+    <button class='langbutton' id='lang_js'>Javascript</button>
+    <button class='langbutton' id='lang_flow'>Flow</button>
+    <button class='langbutton' id='lang_rust'>Rust</button>
+    <br><br>
+    <div class='textinputlabel'>Groups</div>
+    <input id='ecmd_groups' type='text' class='textinput' placeholder='Comma delimited, no spaces'>
+    <br><br>
+    <div class='textinputlabel'>Description</div>
+    <textarea id='ecmd_desc' class='textinput' placeholder='Enter a description for this command'></textarea>
+  </div>
+</div>
+<div class='imports card ctlinfo'>
+  <div class='padme dialog-header'>
+    Imports
+  </div>
+  <div class='padme importform importjava'>
+    <div class='textinputlabel'>Import Statements</div>
+    <textarea id='ecmd_imports' class='textinput' rows= "5" placeholder='Import classes and/or packages'>import org.json.*;
+import com.newbound.robot.*;
+</textarea>
+  </div>
+  <div class='padme importform importpython'>
+    <div class='textinputlabel'>Import Statements</div>
+    <textarea id='ecmdpy_imports' class='textinput' rows= "5" placeholder='Import classes and/or packages'>import sys
+import json
+</textarea>
+  </div>
+  <div class='padme importform importrust'>
+    <div class='textinputlabel'>Import Statements</div>
+    <textarea id='ecmdrust_imports' class='textinput' rows= "5" placeholder='Import classes and/or packages'></textarea>
+  </div>
+</div>
+<div class='returntype'>
+  <button id="savecommandbutton" class="accentbutton">save</button>
+  <button id="deletecommandbutton" class="floatright accentbutton">delete</button>
+  <br><br>
+  Return Type
+  <br><br>
+  <button class='rtbutton rtbselected' id='rtbjsonobject'>JSON</button>
+  <button class='rtbutton' id='rtbjsonarray'>Array</button>
+  <button class='rtbutton' id='rtbstring'>String</button>
+  <button class='rtbutton' id='rtbinteger'>Integer</button>
+  <button class='rtbutton' id='rtbfloat'>Float</button>
+  <br>
+  <button class='rtbutton' id='rtbboolean'>Boolean</button>
+  <button class='rtbutton' id='rtbany'>Any</button>
+  <button class='rtbutton' id='rtbfile'>File</button>
+  <button class='rtbutton' id='rtbinputstream'>Stream</button>
+  <button class='rtbutton' id='rtbflat'>FLAT</button>
+</div>  
+
+
+
+<div class='commandcodediv'>
+  <div class='javaerror'></div>
+  <span class='cmdlable cmdlablejava'>public</span>
+  <span class='cmdlable cmdlablepython'>def</span>
+  <span class='cmdlable cmdlablejs'>function</span>
+  <span class='cmdlable cmdlablerust'>pub fn</span>
+  <span class='cmdlable cmdlablejava returntypespan'>JSONObject</span>
+  <span class='methodnamespan'>methodName</span>
+  (<span class='methodparams'></span>
+  <img class='roundbutton-small addmethodparam'  src='../app/asset/app/add_icon-white.png'>
+  <select data-role="none" id="cmd_edit_java_newparamtype" class="bggray newparam">
+    <option value="String">String</option>
+    <option value="Integer">int</option>
+    <option value="Double">double</option>
+    <option value="Float">float</option>
+    <option value="Long">long</option>
+    <option value="Boolean">boolean</option>
+    <option value="JSONObject">JSONObject</option>
+    <option value="JSONArray">JSONArray</option>
+    <option value="Any">Any</option>
+    <option value="Data">Data</option>
+    <option value="Bot">Bot</option>
+  </select>
+  <input type='text' class='newparamname newparam'>
+  <img class="newparam newparamaddbutton roundbutton-small" src='../app/asset/app/check-green.png'>
+  <img class='newparam dontaddmethodparam roundbutton-small' src='../app/asset/app/close-white.png'>
+  )<span class='cmdlable cmdlablepython'>:</span>
+  <span class='cmdlable cmdlablejava'>
+    throws Exception {
+  </span>
+  <span class='cmdlable cmdlablerust'>-></span>
+  <span class='cmdlable cmdlablerust returntypespan'>JSONObject</span>
+  <span class='cmdlable cmdlablejs'>{</span>
+  <span class='cmdlable cmdlableflow'>:</span>
+  <span class='cmdlable cmdlablerust'>{</span>
+  <div class='indent'>
+    <textarea class='cmdlable cmdlablerust' id='commandcoderust'></textarea>
+    <textarea class='cmdlable cmdlablejava' id='commandcodejava'></textarea>
+    <textarea class='cmdlable cmdlablepython' id='commandcodepython'></textarea>
+    <textarea class='cmdlable cmdlablejs' id='commandcodejs'></textarea>
+    <div class='cmdlable cmdlableflow' id='commandcodeflow'></div>
+  </div>
+  <span class='cmdlable cmdlablejava cmdlablerust'>}</span>
+  <br><br>
+  <span class='cmdlable cmdlablerust'>Rust ID: <span class='editcommandrustiddisplay'></span></span>
+  <span class='cmdlable cmdlablejava'>Java ID: <span class='editcommandjavaiddisplay'></span></span>
+  <span class='cmdlable cmdlablepython'>Python ID: <span class='editcommandpythoniddisplay'></span></span>
+  <span class='cmdlable cmdlablejs'>Javascript ID: <span class='editcommandjsiddisplay'></span></span>
+  <span class='cmdlable cmdlableflow'>Flow ID: <span class='editcommandflowiddisplay'></span></span>
+</div>

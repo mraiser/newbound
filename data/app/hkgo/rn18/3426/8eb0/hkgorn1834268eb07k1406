@@ -1,0 +1,1 @@
+{"data":{"import":"use std::fs;\nuse flowlang::datastore::*;\nuse flowlang::appserver::init_globals;","lib":"app","returntype":"String","ctl":"app","cmd":"deletelib","type":"rust","params":[{"name":"lib","type":"String"}],"attachmentkeynames":["rs"],"desc":""},"id":"hkgorn1834268eb07k1406","time":1663274125339,"addr":"/0:0:0:0:0:0:0:1:36592","username":"admin"}

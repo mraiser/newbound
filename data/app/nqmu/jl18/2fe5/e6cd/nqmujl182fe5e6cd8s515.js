@@ -42,6 +42,8 @@ me.build = function(el, app){
       
       var parms = $('<td/>')[0];
       row.append(parms);
+      var n = comm.parameters.length;
+      while (n-->0) if (comm.parameters[n].startsWith('nn_')) comm.parameters.pop(n);
       commaList(parms, comm.parameters, null);
       
       var desc = $('<td/>')[0];

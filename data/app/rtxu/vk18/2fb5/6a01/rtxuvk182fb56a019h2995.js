@@ -31,6 +31,10 @@ $(ME).find('.app-run-button').click(function(){
   window.location.href = "../"+ME.DATA.id+"/index.html";
 });
 
+$(ME).find('.app-edit-button').click(function(){
+  window.location.href = "../lib/editcontrol.html?lib="+ME.DATA.ctldb+"&id="+ME.DATA.ctlid;
+});
+
 $(ME).find('.app-uninstall-button').click(function(){
   json('../app/uninstall', 'app='+encodeURIComponent(ME.DATA.id), function(result){
     if (result.status != 'ok') alert(result.msg);

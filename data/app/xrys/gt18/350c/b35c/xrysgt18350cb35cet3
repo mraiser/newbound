@@ -1,0 +1,1 @@
+{"username":"system","id":"xrysgt18350cb35cet3","writers":[],"data":{"attachmentkeynames":["rs"],"ctl":"app","desc":"","lib":"app","import":"use flowlang::appserver::*;\n","params":[{"name":"id","type":"String"}],"type":"rust","returntype":"String","cmd":"eventoff"},"time":1663602998307,"readers":[]}

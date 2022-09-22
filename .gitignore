@@ -239,3 +239,7 @@ dmypy.json
 /runtime/testflow/
 /runtime/dvr/
 /config.properties
+/data/junk/
+/data/xxx/
+/data/yyy/
+/runtime/junk/

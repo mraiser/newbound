@@ -35,7 +35,7 @@ function updateFilters() {
   }
   var args = { inactive: $('#appfilter-inactive').prop('checked'), remote: $(ME).find('#appfilter-available').prop('checked') }
   json('../app/write', 'lib=runtime&id=metabot_applist_filters&readers=[]&writers=[]&data='+encodeURIComponent(JSON.stringify(args)), function(result){
-    console.log(result);
+    if (result.status != "ok") alert(result.msg);
   });
 }
 

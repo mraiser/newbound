@@ -1,5 +1,3 @@
-pub mod generated;
-pub mod appserver;
 use std::env;
 use std::io;
 use std::io::BufRead;
@@ -7,12 +5,14 @@ use ndata::dataobject::*;
 
 use flowlang::datastore::*;
 use flowlang::command::*;
-
-use crate::generated::*;
+use flowlang::rustcmd::*;
+use flowlang::generated::Generated as Fgen;
 
 fn main() {
-  DataStore::init("data");
-  Generated::init();
+  let mut initializer = cmd::Initializer { data_ref: flowlang::init("data"), cmds: Vec::new() };
+  Fgen::init();
+  cmd::mirror(&mut initializer);
+  for q in &initializer.cmds { RustCmd::add(q.0.to_owned(), q.1, q.2.to_owned()); }
   
   env::set_var("RUST_BACKTRACE", "1");
   {

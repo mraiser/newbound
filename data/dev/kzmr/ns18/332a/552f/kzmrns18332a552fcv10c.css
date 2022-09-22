@@ -1,0 +1,60 @@
+.groupmenupopup{
+  position:absolute;
+  z-index:1;
+  padding:0px;
+}
+
+#groupmenu, .editctlicon, .deleteasseticon{
+  vertical-align:middle;
+  width:24px;
+  height:24px;
+}
+
+#groupmenu:hover, .editctlicon:hover, .deleteasseticon:hover{
+  background-color:#ddd;
+  border-radius:16px;
+  border:4px solid #ddd;
+  margin:-4px;
+}
+
+.ctl-table-wrapper, .asset-table-wrapper{
+  position:relative;
+  display:inline-block;
+  vertical-align:top;
+  margin-right:20px;
+  margin-top:20px;
+  min-width:180px;
+}
+
+.ctlstable, .assetstable {
+  border: thin solid #0002;
+  border-collapse: collapse;
+  white-space: nowrap;
+  width:100%;
+}
+
+.ctlstable td, .ctlstable th, .assetstable td, .assetstable th {
+  padding-left:24px;
+  padding-right:24px;
+  padding-top:12px;
+  padding-bottom:12px;
+  text-align:left;
+}
+
+.ctlstable td, .assetstable td {
+  cursor:pointer;
+}
+
+.ctlstable tr:hover, .assetstable tr:hover {
+  background-color: #0002;
+}
+
+.previewctl, .previewasset {
+  text-decoration:none;
+}
+
+.tablewhite-add {
+  position:absolute;
+  top:8px;
+  right:20px;
+}

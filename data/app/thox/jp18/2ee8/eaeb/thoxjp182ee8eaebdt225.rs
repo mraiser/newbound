@@ -5,4 +5,4 @@ if check_auth(&lib, &id, &nn_sessionid, false) {
   let o = command.execute(args).unwrap();
   return format_result(command, o);
 }
-panic!("UNAUTHORIZED read {}:{}", lib, id);
+panic!("UNAUTHORIZED exec {}:{}", lib, id);

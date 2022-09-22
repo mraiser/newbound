@@ -11,13 +11,19 @@ use ::flowlang::command::*;
 use ::flowlang::datastore::*;
 use ::flowlang::primitives::*;
 use ::flowlang::buildrust::*;
+use ::flowlang::rustcmd::*;
 use ::flowlang::generated::Generated as Fgen;
 
-pub mod generated;
-pub mod appserver;
-use crate::generated::*;
-
 static START: Once = Once::new();
+
+fn init_private() {
+  START.call_once(|| {
+    let mut initializer = cmd::Initializer { data_ref: flowlang::init("data"), cmds: Vec::new() };
+    Fgen::init();
+    cmd::mirror(&mut initializer);
+    for q in &initializer.cmds { RustCmd::add(q.0.to_owned(), q.1, q.2.to_owned()); }
+  });
+}
 
 #[no_mangle]
 pub extern "system" fn Java_com_newbound_code_LibFlow_call(env: JNIEnv,
@@ -27,11 +33,7 @@ pub extern "system" fn Java_com_newbound_code_LibFlow_call(env: JNIEnv,
                                              cmd: JString,
                                              args: JString)
                                              -> jstring {
-  START.call_once(|| {
-    DataStore::init("data");
-    Fgen::init();
-    Generated::init();
-  });
+  init_private();
   
   env::set_var("RUST_BACKTRACE", "1");
   {
@@ -80,10 +82,7 @@ pub extern "system" fn Java_com_newbound_code_LibFlow_build(env: JNIEnv,
                                              ctl: JString,
                                              cmd: JString)
                                              -> jstring {
-  START.call_once(|| {
-    DataStore::init("data");
-    Generated::init();
-  });
+  init_private();
   
   env::set_var("RUST_BACKTRACE", "1");
   {
@@ -122,10 +121,7 @@ pub extern "system" fn Java_com_newbound_code_LibFlow_build(env: JNIEnv,
 pub extern "system" fn Java_com_newbound_code_LibFlow_list(env: JNIEnv,
                                              _class: JClass)
                                              -> jstring {
-  START.call_once(|| {
-    DataStore::init("data");
-    Generated::init();
-  });
+  init_private();
   let output:JString;
   {
     let result = Primitive::list();

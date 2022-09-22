@@ -7,5 +7,4 @@ for file in fs::read_dir(&p).unwrap() {
   let name:String = path.file_name().unwrap().to_str().unwrap().to_string();
   a.push_str(&name);
 }
-
 a

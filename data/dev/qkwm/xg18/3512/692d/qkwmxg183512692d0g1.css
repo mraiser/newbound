@@ -1,0 +1,10 @@
+.darkselect option {
+  color:black;
+}
+
+.darkselect {
+  border:none;
+  background-color:transparent;
+  color:white;
+  border-bottom: thin solid #fff2;
+}

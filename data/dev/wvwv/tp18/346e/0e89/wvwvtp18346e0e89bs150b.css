@@ -1,0 +1,73 @@
+.cancelcommandbutton{
+  position:absolute;
+  top:20px;
+  right:20px;
+}
+
+.rtbutton, .langbutton{
+  display:inline-block;
+  width:80px;
+  padding:5px;
+  border:thin solid black;
+  margin-left:-3px;
+  margin-right:-3px;
+  margin-top:-1px;
+  margin-bottom:-1px;
+  background-color:#7c7f86;
+  color:white;
+}
+
+.rtbselected, .rtbutton:hover, .lbselected, .langbutton:hover {
+  background-color:#505359;
+  color:white;
+}
+
+.importform {
+  display:none;
+}
+
+.returntype{
+  display:inline-block;
+  margin-bottom:20px;
+}
+
+.commandcodediv{
+  display:block;
+  clear:both;
+}
+
+.cmdlablepython, .cmdlablejs{
+  display:none;
+}
+
+.indent{
+  padding:10px;
+}
+
+.commandcodediv .CodeMirror-scroll {
+  height:auto;
+}
+
+.floatright{
+  float:right;
+}
+
+.mpdelete {
+  vertical-align:middle;
+  cursor:pointer;
+  color:#7c7f86;
+}
+
+.newparam {
+  display:none;
+}
+
+.noborder{
+  border:none;
+}
+
+#commandcodeflow{
+  position: relative;
+  height:100%;
+  width:100%;
+}

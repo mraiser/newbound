@@ -1,0 +1,191 @@
+<div class='data-control' data-control='app:ui:{}'></div>
+<div class='wrap wrap-dark' style='display:none;'>
+  <div class='dark-title'>
+    <img src="../app/asset/app/arrow-left-white.png" class="backbutton">
+    <div class='inline ctltitle'>
+      Control Editor<br>
+      <span class='ctl-lib'></span>:<span class='ctl-name'></span>
+    </div>
+    <div class='toprighthugger'>
+      <button class='regularbutton accentbutton previewbutton'>Preview</button>
+      &nbsp;
+      <button class='regularbutton accentbutton savebutton'>Save</button>
+    </div>
+  </div>
+  <div class='navbar navbar-dark'>
+    <div class='navbar-tab selected' data-id='tab1'>HTML5</div>
+    <!-- div class='navbar-tab' data-id='tab2'>3D</div -->
+    <div class='navbar-tab' data-id='tab3'>API</div>
+    <div class='navbar-tab' data-id='tab4'>Publish</div>
+  </div>
+  <div class='main'>
+    <div class='tab-content tab1 selected'>
+      <div class='html5editor'>
+        <table border='0' cellpadding='0' cellspacing='0' width='100%' height='100%'>
+          <tr>
+            <td width='25%'>
+              <div class='editor editor-html'>
+                <div class='vbar'></div>
+                <div class='editor-title'>
+                  HTML
+                </div>
+                <img class="zoomer zoomer-min" src="../app/asset/app/minimize_icon-white.png">
+                <img class="zoomer zoomer-max" src="../app/asset/app/maximize_icon-white.png">
+                <div class='editor-code'>
+                  <textarea class='editor-code-textarea html-textarea'></textarea>
+                </div>
+              </div>
+            </td>
+            <td width='25%'>
+              <div class='editor editor-css'>
+                <div class='grabbybar'></div>
+                <div class='editor-title'>CSS</div>
+                <img class="zoomer zoomer-min" src="../app/asset/app/minimize_icon-white.png">
+                <img class="zoomer zoomer-max" src="../app/asset/app/maximize_icon-white.png">
+                <div class='editor-code'>
+                  <textarea class='editor-code-textarea css-textarea'></textarea>
+                </div>
+              </div>
+            </td>
+            <td width='25%'>
+              <div class='editor editor-js'>
+                <div class='grabbybar'></div>
+                <div class='editor-title'>JS</div>
+                <img class="zoomer zoomer-min" src="../app/asset/app/minimize_icon-white.png">
+                <img class="zoomer zoomer-max" src="../app/asset/app/maximize_icon-white.png">
+                <div class='editor-code'>
+                  <textarea class='editor-code-textarea js-textarea'></textarea>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class='editor editor-data'>
+                <div class='grabbybar'></div>
+                <div class='editor-title'>DATA</div>
+                <img class="zoomer zoomer-min" src="../app/asset/app/minimize_icon-white.png">
+                <img class="zoomer zoomer-max" src="../app/asset/app/maximize_icon-white.png">
+                <div class='editor-code'>
+                  <textarea class='editor-code-textarea data-textarea'></textarea>
+                </div>
+              </div>
+            </td>
+          </tr>
+          <tr height='20px'>
+            <td colspan='4'>
+              <div class='grabby-v'>
+                <div class='editor-title preview-title'>
+                  PREVIEW
+                </div>
+                <img class="zoomer zoomer-pmin" src="../app/asset/app/minimize_icon-white.png">
+                <img class="zoomer zoomer-pmax" src="../app/asset/app/maximize_icon-white.png">
+              </div>
+            </td>
+          </tr>
+          <tr id='previewrow'>
+            <td id='previewcol' colspan='4'></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    <div class='tab-content tab2 scrollme'>
+      [3D]
+    </div>
+    <div class='tab-content tab3 scrollme'>
+      <div class='api-main'>
+        <div class='card ctlinfo'>
+          <div class='padme dialog-header'>
+            Overview
+          </div>
+          <div class='padme'>
+            <label class="textinputlabel" for="ov_groups">Groups</label>
+            <input class="textinput" type="text" id="ov_groups" placeholder="Comma separated no spaces">
+            <br><br>
+            <label class="textinputlabel" for="devorg">Description</label>
+            <textarea class="textinput" id="ov_desc" placeholder="Enter a description for this control"></textarea>
+          </div> 
+        </div>
+        <div class='card ctlinfo'>
+          <div class='padme dialog-header'>
+            Commands
+            <img src='../app/asset/app/add_icon-white.png' class='tablewhite-add addcmdbutton roundbutton'>
+          </div>
+          <table class="tablewhite cmdstable">
+            <tbody class='commandlist-inner'>
+            </tbody>
+          </table>
+        </div>
+        <div class='card ctlinfo'>
+          <div class='padme dialog-header'>
+            Events
+            <img src='../app/asset/app/add_icon-white.png' class='tablewhite-add addeventbutton roundbutton'>
+          </div>
+          <table class="tablewhite eventstable">
+            <tbody class='eventlist-inner'>
+            </tbody>
+          </table>
+        </div>
+        <div class='card ctlinfo'>
+          <div class='padme dialog-header'>
+            Timers
+            <img src='../app/asset/app/add_icon-white.png' class='tablewhite-add addtimerbutton roundbutton'>
+          </div>
+          <table class="tablewhite timerstable">
+            <tbody class='timerlist-inner'>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class='api-editcommand'></div>
+      <div class='api-editevent'></div>
+      <div class='api-edittimer'></div>
+    </div>
+    <div class='tab-content tab4 scrollme'>
+      <div class='card ctlinfo'>
+        <div class='padme dialog-header'>
+          <div id='publishappname'>Publish [APPNAME] ([CTLID])</div>
+        </div>
+        <div class='padme card-text publishoptions'>
+          <div class='inline publishfield'>
+            <label class="textinputlabel" for="pa_name">Name</label>
+            <input class="textinput" type="text" id="pa_name" placeholder="The name of this app">
+          </div>
+          <div class='inline publishfield'>
+            <label class="textinputlabel" for="pa_libraries">Libraries</label>
+            <input class="textinput" type="text" id="pa_libraries" placeholder="Comma delimited, no spaces">
+          </div>
+          <div class='inline publishfield'>
+            <label class="textinputlabel" for="pa_subtitle">Subtitle</label>
+            <input class="textinput" type="text" id="pa_subtitle" placeholder="One short sentence">
+          </div>
+          <div class='inline publishfield'>
+            <label class="textinputlabel" for="pa_desc">Description</label>
+            <input class="textinput" type="text" id="pa_desc" placeholder="Describe this app">
+          </div>
+          <div class='inline publishfield'>
+            <label class="textinputlabel" for="pa_img">Icon</label>
+            <input class="textinput" type="text" id="pa_img" placeholder="An image url">
+          </div>
+          <div class='inline publishfield'>
+            <label class="textinputlabel" for="pa_video">Video</label>
+            <input class="textinput" type="text" id="pa_video" placeholder="Embed HTML">
+          </div>
+          <div class='inline publishfield'>
+            <label class="textinputlabel" for="pa_detail">Detail</label>
+            <input class="textinput" type="text" id="pa_detail" placeholder="LIB:CTL:{DATA}">
+          </div>
+          <div class='inline publishfield'>
+            <label class="plaincheckbox">
+              <input type='checkbox' id='pa_forsale'>
+              <span>Make Public</span>
+            </label>
+          </div>
+        </div>
+        <div class="card-button-wrap publishoptions">
+          <a class="clearbutton button-text-green publishbutton" id="publishbutton">Publish</a>
+          <a class="clearbutton card-button-right deletecontrolbutton">Delete this control</a>
+        </div>
+        <div class='publishing padme hideme'></div>
+      </div>
+    </div>
+  </div>
+</div>

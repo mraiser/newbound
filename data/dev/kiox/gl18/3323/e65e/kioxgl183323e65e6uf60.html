@@ -1,0 +1,41 @@
+<div class='data-control' data-control='app:ui:{}'></div>
+<div class='wrap' style='display:none;'>
+  <div class='titlebar'>
+    <a href='../app/index.html'><img src='../app/asset/app/menu_icon.png' class='menuicon'></a>
+    Development
+    <div class='upper-right'>
+      <div class='card modal library-settings'>
+        <div class='libinfo-header padme'>
+          Public Developer Info
+          <img src='../app/asset/app/close-white.png' class='upper-right close-library-settings roundbutton-small out10'>
+        </div>
+        <div class='padme'>
+          <div class='card-text'>
+            Your Universally Unique Identifier (UUID):
+          </div>
+          <div id="editidentityuuid">&nbsp;</div>
+          <br>
+          <label class="textinputlabel" for="devname">Name</label>
+          <input class="textinput" type="text" id="devname">
+          <br><br>
+          <label class="textinputlabel" for="devorg">Organization</label>
+          <input class="textinput" type="text" id="devorg">
+          <br><br>
+        </div>
+        <div class="card-button-wrap">
+          <a class="clearbutton button-text-green save-library-settings close-library-settings" id="savemyidentity">save</a>
+          <!-- a class="clearbutton save-and-restart">save and restart</a -->
+        </div>
+      </div>
+      <img src='../app/asset/app/more_icon.png' class='open-library-settings roundbutton-small popupmenu' data-popup='{"selector":".library-settings", "closeselector":".close-library-settings", "modal":true}'>
+    </div>
+  </div>
+  <div class='scrollme'>
+    <div class='padme dialog-header'>
+      Libraries
+      <img src='../app/asset/app/add_icon-white.png' class='tablewhite-add addlibrarybutton roundbutton'>
+    </div>
+    <div class='liblist'></div>
+  </div>
+  <div class='scrollme2'></div>
+</div>

@@ -1,0 +1,80 @@
+.libinfo-header{
+  background-color:#7c7f86;
+  color:white;
+  position:sticky;
+  top:0px;
+}
+
+.out10 {
+  margin-top:-10px;
+  margin-right:-10px;
+}
+
+.libstable {
+  border: thin solid #0002;
+  border-collapse: collapse;
+  white-space: nowrap;
+  width:100%;
+}
+
+.libstable td, .libstable th {
+  border: thin solid #0002;
+  padding-left:24px;
+  padding-right:24px;
+  padding-top:12px;
+  padding-bottom:12px;
+  text-align:left;
+}
+
+.libstable td {
+  cursor:pointer;
+}
+
+.libstable td:hover {
+  background-color: #0002;
+}
+
+.scrollme {
+  position:absolute;
+  top:62px;
+  left:0px;
+  bottom:0px;
+  overflow-y:scroll;
+  width:300px;
+}
+
+.scrollme2 {
+  position:absolute;
+  top:62px;
+  left:320px;
+  bottom:0px;
+  right:0px;
+  overflow-y:auto;
+}
+
+.wrap { 
+  position:absolute;
+  width:100%;
+  height:100%;
+}
+
+.deletelibrarybutton{
+  float:right;
+  margin:20px;
+}
+
+.card.library-settings {
+  white-space:nowrap;
+  overflow:hidden;
+}
+
+#editidentityuuid{
+  font-size:0.9rem;
+  font-weight:900;
+}
+
+.addlibrarybutton{
+  position:absolute;
+  top:8px;
+  right:16px;
+}
