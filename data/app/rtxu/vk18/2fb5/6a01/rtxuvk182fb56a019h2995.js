@@ -32,7 +32,7 @@ $(ME).find('.app-run-button').click(function(){
 });
 
 $(ME).find('.app-edit-button').click(function(){
-  window.location.href = "../lib/editcontrol.html?lib="+ME.DATA.ctldb+"&id="+ME.DATA.ctlid;
+  window.location.href = "../dev/editcontrol.html?lib="+ME.DATA.ctldb+"&id="+ME.DATA.ctlid;
 });
 
 $(ME).find('.app-uninstall-button').click(function(){

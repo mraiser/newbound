@@ -6,13 +6,22 @@ edition = "2021"
 [lib]
 crate-type = ["rlib", "dylib"]
 
+[features]
+serde_support = ["serde","serde_json","flowlang/serde_support","ndata/serde_support"]
+
 [dependencies]
-flowlang = { version = "0.1.17" }
+flowlang = { version = "0.1.18" }
 #flowlang = { path = "../../../rust/flow" }
-ndata="0.2.3"
+ndata="0.2.5"
 #ndata = { path = "../../../rust/ndata" }
 state="0.5.3"
 zip = { version="0.6.2", features=["deflate-miniz"] }
 walkdir = "2.3.2"
-openssl = "0.10.41"
+x25519-dalek = "1.2.0"
+blake2 = "0.10.4"
+rand = "0.7"
+aes = "0.8.1"
+uuid = { version="1.1.2", features=["v4"] }
+serde = { version = "1.0.143", features = ["derive"], optional = true }
+serde_json = { version = "1.0.83", optional = true }
 

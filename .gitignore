@@ -243,3 +243,7 @@ dmypy.json
 /data/xxx/
 /data/yyy/
 /runtime/junk/
+/users/
+/data/zzz/
+/runtime/yyy/
+/runtime/zzz/

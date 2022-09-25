@@ -1,0 +1,1 @@
+{"id":"jypyqw1836795f8fbn2","data":{"cmd":"deviceid","attachmentkeynames":["rs"],"type":"rust","desc":"","ctl":"app","returntype":"String","lib":"app","params":[],"import":"use flowlang::datastore::DataStore;\n"},"username":"system","time":1663890324015,"readers":[],"writers":[]}

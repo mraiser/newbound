@@ -1,0 +1,1 @@
+{"time":1663964488997,"readers":[],"username":"system","writers":[],"id":"jszjgy1836bfe023ckc","data":{"type":"rust","returntype":"String","attachmentkeynames":["rs"],"ctl":"security","desc":"","params":[{"type":"String","name":"id"}],"import":"use flowlang::appserver::*;\n","lib":"security","cmd":"deleteuser"}}

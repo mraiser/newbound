@@ -1,0 +1,57 @@
+<div class='data-control' data-control='app:ui:{}'></div>
+<div class='background'></div>
+<div class='wrap' style='display:none;'>
+  <div class='titlebar'>
+    <a href='../app/index.html'><img src='../app/asset/app/menu_icon.png' class='menuicon'></a>
+    Security
+  </div>
+  <div class='main'>
+    <label>
+      <div class="switch">
+        <input id="security-power-switch" type="checkbox" class="switch-input" />
+        <span class="switch-label"></span>
+      </div>
+      Off / On
+    </label>
+    <div class='usercontrols whenon'>
+      <div class='userfilter'>
+        <div class='textinputlabel'>Filter By Group</div>
+        <select name='defaultbot' class='textinput' id='userfilterselect'></select> 
+      </div>
+      <div class='newuser'>
+        <div class='textinputlabel newusernamelabel'>Add User</div>
+        <input type='text' class='textinput newusername' placeholder='LC-letters, numbers, underscores only'>
+      </div>
+      <img src='../app/asset/app/add_icon.png' class='roundbutton adduserbutton'>
+    </div>
+    <div class='whenon usertitle'>Users</div>
+    <div class='userlist whenon'></div>
+  </div>
+  <div class='hideme usercard card'>
+    <div class='usercard-header padme dialog-header'>
+      Edit User: <span class='usercard-header-text'></span>
+      <div class='usercard-close'>
+        <img src='../app/asset/app/close-white.png' class='roundbutton-small usercard-closebutton usercard-cancel'>
+      </div>    
+    </div>
+    <div class='main usercard-main'>
+      <div class='textinputlabel'>Display Name</div>
+      <input type='text' class='textinput usercard-displayname' placeholder='Display Name'>
+      <br><br>
+      <div class='textinputlabel'>Password</div>
+      <input type='text' class='textinput usercard-password' placeholder='Password'>
+      <br><br>
+      <div class='textinputlabel'>Groups</div>
+      <div class='card pad10 usercard-grouplist'></div>
+      <div class='padme nowrap'>
+        <div class='textinputlabel'>New Group</div>
+        <input type='text' class='textinput usercard-newgroupname' placeholder='LC-letters, numbers, underscores only'>
+        <img src='../app/asset/app/add_icon.png' class='roundbutton addgroupbutton'>
+      </div>
+    </div>
+    <div class="card-button-wrap">
+      <a class="clearbutton button-text-green usercard-save usercard-cancel">save</a>
+      <a class="clearbutton card-button-right usercard-delete">delete</a>
+    </div>
+  </div>
+</div>

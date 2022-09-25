@@ -20,3 +20,4 @@ pub mod eventoff;
 pub mod eventon;
 pub mod timeroff;
 pub mod timeron;
+pub mod deviceid;

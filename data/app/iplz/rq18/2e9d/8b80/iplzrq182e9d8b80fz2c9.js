@@ -169,7 +169,9 @@ me.prompt = function(d) {
   d.closeselector = el.find('.close-prompt-dialog')[0];
   d.modal = true;
   d.close = function(){ el.remove(); };
-  me.popup(d);
+  me.popup(d, function(){
+    el.find('#sample3').focus()
+  });
   el.find('.continuebutton').click(function(){
     var val = el.find('#sample3').val();
     if (d.validate) {

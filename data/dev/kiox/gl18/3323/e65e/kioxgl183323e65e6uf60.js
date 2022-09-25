@@ -96,7 +96,7 @@ $(ME).find('.open-library-settings').click(function(){
       $('#devname').val(data.displayname);
       $('#devorg').val(data.organization);
       
-      json('../peerbot/getpeerid', null, function(result){
+      json('../app/deviceid', null, function(result){
         $('#editidentityuuid').text(result.msg);
         document.body.MYUUID = result.msg;
       });

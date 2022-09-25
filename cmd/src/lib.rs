@@ -1,10 +1,11 @@
+pub mod security;
 pub mod dev;
 pub mod app;
 use flowlang::rustcmd::*;
 
 #[derive(Debug)]
 pub struct Initializer {
-    pub data_ref: (&'static str, ((usize,usize),(usize,usize),(usize,usize))),
+    pub data_ref: (&'static str, (((usize,usize),(usize,usize)),((usize,usize),(usize,usize)),((usize,usize),(usize,usize)))),
     pub cmds: Vec<(String, Transform, String)>,
 }
 
@@ -12,6 +13,15 @@ pub struct Initializer {
 pub fn mirror(state: &mut Initializer) {
     flowlang::mirror(state.data_ref);
     state.cmds.clear();
+    state.cmds.push(("jszjgy1836bfe023ckc".to_string(), security::security::deleteuser::execute, "".to_string()));
+    state.cmds.push(("soqxoo1836bb51d5dy2".to_string(), security::security::setuser::execute, "".to_string()));
+    state.cmds.push(("qjmvtm1836b1bc850o9".to_string(), security::security::groups::execute, "".to_string()));
+    state.cmds.push(("ysnihn1836b0814aen5".to_string(), security::security::users::execute, "".to_string()));
+    state.cmds.push(("yvktsi1836b070c6dz2".to_string(), security::security::users::execute, "".to_string()));
+    state.cmds.push(("huwgsg1836a850ba8w3".to_string(), security::security::init::execute, "".to_string()));
+    state.cmds.push(("jypyqw1836795f8fbn2".to_string(), app::app::deviceid::execute, "".to_string()));
+    state.cmds.push(("kgkxpw183664f5554q4".to_string(), app::util::hash::execute, "".to_string()));
+    state.cmds.push(("thtpku18366290644p4".to_string(), app::util::init::execute, "".to_string()));
     state.cmds.push(("iwvgmq1835bb194ffo8".to_string(), dev::editcontrol::publishapp::execute, "".to_string()));
     state.cmds.push(("gjssly1834862d5acg37d9".to_string(), dev::dev::compile::execute, "".to_string()));
     state.cmds.push(("guuqrj1836147b650zd".to_string(), app::util::zip::execute, "".to_string()));

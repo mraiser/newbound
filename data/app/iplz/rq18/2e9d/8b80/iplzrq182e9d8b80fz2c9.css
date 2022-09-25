@@ -472,6 +472,10 @@ textarea{
   user-select: none;
 }
 
+label {
+  cursor:pointer;
+}
+
 .switch-label::before,
 .switch-label::after {
   content: "";

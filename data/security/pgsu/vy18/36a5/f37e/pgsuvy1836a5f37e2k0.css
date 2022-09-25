@@ -1,0 +1,64 @@
+.usercard{
+  width:340px;
+}
+
+.usercontrols{
+  position:absolute;
+  top:20px;
+  right:20px;
+}
+
+.userfilter, .newuser {
+  display:inline-block;
+  margin-left:20px;
+}
+
+.main {
+  position:relative;
+}
+
+.whenon{
+  display:none;
+}
+
+.userrow{
+  cursor:pointer;
+}
+
+.userrow:hover{
+  background-color:#0002;
+}
+
+.userrow{
+  vertical-align:top;
+}
+
+.usertitle {
+  font-size:x-large;
+  font-weight:900;
+  margin-top:40px;
+}
+
+.usercard-close{
+  position:absolute;
+  top:10px;
+  right:10px;
+}
+
+.usercard-grouplist{
+  background-color:#0001;
+  height:80px;
+  overflow-y:auto;
+}
+
+.textinput.usercard-newgroupname, .textinput.newusername{
+  width:205px;
+}
+
+.roundbutton.addgroupbutton{
+  margin-top:-20px;
+}
+
+.nowrap{
+  white-space:nowrap;
+}
