@@ -1,5 +1,5 @@
 let mut v = Vec::new();
-let mut system = DataStore::globals().get_object("system");
+let system = DataStore::globals().get_object("system");
 let users = system.get_object("users");
 for (_k, user) in users.objects(){
   for group in user.object().get_array("groups").objects() {

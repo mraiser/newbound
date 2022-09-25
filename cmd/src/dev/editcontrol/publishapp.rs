@@ -1,7 +1,7 @@
+use ndata::dataobject::*;
 use std::fs;
 use std::fs::*;
 use ndata::data::Data;
-use ndata::dataobject::DataObject;
 use ndata::dataarray::DataArray;
 use flowlang::datastore::*;
 use flowlang::generated::flowlang::file::read_properties::read_properties;
@@ -43,7 +43,7 @@ let mut out = DataArray::new();
 let store = DataStore::new();
 
 let system = DataStore::globals().get_object("system");
-let mut o = system.get_object("apps").get_object("app").get_object("runtime");
+let o = system.get_object("apps").get_object("app").get_object("runtime");
 let bytes: [u8; 32] = decode_hex(&o.get_string("privatekey")).unwrap().try_into().unwrap();
 let private = StaticSecret::from(bytes);
 let public = o.get_string("publickey");
@@ -62,12 +62,12 @@ let ctlid = data.get_string("ctlid");
 let approot = store.root.parent().unwrap().join("runtime").join(&appid);
 let appsrc = approot.join("src");
 let devroot = store.root.parent().unwrap().join("runtime").join("dev").join("libraries");
-create_dir_all(&approot);
-create_dir_all(&devroot);
+let _x = create_dir_all(&approot);
+let _x = create_dir_all(&devroot);
 
 /* 1. build _APPS/[APPNAME] */
 let path = store.root.join(&applib).join("_APPS").join(&appid);
-create_dir_all(&path);
+let _x = create_dir_all(&path);
 let propfile = path.join("app.properties");
 write_properties(propfile.into_os_string().into_string().unwrap(), data.duplicate());
 let propfile = approot.join("app.properties");
@@ -77,12 +77,12 @@ if !propfile.exists() {
   write_properties(propfile.into_os_string().into_string().unwrap(), DataObject::new());
 }
 let dest = path.join("src");
-create_dir_all(&dest);
+let _x = create_dir_all(&dest);
 
 let htmlpath = appsrc.join("html").join(&appid);
 let destfile = htmlpath.join("index.html");
 if !destfile.exists() {
-  create_dir_all(&htmlpath);
+  let _x = create_dir_all(&htmlpath);
   let templatepath = store.root.parent().unwrap()
         .join("runtime")
         .join("dev")
@@ -137,7 +137,7 @@ for lib in libs {
     let propfile = datapath.join("version.txt");
     fs::write(propfile, &libversion.to_string()).expect("Unable to write file");
     let zipfile = devroot.join(&(lib.to_owned()+"_"+&(libversion-1).to_string()+".zip"));
-    remove_file(zipfile);
+    let _x = remove_file(zipfile);
     let zipfile = devroot.join(&(lib.to_owned()+"_"+&libversion.to_string()+".zip"));
     zip(dir.to_owned(), zipfile.into_os_string().into_string().unwrap());
     let h = hash(dir.to_owned());
@@ -148,7 +148,7 @@ for lib in libs {
     let shared_secret = private.diffie_hellman(&app_public);
     let key = GenericArray::from(shared_secret.to_bytes());
     let cipher = Aes256::new(&key);
-    let mut buf = decode_hex(&h).unwrap();
+    let buf = decode_hex(&h).unwrap();
     let blocks: Vec<&[u8]> = buf.chunks(16).collect();
     let mut buf = Vec::new();
     for ba in blocks {
@@ -202,5 +202,6 @@ pub fn decode_hex(s: &str) -> Result<Vec<u8>, ParseIntError> {
         .step_by(2)
         .map(|i| u8::from_str_radix(&s[i..i + 2], 16))
         .collect()
+
 }
 

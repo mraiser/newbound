@@ -9,7 +9,7 @@ o
 }
 
 pub fn users() -> DataObject {
-let mut system = DataStore::globals().get_object("system");
+let system = DataStore::globals().get_object("system");
 system.get_object("users")
 }
 
