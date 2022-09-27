@@ -20,7 +20,7 @@ if meta.has("ip_address") { ipaddr = meta.get_string("ip_address"); }
 else { ipaddr = "0.0.0.0".to_string(); meta.put_str("ip_address", &ipaddr); b=true; }
 let port;
 if meta.has("port") { port = Data::as_string(meta.get_property("port")).parse::<i64>().unwrap(); }
-else { port = 5775; meta.put_i64("port", port); b=true; }
+else { port = 0; meta.put_i64("port", port); b=true; }
 if b {
   let file = DataStore::new().root
                 .parent().unwrap()

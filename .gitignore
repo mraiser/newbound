@@ -37,7 +37,9 @@ runtime/securitybot/users/
 data/runtime
 converted
 tmp/mime
-html
+/html
+runtime/botmanager/html
+
 
 # IntelliJ
 out/
@@ -247,3 +249,7 @@ dmypy.json
 /data/zzz/
 /runtime/yyy/
 /runtime/zzz/
+/runtime/app/botd.properties
+/runtime/dev/botd.properties
+/runtime/peer/botd.properties
+/runtime/security/botd.properties

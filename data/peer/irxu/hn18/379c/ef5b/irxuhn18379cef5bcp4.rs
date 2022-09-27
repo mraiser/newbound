@@ -1,8 +1,25 @@
   START.call_once(|| { P2PHEAP.set(RwLock::new(Heap::new())); });
 
-  println!("P2P TCP listening...");
   let socket_address = ipaddr+":"+&port.to_string();
   let listener = TcpListener::bind(socket_address).unwrap();
+  
+  let system = DataStore::globals().get_object("system");
+  let mut botd = system.get_object("apps").get_object("peer").get_object("runtime");
+  let b = port == 0;
+  let port = listener.local_addr().unwrap().port();
+  botd.put_i64("port", port as i64);
+  
+  if b {
+    let file = DataStore::new().root
+                .parent().unwrap()
+                .join("runtime")
+                .join("peer")
+                .join("botd.properties");
+  	let _x = write_properties(file.into_os_string().into_string().unwrap(), botd);
+  }
+
+  println!("P2P TCP listening on port {}", port);
+
   for stream in listener.incoming() {
     let mut stream = stream.unwrap();
     thread::spawn(move || {
