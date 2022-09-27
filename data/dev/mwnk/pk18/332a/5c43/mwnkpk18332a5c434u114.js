@@ -8,6 +8,9 @@ var validchars = 'abcdefghijklmnopqrstuvwxyz_0123456789';
 var lib = getQueryParameter('lib');
 var id = getQueryParameter('id');
 
+me.ready = function(api){
+}
+
 me.uiReady = function(ui){
   me.ui = ui;
   $(ME).find('.wrap').css('display', 'block');
@@ -513,6 +516,9 @@ me.buildPublish = function(){
     $('#pa_detail').val(d.detail).change(function(){ d.detail = $(this).val(); });  
     $('#pa_subtitle').val(d.subtitle).change(function(){ d.subtitle = $(this).val(); });  
     $('#pa_forsale').prop('checked', d.forsale == 'true').change(function(){ d.name = $(this).prop('checked'); });  
+    json('../app/libs', null, function(result){
+      me.liblist = result.data;
+    });
   });
 };
 
@@ -521,19 +527,30 @@ function publishApp() {
   $(ME).find('.publishoptions').css('display', 'none');
   var newhtml = "<h3>Publishing App: "
   	+ d.name
-  	+ "</h3>Checking libraries"
+  	+ "</h3>Checking libraries:"
     + "<div class='padme'>";
   var libs = d.libraries.split(',');
   for (var i in libs) {
-  	newhtml +=  "<img src='../app/asset/app/loading.gif' class='roundbutton-small'>&nbsp;"
+  	newhtml +=  "<img src='../app/asset/app/loading.gif' class='roundbutton-small pleasewait'>&nbsp;"
       + libs[i]
       + "<br>";
   }
   newhtml += "</div>";
-  $(ME).find('.publishing').css('display', 'block').html(newhtml);
+  var el = $(ME).find('.publishing');
+  el.css('display', 'block').html(newhtml);
   
   send_publishapp(me.properties, function(result) {
-    console.log(result);
+    if (result.status != 'ok') alert(result.msg);
+    else {
+      $(ME).find('.publishing').find('.pleasewait').prop('src', '../app/asset/app/check-green.png');
+      for (var i in result.data) {
+        var lib = getByProperty(me.liblist, "id", result.data);
+        var version = lib.version+1;;
+        el.append("<b>Library "+lib.id+" v"+version+" published</b><br>");
+      }
+      el.append('<br><b>Application '+d.name+' v'+(parseInt(d.version)+1)+' published</b>');
+      console.log(d);
+    }
   });
 }
 $(ME).find('.publishbutton').click(publishApp);

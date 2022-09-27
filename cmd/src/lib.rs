@@ -1,3 +1,4 @@
+pub mod peer;
 pub mod security;
 pub mod dev;
 pub mod app;
@@ -13,6 +14,8 @@ pub struct Initializer {
 pub fn mirror(state: &mut Initializer) {
     flowlang::mirror(state.data_ref);
     state.cmds.clear();
+    state.cmds.push(("grvupm18379e9a159n8".to_string(), peer::service::init::execute, "".to_string()));
+    state.cmds.push(("irxuhn18379cef5bcp4".to_string(), peer::service::listen::execute, "".to_string()));
     state.cmds.push(("jszjgy1836bfe023ckc".to_string(), security::security::deleteuser::execute, "".to_string()));
     state.cmds.push(("soqxoo1836bb51d5dy2".to_string(), security::security::setuser::execute, "".to_string()));
     state.cmds.push(("qjmvtm1836b1bc850o9".to_string(), security::security::groups::execute, "".to_string()));

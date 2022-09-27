@@ -122,7 +122,7 @@ for lib in libs {
       let block: [u8; 16] = ba.try_into().expect("slice with incorrect length");
       let mut block = GenericArray::from(block);
       cipher.encrypt_block(&mut block);
-      buf.extend_from_slice(&block[0..15]);
+      buf.extend_from_slice(&block[0..16]);
     }
     let sig = to_hex(&buf);
     
