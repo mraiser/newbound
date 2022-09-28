@@ -40,7 +40,7 @@ me.ready = function(){
   json('../app/read', 'lib='+lib+'&id='+id, function(result) {
     var data = me.data = result.data;
     $('#timer_edit')[0].data = data;
-    
+    $('#timer_edit_task').val(data.cmd);
     if (data.start) {
       if (data.start>99){
         $(ME).find('#timer_edit_start-3').prop('checked', true);

@@ -13,7 +13,8 @@ pub struct P2PConnection {
 static START: Once = Once::new();
 pub static P2PHEAP:Storage<RwLock<Heap<P2PConnection>>> = Storage::new();
 
-pub fn handshake(stream: &mut TcpStream, init: bool) -> Option<P2PConnection> {
+// FIXME - Allow connect only if uuid matches
+pub fn handshake(stream: &mut TcpStream, peer: Option<String>) -> Option<P2PConnection> {
   let system = DataStore::globals().get_object("system");
   let runtime = system.get_object("apps").get_object("app").get_object("runtime");
   let my_uuid = runtime.get_string("uuid");
@@ -29,6 +30,7 @@ pub fn handshake(stream: &mut TcpStream, init: bool) -> Option<P2PConnection> {
   let my_session_public = PublicKey::from(&my_session_private);
 
   // Send temp pubkey if init
+  let init = peer.is_some();
   if init { let _x = stream.write(&my_session_public.to_bytes()).unwrap(); }
 
   // Read remote temp pubkey
@@ -55,6 +57,7 @@ pub fn handshake(stream: &mut TcpStream, init: bool) -> Option<P2PConnection> {
   let mut bytes = decrypt(&cipher, &bytes);
   bytes.resize(36, 0);
   let uuid = String::from_utf8(bytes).unwrap();
+  if init && peer.unwrap().to_owned() != uuid { return None; }
   
   let user = get_user(&uuid);
   if user.is_some(){
@@ -171,80 +174,93 @@ fn do_listen(ipaddr:String, port:i64) -> String {
       let remote_addr = stream.peer_addr().unwrap();
       println!("P2P TCP incoming request from {}", remote_addr);
       
-      let con = handshake(&mut stream, false);
+      let con = handshake(&mut stream, None);
       if con.is_some() {
-        let con = con.unwrap();
-        let uuid = con.uuid.to_owned();
-        let user = get_user(&uuid).unwrap();
-        let sessionid = con.sessionid.to_owned();
-        let cipher = con.cipher.to_owned();
-        
-        let system = DataStore::globals().get_object("system");
-        let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
-        
-        let mut session = DataObject::new();
-        session.put_i64("count", 0);
-        session.put_str("id", &sessionid);
-        session.put_str("username", &uuid);
-        session.put_object("user", user.duplicate());
-        let expire = time() + sessiontimeoutmillis;
-        session.put_i64("expire", expire);
-
-        let mut sessions = system.get_object("sessions");
-        sessions.put_object(&sessionid, session.duplicate());
-        
-        let data_ref = P2PHEAP.get().write().unwrap().push(con);
-        let mut connections = user.get_array("connections");
-        connections.push_i64(data_ref as i64);
-
-        println!("P2P TCP Connect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
-        
-        loop {
-          let mut bytes = vec![0u8; 2];
-          let x = stream.read_exact(&mut bytes);
-          if x.is_err() { 
-            break; 
-          }
-
-          let bytes: [u8; 2] = bytes.try_into().unwrap();
-          let len = i16::from_be_bytes(bytes) as usize;
-          let mut bytes:Vec<u8> = Vec::with_capacity(len);
-          bytes.resize(len, 0);
-          let _x = stream.read_exact(&mut bytes).unwrap();
-          let bytes = decrypt(&cipher, &bytes);
-          let msg = String::from_utf8(bytes).unwrap();
-
-          session.put_i64("expire", time() + sessiontimeoutmillis);
-          let count = session.get_i64("count") + 1;
-          session.put_i64("count", count);
-
-          if msg.starts_with("cmd ") {
-            let msg = &msg[4..];
-            let d = DataObject::from_string(msg);
-            let mut params = d.get_object("params");
-            params.put_str("nn_sessionid", &sessionid);
-            params.put_object("nn_session", session.duplicate());
-
-            let o = handle_command(d, sessionid.to_owned());
-
-            let s = "res ".to_string() + &o.to_string();
-            let buf = encrypt(&cipher, s.as_bytes());
-            let len = buf.len() as i16;
-            let _x = stream.write(&len.to_be_bytes()).unwrap();
-            let _x = stream.write(&buf).unwrap();
-          }
-        }
-        // end loop
-
-        println!("P2P TCP Disconnect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
-
-        sessions.remove_property(&sessionid);
-        let _x = connections.remove_data(Data::DInt(data_ref as i64));
-        P2PHEAP.get().write().unwrap().decr(data_ref);
+        handle_connection(con.unwrap());
       }
     });
   }
   "OK".to_string()
+}
+
+pub fn handle_connection(con:P2PConnection) {
+  let uuid = con.uuid.to_owned();
+  let user = get_user(&uuid).unwrap();
+  let sessionid = con.sessionid.to_owned();
+  let cipher = con.cipher.to_owned();
+  let mut stream = con.stream.try_clone().unwrap();
+
+  let system = DataStore::globals().get_object("system");
+  let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
+
+  let mut session = DataObject::new();
+  session.put_i64("count", 0);
+  session.put_str("id", &sessionid);
+  session.put_str("username", &uuid);
+  session.put_object("user", user.duplicate());
+  let expire = time() + sessiontimeoutmillis;
+  session.put_i64("expire", expire);
+
+  let mut sessions = system.get_object("sessions");
+  sessions.put_object(&sessionid, session.duplicate());
+
+  let data_ref = P2PHEAP.get().write().unwrap().push(con);
+  let mut connections = user.get_array("connections");
+  connections.push_i64(data_ref as i64);
+
+  let remote_addr = stream.peer_addr().unwrap();
+  println!("P2P TCP Connect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
+
+  // loop
+  while system.get_bool("running") {
+    let mut bytes = vec![0u8; 2];
+    let x = stream.read_exact(&mut bytes);
+    if x.is_err() { 
+      break; 
+    }
+
+    let bytes: [u8; 2] = bytes.try_into().unwrap();
+    let len = i16::from_be_bytes(bytes) as usize;
+    let mut bytes:Vec<u8> = Vec::with_capacity(len);
+    bytes.resize(len, 0);
+    let _x = stream.read_exact(&mut bytes).unwrap();
+    let bytes = decrypt(&cipher, &bytes);
+    let msg = String::from_utf8(bytes).unwrap();
+
+    session.put_i64("expire", time() + sessiontimeoutmillis);
+    let count = session.get_i64("count") + 1;
+    session.put_i64("count", count);
+
+    if msg.starts_with("cmd ") {
+      let msg = &msg[4..];
+      let d = DataObject::from_string(msg);
+      let mut params = d.get_object("params");
+      params.put_str("nn_sessionid", &sessionid);
+      params.put_object("nn_session", session.duplicate());
+      
+      let mut stream = stream.try_clone().unwrap();
+      let cipher = cipher.to_owned();
+      let sessionid = sessionid.to_owned();
+      thread::spawn(move || {
+        let o = handle_command(d, sessionid);
+
+        let s = "res ".to_string() + &o.to_string();
+        let buf = encrypt(&cipher, s.as_bytes());
+        let len = buf.len() as i16;
+        
+        // FIXME - Not thread safe
+        let _x = stream.write(&len.to_be_bytes()).unwrap();
+        let _x = stream.write(&buf).unwrap();
+      });
+    }
+  }
+  // end loop
+
+  println!("P2P TCP Disconnect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
+
+  sessions.remove_property(&sessionid);
+  let _x = connections.remove_data(Data::DInt(data_ref as i64));
+  P2PHEAP.get().write().unwrap().decr(data_ref);
 }
 
 pub fn encrypt(cipher:&Aes256, buf:&[u8]) -> Vec<u8> {
