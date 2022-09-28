@@ -110,7 +110,9 @@ pub fn handshake(stream: &mut TcpStream, peer: Option<String>) -> Option<P2PConn
 
     //read remote_step
     let mut bytes = vec![0u8; 1];
-    let _x = stream.read_exact(&mut bytes).unwrap();
+    let x = stream.read_exact(&mut bytes);
+    if x.is_err() { return None; }
+    
     let remote_step = bytes[0];
 
     // Remote step
