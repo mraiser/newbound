@@ -9,11 +9,11 @@ let a1 = o.get_string("ipaddr");
 let a2 = o.get_i64("port");
 let ax = tcp_connect(a0, a1, a2);
 let mut o = DataObject::new();
-o.put_object("a", ax);
+o.put_bool("a", ax);
 o
 }
 
-pub fn tcp_connect(uuid:String, ipaddr:String, port:i64) -> DataObject {
+pub fn tcp_connect(uuid:String, ipaddr:String, port:i64) -> bool {
 let sock_addr = ipaddr+":"+&port.to_string();
 let mut stream = TcpStream::connect(sock_addr).unwrap();
 let con = handshake(&mut stream, Some(uuid));
@@ -24,9 +24,9 @@ if con.is_some() {
   thread::spawn(move || {
     handle_connection(con.unwrap());
   });
+  return true;
 }
 
-
-DataObject::new()
+false
 }
 

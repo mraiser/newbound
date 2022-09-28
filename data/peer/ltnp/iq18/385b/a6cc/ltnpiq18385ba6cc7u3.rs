@@ -8,7 +8,7 @@ if con.is_some() {
   thread::spawn(move || {
     handle_connection(con.unwrap());
   });
+  return true;
 }
 
-
-DataObject::new()
+false
