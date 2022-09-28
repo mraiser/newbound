@@ -16,4 +16,4 @@ else { writers = DataArray::from_string(&Data::as_string(tid)); }
 if check_auth(&lib, &id, &nn_sessionid, false) {
   return data::write::write(lib, id, data, readers, writers);
 }
-panic!("UNAUTHORIZED write {}:{}", lib, id);
+DataObject::from_string("{\"status\":\"err\",\"msg\":\"UNAUTHORIZED\"}")
