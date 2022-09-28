@@ -6,15 +6,15 @@ me.uiReady = function(ui){
   ui.initPopups(ME);
   $(ME).find('.wrap').css('display', 'block');
   json('../app/read', 'lib=runtime&id=metabot_applist_filters', function(result){
-    if (result.status != 'ok' && result.msg.indexOf("UNAUTHORIZED") != -1) {
-      window.location.href = '../app/login.html';
-    }
     if (result.data){
       $(ME).find('#appfilter-inactive').prop('checked', result.data.inactive); 
       $(ME).find('#appfilter-available').prop('checked', result.data.remote);
     }
     send_apps(function(result){
-      if (result.status != "ok") alert(result.msg);
+      if (result.status != 'ok' && result.msg.indexOf("UNAUTHORIZED") != -1) {
+        window.location.href = '../app/login.html';
+      }
+      else if (result.status != "ok") alert(result.msg);
       else {
         var div = $(ME).find(".applist");
         me.list = result.data;
