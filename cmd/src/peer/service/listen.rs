@@ -53,7 +53,6 @@ pub struct P2PConnection {
 static START: Once = Once::new();
 pub static P2PHEAP:Storage<RwLock<Heap<P2PConnection>>> = Storage::new();
 
-// FIXME - Allow connect only if uuid matches
 pub fn handshake(stream: &mut TcpStream, peer: Option<String>) -> Option<P2PConnection> {
   let system = DataStore::globals().get_object("system");
   let runtime = system.get_object("apps").get_object("app").get_object("runtime");
