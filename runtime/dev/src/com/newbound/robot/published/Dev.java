@@ -1,1 +1,0 @@
-package com.newbound.robot.published;public class Dev extends com.newbound.robot.BotBase {	public Dev()	{		super();	}		public String DB() { return "dev"; }	public String ID() { return "kioxgl183323e65e6uf60"; }		public String getServiceName() 	{		return "dev";	}}

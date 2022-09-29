@@ -51,6 +51,8 @@ let _x = stream.write(&len.to_be_bytes()).unwrap();
 let _x = stream.write(&buf).unwrap();
 
 let pid = &pid.to_string();
+
+// FIXME - should timeout
 while ! res.has(pid) {
   xxx();
 }
