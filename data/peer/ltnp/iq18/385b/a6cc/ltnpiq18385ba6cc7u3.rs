@@ -1,14 +1,15 @@
 let sock_addr = ipaddr+":"+&port.to_string();
-let mut stream = TcpStream::connect(sock_addr).unwrap();
-let con = handshake(&mut stream, Some(uuid));
-let remote_addr = stream.peer_addr().unwrap();
-println!("P2P TCP incoming request from {}", remote_addr);
-
-if con.is_some() {
-  thread::spawn(move || {
-    handle_connection(con.unwrap());
-  });
-  return true;
+let stream = TcpStream::connect(sock_addr);
+if stream.is_ok() {
+  let mut stream = stream.unwrap();
+  let remote_addr = stream.peer_addr().unwrap();
+  println!("P2P TCP outgoing request to {}", remote_addr);
+  let con = handshake(&mut stream, Some(uuid));
+  if con.is_some() {
+    thread::spawn(move || {
+      handle_connection(con.unwrap());
+    });
+    return true;
+  }
 }
-
 false
