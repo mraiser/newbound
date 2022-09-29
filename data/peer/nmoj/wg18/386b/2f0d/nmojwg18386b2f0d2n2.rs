@@ -31,8 +31,7 @@ let _x = stream.write(&buf).unwrap();
 
 let pid = &pid.to_string();
 while ! res.has(pid) {
-  spin_loop();
-  yield_now();
+  xxx();
 }
 
 let o = res.get_object(pid);
@@ -44,3 +43,5 @@ o
 static mut NEXT_CMD: AtomicUsize = AtomicUsize::new(1);
 
 fn xxx(){
+  spin_loop();
+  yield_now();
