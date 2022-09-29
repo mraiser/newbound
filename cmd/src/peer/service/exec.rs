@@ -5,7 +5,7 @@ use crate::peer::service::listen::encrypt;
 use std::io::Write;
 use std::hint::spin_loop;
 use std::thread::yield_now;
-
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("uuid");
@@ -29,7 +29,9 @@ if cons.len() == 0 {
   return DataObject::from_string("{\"status\":\"err\",\"msg\":\"No route to peer\"}");
 }
 
-let pid = 69;
+let pid;
+unsafe { pid = NEXT_CMD.fetch_add(1, Ordering::SeqCst) as i64;}
+
 let mut d = DataObject::new();
 d.put_str("bot", &app);
 d.put_str("cmd", &cmd);
@@ -58,5 +60,10 @@ let o = res.get_object(pid);
 res.remove_property(pid);
 
 o
+}
+
+static mut NEXT_CMD: AtomicUsize = AtomicUsize::new(1);
+
+fn xxx(){
 }
 
