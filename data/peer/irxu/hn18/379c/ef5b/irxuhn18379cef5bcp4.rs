@@ -4,10 +4,11 @@
 
 #[derive(Debug)]
 pub struct P2PConnection {
-  stream: TcpStream,
-  sessionid: String,
-  cipher: Aes256,
-  uuid: String,
+  pub stream: TcpStream,
+  pub sessionid: String,
+  pub cipher: Aes256,
+  pub uuid: String,
+  pub res: DataObject,
 }
 
 static START: Once = Once::new();
@@ -136,6 +137,7 @@ pub fn handshake(stream: &mut TcpStream, peer: Option<String>) -> Option<P2PConn
         sessionid: unique_session_id(),
         cipher: cipher,
         uuid: uuid.to_owned(),
+        res: DataObject::new(),
       };
   
       if saveme {
@@ -191,6 +193,7 @@ pub fn handle_connection(con:P2PConnection) {
   let sessionid = con.sessionid.to_owned();
   let cipher = con.cipher.to_owned();
   let mut stream = con.stream.try_clone().unwrap();
+  let mut res = con.res.duplicate();
 
   let system = DataStore::globals().get_object("system");
   let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
@@ -228,6 +231,7 @@ pub fn handle_connection(con:P2PConnection) {
     let _x = stream.read_exact(&mut bytes).unwrap();
     let bytes = decrypt(&cipher, &bytes);
     let msg = String::from_utf8(bytes).unwrap();
+    let msg = msg.trim_matches(char::from(0));
 
     session.put_i64("expire", time() + sessiontimeoutmillis);
     let count = session.get_i64("count") + 1;
@@ -254,6 +258,15 @@ pub fn handle_connection(con:P2PConnection) {
         let _x = stream.write(&len.to_be_bytes()).unwrap();
         let _x = stream.write(&buf).unwrap();
       });
+    }
+    else if msg.starts_with("res ") {
+      let msg = &msg[4..];
+      let d = DataObject::from_string(msg);
+      let i = d.get_i64("pid");
+      res.put_object(&i.to_string(), d);
+    }
+    else {
+      println!("Unknown message type: {}", msg);
     }
   }
   // end loop

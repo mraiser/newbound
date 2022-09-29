@@ -14,6 +14,7 @@ pub struct Initializer {
 pub fn mirror(state: &mut Initializer) {
     flowlang::mirror(state.data_ref);
     state.cmds.clear();
+    state.cmds.push(("nmojwg18386b2f0d2n2".to_string(), peer::service::exec::execute, "".to_string()));
     state.cmds.push(("ltnpiq18385ba6cc7u3".to_string(), peer::service::tcp_connect::execute, "".to_string()));
     state.cmds.push(("rjntml18385b15b5ch0".to_string(), peer::service::maintenance::execute, "".to_string()));
     state.cmds.push(("grvupm18379e9a159n8".to_string(), peer::service::init::execute, "".to_string()));
