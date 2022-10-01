@@ -4,3 +4,30 @@
   position:relative;
   background-color:black;
 }
+
+.topleftcorner{
+  position:fixed;
+  top:20px;
+  left:20px;
+  color:#83bc00;
+}
+
+.bigtext{
+  font-size:20px;
+}
+
+.bottomleftcorner{
+  position:fixed;
+  bottom:20px;
+  left:20px;
+  color:white;
+}
+
+.localpeername{
+  color:#83bc00;
+  font-size:24px;
+}
+
+.localpeerid{
+  font-size:x-small;
+}

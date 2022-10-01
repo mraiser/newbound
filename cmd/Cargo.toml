@@ -10,9 +10,9 @@ crate-type = ["rlib", "dylib"]
 serde_support = ["serde","serde_json","flowlang/serde_support","ndata/serde_support"]
 
 [dependencies]
-flowlang = { version = "0.1.23" }
+flowlang = { version = "0.1.24" }
 #flowlang = { path = "../../../rust/flow" }
-ndata="0.2.8"
+ndata="0.2.9"
 #ndata = { path = "../../../rust/ndata" }
 state="0.5.3"
 zip = { version="0.6.2", features=["deflate-miniz"] }
@@ -24,4 +24,5 @@ aes = "0.8.1"
 uuid = { version="1.1.2", features=["v4"] }
 serde = { version = "1.0.143", features = ["derive"], optional = true }
 serde_json = { version = "1.0.83", optional = true }
+local-ip-address = "0.4.8"
 

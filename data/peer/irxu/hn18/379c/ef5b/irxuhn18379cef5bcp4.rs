@@ -214,7 +214,10 @@ pub fn handle_connection(con:P2PConnection) {
 
   let remote_addr = stream.peer_addr().unwrap();
   println!("P2P TCP Connect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
-
+  let peer = user_to_peer(user.duplicate(), uuid.to_owned());
+  fire_event("peer", "CONNECT", peer.duplicate());
+  fire_event("peer", "UPDATE", peer.duplicate());
+  
   // loop
   while system.get_bool("running") {
     let mut bytes = vec![0u8; 2];
@@ -253,7 +256,7 @@ pub fn handle_connection(con:P2PConnection) {
         let buf = encrypt(&cipher, s.as_bytes());
         let len = buf.len() as i16;
         
-        // FIXME - Not thread safe
+        let _lock = P2PHEAP.get().write().unwrap();
         let _x = stream.write(&len.to_be_bytes()).unwrap();
         let _x = stream.write(&buf).unwrap();
       });
@@ -270,11 +273,14 @@ pub fn handle_connection(con:P2PConnection) {
   }
   // end loop
 
-  println!("P2P TCP Disconnect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
-
   sessions.remove_property(&sessionid);
   let _x = connections.remove_data(Data::DInt(data_ref as i64));
   P2PHEAP.get().write().unwrap().decr(data_ref);
+
+  println!("P2P TCP Disconnect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
+  let peer = user_to_peer(user.duplicate(), uuid.to_owned());
+  fire_event("peer", "DISCONNECT", peer.duplicate());
+  fire_event("peer", "UPDATE", peer.duplicate());
 }
 
 pub fn encrypt(cipher:&Aes256, buf:&[u8]) -> Vec<u8> {

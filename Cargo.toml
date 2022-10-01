@@ -17,9 +17,9 @@ javascript_runtime = ["flowlang/javascript_runtime"]
 [dependencies]
 cmd = { path = "./cmd" }
 hot-lib-reloader = { version = "^0.6", optional = true }
-flowlang = { version = "0.1.23" }
+flowlang = { version = "0.1.24" }
 #flowlang = { path = "../../rust/flow" }
-ndata="0.2.8"
+ndata="0.2.9"
 #ndata = { path = "../../rust/ndata" }
 serde = { version = "1.0.143", features = ["derive"], optional = true }
 serde_json = { version = "1.0.83", optional = true }

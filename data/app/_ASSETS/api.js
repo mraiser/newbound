@@ -378,6 +378,9 @@ function startWebSocket(){
 		  cb(o);
 		}
 	  }
+	  else if (o.app && o.event && SUBSCRIPTIONS[o.app] && SUBSCRIPTIONS[o.app][o.event]) 
+	    for (var i in SUBSCRIPTIONS[o.app][o.event]) 
+	      SUBSCRIPTIONS[o.app][o.event][i](o.data);
 	  else if (div && div.api && div.api.wscb) div.api.wscb(o);
 	  else if (typeof WSCB != 'undefined') WSCB(o);
 	  else console.log("Received unexpected websocket data: "+e.data);
@@ -395,6 +398,16 @@ function tempfile(peer, stream, cb){
 	  "stream": stream
 	};
 	SOCK.send("tempfile "+JSON.stringify(wrap));
+}
+
+var SUBSCRIPTIONS = {};
+function subscribe_event(app, event, cb) {
+  if (!SUBSCRIPTIONS[app]) SUBSCRIPTIONS[app] = {};
+  if (!SUBSCRIPTIONS[app][event]) SUBSCRIPTIONS[app][event] = [];
+  SUBSCRIPTIONS[app][event].push(cb);
+  
+  var d = { app: app, event: event }
+  SOCK.send("sub "+JSON.stringify(d));
 }
 
 function json(cmd, vars, cb) { 

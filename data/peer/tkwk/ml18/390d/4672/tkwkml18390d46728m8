@@ -1,0 +1,1 @@
+{"readers":[],"writers":[],"id":"tkwkml18390d46728m8","time":1664583413764,"data":{"returntype":"JSONObject","type":"rust","import":"use local_ip_address::list_afinet_netifas;\nuse ndata::dataarray::DataArray;\nuse flowlang::datastore::DataStore;\n","params":[],"lib":"peer","cmd":"info","attachmentkeynames":["rs"],"desc":"","ctl":"peer"},"username":"system"}
