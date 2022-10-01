@@ -94,7 +94,8 @@ me.render = function(){
     me.model.add(textMesh(ME.DATA.displayname));
   }
   
-  c = 0; // - Math.min(1, 1/((new Date().getTime() - ME.DATA.lastcontact + network.timedelta)/15000));
+  let delta = Math.max(0, new Date().getTime() - ME.DATA.last_contact - 30000);
+  var c = 1 - Math.min(1, 1/(delta/15000));
   if (ME.DATA.connected){
     if (ME.DATA.tcp) me.sphere.material.color.setRGB(c,1,c);
     else if (ME.DATA.udp) me.sphere.material.color.setRGB(c,c,1);

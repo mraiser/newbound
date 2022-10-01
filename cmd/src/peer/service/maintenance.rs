@@ -4,6 +4,10 @@ use ndata::data::Data;
 use crate::peer::service::tcp_connect::tcp_connect;
 use std::thread;
 use crate::peer::service::exec::exec;
+use flowlang::generated::flowlang::system::time::time;
+use ndata::dataarray::DataArray;
+use flowlang::appserver::fire_event;
+use crate::peer::peer::peers::user_to_peer;
 
 pub fn execute(_o: DataObject) -> DataObject {
 let ax = maintenance();
@@ -15,7 +19,7 @@ o
 pub fn maintenance() -> DataObject {
 let users = users();
 for (uuid, user) in users.objects(){
-  let user = user.object();
+  let mut user = user.object();
   if user.get_array("connections").len() == 0 {
     if user.has("keepalive") && Data::as_string(user.get_property("keepalive")) == "true" {
       if user.has("address") && user.has("port") {
@@ -28,8 +32,18 @@ for (uuid, user) in users.objects(){
     }
   }
   else {
+    let t1 = time();
     let o = exec(user.get_string("id"), "peer".to_string(), "info".to_string(), DataObject::new());
-    println!("maint {}", o.to_string());
+    let t2 = time();
+    let l = t2 - t1;
+    user.put_i64("latency", l);
+    if !user.has("addresses") { user.put_array("addresses", DataArray::new()); }
+    let addrs = user.get_array("addresses");
+    let v = user.get_array("addresses");
+    for a in v.objects(){
+      addrs.push_unique(a);
+    }
+    fire_event("peer", "UPDATE", user_to_peer(user, uuid));
   }
 }
 DataObject::new()
