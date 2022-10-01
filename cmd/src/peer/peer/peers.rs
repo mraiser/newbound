@@ -32,6 +32,8 @@ pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
   if connected { o.put_bool("tcp", true); }
   else { o.put_bool("tcp", false); }
   o.put_bool("udp", false);
+  let name = o.get_string("displayname");
+  o.put_str("name", &name);
   o
 }
 

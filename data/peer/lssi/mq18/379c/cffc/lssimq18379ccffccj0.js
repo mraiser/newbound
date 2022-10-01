@@ -119,6 +119,43 @@ me.animate = function () {
   me.render();
 };
 
+$(ME).click(function(event){
+  var model = findClick(event);
+  if (model && model.click) return model.click(event);
+});
+
+function findClick(event){
+  event.three = {};
+  var clientX = event.clientX - $(ME).offset().left;
+  var clientY = event.clientY - $(ME).offset().top;
+  var vector = new THREE.Vector3(
+    ( clientX / $(ME).width() ) * 2 - 1,
+    - ( clientY / $(ME).height() ) * 2 + 1,
+    0.5
+  );
+  vector.unproject(me.camera);
+
+  var ray = new THREE.Raycaster( me.camera.position, vector.sub( me.camera.position ).normalize() );
+  event.three.ray = ray.ray;
+
+  var l1 = []
+  for (var i in me.children) l1.push(me.children[i].model);
+
+  var intersects = ray.intersectObjects( l1, true );
+  if ( intersects.length > 0 ) {
+    event.three.intersect = intersects[0];
+    var o = event.three.intersect.object;
+    while (!o.api && o.parent) o = o.parent;
+    if (o.api) {
+      o = o.api;
+      while (!o.click && o.owner) o = o.owner;
+      if (o.click) return o;
+    }
+  }
+  return null;
+}
+
+
 $(window).on("resize", function(e){
   var w = $(ME).width();
   var h = $(ME).height();

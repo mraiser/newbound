@@ -31,3 +31,15 @@
 .localpeerid{
   font-size:x-small;
 }
+
+#headsupdisplay{
+  max-width: 90%;
+  background-color:#ffffff22;
+  position:fixed;
+  top:0px;
+  right:0px;
+  height:100%;
+  overflow-y:auto;
+  color:white;
+  padding:20px;
+}

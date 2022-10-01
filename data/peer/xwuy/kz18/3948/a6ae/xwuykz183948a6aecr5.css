@@ -1,0 +1,30 @@
+.rp-info {
+  display:inline-block;
+  vertical-align:top;
+}
+
+.rp-name {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 400;
+}
+
+.rp-uuid {
+  font-size:x-small;
+}
+
+.top-right{
+  position:absolute;
+  top:20px;
+  right:20px;
+}
+
+.connectionindicator {
+  margin-top: 6px;
+  margin-left: 3px;
+  height: 10px;
+  width: 10px;
+  border: thin solid black;
+  border-radius: 10px;
+  display: inline-block;
+}
