@@ -1,1 +1,1 @@
-{"username":"system","data":{"start":30,"startunit":"seconds","intervalunit":"minutes","interval":2,"repeat":true,"cmdlib":"peer","params":{},"cmd":"nmjhyo18385af8919t1","cmddb":"peer"},"writers":[],"time":1664395647230,"id":"xyznrg18385afdf87i2","readers":[]}
+{"data":{"cmd":"nmjhyo18385af8919t1","cmddb":"peer","cmdlib":"peer","interval":30,"intervalunit":"seconds","params":{},"repeat":true,"start":30,"startunit":"seconds"},"id":"xyznrg18385afdf87i2","readers":[],"time":1664647734961,"username":"system","writers":[]}
