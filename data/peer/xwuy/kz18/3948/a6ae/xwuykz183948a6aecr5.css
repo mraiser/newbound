@@ -33,3 +33,9 @@
   font-size: x-small;
   text-align: right;
 }
+
+.abspos{
+  position:absolute;
+  margin-top:-6px;
+  margin-left: 6px
+}

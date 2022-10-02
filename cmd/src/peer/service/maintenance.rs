@@ -34,16 +34,19 @@ for (uuid, user) in users.objects(){
   else {
     let t1 = time();
     let o = exec(user.get_string("id"), "peer".to_string(), "info".to_string(), DataObject::new());
-    let t2 = time();
-    let l = t2 - t1;
-    user.put_i64("latency", l);
-    if !user.has("addresses") { user.put_array("addresses", DataArray::new()); }
-    let addrs = user.get_array("addresses");
-    let v = user.get_array("addresses");
-    for a in v.objects(){
-      addrs.push_unique(a);
+    if o.get_string("status") == "ok" {
+      let o = o.get_object("data");
+      let t2 = time();
+      let l = t2 - t1;
+      user.put_i64("latency", l);
+      if !user.has("addresses") { user.put_array("addresses", DataArray::new()); }
+      let addrs = user.get_array("addresses");
+      let v = o.get_array("addresses");
+      for a in v.objects(){
+        addrs.push_unique(a);
+      }
+      fire_event("peer", "UPDATE", user_to_peer(user, uuid));
     }
-    fire_event("peer", "UPDATE", user_to_peer(user, uuid));
   }
 }
 DataObject::new()

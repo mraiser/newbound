@@ -2,6 +2,7 @@ use ndata::dataobject::*;
 use local_ip_address::list_afinet_netifas;
 use ndata::dataarray::DataArray;
 use flowlang::datastore::DataStore;
+use ndata::data::Data;
 
 pub fn execute(_o: DataObject) -> DataObject {
 let ax = info();
@@ -25,11 +26,13 @@ for (_name, ip) in network_interfaces.iter() {
 
 let system = DataStore::globals().get_object("system");
 let name = system.get_object("config").get_string("machineid");
+let http_port = Data::as_string(system.get_object("config").get_property("http_port")).parse::<i64>().unwrap();
 let port = system.get_object("apps").get_object("peer").get_object("runtime").get_i64("port");
 let uuid = system.get_object("apps").get_object("app").get_object("runtime").get_string("uuid");
 o.put_str("name", &name);
 o.put_str("uuid", &uuid);
-o.put_i64("port", port);
+o.put_i64("p2p_port", port);
+o.put_i64("http_port", http_port);
 
 o
 }
