@@ -5,14 +5,14 @@ use flowlang::datastore::DataStore;
 use ndata::data::Data;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("nn_session_id");
+let a0 = o.get_string("nn_sessionid");
 let ax = info(a0);
 let mut o = DataObject::new();
 o.put_object("a", ax);
 o
 }
 
-pub fn info(nn_session_id:String) -> DataObject {
+pub fn info(nn_sessionid:String) -> DataObject {
 let mut o = DataObject::new();
 let mut a = DataArray::new();
 o.put_array("addresses", a.duplicate());
@@ -32,7 +32,7 @@ let port = system.get_object("apps").get_object("peer").get_object("runtime").ge
 let uuid = system.get_object("apps").get_object("app").get_object("runtime").get_string("uuid");
 o.put_str("name", &name);
 o.put_str("uuid", &uuid);
-o.put_str("session_id", &nn_session_id);
+o.put_str("session_id", &nn_sessionid);
 o.put_i64("p2p_port", port);
 o.put_i64("http_port", http_port);
 

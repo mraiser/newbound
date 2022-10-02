@@ -17,7 +17,7 @@ let port = system.get_object("apps").get_object("peer").get_object("runtime").ge
 let uuid = system.get_object("apps").get_object("app").get_object("runtime").get_string("uuid");
 o.put_str("name", &name);
 o.put_str("uuid", &uuid);
-o.put_str("session_id", &nn_session_id);
+o.put_str("session_id", &nn_sessionid);
 o.put_i64("p2p_port", port);
 o.put_i64("http_port", http_port);
 
