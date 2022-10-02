@@ -61,22 +61,24 @@ for file in fs::read_dir(&p).unwrap() {
             //let name = &data.get_string("name");
 
             let codename = &data.get_string(typ);
-            let code = store.get_data(&ctldb, codename).get_object("data");
-            if code.has("desc") { c.put_str("desc", &code.get_string("desc")); }
+            if store.get_data_file(&ctldb, codename).exists(){
+              let code = store.get_data(&ctldb, codename).get_object("data");
+              if code.has("desc") { c.put_str("desc", &code.get_string("desc")); }
 
-            let mut params = DataArray::new();
-            if code.has("params") {
-              let p = &code.get_array("params");
-              for d in p.objects() {
-                let d = d.object();
-                let a = d.get_string("name");
-                params.push_str(&a);
+              let mut params = DataArray::new();
+              if code.has("params") {
+                let p = &code.get_array("params");
+                for d in p.objects() {
+                  let d = d.object();
+                  let a = d.get_string("name");
+                  params.push_str(&a);
+                }
               }
+              c.put_array("parameters", params);
+
+
+              o.put_object(&name, c);
             }
-            c.put_array("parameters", params);
-
-
-            o.put_object(&name, c);
           }
           appdata.put_object("commands", o);
         }
