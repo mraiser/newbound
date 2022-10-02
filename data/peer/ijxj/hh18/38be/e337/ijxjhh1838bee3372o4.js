@@ -80,9 +80,9 @@ me.render = function(){
       dv.add(v);
       count++;
       
-//      if (p.div.DATA.connected) {
-        
-//      }
+      if (p.div.DATA.peers) {
+        //console.log(p.div.DATA.peers);
+      }
     }
   }
   

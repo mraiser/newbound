@@ -42,8 +42,8 @@ o.put_i64("http_port", http_port);
 let mut c = DataObject::new();
 o.put_object("connections", c.duplicate());
 
-if uuid.is_array(){
-  for uuid in uuid.array().objects() {
+if !uuid.clone().is_null(){
+  for uuid in DataArray::from_string(&Data::as_string(uuid)).objects() {
     let uuid = uuid.string();
     let u = get_user(&uuid);
     if u.is_some(){
