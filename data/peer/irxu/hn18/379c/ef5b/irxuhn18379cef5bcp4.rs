@@ -188,7 +188,7 @@ fn do_listen(ipaddr:String, port:i64) -> String {
 
 pub fn handle_connection(con:P2PConnection) {
   let uuid = con.uuid.to_owned();
-  let user = get_user(&uuid).unwrap();
+  let mut user = get_user(&uuid).unwrap();
   let sessionid = con.sessionid.to_owned();
   let cipher = con.cipher.to_owned();
   let mut stream = con.stream.try_clone().unwrap();
@@ -212,6 +212,7 @@ pub fn handle_connection(con:P2PConnection) {
   let mut connections = user.get_array("connections");
   connections.push_i64(data_ref as i64);
 
+  user.put_i64("last_contact", time());
   let remote_addr = stream.peer_addr().unwrap();
   println!("P2P TCP Connect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
   let peer = user_to_peer(user.duplicate(), uuid.to_owned());
