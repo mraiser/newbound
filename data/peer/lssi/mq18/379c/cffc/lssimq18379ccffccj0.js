@@ -48,7 +48,7 @@ me.ready = function(){
                   var p = result.data[i];
                   addPeer(p);
                 }
-                send_info(function(result){
+                send_info(null, [],function(result){
                   $(ME).find('.localpeername').text(result.data.name);
                   $(ME).find('.localpeerid').text(result.data.uuid);
                   $(ME).find('.localpeerport').text("P2P Port: "+result.data.p2p_port);
