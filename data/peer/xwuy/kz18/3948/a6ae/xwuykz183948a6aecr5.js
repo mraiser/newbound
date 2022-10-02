@@ -24,7 +24,7 @@ me.update = function(){
     
     var newhtml = '';
     for (var i in ME.DATA.addresses) {
-      newhtml += '<span class="chip">'+ME.DATA.addresses[i]+'</span>'
+      newhtml += '<a class="chip" target="_blank" href="http://'+ME.DATA.addresses[i]+':'+ME.DATA.http_port+'">'+ME.DATA.addresses[i]+'</a>'
     }
     $(ME).find('.hud_address_list').html(newhtml);
 

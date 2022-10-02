@@ -26,6 +26,9 @@ for (uuid, user) in users.objects(){
       for a in v.objects(){
         addrs.push_unique(a);
       }
+      user.put_str("displayname", &o.get_string("name"));
+      user.put_i64("http_port", o.get_i64("http_port"));
+      user.put_i64("p2p_port", o.get_i64("p2p_port"));
       fire_event("peer", "UPDATE", user_to_peer(user, uuid));
     }
   }

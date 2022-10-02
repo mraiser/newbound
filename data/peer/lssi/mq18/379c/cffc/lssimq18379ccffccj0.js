@@ -51,7 +51,8 @@ me.ready = function(){
                 send_info(function(result){
                   $(ME).find('.localpeername').text(result.data.name);
                   $(ME).find('.localpeerid').text(result.data.uuid);
-                  $(ME).find('.localpeerport').text("Port: "+result.data.port);
+                  $(ME).find('.localpeerport').text("P2P Port: "+result.data.p2p_port);
+                  $(ME).find('.localhttpport').text("HTTP Port: "+result.data.http_port);
                 });
               });
 
