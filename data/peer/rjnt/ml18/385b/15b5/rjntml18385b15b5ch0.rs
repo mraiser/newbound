@@ -16,8 +16,6 @@ for (uuid, user) in users.objects(){
   }
 }
 
-println!("ask {}", ask.to_string());
-
 let adr = ask.data_ref;
 for (uuid, user) in users.objects(){
   let mut user = user.object();
@@ -45,8 +43,6 @@ for (uuid, user) in users.objects(){
         user.put_i64("p2p_port", o.get_i64("p2p_port"));
         user.put_object("peers", o.get_object("connections"));
         fire_event("peer", "UPDATE", user_to_peer(user, uuid));
-        
-        println!("got {}", o.to_string());
       }
     });
   }
