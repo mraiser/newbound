@@ -87,19 +87,22 @@ me.render = function(){
         if (!me.lines[rid]) {
           p.div.DATA.connected = true;
           var points = [];
-          points.push(
-            new THREE.Vector3(pos1.x,pos1.y,pos1.z),
-            new THREE.Vector3(pos2.x,pos2.y,pos2.z)
-          );
+          points.push(new THREE.Vector3(pos1.x,pos1.y,pos1.z));
+          points.push(new THREE.Vector3(pos2.x,pos2.y,pos2.z));
           var geometry = new THREE.BufferGeometry().setFromPoints( points );
           var color = op.startsWith('tcp#') ? 0x00ff00 : op.startsWith('udp#') ? 0x0000ff : 0xffff00;
-          var material = new THREE.LineBasicMaterial( { color: color } );
-          var mesh = new THREE.Line( geometry, material );
+          var m = {
+            color: color, 
+            linewidth: 1
+          };
+          var material = new THREE.LineBasicMaterial(m);
+          var mesh = new THREE.Line(geometry, material);
           me.viewer.scene.add(mesh);
           me.lines[rid] = mesh;
         }
         
         var line = me.lines[rid];
+        line.geometry.computeBoundingBox();
         
         var p = line.geometry.attributes.position.array;
         p[0] = pos1.x;
@@ -108,6 +111,7 @@ me.render = function(){
         p[3] = pos2.x;
         p[4] = pos2.y;
         p[5] = pos2.z;
+        line.geometry.computeBoundingSphere();
         line.geometry.attributes.position.needsUpdate = true;
         
         var tcp = op.startsWith('tcp#');

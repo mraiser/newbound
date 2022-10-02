@@ -10,6 +10,7 @@ me.uiReady = function(ui){
 
 me.ready = function(){
   subscribe_event("peer", "UPDATE", function(data){
+    // FIMXE - Handle previously unseen peers
     $(ME).find('#peer_'+data.id)[0].DATA = data;
   });
   
@@ -35,7 +36,7 @@ me.ready = function(){
               hemi = new THREE.HemisphereLight( 0x888888, 0x888888 );
               scene.add(hemi);
 
-              spotLight = new THREE.SpotLight(0xffffff);
+              var spotLight = me. spotLight = new THREE.SpotLight(0xffffff);
               spotLight.castShadow = true;
               spotLight.position.set (20, 35, 40);
               scene.add(spotLight);
@@ -117,6 +118,7 @@ me.render = function(){
 
 me.animate = function () {
   requestAnimationFrame(me.animate);
+  me.spotLight.position.copy(me.camera.position);
   me.render();
 };
 
