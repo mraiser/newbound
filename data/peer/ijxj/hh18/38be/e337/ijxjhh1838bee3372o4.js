@@ -11,6 +11,8 @@ me.animate = function(model) {
   var group = me.model;
   group.add(sphereMesh());
   group.add(textMesh(ME.DATA.displayname));
+  me.lines = {};
+  me.div = ME;
 };
 
 var v = new THREE.Vector3();
@@ -77,6 +79,10 @@ me.render = function(){
       v.copy(pos1).sub(pos2).normalize().multiplyScalar(1/(d*d));
       dv.add(v);
       count++;
+      
+//      if (p.div.DATA.connected) {
+        
+//      }
     }
   }
   
