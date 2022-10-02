@@ -10,8 +10,7 @@ o
 }
 
 pub fn peers() -> DataArray {
-  let system = DataStore::globals().get_object("system");
-  let users = system.get_object("users");
+  let users = DataStore::globals().get_object("system").get_object("users");
   let mut peers = DataArray::new();
   for (id, o) in users.objects(){
     if id.len() == 36 {
@@ -22,18 +21,43 @@ pub fn peers() -> DataArray {
   peers
 }
 
+pub fn get_relays(id:String) -> DataArray {
+  let users = DataStore::globals().get_object("system").get_object("users");
+  let mut v = DataArray::new();
+  for (uuid, user) in users.objects(){
+    if uuid != id {
+      let user = user.object();
+      if user.has("peers"){
+        let peers = user.get_object("peers");
+        if peers.has(&id) && peers.get_string(&id).starts_with("tcp#") {
+          v.push_str(&uuid);
+        }
+      }
+    }
+  }
+  v
+}
+
 pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
   let mut o = o.deep_copy();
   o.remove_property("password");
   o.remove_property("publickkey");
   o.put_str("id", &id);
-  let connected = o.get_array("connections").len()>0;
+  o.put_str("name", &o.get_string("displayname"));
+  
+  let relays = get_relays(id);
+  
+  let tcp = o.get_array("connections").len()>0;
+  let udp = false;
+  let relay = relays.len()>0;
+  let connected = tcp || udp || relay;
+  
+  o.put_bool("tcp", tcp);  
+  o.put_bool("udp", udp);  
+  o.put_bool("relay", relay);  
   o.put_bool("connected", connected);  
-  if connected { o.put_bool("tcp", true); }
-  else { o.put_bool("tcp", false); }
-  o.put_bool("udp", false);
-  let name = o.get_string("displayname");
-  o.put_str("name", &name);
+  o.put_array("relays", relays);  
+
   o
 }
 

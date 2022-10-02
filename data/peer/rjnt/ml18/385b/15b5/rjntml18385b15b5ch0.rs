@@ -42,9 +42,14 @@ for (uuid, user) in users.objects(){
         user.put_i64("http_port", o.get_i64("http_port"));
         user.put_i64("p2p_port", o.get_i64("p2p_port"));
         user.put_object("peers", o.get_object("connections"));
+        // Fixme - notify if something changes (latency?)
         fire_event("peer", "UPDATE", user_to_peer(user, uuid));
       }
     });
+  }
+  else {
+    // FIXME - notify on relay add
+    fire_event("peer", "UPDATE", user_to_peer(user, uuid));
   }
 }
 DataObject::new()

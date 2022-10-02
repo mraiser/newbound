@@ -80,8 +80,55 @@ me.render = function(){
       dv.add(v);
       count++;
       
-      if (p.div.DATA.peers) {
-        //console.log(p.div.DATA.peers);
+      var rid = p.div.DATA.id;
+      
+      if (ME.DATA.peers && ME.DATA.peers[rid]) {
+        var op = ME.DATA.peers[rid];
+        if (!me.lines[rid]) {
+          p.div.DATA.connected = true;
+          var points = [];
+          points.push(
+            new THREE.Vector3(pos1.x,pos1.y,pos1.z),
+            new THREE.Vector3(pos2.x,pos2.y,pos2.z)
+          );
+          var geometry = new THREE.BufferGeometry().setFromPoints( points );
+          var color = op.startsWith('tcp#') ? 0x00ff00 : op.startsWith('udp#') ? 0x0000ff : 0xffff00;
+          var material = new THREE.LineBasicMaterial( { color: color } );
+          var mesh = new THREE.Line( geometry, material );
+          me.viewer.scene.add(mesh);
+          me.lines[rid] = mesh;
+        }
+        
+        var line = me.lines[rid];
+        
+        var p = line.geometry.attributes.position.array;
+        p[0] = pos1.x;
+        p[1] = pos1.y;
+        p[2] = pos1.z;
+        p[3] = pos2.x;
+        p[4] = pos2.y;
+        p[5] = pos2.z;
+        line.geometry.attributes.position.needsUpdate = true;
+        
+        var tcp = op.startsWith('tcp#');
+        var udp = op.startsWith('udp#');
+        if (tcp || udp){
+          d = pos2.distanceTo(pos1);
+          v.copy(pos2).sub(pos1).normalize().multiplyScalar(0.01*d*d);
+          dv.add(v);
+          count++;
+          line.material.color.r = 0;
+          line.material.color.g = tcp ? 0.5 : 0;
+          line.material.color.b = udp ? 0.5 : 0;
+        }
+        else{
+          line.material.color.r = 0.5;
+          line.material.color.g = 0.5;
+          line.material.color.b = 0;
+        }
+        
+        
+        
       }
     }
   }
