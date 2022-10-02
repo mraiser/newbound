@@ -48,8 +48,8 @@ if !uuid.clone().is_null(){
     let u = get_user(&uuid);
     if u.is_some(){
       let p = user_to_peer(u.unwrap(), uuid.to_owned());
-      if p.get_bool("tcp") { c.put_str(&uuid, &("tcp#".to_string()+&p.get_string("address"))); }
-      else if p.get_bool("udp") { c.put_str(&uuid, &("udp#".to_string()+&p.get_string("address"))); }
+      if p.get_bool("tcp") { c.put_str(&uuid, &("tcp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
+      else if p.get_bool("udp") { c.put_str(&uuid, &("udp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
       else if p.get_bool("connected") { c.put_str(&uuid, "relay#"); }
     }
   }
