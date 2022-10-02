@@ -256,6 +256,7 @@ pub fn handle_connection(con:P2PConnection) {
   user.put_i64("last_contact", time());
   let remote_addr = stream.peer_addr().unwrap();
   println!("P2P TCP Connect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
+  user.put_str("address", &remote_addr.ip().to_string());
   let peer = user_to_peer(user.duplicate(), uuid.to_owned());
   fire_event("peer", "CONNECT", peer.duplicate());
   fire_event("peer", "UPDATE", peer.duplicate());

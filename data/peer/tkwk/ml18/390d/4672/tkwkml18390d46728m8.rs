@@ -14,11 +14,27 @@ let system = DataStore::globals().get_object("system");
 let name = system.get_object("config").get_string("machineid");
 let http_port = Data::as_string(system.get_object("config").get_property("http_port")).parse::<i64>().unwrap();
 let port = system.get_object("apps").get_object("peer").get_object("runtime").get_i64("port");
-let uuid = system.get_object("apps").get_object("app").get_object("runtime").get_string("uuid");
+let id = system.get_object("apps").get_object("app").get_object("runtime").get_string("uuid");
 o.put_str("name", &name);
-o.put_str("uuid", &uuid);
+o.put_str("uuid", &id);
 o.put_str("session_id", &nn_sessionid);
 o.put_i64("p2p_port", port);
 o.put_i64("http_port", http_port);
+
+let mut c = DataObject::new();
+o.put_object("connections", c.duplicate());
+
+if uuid.is_array(){
+  for uuid in uuid.array().objects() {
+    let uuid = uuid.string();
+    let u = get_user(&uuid);
+    if u.is_some(){
+      let p = user_to_peer(u.unwrap(), uuid.to_owned());
+      if p.get_bool("tcp") { c.put_str(&uuid, &("tcp#".to_string()+&p.get_string("address"))); }
+      else if p.get_bool("udp") { c.put_str(&uuid, &("udp#".to_string()+&p.get_string("address"))); }
+      else if p.get_bool("connected") { c.put_str(&uuid, "relay#"); }
+    }
+  }
+}
 
 o
