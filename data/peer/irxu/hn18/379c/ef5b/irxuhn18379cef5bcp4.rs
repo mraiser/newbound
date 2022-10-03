@@ -3,8 +3,145 @@
 }
 
 #[derive(Debug)]
+pub struct RelayStream {
+  from: String,
+  to: String,
+  buf: Vec<Vec<u8>>,
+}
+
+impl RelayStream {
+  pub fn new(from:String, to:String) -> RelayStream {
+    RelayStream{
+      from:from,
+      to:to,
+      buf:Vec::new(),
+    }
+  }
+}
+
+#[derive(Debug)]
+pub enum P2PStream {
+  Tcp(TcpStream),
+  Relay(RelayStream),
+}
+
+impl P2PStream {
+  pub fn is_tcp(&self) -> bool {
+    match self {
+      P2PStream::Tcp(stream) => true,
+      P2PStream::Relay(stream) => false,
+    }
+  }
+  
+  pub fn is_relay(&self) -> bool {
+    match self {
+      P2PStream::Tcp(stream) => false,
+      P2PStream::Relay(stream) => true,
+    }
+  }
+  
+  pub fn try_clone(&self) -> io::Result<P2PStream> {
+    match self {
+      P2PStream::Tcp(stream) => {
+        let s2 = stream.try_clone()?;
+        Ok(P2PStream::Tcp(s2))
+      },
+      P2PStream::Relay(stream) => {
+        Ok(P2PStream::Relay(RelayStream::new(stream.from.to_string(), stream.to.to_string())))
+      },
+    }
+  }
+  
+  pub fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    match self {
+      P2PStream::Tcp(stream) => {
+        stream.write(buf)
+      },
+      P2PStream::Relay(stream) => {
+        let from = &stream.from;
+        let to = &stream.to;
+        
+        let user = get_user(&from);
+        if user.is_some(){
+          // FIXME - The code that calls us also locks the same heap. Will deadlock.
+          let mut heap = P2PHEAP.get().write().unwrap();
+          
+          let user = user.unwrap();
+          for con in user.get_array("connections").objects(){  // FIXME - replace with get_tcp()
+            let conid = con.int();
+            let con = heap.get(conid as usize);
+            if con.stream.is_tcp() {
+              let cipher = con.cipher.to_owned();
+              let mut stream = con.stream.try_clone().unwrap();
+              let mut bytes = ("fwd ".to_string()+&to).as_bytes().to_vec();
+              bytes.extend_from_slice(buf);
+              
+              let buf = encrypt(&cipher, &bytes);
+              let len = buf.len() as i16;
+              let x = stream.write(&len.to_be_bytes()).unwrap();
+              let y = stream.write(&buf).unwrap();
+              return Ok(x+y);
+            }
+          }
+          panic!("No route to relay {}", from);
+        }
+        panic!("No such relay {}", from);
+      },
+    }
+  }
+  
+  pub fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
+    match self {
+      P2PStream::Tcp(stream) => {
+        stream.read_exact(buf)
+      },
+      P2PStream::Relay(stream) => {
+        let len = buf.len();
+        let mut i = 0;
+        let mut v = Vec::new();
+        while i < len {
+          
+          // FIXME - block if no data available
+          
+          let mut bytes = &mut stream.buf[0];
+          let n = std::cmp::min(bytes.len(), len-i);
+          v.extend_from_slice(&bytes[0..n]);
+          i += n;
+          let bytes = &mut bytes[n..].to_vec();
+          if bytes.len() > 0 { stream.buf[0] = bytes.to_vec(); }
+          else { stream.buf.remove(0); }
+          
+          // FIXME - check this.
+          
+          
+          
+          
+          
+          
+          
+          
+        }        
+        buf.clone_from_slice(&v);
+        Ok(())
+      },
+    }
+  }
+  
+  pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+    match self {
+      P2PStream::Tcp(stream) => {
+        stream.peer_addr()
+      },
+      P2PStream::Relay(stream) => {
+        panic!("Not implemented");
+      },
+    }
+  }
+}
+
+#[derive(Debug)]
 pub struct P2PConnection {
-  pub stream: TcpStream,
+  pub stream: P2PStream,
   pub sessionid: String,
   pub cipher: Aes256,
   pub uuid: String,
@@ -14,7 +151,7 @@ pub struct P2PConnection {
 static START: Once = Once::new();
 pub static P2PHEAP:Storage<RwLock<Heap<P2PConnection>>> = Storage::new();
 
-pub fn handshake(stream: &mut TcpStream, peer: Option<String>) -> Option<P2PConnection> {
+pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<P2PConnection> {
   let system = DataStore::globals().get_object("system");
   let runtime = system.get_object("apps").get_object("app").get_object("runtime");
   let my_uuid = runtime.get_string("uuid");
@@ -172,10 +309,12 @@ fn do_listen(ipaddr:String, port:i64) -> String {
   println!("P2P TCP listening on port {}", port);
 
   for stream in listener.incoming() {
-    let mut stream = stream.unwrap();
+    let stream = stream.unwrap();
     thread::spawn(move || {
       let remote_addr = stream.peer_addr().unwrap();
       println!("P2P TCP incoming request from {}", remote_addr);
+      
+      let mut stream = P2PStream::Tcp(stream);
       
       let con = handshake(&mut stream, None);
       if con.is_some() {
@@ -234,15 +373,24 @@ pub fn handle_connection(con:P2PConnection) {
     bytes.resize(len, 0);
     let _x = stream.read_exact(&mut bytes).unwrap();
     let bytes = decrypt(&cipher, &bytes);
-    let msg = String::from_utf8(bytes).unwrap();
-    let msg = msg.trim_matches(char::from(0));
+    let method = String::from_utf8(bytes[0..4].to_vec()).unwrap();
 
     session.put_i64("expire", time() + sessiontimeoutmillis);
     let count = session.get_i64("count") + 1;
     session.put_i64("count", count);
 
-    if msg.starts_with("cmd ") {
-      let msg = &msg[4..];
+    if method == "fwd ".to_string() {
+      let uuid = std::str::from_utf8(&bytes[4..40]);
+      let bytes = &bytes[40..];
+      
+      
+      // FIXME
+      
+      
+    }
+    else if method == "cmd ".to_string() {
+      let msg = String::from_utf8(bytes[4..].to_vec()).unwrap();
+      let msg = msg.trim_matches(char::from(0));
       let d = DataObject::from_string(msg);
       let mut params = d.get_object("params");
       params.put_str("nn_sessionid", &sessionid);
@@ -263,14 +411,15 @@ pub fn handle_connection(con:P2PConnection) {
         let _x = stream.write(&buf).unwrap();
       });
     }
-    else if msg.starts_with("res ") {
-      let msg = &msg[4..];
+    else if method == "res ".to_string() {
+      let msg = String::from_utf8(bytes[4..].to_vec()).unwrap();
+      let msg = msg.trim_matches(char::from(0));
       let d = DataObject::from_string(msg);
       let i = d.get_i64("pid");
       res.put_object(&i.to_string(), d);
     }
     else {
-      println!("Unknown message type: {}", msg);
+      println!("Unknown message type: {}", method);
     }
   }
   // end loop
