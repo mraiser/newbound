@@ -32,6 +32,8 @@ use std::io;
 use std::net::SocketAddr;
 use std::hint::spin_loop;
 use std::thread::yield_now;
+use ndata::dataarray::DataArray;
+use ndata::databytes::DataBytes;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("ipaddr");
@@ -54,7 +56,7 @@ pub static P2PHEAP:Storage<RwLock<Heap<P2PConnection>>> = Storage::new();
 pub struct RelayStream {
   from: String,
   to: String,
-  buf: Vec<Vec<u8>>,
+  buf: DataArray,
 }
 
 impl RelayStream {
@@ -62,7 +64,7 @@ impl RelayStream {
     RelayStream{
       from:from,
       to:to,
-      buf:Vec::new(),
+      buf:DataArray::new(),
     }
   }
 }
@@ -151,12 +153,13 @@ impl P2PStream {
           }
           println!("doing read {:?}, {}, {}, {}", stream, i, len, stream.buf.len());
           
-          let mut bytes = &mut stream.buf[0];
+          let mut bd = &mut stream.buf.get_bytes(0);
+          let mut bytes = bd.get_data();
           let n = std::cmp::min(bytes.len(), len-i);
           v.extend_from_slice(&bytes[0..n]);
           let bytes = bytes[n..].to_vec();
-          if bytes.len() > 0 { stream.buf[0] = bytes; }
-          else { stream.buf.remove(0); }
+          if bytes.len() > 0 { bd.set_data(&bytes); }
+          else { stream.buf.remove_property(0); }
           i += n;
         }        
         buf.clone_from_slice(&v);
@@ -548,7 +551,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     let con = relay(&uuid, &uuid2, true).unwrap();  
 	if let P2PStream::Relay(mut stream) = con.stream.try_clone().unwrap() {
       println!("pushing con {:?}", con);
-      stream.buf.push(buf.to_vec());
+      stream.buf.push_bytes(DataBytes::from_bytes(&buf.to_vec()));
       handle_next_message(con);
     }
   }

@@ -10,9 +10,9 @@ crate-type = ["rlib", "dylib"]
 serde_support = ["serde","serde_json","flowlang/serde_support","ndata/serde_support"]
 
 [dependencies]
-flowlang = { version = "0.1.26" }
+flowlang = { version = "0.1.27" }
 #flowlang = { path = "../../../rust/flow" }
-ndata="0.2.9"
+ndata="0.2.10"
 #ndata = { path = "../../../rust/ndata" }
 state="0.5.3"
 zip = { version="0.6.2", features=["deflate-miniz"] }
