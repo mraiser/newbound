@@ -172,7 +172,9 @@ impl P2PConnection {
 
 pub fn get_tcp(user:DataObject) -> Option<P2PConnection> {
   let mut heap = P2PHEAP.get().write().unwrap();
-  for con in user.get_array("connections").objects(){
+  let cons = user.get_array("connections");
+//  println!("heap {:?} cons {}", heap, cons.to_string());
+  for con in cons.objects(){
     let conid = con.int();
     let con = heap.get(conid as usize);
     if con.stream.is_tcp() {
@@ -462,6 +464,13 @@ pub fn handle_connection(con:P2PConnection) {
   }
   // end loop
 
+  let mut users = DataStore::globals().get_object("system").get_object("users");
+  for (uuid2,_u) in users.objects() {
+    if (uuid2.len() == 36 && uuid != uuid2) {
+      relay(&uuid, &uuid2, false);
+    }
+  }
+  
   sessions.remove_property(&sessionid);
   let _x = connections.remove_data(Data::DInt(data_ref as i64));
   P2PHEAP.get().write().unwrap().decr(data_ref);
