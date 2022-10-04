@@ -568,12 +568,24 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       
       let buf: [u8; 2] = bytes[44..46].try_into().unwrap();
       let len2 = i16::from_be_bytes(buf) as usize;
-      let buf = &bytes[46..];
+      let bytes = &bytes[46..];
+      let buf: [u8; 2] = bytes[..2].try_into().unwrap();
+      let len3 = i16::from_be_bytes(buf) as usize;
+      println!("len {} {} {}", bytes.len(), len2, len3);
+      
 //      println!("buf len 1 {}", buf.len());
 //      let buf = &buf[..len2];
 //      println!("buf len 1 {}", buf.len());
+      
+      
+/*      
 
       let user = get_user(uuid2).unwrap();
+      
+      
+      
+      
+      
       
       // FIXME - move cipher generation to its own function
       let system = DataStore::globals().get_object("system");
@@ -593,10 +605,21 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       
       let mut bytes = decrypt(&cipher, &buf);
       println!("ERR DATA {}", to_hex(&bytes));
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
       let s = String::from_utf8(bytes).unwrap();
       println!("ERR STRING {}", s);
       
-      
+*/      
       
       
       
