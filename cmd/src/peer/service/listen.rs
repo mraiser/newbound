@@ -241,8 +241,8 @@ pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
       if stream.from == from && stream.to == to {
         if connected { return Some(con.duplicate()); }
         // FIXME - remove session
-        heap.decr(conid);
         cons.remove_data(Data::DInt(conid as i64));
+        heap.decr(conid);
       }
     }
   }
