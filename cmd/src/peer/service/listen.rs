@@ -616,9 +616,9 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       let buf: [u8; 2] = bytes[44..46].try_into().unwrap();
       let len2 = i16::from_be_bytes(buf) as usize;
       let buf = &bytes[46..];
-      println!("buf len 1 {}", buf.len());
-      let buf = &buf[..len2];
-      println!("buf len 1 {}", buf.len());
+//      println!("buf len 1 {}", buf.len());
+//      let buf = &buf[..len2];
+//      println!("buf len 1 {}", buf.len());
 
       let user = get_user(uuid2).unwrap();
       
