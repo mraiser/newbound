@@ -563,26 +563,16 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     if cmd == "fwd " {
       let uuid2 = String::from_utf8(bytes[8..44].to_vec()).unwrap();
       let uuid2 = uuid2.trim_matches(char::from(0));
-      relay(&uuid, &uuid2, false);
-      println!("ERR FWD {} -> {}", uuid, uuid2);
       
       let buf: [u8; 2] = bytes[44..46].try_into().unwrap();
-      let len2 = i16::from_be_bytes(buf) as usize;
+      let len2 = i16::from_be_bytes(buf) as usize; // FIXME - Ignored, don't send
       let bytes = &bytes[46..];
       let buf: [u8; 2] = bytes[..2].try_into().unwrap();
       let len3 = i16::from_be_bytes(buf) as usize;
-      println!("len {} {} {}", bytes.len(), len2, len3);
-      
       let buf = &bytes[2..];
       let buf = &buf[..len3];
-      
 
       let user = get_user(uuid2).unwrap();
-      
-      
-      
-      
-      
       
       // FIXME - move cipher generation to its own function
       let system = DataStore::globals().get_object("system");
@@ -601,28 +591,19 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       let cipher = Aes256::new(&key);
       
       let mut bytes = decrypt(&cipher, &buf);
-      println!("ERR DATA {}", to_hex(&bytes));
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
       let s = String::from_utf8(bytes).unwrap();
-      println!("ERR STRING {}", s);
+      println!("ERR FWD {}", s);
+      let o = DataObject::from_string(&s[4..]);
+      let pid = o.get_i64("pid");
+      let pid = &pid.to_string();
+      let mut con = relay(&uuid, &uuid2, true).unwrap();
       
+      let mut err = DataObject::new();
+      err.put_str("status", "err");
+      err.put_str("msg", "No route to host");
+      con.res.put_object(&pid, err);
       
-      
-      
-      
-      
-      
-      
+      relay(&uuid, &uuid2, false);
     }
   }
   else if method == "cmd ".to_string() {
