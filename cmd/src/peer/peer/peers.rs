@@ -1,6 +1,7 @@
 use ndata::dataobject::*;
 use flowlang::datastore::DataStore;
 use ndata::dataarray::DataArray;
+use crate::peer::service::listen::get_tcp;
 
 pub fn execute(_o: DataObject) -> DataObject {
 let ax = peers();
@@ -47,7 +48,7 @@ pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
   
   let relays = get_relays(id);
   
-  let tcp = o.get_array("connections").len()>0;
+  let tcp = get_tcp(o.duplicate()).is_some();
   let udp = false;
   let relay = relays.len()>0;
   let connected = tcp || udp || relay;
