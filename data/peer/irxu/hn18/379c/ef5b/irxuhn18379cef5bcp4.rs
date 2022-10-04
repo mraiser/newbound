@@ -529,18 +529,29 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     let uuid2 = std::str::from_utf8(&bytes[4..40]).unwrap();
     let buf = &bytes[40..];
 
-    let con = get_tcp(get_user(&uuid2).unwrap()).unwrap();
-    let cipher = con.cipher;
-    let mut stream = con.stream;
+    let con = get_tcp(get_user(&uuid2).unwrap());
+    if con.is_some() {
+      let con = con.unwrap();
+      let cipher = con.cipher;
+      let mut stream = con.stream;
 
-    let mut bytes = ("rcv ".to_string()+&uuid).as_bytes().to_vec();
-    bytes.extend_from_slice(buf);
+      let mut bytes = ("rcv ".to_string()+&uuid).as_bytes().to_vec();
+      bytes.extend_from_slice(buf);
 
-    let buf = encrypt(&cipher, &bytes);
-    let len = buf.len() as i16;
-    let mut bytes = len.to_be_bytes().to_vec();
-    bytes.extend_from_slice(&buf);
-    let _x = stream.write(&bytes).unwrap();
+      let buf = encrypt(&cipher, &bytes);
+      let len = buf.len() as i16;
+      let mut bytes = len.to_be_bytes().to_vec();
+      bytes.extend_from_slice(&buf);
+      let _x = stream.write(&bytes).unwrap();
+    }
+    else {
+      let s = "err fwd ".to_string() + &uuid2;
+      let buf = encrypt(&cipher, s.as_bytes());
+      let len = buf.len() as i16;
+      let mut bytes = len.to_be_bytes().to_vec();
+      bytes.extend_from_slice(&buf);
+      let _x = stream.write(&bytes).unwrap();
+    }
   }
   else if method == "cmd ".to_string() {
     let msg = String::from_utf8(bytes[4..].to_vec()).unwrap();
