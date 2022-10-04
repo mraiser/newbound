@@ -103,7 +103,6 @@ impl P2PStream {
       },
       P2PStream::Relay(stream) => {
         let len = buf.len();
-        println!("READ asked for {}", len);
         let mut i = 0;
         let mut v = Vec::new();
         while i < len {
@@ -514,7 +513,6 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     let con = relay(&uuid, &uuid2, true).unwrap();  
 	if let P2PStream::Relay(mut stream) = con.stream.try_clone().unwrap() {
       stream.buf.push_bytes(DataBytes::from_bytes(&buf.to_vec()));
-      println!("RCV pushed bytes {}", buf.len());
       handle_next_message(con);
     }
   }
