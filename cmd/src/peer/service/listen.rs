@@ -143,11 +143,13 @@ impl P2PStream {
         let len = buf.len();
         let mut i = 0;
         let mut v = Vec::new();
+        println!("begin read {:?}, {}, {}, {}", stream, i, len, stream.buf.len());
         while i < len {
           while stream.buf.len() == 0 {
             spin_loop();
             yield_now();
           }
+          println!("doing read {:?}, {}, {}, {}", stream, i, len, stream.buf.len());
           
           let mut bytes = &mut stream.buf[0];
           let n = std::cmp::min(bytes.len(), len-i);
@@ -158,6 +160,7 @@ impl P2PStream {
           i += n;
         }        
         buf.clone_from_slice(&v);
+        println!("read done {:?}", stream);
         Ok(())
       },
     }
