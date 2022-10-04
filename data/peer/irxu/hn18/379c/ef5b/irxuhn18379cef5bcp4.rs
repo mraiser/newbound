@@ -508,7 +508,8 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     
     let bytes: [u8; 2] = buf[0..2].try_into().unwrap();
     let len2 = i16::from_be_bytes(bytes) as usize;
-    println!("RCV len {} len2 {}", len, len2);
+    let mut buf = buf.to_vec();
+    buf.resize(len2+2,0);
     
     let con = relay(&uuid, &uuid2, true).unwrap();  
 	if let P2PStream::Relay(mut stream) = con.stream.try_clone().unwrap() {
