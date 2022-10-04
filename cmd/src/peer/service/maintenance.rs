@@ -8,15 +8,17 @@ use flowlang::generated::flowlang::system::time::time;
 use ndata::dataarray::DataArray;
 use flowlang::appserver::fire_event;
 use crate::peer::peer::peers::user_to_peer;
+use flowlang::datastore::DataStore;
+use crate::peer::service::listen::relay;
 
 pub fn execute(_o: DataObject) -> DataObject {
 let ax = maintenance();
 let mut o = DataObject::new();
-o.put_object("a", ax);
+o.put_str("a", &ax);
 o
 }
 
-pub fn maintenance() -> DataObject {
+pub fn maintenance() -> String {
 let users = users();
 let mut ask = DataArray::new();
 for (uuid, user) in users.objects(){
@@ -63,18 +65,35 @@ for (uuid, user) in users.objects(){
           user.put_str("session_id", &o.get_string("session_id"));
           user.put_i64("http_port", o.get_i64("http_port"));
           user.put_i64("p2p_port", o.get_i64("p2p_port"));
-          user.put_object("peers", o.get_object("connections"));
+          
+          let cons = o.get_object("connections");
+          user.put_object("peers", cons.duplicate());
+          
+          let mut users = DataStore::globals().get_object("system").get_object("users");
+          for (uuid2,_u) in users.objects() {
+            if (uuid2.len() == 36 && uuid != uuid2) {
+              let b = cons.has(&uuid2) && cons.get_string(&uuid2).starts_with("tcp#");
+              relay(&uuid, &uuid2, b);
+            }
+          }
+          
           // Fixme - notify if something changes (latency?)
           fire_event("peer", "UPDATE", user_to_peer(user, uuid));
         }
       });
     }
     else {
+      let mut users = DataStore::globals().get_object("system").get_object("users");
+      for (uuid2,_u) in users.objects() {
+        if (uuid2.len() == 36 && uuid != uuid2) {
+          relay(&uuid, &uuid2, false);
+        }
+      }
       // FIXME - notify on relay add
       fire_event("peer", "UPDATE", user_to_peer(user, uuid));
     }
   }
 }
-DataObject::new()
+"OK".to_string()
 }
 

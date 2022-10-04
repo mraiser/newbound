@@ -2,6 +2,9 @@
   do_listen(ipaddr, port)
 }
 
+static START: Once = Once::new();
+pub static P2PHEAP:Storage<RwLock<Heap<P2PConnection>>> = Storage::new();
+
 #[derive(Debug)]
 pub struct RelayStream {
   from: String,
@@ -63,25 +66,21 @@ impl P2PStream {
         
         let user = get_user(&from);
         if user.is_some(){
-          // FIXME - The code that calls us also locks the same heap. Will deadlock.
-          let mut heap = P2PHEAP.get().write().unwrap();
-          
           let user = user.unwrap();
-          for con in user.get_array("connections").objects(){  // FIXME - replace with get_tcp()
-            let conid = con.int();
-            let con = heap.get(conid as usize);
-            if con.stream.is_tcp() {
-              let cipher = con.cipher.to_owned();
-              let mut stream = con.stream.try_clone().unwrap();
-              let mut bytes = ("fwd ".to_string()+&to).as_bytes().to_vec();
-              bytes.extend_from_slice(buf);
-              
-              let buf = encrypt(&cipher, &bytes);
-              let len = buf.len() as i16;
-              let x = stream.write(&len.to_be_bytes()).unwrap();
-              let y = stream.write(&buf).unwrap();
-              return Ok(x+y);
-            }
+          let con = get_tcp(user);
+          if con.is_some(){
+            let con = con.unwrap();
+            let cipher = con.cipher;
+            let mut stream = con.stream;
+            let mut bytes = ("fwd ".to_string()+&to).as_bytes().to_vec();
+            bytes.extend_from_slice(buf);
+
+            let buf = encrypt(&cipher, &bytes);
+            let len = buf.len() as i16;
+            let mut bytes = len.to_be_bytes().to_vec();
+            bytes.extend_from_slice(&buf);
+            let x = stream.write(&bytes)?;
+            return Ok(x);
           }
           panic!("No route to relay {}", from);
         }
@@ -100,26 +99,18 @@ impl P2PStream {
         let mut i = 0;
         let mut v = Vec::new();
         while i < len {
-          
-          // FIXME - block if no data available
+          while stream.buf.len() == 0 {
+            spin_loop();
+            yield_now();
+          }
           
           let mut bytes = &mut stream.buf[0];
           let n = std::cmp::min(bytes.len(), len-i);
           v.extend_from_slice(&bytes[0..n]);
-          i += n;
-          let bytes = &mut bytes[n..].to_vec();
-          if bytes.len() > 0 { stream.buf[0] = bytes.to_vec(); }
+          let bytes = bytes[n..].to_vec();
+          if bytes.len() > 0 { stream.buf[0] = bytes; }
           else { stream.buf.remove(0); }
-          
-          // FIXME - check this.
-          
-          
-          
-          
-          
-          
-          
-          
+          i += n;
         }        
         buf.clone_from_slice(&v);
         Ok(())
@@ -137,6 +128,17 @@ impl P2PStream {
       },
     }
   }
+  
+  pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+    match self {
+      P2PStream::Tcp(stream) => {
+        stream.peek(buf)
+      },
+      P2PStream::Relay(stream) => {
+        panic!("Not implemented");
+      },
+    }
+  }
 }
 
 #[derive(Debug)]
@@ -148,14 +150,83 @@ pub struct P2PConnection {
   pub res: DataObject,
 }
 
-static START: Once = Once::new();
-pub static P2PHEAP:Storage<RwLock<Heap<P2PConnection>>> = Storage::new();
+impl P2PConnection {
+  pub fn duplicate(&self) -> P2PConnection {
+    P2PConnection{
+      stream: self.stream.try_clone().unwrap(),
+      sessionid: self.sessionid.to_owned(),
+      cipher: self.cipher.to_owned(),
+      uuid: self.uuid.to_owned(),
+      res: self.res.duplicate(),
+    }
+  }
+}
+
+pub fn get_tcp(user:DataObject) -> Option<P2PConnection> {
+  let mut heap = P2PHEAP.get().write().unwrap();
+  for con in user.get_array("connections").objects(){
+    let conid = con.int();
+    let con = heap.get(conid as usize);
+    if con.stream.is_tcp() {
+      return Some(con.duplicate());
+    }
+  }
+  None
+}
+
+pub fn relay(from:&str, to:&str, connected:bool) {
+  let mut heap = P2PHEAP.get().write().unwrap();
+  let user = get_user(to).unwrap();
+  let mut cons = user.get_array("connections");
+  for con in cons.objects(){
+    let conid = con.int() as usize;
+    let con = heap.get(conid);
+    if let P2PStream::Relay(stream) = &con.stream {
+      if stream.from == from && stream.to == to {
+        if connected { return; }
+        heap.decr(conid);
+        cons.remove_data(Data::DInt(conid as i64));
+      }
+    }
+  }
+  if connected {
+    // FIXME - move cipher generation to its own function
+    let system = DataStore::globals().get_object("system");
+    let runtime = system.get_object("apps").get_object("app").get_object("runtime");
+    let my_private = runtime.get_string("privatekey");
+    let my_private = decode_hex(&my_private).unwrap();
+    let my_private: [u8; 32] = my_private.try_into().expect("slice with incorrect length");
+    let my_private = StaticSecret::from(my_private);
+    
+    let peer_public = user.get_string("publickey");
+    let peer_public = decode_hex(&peer_public).unwrap();
+    let peer_public: [u8; 32] = peer_public.try_into().expect("slice with incorrect length");
+    let peer_public = PublicKey::from(peer_public);
+    let shared_secret = my_private.diffie_hellman(&peer_public);
+    let key = GenericArray::from(shared_secret.to_bytes());
+    let cipher = Aes256::new(&key);
+    
+    let stream = RelayStream::new(from.to_string(), to.to_string());
+    let stream = P2PStream::Relay(stream);
+    
+    let con = P2PConnection{
+      stream: stream,
+      sessionid: unique_session_id(),
+      cipher: cipher,
+      uuid: from.to_string(),
+      res: DataObject::new(),
+    };
+    
+	cons.push_i64(heap.push(con)as i64);
+  }
+}
 
 pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<P2PConnection> {
   let system = DataStore::globals().get_object("system");
   let runtime = system.get_object("apps").get_object("app").get_object("runtime");
   let my_uuid = runtime.get_string("uuid");
 
+  // FIXME - move cipher generation to its own function
   let my_public = runtime.get_string("publickey");
   let my_private = runtime.get_string("privatekey");
   let my_private = decode_hex(&my_private).unwrap();
@@ -385,7 +456,7 @@ pub fn handle_connection(con:P2PConnection) {
       
       
       // FIXME
-      
+      println!("WRITEME");
       
     }
     else if method == "cmd ".to_string() {
@@ -406,9 +477,10 @@ pub fn handle_connection(con:P2PConnection) {
         let buf = encrypt(&cipher, s.as_bytes());
         let len = buf.len() as i16;
         
-        let _lock = P2PHEAP.get().write().unwrap();
-        let _x = stream.write(&len.to_be_bytes()).unwrap();
-        let _x = stream.write(&buf).unwrap();
+//        let _lock = P2PHEAP.get().write().unwrap();
+        let mut bytes = len.to_be_bytes().to_vec();
+        bytes.extend_from_slice(&buf);
+        let _x = stream.write(&bytes).unwrap();
       });
     }
     else if method == "res ".to_string() {
