@@ -230,6 +230,7 @@ pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
     if let P2PStream::Relay(stream) = &con.stream {
       if stream.from == from && stream.to == to {
         if connected { return Some(con.duplicate()); }
+        // FIXME - remove session
         heap.decr(conid);
         cons.remove_data(Data::DInt(conid as i64));
       }
@@ -255,13 +256,27 @@ pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
     let stream = RelayStream::new(from.to_string(), to.to_string());
     let stream = P2PStream::Relay(stream);
     
+    let sessionid = unique_session_id();
     let con = P2PConnection{
       stream: stream,
-      sessionid: unique_session_id(),
+      sessionid: sessionid.to_owned(),
       cipher: cipher,
-      uuid: from.to_string(),
+      uuid: to.to_string(),
       res: DataObject::new(),
     };
+    
+    let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
+
+    let mut session = DataObject::new();
+    session.put_i64("count", 0);
+    session.put_str("id", &sessionid);
+    session.put_str("username", &to);
+    session.put_object("user", user.duplicate());
+    let expire = time() + sessiontimeoutmillis;
+    session.put_i64("expire", expire);
+
+    let mut sessions = system.get_object("sessions");
+    sessions.put_object(&sessionid, session.duplicate());
     
 	cons.push_i64(heap.push(con.duplicate())as i64);
     return Some(con.duplicate());
