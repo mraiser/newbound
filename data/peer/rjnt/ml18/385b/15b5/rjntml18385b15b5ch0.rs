@@ -62,12 +62,14 @@ for (uuid, user) in users.objects(){
       });
     }
     else {
+      /*
       let mut users = DataStore::globals().get_object("system").get_object("users");
       for (uuid2,_u) in users.objects() {
         if (uuid2.len() == 36 && uuid != uuid2) {
           relay(&uuid, &uuid2, false);
         }
       }
+      */
       // FIXME - notify on relay add
       fire_event("peer", "UPDATE", user_to_peer(user, uuid));
     }
