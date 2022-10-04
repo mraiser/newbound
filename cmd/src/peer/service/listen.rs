@@ -639,6 +639,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       
       let mut bytes = decrypt(&cipher, &buf);
       let s = String::from_utf8(bytes).unwrap();
+      let s = s.trim_matches(char::from(0));
       println!("ERR FWD {}", s);
       let o = DataObject::from_string(&s[4..]);
       let pid = o.get_i64("pid");
