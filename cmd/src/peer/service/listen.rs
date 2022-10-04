@@ -618,6 +618,31 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       let buf = &bytes[46..];
       let buf = &buf[..len2];
       println!("ERR DATA {}", to_hex(&buf.to_vec()));
+      let user = get_user(uuid2).unwrap();
+      
+      // FIXME - move cipher generation to its own function
+      let system = DataStore::globals().get_object("system");
+      let runtime = system.get_object("apps").get_object("app").get_object("runtime");
+      let my_private = runtime.get_string("privatekey");
+      let my_private = decode_hex(&my_private).unwrap();
+      let my_private: [u8; 32] = my_private.try_into().expect("slice with incorrect length");
+      let my_private = StaticSecret::from(my_private);
+
+      let peer_public = user.get_string("publickey");
+      let peer_public = decode_hex(&peer_public).unwrap();
+      let peer_public: [u8; 32] = peer_public.try_into().expect("slice with incorrect length");
+      let peer_public = PublicKey::from(peer_public);
+      let shared_secret = my_private.diffie_hellman(&peer_public);
+      let key = GenericArray::from(shared_secret.to_bytes());
+      let cipher = Aes256::new(&key);
+      
+      let mut bytes = decrypt(&cipher, &buf);
+      let s = String::from_utf8(bytes).unwrap();
+      println!("ERR STRING {}", s);
+      
+      
+      
+      
       
       
       
