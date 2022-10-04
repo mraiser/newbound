@@ -105,13 +105,11 @@ impl P2PStream {
         let len = buf.len();
         let mut i = 0;
         let mut v = Vec::new();
-        println!("begin read {:?}, {}, {}, {}", stream, i, len, stream.buf.len());
         while i < len {
           while stream.buf.len() == 0 {
             spin_loop();
             yield_now();
           }
-          println!("doing read {:?}, {}, {}, {}", stream, i, len, stream.buf.len());
           
           let mut bd = &mut stream.buf.get_bytes(0);
           let mut bytes = bd.get_data();
@@ -123,7 +121,6 @@ impl P2PStream {
           i += n;
         }        
         buf.clone_from_slice(&v);
-        println!("read done {:?}", stream);
         Ok(())
       },
     }
@@ -504,15 +501,13 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
   let count = session.get_i64("count") + 1;
   session.put_i64("count", count);
 
-  println!("checking session {}", sessionid);
   if method == "rcv " {
     let uuid2 = std::str::from_utf8(&bytes[4..40]).unwrap();
     let buf = &bytes[40..];
     let con = relay(&uuid, &uuid2, true).unwrap();  
 	if let P2PStream::Relay(mut stream) = con.stream.try_clone().unwrap() {
-      println!("pushing con {:?}", con);
       stream.buf.push_bytes(DataBytes::from_bytes(&buf.to_vec()));
-      println!("pushed bytes {:0x?}", stream.buf.get_bytes(0).get_data());
+      println!("pushed bytes {:0x?}, {:?}", buf, con);
       handle_next_message(con);
     }
   }
