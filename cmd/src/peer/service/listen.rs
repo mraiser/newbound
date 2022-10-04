@@ -67,6 +67,13 @@ impl RelayStream {
       buf:DataArray::new(),
     }
   }
+  pub fn duplicate(&self) -> RelayStream {
+    RelayStream{
+      from:self.from.to_owned(),
+      to:self.to.to_owned(),
+      buf:self.buf.duplicate(),
+    }
+  }
 }
 
 #[derive(Debug)]
@@ -97,7 +104,7 @@ impl P2PStream {
         Ok(P2PStream::Tcp(s2))
       },
       P2PStream::Relay(stream) => {
-        Ok(P2PStream::Relay(RelayStream::new(stream.from.to_string(), stream.to.to_string())))
+        Ok(P2PStream::Relay(stream.duplicate()))
       },
     }
   }
