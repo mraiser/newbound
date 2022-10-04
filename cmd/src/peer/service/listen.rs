@@ -219,7 +219,8 @@ pub fn get_tcp(user:DataObject) -> Option<P2PConnection> {
   None
 }
 
-pub fn relay(from:&str, to:&str, connected:bool) {
+pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
+  //FIXME - Fire peer UPDATE, CONNECT & DISCONNECT events
   let mut heap = P2PHEAP.get().write().unwrap();
   let user = get_user(to).unwrap();
   let mut cons = user.get_array("connections");
@@ -228,7 +229,7 @@ pub fn relay(from:&str, to:&str, connected:bool) {
     let con = heap.get(conid);
     if let P2PStream::Relay(stream) = &con.stream {
       if stream.from == from && stream.to == to {
-        if connected { return; }
+        if connected { return Some(con.duplicate()); }
         heap.decr(conid);
         cons.remove_data(Data::DInt(conid as i64));
       }
@@ -262,8 +263,10 @@ pub fn relay(from:&str, to:&str, connected:bool) {
       res: DataObject::new(),
     };
     
-	cons.push_i64(heap.push(con)as i64);
+	cons.push_i64(heap.push(con.duplicate())as i64);
+    return Some(con.duplicate());
   }
+  None
 }
 
 pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<P2PConnection> {
@@ -463,7 +466,7 @@ pub fn handle_connection(con:P2PConnection) {
   let mut sessions = system.get_object("sessions");
   sessions.put_object(&sessionid, session.duplicate());
 
-  let data_ref = P2PHEAP.get().write().unwrap().push(con);
+  let data_ref = P2PHEAP.get().write().unwrap().push(con.duplicate());
   let mut connections = user.get_array("connections");
   connections.push_i64(data_ref as i64);
 
@@ -477,88 +480,7 @@ pub fn handle_connection(con:P2PConnection) {
   
   // loop
   while system.get_bool("running") {
-    let mut bytes = vec![0u8; 2];
-    let x = stream.read_exact(&mut bytes);
-    if x.is_err() { 
-      break; 
-    }
-
-    let bytes: [u8; 2] = bytes.try_into().unwrap();
-    let len = i16::from_be_bytes(bytes) as usize;
-    let mut bytes:Vec<u8> = Vec::with_capacity(len);
-    bytes.resize(len, 0);
-    let _x = stream.read_exact(&mut bytes).unwrap();
-    let bytes = decrypt(&cipher, &bytes);
-    let method = String::from_utf8(bytes[0..4].to_vec()).unwrap();
-
-    session.put_i64("expire", time() + sessiontimeoutmillis);
-    let count = session.get_i64("count") + 1;
-    session.put_i64("count", count);
-
-    if method == "rcv " {
-      
-      
-      
-      // FIXME
-      println!("WRITE RELAY RCV");
-      
-      
-      
-      
-      
-      
-    }
-    else if method == "fwd ".to_string() {
-      let uuid2 = std::str::from_utf8(&bytes[4..40]).unwrap();
-      let buf = &bytes[40..];
-      
-      let con = get_tcp(get_user(&uuid2).unwrap()).unwrap();
-      let cipher = con.cipher;
-      let mut stream = con.stream;
-      
-      let mut bytes = ("rcv ".to_string()+&uuid).as_bytes().to_vec();
-      bytes.extend_from_slice(buf);
-
-      let buf = encrypt(&cipher, &bytes);
-      let len = buf.len() as i16;
-      let mut bytes = len.to_be_bytes().to_vec();
-      bytes.extend_from_slice(&buf);
-      let _x = stream.write(&bytes).unwrap();
-    }
-    else if method == "cmd ".to_string() {
-      let msg = String::from_utf8(bytes[4..].to_vec()).unwrap();
-      let msg = msg.trim_matches(char::from(0));
-      let d = DataObject::from_string(msg);
-      let mut params = d.get_object("params");
-      params.put_str("nn_sessionid", &sessionid);
-      params.put_object("nn_session", session.duplicate());
-      
-      let mut stream = stream.try_clone().unwrap();
-      let cipher = cipher.to_owned();
-      let sessionid = sessionid.to_owned();
-      thread::spawn(move || {
-        let o = handle_command(d, sessionid);
-
-        let s = "res ".to_string() + &o.to_string();
-        let buf = encrypt(&cipher, s.as_bytes());
-        let len = buf.len() as i16;
-        
-//        let _lock = P2PHEAP.get().write().unwrap();
-        let mut bytes = len.to_be_bytes().to_vec();
-        bytes.extend_from_slice(&buf);
-        let _x = stream.write(&bytes).unwrap();
-      });
-    }
-    else if method == "res ".to_string() {
-      let msg = String::from_utf8(bytes[4..].to_vec()).unwrap();
-      let msg = msg.trim_matches(char::from(0));
-      let d = DataObject::from_string(msg);
-      let i = d.get_i64("pid");
-      res.put_object(&i.to_string(), d);
-    }
-    else {
-      println!("Unknown message type: {}", method);
-    }
+    if !handle_next_message(con.duplicate()) { break; }
   }
   // end loop
 
@@ -570,6 +492,98 @@ pub fn handle_connection(con:P2PConnection) {
   let peer = user_to_peer(user.duplicate(), uuid.to_owned());
   fire_event("peer", "DISCONNECT", peer.duplicate());
   fire_event("peer", "UPDATE", peer.duplicate());
+}
+
+pub fn handle_next_message(con:P2PConnection) -> bool {
+  let mut stream = con.stream;
+  let cipher = con.cipher;
+  let uuid = con.uuid;
+  let mut res = con.res;
+  let system = DataStore::globals().get_object("system");
+  let mut sessions = system.get_object("sessions");
+  let sessionid = con.sessionid;
+  let mut session = sessions.get_object(&sessionid);
+  
+  let mut bytes = vec![0u8; 2];
+  let x = stream.read_exact(&mut bytes);
+  if x.is_err() { 
+    return false; 
+  }
+
+  let bytes: [u8; 2] = bytes.try_into().unwrap();
+  let len = i16::from_be_bytes(bytes) as usize;
+  let mut bytes:Vec<u8> = Vec::with_capacity(len);
+  bytes.resize(len, 0);
+  let _x = stream.read_exact(&mut bytes).unwrap();
+  let bytes = decrypt(&cipher, &bytes);
+  let method = String::from_utf8(bytes[0..4].to_vec()).unwrap();
+
+  let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
+  session.put_i64("expire", time() + sessiontimeoutmillis);
+  let count = session.get_i64("count") + 1;
+  session.put_i64("count", count);
+
+  if method == "rcv " {
+    let uuid2 = std::str::from_utf8(&bytes[4..40]).unwrap();
+    let buf = &bytes[40..];
+    let con = relay(&uuid, &uuid2, true).unwrap();  
+	if let P2PStream::Relay(mut stream) = con.stream.try_clone().unwrap() {
+      stream.buf.push(buf.to_vec());
+      handle_next_message(con);
+    }
+  }
+  else if method == "fwd ".to_string() {
+    let uuid2 = std::str::from_utf8(&bytes[4..40]).unwrap();
+    let buf = &bytes[40..];
+
+    let con = get_tcp(get_user(&uuid2).unwrap()).unwrap();
+    let cipher = con.cipher;
+    let mut stream = con.stream;
+
+    let mut bytes = ("rcv ".to_string()+&uuid).as_bytes().to_vec();
+    bytes.extend_from_slice(buf);
+
+    let buf = encrypt(&cipher, &bytes);
+    let len = buf.len() as i16;
+    let mut bytes = len.to_be_bytes().to_vec();
+    bytes.extend_from_slice(&buf);
+    let _x = stream.write(&bytes).unwrap();
+  }
+  else if method == "cmd ".to_string() {
+    let msg = String::from_utf8(bytes[4..].to_vec()).unwrap();
+    let msg = msg.trim_matches(char::from(0));
+    let d = DataObject::from_string(msg);
+    let mut params = d.get_object("params");
+    params.put_str("nn_sessionid", &sessionid);
+    params.put_object("nn_session", session.duplicate());
+
+    let mut stream = stream.try_clone().unwrap();
+    let cipher = cipher.to_owned();
+    let sessionid = sessionid.to_owned();
+    thread::spawn(move || {
+      let o = handle_command(d, sessionid);
+
+      let s = "res ".to_string() + &o.to_string();
+      let buf = encrypt(&cipher, s.as_bytes());
+      let len = buf.len() as i16;
+
+      //        let _lock = P2PHEAP.get().write().unwrap();
+      let mut bytes = len.to_be_bytes().to_vec();
+      bytes.extend_from_slice(&buf);
+      let _x = stream.write(&bytes).unwrap();
+    });
+  }
+  else if method == "res ".to_string() {
+    let msg = String::from_utf8(bytes[4..].to_vec()).unwrap();
+    let msg = msg.trim_matches(char::from(0));
+    let d = DataObject::from_string(msg);
+    let i = d.get_i64("pid");
+    res.put_object(&i.to_string(), d);
+  }
+  else {
+    println!("Unknown message type: {}", method);
+  }
+  true
 }
 
 pub fn encrypt(cipher:&Aes256, buf:&[u8]) -> Vec<u8> {
