@@ -564,12 +564,13 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       let uuid2 = String::from_utf8(bytes[8..44].to_vec()).unwrap();
       let uuid2 = uuid2.trim_matches(char::from(0));
       relay(&uuid, &uuid2, false);
+      println!("ERR FWD {} -> {}", uuid, uuid2);
       
       let buf: [u8; 2] = bytes[44..46].try_into().unwrap();
       let len2 = i16::from_be_bytes(buf) as usize;
       let buf = &bytes[46..];
       let buf = &buf[..len2];
-      println!("ERR FWD {}", String::from_utf8(buf.to_vec()).unwrap());
+      println!("ERR DATA {}", to_hex(&buf.to_vec()));
       
       
       
