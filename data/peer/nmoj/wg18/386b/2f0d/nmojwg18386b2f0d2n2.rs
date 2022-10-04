@@ -37,6 +37,7 @@ while ! res.has(pid) {
   thread::sleep(beat);
   wait();
 }
+println!("done {}", pid);
 
 let o = res.get_object(pid);
 res.remove_property(pid);
