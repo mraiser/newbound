@@ -505,6 +505,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
 	if let P2PStream::Relay(mut stream) = con.stream.try_clone().unwrap() {
       println!("pushing con {:?}", con);
       stream.buf.push_bytes(DataBytes::from_bytes(&buf.to_vec()));
+      println!("pushed bytes {}", stream.buf.len());
       handle_next_message(con);
     }
   }
