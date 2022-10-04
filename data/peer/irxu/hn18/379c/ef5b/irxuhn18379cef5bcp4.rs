@@ -570,7 +570,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       let len2 = i16::from_be_bytes(buf) as usize;
       let buf = &bytes[46..];
       let buf = &buf[..len2];
-      println!("ERR DATA {}", to_hex(&buf.to_vec()));
+
       let user = get_user(uuid2).unwrap();
       
       // FIXME - move cipher generation to its own function
@@ -590,6 +590,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       let cipher = Aes256::new(&key);
       
       let mut bytes = decrypt(&cipher, &buf);
+      println!("ERR DATA {}", to_hex(&bytes));
       let s = String::from_utf8(bytes).unwrap();
       println!("ERR STRING {}", s);
       
