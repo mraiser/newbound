@@ -496,12 +496,13 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
   let count = session.get_i64("count") + 1;
   session.put_i64("count", count);
 
+  println!("checking session {}", sessionid);
   if method == "rcv " {
     let uuid2 = std::str::from_utf8(&bytes[4..40]).unwrap();
     let buf = &bytes[40..];
     let con = relay(&uuid, &uuid2, true).unwrap();  
 	if let P2PStream::Relay(mut stream) = con.stream.try_clone().unwrap() {
-      println!("pushing vec {:0x?}", buf);
+      println!("pushing con {:?}", con);
       stream.buf.push(buf.to_vec());
       handle_next_message(con);
     }
