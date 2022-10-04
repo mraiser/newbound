@@ -546,11 +546,35 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     }
     else {
       let s = "err fwd ".to_string() + &uuid2;
-      let buf = encrypt(&cipher, s.as_bytes());
+      let mut bytes = s.as_bytes().to_vec();
+      let len = buf.len() as i16;
+      bytes.extend_from_slice(&len.to_be_bytes());
+      bytes.extend_from_slice(&buf);
+      
+      let buf = encrypt(&cipher, &bytes);
       let len = buf.len() as i16;
       let mut bytes = len.to_be_bytes().to_vec();
       bytes.extend_from_slice(&buf);
       let _x = stream.write(&bytes).unwrap();
+    }
+  }
+  else if method == "err ".to_string() {
+    let cmd = String::from_utf8(bytes[4..8].to_vec()).unwrap();
+    if cmd == "fwd " {
+      let uuid2 = String::from_utf8(bytes[8..44].to_vec()).unwrap();
+      let uuid2 = uuid2.trim_matches(char::from(0));
+      relay(&uuid, &uuid2, false);
+      
+      let buf: [u8; 2] = bytes[44..46].try_into().unwrap();
+      let len2 = i16::from_be_bytes(buf) as usize;
+      let buf = &bytes[46..];
+      let buf = &buf[..len2];
+      println!("ERR FWD {}", String::from_utf8(buf.to_vec()).unwrap());
+      
+      
+      
+      
+      
     }
   }
   else if method == "cmd ".to_string() {
