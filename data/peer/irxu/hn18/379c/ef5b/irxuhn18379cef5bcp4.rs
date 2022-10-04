@@ -573,12 +573,9 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       let len3 = i16::from_be_bytes(buf) as usize;
       println!("len {} {} {}", bytes.len(), len2, len3);
       
-//      println!("buf len 1 {}", buf.len());
-//      let buf = &buf[..len2];
-//      println!("buf len 1 {}", buf.len());
+      let buf = &bytes[2..];
+      let buf = &buf[..len3];
       
-      
-/*      
 
       let user = get_user(uuid2).unwrap();
       
@@ -619,7 +616,6 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       let s = String::from_utf8(bytes).unwrap();
       println!("ERR STRING {}", s);
       
-*/      
       
       
       
