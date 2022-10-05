@@ -4,7 +4,7 @@ let mut ask = DataArray::new();
 for (uuid, user) in users.objects(){
   if uuid.len() == 36 {
     let user = user.object();
-    println!("USER {}", user.to_string());
+    //println!("USER {}", user.to_string());
     if user.get_array("connections").len() == 0 {
       if user.has("keepalive") && Data::as_string(user.get_property("keepalive")) == "true" {
         ask.push_str(&uuid);
