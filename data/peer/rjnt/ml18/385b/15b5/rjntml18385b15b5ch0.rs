@@ -5,7 +5,7 @@ for (uuid, user) in users.objects(){
   if uuid.len() == 36 {
     let user = user.object();
     //println!("USER {}", user.to_string());
-    if user.get_array("connections").len() == 0 {
+    if get_tcp(user.duplicate()).is_none() {
       if user.has("keepalive") && Data::as_string(user.get_property("keepalive")) == "true" {
         ask.push_str(&uuid);
         if user.has("address") && user.has("port") {
@@ -53,7 +53,6 @@ for (uuid, user) in users.objects(){
           
           let cons = o.get_object("connections");
           user.put_object("peers", cons.duplicate());
-          //println!("CONS {}", cons.to_string());
           
           let mut users = DataStore::globals().get_object("system").get_object("users");
           for (uuid2,_u) in users.objects() {
@@ -67,6 +66,7 @@ for (uuid, user) in users.objects(){
           
           // Fixme - notify if something changes (latency?)
           fire_event("peer", "UPDATE", user_to_peer(user, uuid));
+          println!("CONS {}", cons.to_string());
         }
       });
     }
