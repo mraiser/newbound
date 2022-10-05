@@ -21,9 +21,11 @@ o
 pub fn maintenance() -> String {
 let users = users();
 let mut ask = DataArray::new();
+println!("PASS 1");
 for (uuid, user) in users.objects(){
   if uuid.len() == 36 {
     let user = user.object();
+    println!("USER {}", user.to_string());
     if user.get_array("connections").len() == 0 {
       if user.has("keepalive") && Data::as_string(user.get_property("keepalive")) == "true" {
         ask.push_str(&uuid);
@@ -39,10 +41,12 @@ for (uuid, user) in users.objects(){
   }
 }
 
+println!("PASS 2");
 let adr = ask.data_ref;
 for (uuid, user) in users.objects(){
   if uuid.len() == 36 {
     let mut user = user.object();
+    println!("USER A {}", user.to_string());
     if user.get_array("connections").len() > 0 {
       thread::spawn(move || {
         let ask = DataArray::get(adr);
@@ -50,6 +54,7 @@ for (uuid, user) in users.objects(){
         let mut d = DataObject::new();
         d.put_array("uuid", ask);
         let o = exec(user.get_string("id"), "peer".to_string(), "info".to_string(), d);
+        println!("INFO {}", o.to_string());
         if o.get_string("status") == "ok" {
           let o = o.get_object("data");
           let t2 = time();
@@ -76,6 +81,7 @@ for (uuid, user) in users.objects(){
               relay(&uuid, &uuid2, b);
             }
           }
+          println!("USER B {}", user.to_string());
           
           // Fixme - notify if something changes (latency?)
           fire_event("peer", "UPDATE", user_to_peer(user, uuid));

@@ -12,6 +12,7 @@ me.ready = function(){
   subscribe_event("peer", "UPDATE", function(data){
     // FIMXE - Handle previously unseen peers
     $(ME).find('#peer_'+data.id)[0].DATA = data;
+    console.log(data);
   });
   
   $.getScript( '../app/asset/peer/three.min.js', function() { 
