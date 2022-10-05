@@ -88,7 +88,6 @@ for (uuid, user) in users.objects(){
           
           // Fixme - notify if something changes (latency?)
           fire_event("peer", "UPDATE", user_to_peer(user, uuid));
-          println!("CONS {}", cons.to_string());
         }
       });
     }
