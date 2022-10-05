@@ -85,15 +85,15 @@ pub enum P2PStream {
 impl P2PStream {
   pub fn is_tcp(&self) -> bool {
     match self {
-      P2PStream::Tcp(stream) => true,
-      P2PStream::Relay(stream) => false,
+      P2PStream::Tcp(_stream) => true,
+      P2PStream::Relay(_stream) => false,
     }
   }
   
   pub fn is_relay(&self) -> bool {
     match self {
-      P2PStream::Tcp(stream) => false,
-      P2PStream::Relay(stream) => true,
+      P2PStream::Tcp(_stream) => false,
+      P2PStream::Relay(_stream) => true,
     }
   }
   
@@ -158,8 +158,8 @@ impl P2PStream {
             yield_now();
           }
           
-          let mut bd = &mut stream.buf.get_bytes(0);
-          let mut bytes = bd.get_data();
+          let bd = &mut stream.buf.get_bytes(0);
+          let bytes = bd.get_data();
           let n = std::cmp::min(bytes.len(), len-i);
           v.extend_from_slice(&bytes[0..n]);
           let bytes = bytes[n..].to_vec();
@@ -178,7 +178,7 @@ impl P2PStream {
       P2PStream::Tcp(stream) => {
         stream.peer_addr()
       },
-      P2PStream::Relay(stream) => {
+      P2PStream::Relay(_stream) => {
         panic!("Not implemented");
       },
     }
@@ -189,7 +189,7 @@ impl P2PStream {
       P2PStream::Tcp(stream) => {
         stream.peek(buf)
       },
-      P2PStream::Relay(stream) => {
+      P2PStream::Relay(_stream) => {
         panic!("Not implemented");
       },
     }
@@ -494,9 +494,9 @@ pub fn handle_connection(con:P2PConnection) {
   let uuid = con.uuid.to_owned();
   let mut user = get_user(&uuid).unwrap();
   let sessionid = con.sessionid.to_owned();
-  let cipher = con.cipher.to_owned();
-  let mut stream = con.stream.try_clone().unwrap();
-  let mut res = con.res.duplicate();
+  //let cipher = con.cipher.to_owned();
+  let stream = con.stream.try_clone().unwrap();
+  //let mut res = con.res.duplicate();
 
   let system = DataStore::globals().get_object("system");
   let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
@@ -530,9 +530,9 @@ pub fn handle_connection(con:P2PConnection) {
   }
   // end loop
 
-  let mut users = DataStore::globals().get_object("system").get_object("users");
+  let users = DataStore::globals().get_object("system").get_object("users");
   for (uuid2,_u) in users.objects() {
-    if (uuid2.len() == 36 && uuid != uuid2) {
+    if uuid2.len() == 36 && uuid != uuid2 {
 //      println!("SUSPECT 1 {} -> {}", uuid,uuid);
       relay(&uuid, &uuid2, false);
     }
@@ -554,7 +554,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
   let uuid = con.uuid;
   let mut res = con.res;
   let system = DataStore::globals().get_object("system");
-  let mut sessions = system.get_object("sessions");
+  let sessions = system.get_object("sessions");
   let sessionid = con.sessionid;
   let mut session = sessions.get_object(&sessionid);
   
@@ -631,8 +631,9 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       let uuid2 = String::from_utf8(bytes[8..44].to_vec()).unwrap();
       let uuid2 = uuid2.trim_matches(char::from(0));
       
-      let buf: [u8; 2] = bytes[44..46].try_into().unwrap();
-      let len2 = i16::from_be_bytes(buf) as usize; // FIXME - Ignored, don't send
+      // FIXME - Ignored, don't send
+      //let buf: [u8; 2] = bytes[44..46].try_into().unwrap();
+      //let len2 = i16::from_be_bytes(buf) as usize; 
       let bytes = &bytes[46..];
       let buf: [u8; 2] = bytes[..2].try_into().unwrap();
       let len3 = i16::from_be_bytes(buf) as usize;
@@ -657,7 +658,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       let key = GenericArray::from(shared_secret.to_bytes());
       let cipher = Aes256::new(&key);
       
-      let mut bytes = decrypt(&cipher, &buf);
+      let bytes = decrypt(&cipher, &buf);
       let s = String::from_utf8(bytes).unwrap();
       let s = s.trim_matches(char::from(0));
       let o = DataObject::from_string(&s[4..]);

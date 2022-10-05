@@ -76,9 +76,9 @@ for (uuid, user) in users.objects(){
           let cons = o.get_object("connections");
           user.put_object("peers", cons.duplicate());
           
-          let mut users = DataStore::globals().get_object("system").get_object("users");
+          let users = DataStore::globals().get_object("system").get_object("users");
           for (uuid2,_u) in users.objects() {
-            if (uuid2.len() == 36 && uuid != uuid2) {
+            if uuid2.len() == 36 && uuid != uuid2 {
               let b = cons.has(&uuid2) && cons.get_string(&uuid2).starts_with("tcp#");
               //println!("SUSPECT 3 {} -> {}", uuid,uuid2);
               if b { relay(&uuid, &uuid2, b); }
@@ -94,9 +94,9 @@ for (uuid, user) in users.objects(){
     else {
       user.put_bool("connected", false);
       /*
-      let mut users = DataStore::globals().get_object("system").get_object("users");
+      let users = DataStore::globals().get_object("system").get_object("users");
       for (uuid2,_u) in users.objects() {
-        if (uuid2.len() == 36 && uuid != uuid2) {
+        if uuid2.len() == 36 && uuid != uuid2 {
           relay(&uuid, &uuid2, false);
         }
       }
