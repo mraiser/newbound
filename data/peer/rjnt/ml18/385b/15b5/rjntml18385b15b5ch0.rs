@@ -27,6 +27,7 @@ for (uuid, user) in users.objects(){
     let mut user = user.object();
     //println!("USER A {}", user.to_string());
     if user.get_array("connections").len() > 0 {
+      user.put_bool("connected", true);
       thread::spawn(move || {
         let ask = DataArray::get(adr);
         let t1 = time();
@@ -69,6 +70,7 @@ for (uuid, user) in users.objects(){
       });
     }
     else {
+      user.put_bool("connected", false);
       /*
       let mut users = DataStore::globals().get_object("system").get_object("users");
       for (uuid2,_u) in users.objects() {
