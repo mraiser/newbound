@@ -185,7 +185,7 @@ pub fn get_tcp(user:DataObject) -> Option<P2PConnection> {
 }
 
 pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
-//  println!("RELAY A {} -> {} {}", from,to,connected);
+  println!("RELAY A {} -> {} {}", from,to,connected);
   //FIXME - Fire peer UPDATE, CONNECT & DISCONNECT events
   let mut heap = P2PHEAP.get().write().unwrap();
   let user = get_user(to).unwrap();
@@ -195,7 +195,7 @@ pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
     let con = heap.get(conid);
     if let P2PStream::Relay(stream) = &con.stream {
       if stream.from == from && stream.to == to {
-//        println!("RELAY A {:?} {}", con, connected);
+        println!("RELAY B {} -> {} {}", from,to,connected);
         if connected { return Some(con.duplicate()); }
         // FIXME - remove session
         cons.remove_data(Data::DInt(conid as i64));
@@ -204,6 +204,7 @@ pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
     }
   }
   if connected {
+    println!("RELAY C {} -> {} {}", from,to,connected);
     // FIXME - move cipher generation to its own function
     let system = DataStore::globals().get_object("system");
     let runtime = system.get_object("apps").get_object("app").get_object("runtime");
@@ -246,8 +247,10 @@ pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
     sessions.put_object(&sessionid, session.duplicate());
     
 	cons.push_i64(heap.push(con.duplicate())as i64);
+    println!("RELAY D {} -> {} {}", from,to,connected);
     return Some(con.duplicate());
   }
+  println!("RELAY E {} -> {} {}", from,to,connected);
   None
 }
 
