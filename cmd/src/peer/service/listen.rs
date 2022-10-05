@@ -519,6 +519,7 @@ pub fn handle_connection(con:P2PConnection) {
   let mut users = DataStore::globals().get_object("system").get_object("users");
   for (uuid2,_u) in users.objects() {
     if (uuid2.len() == 36 && uuid != uuid2) {
+      println!("SUSPECT 1 {} -> {}", uuid,uuid);
       relay(&uuid, &uuid2, false);
     }
   }
@@ -655,6 +656,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       err.put_str("msg", "No route to host");
       con.res.put_object(&pid, err);
       
+      println!("SUSPECT 2 {} -> {}", uuid,uuid2);
       relay(&uuid, &uuid2, false);
     }
   }
