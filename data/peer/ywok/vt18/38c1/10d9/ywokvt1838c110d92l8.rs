@@ -8,7 +8,7 @@
 
   peers
 }
-
+/*
 pub fn get_relays(id:String) -> DataArray {
   let users = DataStore::globals().get_object("system").get_object("users");
   let mut v = DataArray::new();
@@ -25,7 +25,7 @@ pub fn get_relays(id:String) -> DataArray {
   }
   v
 }
-
+*/
 pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
   let mut o = o.deep_copy();
   o.remove_property("password");
@@ -33,17 +33,14 @@ pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
   o.put_str("id", &id);
   o.put_str("name", &o.get_string("displayname"));
   
-  let relays = get_relays(id);
-  
   let tcp = get_tcp(o.duplicate()).is_some();
   let udp = false;
-  let relay = relays.len()>0;
+  let relay = get_relay(o.duplicate()).is_some();
   let connected = tcp || udp || relay;
   
   o.put_bool("tcp", tcp);  
   o.put_bool("udp", udp);  
   o.put_bool("relay", relay);  
   o.put_bool("connected", connected);  
-  o.put_array("relays", relays);  
 
   o

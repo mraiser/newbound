@@ -184,6 +184,20 @@ pub fn get_tcp(user:DataObject) -> Option<P2PConnection> {
   None
 }
 
+pub fn get_relay(user:DataObject) -> Option<P2PConnection> {
+  let mut heap = P2PHEAP.get().write().unwrap();
+  let cons = user.get_array("connections");
+//  println!("heap {:?} cons {}", heap, cons.to_string());
+  for con in cons.objects(){
+    let conid = con.int();
+    let con = heap.get(conid as usize);
+    if con.stream.is_relay() {
+      return Some(con.duplicate());
+    }
+  }
+  None
+}
+
 pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
   println!("RELAY A {} -> {} {}", from,to,connected);
   //FIXME - Fire peer UPDATE, CONNECT & DISCONNECT events
