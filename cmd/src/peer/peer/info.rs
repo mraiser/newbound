@@ -51,7 +51,6 @@ if !uuid.clone().is_null(){
       if p.get_bool("tcp") { c.put_str(&uuid, &("tcp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
       else if p.get_bool("udp") { c.put_str(&uuid, &("udp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
       else if p.get_bool("relay") { c.put_str(&uuid, "relay#"); }
-      if p.get_bool("connected") { c.put_object(&uuid, p); }
     }
   }
 }
