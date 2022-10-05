@@ -39,8 +39,8 @@ o.put_str("session_id", &nn_sessionid);
 o.put_i64("p2p_port", port);
 o.put_i64("http_port", http_port);
 
-let mut c = DataObject::new();
-o.put_object("connections", c.duplicate());
+let mut cons = DataObject::new();
+o.put_object("connections", cons.duplicate());
 
 if !uuid.clone().is_null(){
   for uuid in DataArray::from_string(&Data::as_string(uuid)).objects() {
@@ -48,9 +48,9 @@ if !uuid.clone().is_null(){
     let u = get_user(&uuid);
     if u.is_some(){
       let p = user_to_peer(u.unwrap(), uuid.to_owned());
-      if p.get_bool("tcp") { c.put_str(&uuid, &("tcp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
-      else if p.get_bool("udp") { c.put_str(&uuid, &("udp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
-      else if p.get_bool("relay") { c.put_str(&uuid, "relay#"); }
+      if p.get_bool("tcp") { cons.put_str(&uuid, &("tcp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
+      else if p.get_bool("udp") { cons.put_str(&uuid, &("udp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
+      else if p.get_bool("relay") { cons.put_str(&uuid, "relay#"); }
     }
   }
 }

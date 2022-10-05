@@ -81,9 +81,10 @@ me.render = function(){
       count++;
       
       var rid = p.div.DATA.id;
-      console.log(ME.DATA);
-      if (ME.DATA.peers && ME.DATA.peers[rid]) {
-        var op = ME.DATA.peers[rid];
+      console.log(ME.DATA.connections);
+      console.log(ME.DATA.peers);
+      if (ME.DATA.connections && ME.DATA.connections[rid]) {
+        var op = ME.DATA.connections[rid];
         if (!me.lines[rid]) {
           p.div.DATA.connected = true;
           var points = [];

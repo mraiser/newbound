@@ -53,6 +53,8 @@ for (uuid, user) in users.objects(){
           
           let cons = o.get_object("connections");
           user.put_object("peers", cons.duplicate());
+          user.put_object("peersx", cons.duplicate());
+          //println!("CONS {}", cons.to_string());
           
           let mut users = DataStore::globals().get_object("system").get_object("users");
           for (uuid2,_u) in users.objects() {
