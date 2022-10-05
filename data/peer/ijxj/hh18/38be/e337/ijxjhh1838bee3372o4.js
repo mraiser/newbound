@@ -81,7 +81,7 @@ me.render = function(){
       count++;
       
       var rid = p.div.DATA.id;
-      
+      console.log(ME.DATA);
       if (ME.DATA.peers && ME.DATA.peers[rid]) {
         var op = ME.DATA.peers[rid];
         if (!me.lines[rid]) {
