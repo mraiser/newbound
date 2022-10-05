@@ -57,8 +57,8 @@ for (uuid, user) in users.objects(){
           for (uuid2,_u) in users.objects() {
             if (uuid2.len() == 36 && uuid != uuid2) {
               let b = cons.has(&uuid2) && cons.get_string(&uuid2).starts_with("tcp#");
-              println!("SUSPECT 3 {} -> {}", uuid,uuid2);
-              relay(&uuid, &uuid2, b);
+              //println!("SUSPECT 3 {} -> {}", uuid,uuid2);
+              if b { relay(&uuid, &uuid2, b); }
             }
           }
           //println!("USER B {}", user.to_string());
