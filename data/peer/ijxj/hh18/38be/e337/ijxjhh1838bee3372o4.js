@@ -81,8 +81,9 @@ me.render = function(){
       count++;
       
       var rid = p.div.DATA.id;
-      console.log(ME.DATA.connections);
-      console.log(ME.DATA.peers);
+//      console.log(ME.DATA.connections);
+//      console.log(ME.DATA.peers);
+//      console.log(ME.DATA.peersx);
       if (ME.DATA.connections && ME.DATA.connections[rid]) {
         var op = ME.DATA.connections[rid];
         if (!me.lines[rid]) {
