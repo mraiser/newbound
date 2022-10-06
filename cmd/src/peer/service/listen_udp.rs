@@ -86,7 +86,7 @@ fn do_listen(){
   // FIXME - Support payloads up to 67K?
   let mut buf = [0; 508]; 
   
-  fn pack(cmd:u8, buf:&mut [u8], my_session_public:PublicKey, my_session_private:StaticSecret, my_uuid:String, my_public:String) -> Vec<u8> {
+  fn helo(cmd:u8, buf:&mut [u8], my_session_public:PublicKey, my_session_private:StaticSecret, my_uuid:String, my_public:String) -> (Aes256, Vec<u8>) {
     let remote_session_public: [u8; 32] = buf[1..33].try_into().unwrap();
     let remote_session_public = PublicKey::from(remote_session_public);
 
@@ -110,7 +110,47 @@ fn do_listen(){
     let bytes = encrypt(&cipher, &decode_hex(&my_public).unwrap());
     buf.extend_from_slice(&bytes);
     
-    buf
+    (cipher, buf)
+  }
+  
+  fn welcome(cmd:u8, buf:&mut [u8], my_session_public:PublicKey, my_session_private:StaticSecret, my_uuid:String, my_public:String, my_private:StaticSecret) -> Option<(Aes256, Vec<u8>)> {
+    let (cipher, bytes2) = helo(cmd, buf, my_session_public, my_session_private, my_uuid, my_public);
+    
+    // Read remote UUID
+    let uuid: [u8; 48] = buf[33..81].try_into().unwrap();
+    let mut uuid = decrypt(&cipher, &uuid);
+    uuid.resize(36,0);
+    let uuid = String::from_utf8(uuid).unwrap();
+
+    let mut ok = true;
+    let user = get_user(&uuid);
+    if user.is_some() {
+      let mut user = user.unwrap();
+      let mut bytes = decrypt(&cipher, &buf[81..113]);
+      let peer_public: [u8; 32];
+      if user.has("publickey") {
+        // fetch remote public key
+        peer_public = decode_hex(&user.get_string("publickey")).unwrap().try_into().unwrap();
+        if peer_public.to_vec() != bytes { ok = false; }
+      }
+      else {
+        // Read remote public key
+        peer_public = bytes.try_into().unwrap();
+        let x = to_hex(&peer_public);
+        user.put_str("publickey", &x);
+        set_user(&uuid, user.duplicate());
+      }
+      if ok {
+        // Switch to permanent keypair
+        let peer_public = PublicKey::from(peer_public);
+        let shared_secret = my_private.diffie_hellman(&peer_public);
+        let key = GenericArray::from(shared_secret.to_bytes());
+        let cipher = Aes256::new(&key);
+        return Some((cipher, bytes2));
+      }
+      else { println!("BAD PUB KEY GIVEN {} / {}", to_hex(&peer_public), to_hex(&buf[81..113])); }
+    }
+    None
   }
   
   while system.get_bool("running") {
@@ -122,7 +162,7 @@ fn do_listen(){
       HELO => {
         println!("P2P UDP incoming request from {:?} len {}", src, amt);
         if amt == 33 {
-          let buf = pack(WELCOME, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned());
+          let (cipher, buf) = helo(WELCOME, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned());
           
           println!("HELO BUFLEN {}", buf.len());
           sock.send_to(&buf, &src).unwrap();
@@ -130,69 +170,16 @@ fn do_listen(){
       },
       WELCOME => {
         if amt == 113 {
-          //Read remote session public key
-          let remote_session_public: [u8; 32] = buf[1..33].try_into().unwrap();
-          let remote_session_public = PublicKey::from(remote_session_public);
-          
-          let shared_secret = my_session_private.diffie_hellman(&remote_session_public);
-          let key = GenericArray::from(shared_secret.to_bytes());
-          let cipher = Aes256::new(&key);
-          
-          // Read remote UUID
-          let uuid: [u8; 48] = buf[33..81].try_into().unwrap();
-          let mut uuid = decrypt(&cipher, &uuid);
-          uuid.resize(36,0);
-          let uuid = String::from_utf8(uuid).unwrap();
-          
-          let mut ok = true;
-          let user = get_user(&uuid);
-          if user.is_some() {
-            let mut user = user.unwrap();
-            let mut bytes = decrypt(&cipher, &buf[81..113]);
-            let peer_public: [u8; 32];
-            if user.has("publickey") {
-              // fetch remote public key
-              peer_public = decode_hex(&user.get_string("publickey")).unwrap().try_into().unwrap();
-              if peer_public.to_vec() != bytes { ok = false; }
-            }
-            else {
-              // Read remote public key
-              peer_public = bytes.try_into().unwrap();
-              let x = to_hex(&peer_public);
-              user.put_str("publickey", &x);
-              set_user(&uuid, user.duplicate());
-            }
-            if ok {
-              let mut buf = Vec::new();
+          let res = welcome(YO, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private.to_owned());
+          if res.is_some(){
+            let (cipher, mut buf) = res.unwrap();
+            
+            // Send proof of crypto
+            let bytes = encrypt(&cipher, "What's good, yo?".as_bytes());
+            buf.extend_from_slice(&bytes);
 
-              // Send YO
-              buf.push(YO);
-              
-              // Send session public key
-              buf.extend_from_slice(my_session_public.as_bytes());
-              
-              // Send my UUID
-              let bytes = encrypt(&cipher, my_uuid.as_bytes());
-              buf.extend_from_slice(&bytes);
-
-              // Send my public key
-              let bytes = encrypt(&cipher, &decode_hex(&my_public).unwrap());
-              buf.extend_from_slice(&bytes);
-              
-              // Switch to permanent keypair
-              let peer_public = PublicKey::from(peer_public);
-              let shared_secret = my_private.diffie_hellman(&peer_public);
-              let key = GenericArray::from(shared_secret.to_bytes());
-              let cipher = Aes256::new(&key);
-
-              // Send proof of crypto
-              let bytes = encrypt(&cipher, "What's good, yo?".as_bytes());
-              buf.extend_from_slice(&bytes);
-
-              println!("WELCOME BUFLEN {} {}", uuid, buf.len());
-              sock.send_to(&buf, &src).unwrap();
-            }
-            else { println!("BAD PUB KEY GIVEN {} / {}", to_hex(&peer_public), to_hex(&buf[81..113])); }
+            println!("WELCOME BUFLEN {}", buf.len());
+            sock.send_to(&buf, &src).unwrap();
           }
         }
       },
