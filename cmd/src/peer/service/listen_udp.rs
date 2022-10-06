@@ -113,7 +113,7 @@ fn do_listen(){
     (cipher, buf)
   }
   
-  fn welcome(cmd:u8, buf:&mut [u8], my_session_public:PublicKey, my_session_private:StaticSecret, my_uuid:String, my_public:String, my_private:StaticSecret) -> Option<(Aes256, Vec<u8>)> {
+  fn welcome(cmd:u8, buf:&mut [u8], my_session_public:PublicKey, my_session_private:StaticSecret, my_uuid:String, my_public:String, my_private:StaticSecret) -> Option<(String, DataObject, Aes256, Vec<u8>)> {
     let (cipher, bytes2) = helo(cmd, buf, my_session_public, my_session_private, my_uuid, my_public);
     
     // Read remote UUID
@@ -146,7 +146,7 @@ fn do_listen(){
         let shared_secret = my_private.diffie_hellman(&peer_public);
         let key = GenericArray::from(shared_secret.to_bytes());
         let cipher = Aes256::new(&key);
-        return Some((cipher, bytes2));
+        return Some((uuid, user, cipher, bytes2));
       }
       else { println!("BAD PUB KEY GIVEN {} / {}", to_hex(&peer_public), to_hex(&buf[81..113])); }
     }
@@ -173,7 +173,7 @@ fn do_listen(){
         if amt == 113 {
           let res = welcome(YO, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private.to_owned());
           if res.is_some(){
-            let (cipher, mut buf) = res.unwrap();
+            let (uuid, user, cipher, mut buf) = res.unwrap();
             
             // Send proof of crypto
             let bytes = encrypt(&cipher, "What's good, yo?".as_bytes());
@@ -188,7 +188,7 @@ fn do_listen(){
         if amt == 129 {
           let res = welcome(SUP, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private.to_owned());
           if res.is_some(){
-            let (cipher, mut buf2) = res.unwrap();
+            let (uuid, user, cipher, mut buf2) = res.unwrap();
 
             // check their proof of crypto
             let bytes = decrypt(&cipher, &buf[113..129]);
@@ -202,33 +202,19 @@ fn do_listen(){
               let bytes = encrypt(&cipher, "All is good now!".as_bytes());
               buf.extend_from_slice(&bytes);
 
+              let con = P2PConnection{
+                stream: P2PStream::Udp(UdpStream::new()),
+                sessionid: unique_session_id(),
+                cipher: cipher.to_owned(),
+                uuid: uuid.to_owned(),
+                res: DataObject::new(),
+              };
+              let data_ref = P2PHEAP.get().write().unwrap().push(con.duplicate()) as i64;
+              let mut connections = user.get_array("connections");
+              connections.push_i64(data_ref);
 
-
-
-
-
-
-
-
-
-
-
-  /*
-                let con = P2PConnection{
-                  stream: P2PStream::Udp(UdpStream::new()),
-                  sessionid: unique_session_id(),
-                  cipher: cipher.to_owned(),
-                  uuid: uuid.to_owned(),
-                  res: DataObject::new(),
-                };
-                let data_ref = P2PHEAP.get().write().unwrap().push(con.duplicate()) as i64;
-                let mut connections = user.get_array("connections");
-                connections.push_i64(data_ref);
-
-                // Send connection ID
-                buf.extend_from_slice(&data_ref.to_be_bytes());
-  */
-                
+              // Send connection ID
+              buf.extend_from_slice(&data_ref.to_be_bytes());
                 
               println!("YO BUFLEN {}", buf.len());
               sock.send_to(&buf, &src).unwrap();
