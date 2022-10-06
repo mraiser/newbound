@@ -15,8 +15,14 @@ if b {
   let _x = write_properties(file.into_os_string().into_string().unwrap(), meta.duplicate());
 }
 
+// FIXME - move threads to listen methods and pass returned port from tcp to udp
+let x = ipaddr.to_owned();
 thread::spawn(move || {
-  listen(ipaddr, port);
+  listen(x, port);
+});
+
+thread::spawn(move || {
+  listen_udp(ipaddr, port);
 });
   
 meta

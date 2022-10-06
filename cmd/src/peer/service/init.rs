@@ -4,6 +4,7 @@ use ndata::data::*;
 use flowlang::datastore::DataStore;
 use flowlang::generated::flowlang::file::write_properties::write_properties;
 use crate::peer::service::listen::listen;
+use crate::peer::service::listen_udp::listen_udp;
 
 pub fn execute(_o: DataObject) -> DataObject {
 let ax = init();
@@ -30,8 +31,14 @@ if b {
   let _x = write_properties(file.into_os_string().into_string().unwrap(), meta.duplicate());
 }
 
+// FIXME - move threads to listen methods and pass returned port from tcp to udp
+let x = ipaddr.to_owned();
 thread::spawn(move || {
-  listen(ipaddr, port);
+  listen(x, port);
+});
+
+thread::spawn(move || {
+  listen_udp(ipaddr, port);
 });
   
 meta

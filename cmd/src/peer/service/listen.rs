@@ -40,11 +40,11 @@ let a0 = o.get_string("ipaddr");
 let a1 = o.get_i64("port");
 let ax = listen(a0, a1);
 let mut o = DataObject::new();
-o.put_str("a", &ax);
+o.put_i64("a", ax);
 o
 }
 
-pub fn listen(ipaddr:String, port:i64) -> String {
+pub fn listen(ipaddr:String, port:i64) -> i64 {
   START.call_once(|| { P2PHEAP.set(RwLock::new(Heap::new())); });
   do_listen(ipaddr, port)
 }
@@ -452,7 +452,7 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<P2PConn
   None
 }
 
-fn do_listen(ipaddr:String, port:i64) -> String {
+fn do_listen(ipaddr:String, port:i64) -> i64 {
   let socket_address = ipaddr+":"+&port.to_string();
   let listener = TcpListener::bind(socket_address).unwrap();
   
@@ -473,6 +473,7 @@ fn do_listen(ipaddr:String, port:i64) -> String {
 
   println!("P2P TCP listening on port {}", port);
 
+  // FIXME - Interrupt and quit if !system.running
   for stream in listener.incoming() {
     let stream = stream.unwrap();
     thread::spawn(move || {
@@ -487,7 +488,7 @@ fn do_listen(ipaddr:String, port:i64) -> String {
       }
     });
   }
-  "OK".to_string()
+  port.into()
 }
 
 pub fn handle_connection(con:P2PConnection) {
@@ -565,7 +566,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
   }
 
   let bytes: [u8; 2] = bytes.try_into().unwrap();
-  let len = i16::from_be_bytes(bytes) as usize;
+  let len = i16::from_be_bytes(bytes) as usize; // FIXME - Should be u16
   let mut bytes:Vec<u8> = Vec::with_capacity(len);
   bytes.resize(len, 0);
   let _x = stream.read_exact(&mut bytes).unwrap();
