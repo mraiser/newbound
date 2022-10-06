@@ -151,7 +151,7 @@ fn do_listen(){
         if amt == 129 {
           let res = welcome(SUP, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private.to_owned());
           if res.is_some(){
-            let (cipher, mut buf) = res.unwrap();
+            let (cipher, mut buf2) = res.unwrap();
 
             // check their proof of crypto
             let bytes = decrypt(&cipher, &buf[113..129]);
@@ -161,6 +161,7 @@ fn do_listen(){
             }
             else {
               // Send proof of crypto
+              let mut buf = buf2;
               let bytes = encrypt(&cipher, "All is good now!".as_bytes());
               buf.extend_from_slice(&bytes);
 
