@@ -160,7 +160,6 @@ fn do_listen(){
         }
       },
       YO => {
-        println!("WELCOME YO {} {:?}", amt, src);
         if amt == 129 {
           //Read remote session public key
           let remote_session_public: [u8; 32] = buf[1..33].try_into().unwrap();
@@ -175,6 +174,7 @@ fn do_listen(){
           let mut uuid = decrypt(&cipher, &uuid);
           uuid.resize(36,0);
           let uuid = String::from_utf8(uuid).unwrap();
+          println!("WELCOME YO {} {:?}", uuid, src);
           
           let mut ok = true;
           let user = get_user(&uuid);
