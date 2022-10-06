@@ -11,6 +11,9 @@ use aes::Aes256;
 use crate::peer::service::listen::encrypt;
 use aes::cipher::KeyInit;
 use aes::cipher::generic_array::GenericArray;
+use std::sync::RwLock;
+use std::sync::Once;
+use state::Storage;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("ipaddr");
@@ -22,6 +25,19 @@ o
 }
 
 pub fn listen_udp(ipaddr:String, port:i64) -> i64 {
+  let socket_address = ipaddr+":"+&port.to_string();
+  START.call_once(|| { 
+    UDPCON.set(RwLock::new(UdpSocket::bind(socket_address).unwrap())); 
+    println!("P2P UDP listening on port {}", port);
+  });
+  do_listen();
+  port
+}
+
+static START: Once = Once::new();
+pub static UDPCON:Storage<RwLock<UdpSocket>> = Storage::new();
+
+fn do_listen(){
   let system = DataStore::globals().get_object("system");
   let runtime = system.get_object("apps").get_object("app").get_object("runtime");
   let my_uuid = runtime.get_string("uuid");
@@ -36,22 +52,17 @@ pub fn listen_udp(ipaddr:String, port:i64) -> i64 {
   // Temp key pair for initial exchange
   let my_session_private = StaticSecret::new(OsRng);
   let my_session_public = PublicKey::from(&my_session_private);
-
-  let socket_address = ipaddr+":"+&port.to_string();
-  let socket = UdpSocket::bind(socket_address).unwrap();
   
   // FIXME - Support payloads up to 67K?
   let mut buf = [0; 508]; 
   
-  println!("P2P UDP listening on port {}", port);
-
   while system.get_bool("running") {
-    let (amt, src) = socket.recv_from(&mut buf).unwrap();
+    let (amt, src) = UDPCON.get().write().unwrap().recv_from(&mut buf).unwrap();
     let buf = &mut buf[..amt];
     let cmd = buf[0];
     match cmd {
       HELO => {
-        println!("P2P UDP incoming request from {:?} len {}", socket, amt);
+        println!("P2P UDP incoming request from {:?} len {}", src, amt);
         if amt == 33 {
           let remote_session_public: [u8; 32] = buf[1..33].try_into().unwrap();
           let remote_session_public = PublicKey::from(remote_session_public);
@@ -80,7 +91,7 @@ pub fn listen_udp(ipaddr:String, port:i64) -> i64 {
           
           
           println!("HELO BUFLEN {}", buf.len());
-          socket.send_to(&buf, &src).unwrap();
+          UDPCON.get().write().unwrap().send_to(&buf, &src).unwrap();
         }
       },
       WELCOME => {
@@ -93,8 +104,6 @@ pub fn listen_udp(ipaddr:String, port:i64) -> i64 {
 
 
   }
-
-  port
 }
 
 const HELO:u8 = 0;

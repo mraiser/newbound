@@ -13,9 +13,6 @@ let my_private = StaticSecret::from(my_private);
 let my_session_private = StaticSecret::new(OsRng);
 let my_session_public = PublicKey::from(&my_session_private);
 
-let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-let socket_address = ipaddr+":"+&port.to_string();
-
 let mut buf = Vec::new();
 buf.push(0);
 buf.extend_from_slice(my_session_public.as_bytes());
@@ -24,5 +21,6 @@ buf.extend_from_slice(my_session_public.as_bytes());
 
 
 
-socket.send_to(&buf, socket_address);
+let socket_address = ipaddr+":"+&port.to_string();
+UDPCON.get().write().unwrap().send_to(&buf, socket_address);
 DataObject::new()
