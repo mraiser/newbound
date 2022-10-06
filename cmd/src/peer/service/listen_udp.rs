@@ -211,7 +211,6 @@ fn do_listen(){
           let mut uuid = decrypt(&cipher, &uuid);
           uuid.resize(36,0);
           let uuid = String::from_utf8(uuid).unwrap();
-          println!("WELCOME YO {} {:?}", uuid, src);
           
           let mut ok = true;
           let user = get_user(&uuid);
@@ -276,6 +275,8 @@ fn do_listen(){
                 // Send connection ID
                 buf.extend_from_slice(&data_ref.to_be_bytes());
   */
+                
+                println!("YO BUFLEN {} {}", uuid, buf.len());
               }              
               
               
