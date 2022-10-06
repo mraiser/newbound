@@ -125,6 +125,7 @@ fn do_listen(){
       HELO => {
         println!("P2P UDP incoming request from {:?} len {}", src, amt);
         if amt == 33 {
+          // FIXME - If we have their pubkey, skip to YO
           let (cipher, buf) = helo(WELCOME, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned());
           
           println!("HELO BUFLEN {}", buf.len());
@@ -148,56 +149,20 @@ fn do_listen(){
       },
       YO => {
         if amt == 129 {
-          //Read remote session public key
-          let remote_session_public: [u8; 32] = buf[1..33].try_into().unwrap();
-          let remote_session_public = PublicKey::from(remote_session_public);
-          
-          let shared_secret = my_session_private.diffie_hellman(&remote_session_public);
-          let key = GenericArray::from(shared_secret.to_bytes());
-          let cipher = Aes256::new(&key);
-          
-          // Read remote UUID
-          let uuid: [u8; 48] = buf[33..81].try_into().unwrap();
-          let mut uuid = decrypt(&cipher, &uuid);
-          uuid.resize(36,0);
-          let uuid = String::from_utf8(uuid).unwrap();
-          
-          let mut ok = true;
-          let user = get_user(&uuid);
-          if user.is_some() {
-            let mut user = user.unwrap();
-            let bytes = decrypt(&cipher, &buf[81..113]);
-            let peer_public: [u8; 32];
-            if user.has("publickey") {
-              // fetch remote public key
-              peer_public = decode_hex(&user.get_string("publickey")).unwrap().try_into().unwrap();
-              if peer_public.to_vec() != bytes { ok = false; }
+          let res = welcome(SUP, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private.to_owned());
+          if res.is_some(){
+            let (cipher, mut buf) = res.unwrap();
+
+            // check their proof of crypto
+            let bytes = decrypt(&cipher, &buf[113..129]);
+            let s = String::from_utf8(bytes).unwrap();
+            if &s != "What's good, yo?" {
+              println!("Bad crypto {}", s);
             }
             else {
-              // Read remote public key
-              peer_public = bytes.try_into().unwrap();
-              let x = to_hex(&peer_public);
-              user.put_str("publickey", &x);
-              set_user(&uuid, user.duplicate());
-            }
-            if ok {
-              // Switch to permanent keypair
-              let peer_public = PublicKey::from(peer_public);
-              let shared_secret = my_private.diffie_hellman(&peer_public);
-              let key = GenericArray::from(shared_secret.to_bytes());
-              let cipher = Aes256::new(&key);
-
-              // check proof
-              let bytes = decrypt(&cipher, &buf[113..129]);
-              let s = String::from_utf8(bytes).unwrap();
-              if &s != "What's good, yo?" {
-                println!("Bad crypto {}", s);
-              }
-              else {
-                let mut buf = Vec::new();
-
-                // Send YO
-                buf.push(SUP);
+              // Send proof of crypto
+              let bytes = encrypt(&cipher, "All is good now!".as_bytes());
+              buf.extend_from_slice(&bytes);
 
 
 
@@ -226,12 +191,10 @@ fn do_listen(){
                 buf.extend_from_slice(&data_ref.to_be_bytes());
   */
                 
-                println!("YO BUFLEN {} {}", uuid, buf.len());
-              }              
-              
-              
+                
+              println!("YO BUFLEN {}", buf.len());
+              sock.send_to(&buf, &src).unwrap();
             }
-            else { println!("BAD PUB KEY GIVEN {} / {}", to_hex(&peer_public), to_hex(&buf[81..113])); }
           }
         }
       },
