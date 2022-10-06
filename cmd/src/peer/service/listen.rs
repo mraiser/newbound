@@ -110,8 +110,8 @@ impl P2PStream {
       P2PStream::Relay(stream) => {
         Ok(P2PStream::Relay(stream.duplicate()))
       },
-      P2PStream::Udp(_stream) => {
-        panic!("Not implemented");
+      P2PStream::Udp(stream) => {
+        Ok(P2PStream::Udp(stream.duplicate()))
       },
     }
   }

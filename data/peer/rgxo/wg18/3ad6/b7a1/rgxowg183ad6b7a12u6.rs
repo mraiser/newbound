@@ -26,6 +26,10 @@ impl UdpStream {
   pub fn new() -> Self {
     UdpStream{}
   }
+  
+  pub fn duplicate(&self) -> UdpStream {
+    UdpStream{}
+  }
 }
 
 fn do_listen(){
