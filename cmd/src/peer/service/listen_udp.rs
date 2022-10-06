@@ -284,7 +284,7 @@ fn do_listen(){
           let res = welcome(RDY, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private.to_owned());
           if res.is_some(){
             let (uuid, user, cipher, mut buf2) = res.unwrap();
-            let bytes:[u8; 8] = buf[129..137].try_into().unwrap();
+            let bytes:[u8; 8] = buf[113..121].try_into().unwrap();
             let conid = i64::from_be_bytes(bytes);
             let mut heap = P2PHEAP.get().write().unwrap();
             let con = heap.get(conid as usize);
