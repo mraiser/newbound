@@ -51,8 +51,7 @@ pub fn listen_udp(ipaddr:String, port:i64) -> i64 {
     let cmd = buf[0];
     match cmd {
       HELO => {
-        let remote_addr = socket.peer_addr().unwrap();
-        println!("P2P UDP incoming request from {} len {}", remote_addr, amt);
+        println!("P2P UDP incoming request from {:?} len {}", socket, amt);
         if amt == 33 {
           let remote_session_public: [u8; 32] = buf[1..33].try_into().unwrap();
           let remote_session_public = PublicKey::from(remote_session_public);

@@ -13,7 +13,7 @@ let my_private = StaticSecret::from(my_private);
 let my_session_private = StaticSecret::new(OsRng);
 let my_session_public = PublicKey::from(&my_session_private);
 
-let socket = UdpSocket::bind("0.0.0.0:34029").unwrap();
+let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 let socket_address = ipaddr+":"+&port.to_string();
 
 let mut buf = Vec::new();
