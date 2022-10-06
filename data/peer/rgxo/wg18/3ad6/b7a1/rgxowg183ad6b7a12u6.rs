@@ -16,19 +16,34 @@ const HELO:u8 = 0;
 const WELCOME:u8 = 1;
 const YO:u8 = 2;
 const SUP:u8 = 3;
-const CMD:u8 = 4;
+const RDY:u8 = 4;
 
 #[derive(Debug)]
 pub struct UdpStream {
+  remote_id: i64,
 }
 
 impl UdpStream {
-  pub fn new() -> Self {
-    UdpStream{}
+  pub fn new(remote_id:i64) -> Self {
+    UdpStream{
+      remote_id: remote_id,
+    }
+  }
+  
+  pub fn blank() -> Self {
+    UdpStream{
+      remote_id: 0,
+    }
   }
   
   pub fn duplicate(&self) -> UdpStream {
-    UdpStream{}
+    UdpStream{
+      remote_id: self.remote_id,
+    }
+  }
+
+  pub fn set_id(&mut self, id:i64) {
+    self.remote_id = id;
   }
 }
 
@@ -170,7 +185,7 @@ fn do_listen(){
               buf.extend_from_slice(&bytes);
 
               let con = P2PConnection{
-                stream: P2PStream::Udp(UdpStream::new()),
+                stream: P2PStream::Udp(UdpStream::blank()),
                 sessionid: unique_session_id(),
                 cipher: cipher.to_owned(),
                 uuid: uuid.to_owned(),
@@ -189,8 +204,62 @@ fn do_listen(){
           }
         }
       },
+      SUP => {
+        if amt == 137 {
+          let res = welcome(RDY, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private.to_owned());
+          if res.is_some(){
+            let (uuid, user, cipher, mut buf2) = res.unwrap();
+
+            // check their proof of crypto
+            let bytes = decrypt(&cipher, &buf[113..129]);
+            let s = String::from_utf8(bytes).unwrap();
+            if &s != "All is good now!" {
+              println!("Bad crypto {}", s);
+            }
+            else {
+              let bytes:[u8; 8] = buf[129..137].try_into().unwrap();
+              let remote_id = i64::from_be_bytes(bytes);
+                            
+              let con = P2PConnection{
+                stream: P2PStream::Udp(UdpStream::new(remote_id)),
+                sessionid: unique_session_id(),
+                cipher: cipher.to_owned(),
+                uuid: uuid.to_owned(),
+                res: DataObject::new(),
+              };
+              let data_ref = P2PHEAP.get().write().unwrap().push(con.duplicate()) as i64;
+              let mut connections = user.get_array("connections");
+              connections.push_i64(data_ref);
+
+              let mut buf = buf2;
+
+              // Send connection ID
+              buf.extend_from_slice(&data_ref.to_be_bytes());
+                
+              println!("SUP BUFLEN {}", buf.len());
+              sock.send_to(&buf, &src).unwrap();
+            }
+          }
+        }
+      },
+      RDY => {
+        if amt == 121 {
+          let res = welcome(RDY, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private.to_owned());
+          if res.is_some(){
+            let (uuid, user, cipher, mut buf2) = res.unwrap();
+            let bytes:[u8; 8] = buf[129..137].try_into().unwrap();
+            let conid = i64::from_be_bytes(bytes);
+            let mut heap = P2PHEAP.get().write().unwrap();
+            let con = heap.get(conid as usize);
+            if let P2PStream::Udp(stream) = &mut con.stream {
+              stream.set_id(conid);
+              println!("RDY");
+            }
+          }
+        }
+      },
       _ => {
-        println!("Unknown UDP command {}", cmd);
+        println!("Unknown UDP command {} len {}", cmd, buf.len());
       },
     }
 
