@@ -14,6 +14,16 @@ use aes::cipher::generic_array::GenericArray;
 use std::sync::RwLock;
 use std::sync::Once;
 use state::Storage;
+use crate::peer::service::listen::decrypt;
+use ndata::databytes::DataBytes;
+use flowlang::appserver::get_user;
+use crate::peer::service::listen::to_hex;
+use flowlang::appserver::set_user;
+use std::sync::atomic::AtomicUsize;
+use crate::peer::service::listen::P2PConnection;
+use flowlang::generated::flowlang::system::unique_session_id::unique_session_id;
+use crate::peer::service::listen::P2PStream;
+use crate::peer::service::listen::P2PHEAP;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("ipaddr");
@@ -28,6 +38,7 @@ pub fn listen_udp(ipaddr:String, port:i64) -> i64 {
   let socket_address = ipaddr+":"+&port.to_string();
   START.call_once(|| { 
     UDPCON.set(RwLock::new(UdpSocket::bind(socket_address).unwrap())); 
+    NEXTID.set(RwLock::new(AtomicUsize::from(1))); 
     println!("P2P UDP listening on port {}", port);
   });
   do_listen();
@@ -36,9 +47,26 @@ pub fn listen_udp(ipaddr:String, port:i64) -> i64 {
 
 static START: Once = Once::new();
 pub static UDPCON:Storage<RwLock<UdpSocket>> = Storage::new();
+static NEXTID:Storage<RwLock<AtomicUsize>> = Storage::new();
+
+const HELO:u8 = 0;
+const WELCOME:u8 = 1;
+const YO:u8 = 2;
+const SUP:u8 = 3;
+const CMD:u8 = 4;
+
+#[derive(Debug)]
+pub struct UdpStream {
+}
+
+impl UdpStream {
+  pub fn new() -> Self {
+    UdpStream{}
+  }
+}
 
 fn do_listen(){
-  let system = DataStore::globals().get_object("system");
+  let mut system = DataStore::globals().get_object("system");
   let runtime = system.get_object("apps").get_object("app").get_object("runtime");
   let my_uuid = runtime.get_string("uuid");
 
@@ -52,12 +80,15 @@ fn do_listen(){
   // Temp key pair for initial exchange
   let my_session_private = StaticSecret::new(OsRng);
   let my_session_public = PublicKey::from(&my_session_private);
+  let buf = DataBytes::from_bytes(&my_session_public.to_bytes().to_vec());
+  system.put_bytes("session_pubkey", buf);
   
   // FIXME - Support payloads up to 67K?
   let mut buf = [0; 508]; 
   
   while system.get_bool("running") {
-    let (amt, src) = UDPCON.get().write().unwrap().recv_from(&mut buf).unwrap();
+    let sock = UDPCON.get().write().unwrap().try_clone().unwrap();
+    let (amt, src) = sock.recv_from(&mut buf).unwrap();
     let buf = &mut buf[..amt];
     let cmd = buf[0];
     match cmd {
@@ -68,6 +99,7 @@ fn do_listen(){
           let remote_session_public = PublicKey::from(remote_session_public);
   //        let remote_id:[u8; 4] = buf[34..38].try_into().unwrap();
   //        let remote_id = u32::from_be_bytes(remote_id) as usize;
+  //        let uuid2 = uuid2.trim_matches(char::from(0));
 
           let mut buf = Vec::new();
           
@@ -91,26 +123,111 @@ fn do_listen(){
           
           
           println!("HELO BUFLEN {}", buf.len());
-          UDPCON.get().write().unwrap().send_to(&buf, &src).unwrap();
+          sock.send_to(&buf, &src).unwrap();
         }
       },
       WELCOME => {
-        if amt == 33 {
+        if amt == 113 {
+          //Read remote session public key
+          let remote_session_public: [u8; 32] = buf[1..33].try_into().unwrap();
+          let remote_session_public = PublicKey::from(remote_session_public);
+          
+          let shared_secret = my_session_private.diffie_hellman(&remote_session_public);
+          let key = GenericArray::from(shared_secret.to_bytes());
+          let cipher = Aes256::new(&key);
+          
+          // Read remote UUID
+          let uuid: [u8; 48] = buf[33..81].try_into().unwrap();
+          let mut uuid = decrypt(&cipher, &uuid);
+          uuid.resize(36,0);
+          let uuid = String::from_utf8(uuid).unwrap();
+          
+          let mut ok = true;
+          let user = get_user(&uuid);
+          if user.is_some() {
+            let mut user = user.unwrap();
+            let peer_public: [u8; 32];
+            if user.has("publickey") {
+              // fetch remote public key
+              peer_public = decode_hex(&user.get_string("publickey")).unwrap().try_into().unwrap();
+              if peer_public != buf[81..113] { ok = false; }
+            }
+            else {
+              // Read remote public key
+              peer_public = buf[81..113].try_into().unwrap();
+              let x = to_hex(&peer_public);
+              user.put_str("publickey", &x);
+              set_user(&uuid, user.duplicate());
+            }
+            if ok {
+              let mut buf = Vec::new();
+
+              // Send YO
+              buf.push(YO);
+              
+              // Send session public key
+              buf.extend_from_slice(my_session_public.as_bytes());
+              
+              // Send my UUID
+              let bytes = encrypt(&cipher, my_uuid.as_bytes());
+              buf.extend_from_slice(&bytes);
+
+              // Send my public key
+              let bytes = encrypt(&cipher, &decode_hex(&my_public).unwrap());
+              buf.extend_from_slice(&bytes);
+              
+              // Switch to permanent keypair
+              let peer_public = PublicKey::from(peer_public);
+              let shared_secret = my_private.diffie_hellman(&peer_public);
+              let key = GenericArray::from(shared_secret.to_bytes());
+              let cipher = Aes256::new(&key);
+
+              // Send proof of crypto
+              let bytes = encrypt(&cipher, "What's good, yo?".as_bytes());
+              buf.extend_from_slice(&bytes);
+
+
+
+
+
+
+
+/*
+              let con = P2PConnection{
+                stream: P2PStream::Udp(UdpStream::new()),
+                sessionid: unique_session_id(),
+                cipher: cipher.to_owned(),
+                uuid: uuid.to_owned(),
+                res: DataObject::new(),
+              };
+              let data_ref = P2PHEAP.get().write().unwrap().push(con.duplicate()) as i64;
+              let mut connections = user.get_array("connections");
+              connections.push_i64(data_ref);
+
+              // Send connection ID
+              buf.extend_from_slice(&data_ref.to_be_bytes());
+*/
+
+
+
+
+
+
+            
+              println!("WELCOME BUFLEN {} {}", uuid, buf.len());
+              sock.send_to(&buf, &src).unwrap();
+            }
+            else { println!("BAD PUB KEY GIVEN"); }
+          }
         }
       },
-      _ => {},
+      _ => {
+        println!("Unknown UDP command {}", cmd);
+      },
     }
 
 
 
   }
-}
-
-const HELO:u8 = 0;
-const WELCOME:u8 = 1;
-const CMD:u8 = 4;
-
-pub struct UdpListener{
-
 }
 

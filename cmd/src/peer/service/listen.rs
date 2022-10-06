@@ -34,6 +34,7 @@ use std::hint::spin_loop;
 use std::thread::yield_now;
 use ndata::dataarray::DataArray;
 use ndata::databytes::DataBytes;
+use crate::peer::service::listen_udp::UdpStream;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("ipaddr");
@@ -80,6 +81,7 @@ impl RelayStream {
 pub enum P2PStream {
   Tcp(TcpStream),
   Relay(RelayStream),
+  Udp(UdpStream),
 }
 
 impl P2PStream {
@@ -87,6 +89,7 @@ impl P2PStream {
     match self {
       P2PStream::Tcp(_stream) => true,
       P2PStream::Relay(_stream) => false,
+      P2PStream::Udp(_stream) => false,
     }
   }
   
@@ -94,6 +97,7 @@ impl P2PStream {
     match self {
       P2PStream::Tcp(_stream) => false,
       P2PStream::Relay(_stream) => true,
+      P2PStream::Udp(_stream) => false,
     }
   }
   
@@ -105,6 +109,9 @@ impl P2PStream {
       },
       P2PStream::Relay(stream) => {
         Ok(P2PStream::Relay(stream.duplicate()))
+      },
+      P2PStream::Udp(_stream) => {
+        panic!("Not implemented");
       },
     }
   }
@@ -140,6 +147,9 @@ impl P2PStream {
         }
         panic!("No such relay {}", from);
       },
+      P2PStream::Udp(_stream) => {
+        panic!("Not implemented");
+      },
     }
   }
   
@@ -170,6 +180,9 @@ impl P2PStream {
         buf.clone_from_slice(&v);
         Ok(())
       },
+      P2PStream::Udp(_stream) => {
+        panic!("Not implemented");
+      },
     }
   }
   
@@ -181,6 +194,9 @@ impl P2PStream {
       P2PStream::Relay(_stream) => {
         panic!("Not implemented");
       },
+      P2PStream::Udp(_stream) => {
+        panic!("Not implemented");
+      },
     }
   }
   
@@ -190,6 +206,9 @@ impl P2PStream {
         stream.peek(buf)
       },
       P2PStream::Relay(_stream) => {
+        panic!("Not implemented");
+      },
+      P2PStream::Udp(_stream) => {
         panic!("Not implemented");
       },
     }

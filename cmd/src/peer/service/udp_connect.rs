@@ -30,17 +30,12 @@ let my_private: [u8; 32] = my_private.try_into().expect("slice with incorrect le
 let my_private = StaticSecret::from(my_private);
 
 // Temp key pair for initial exchange
-let my_session_private = StaticSecret::new(OsRng);
-let my_session_public = PublicKey::from(&my_session_private);
+let my_session_public: [u8; 32] = system.get_bytes("session_pubkey").get_data().try_into().unwrap();
+let my_session_public = PublicKey::from(my_session_public);
 
 let mut buf = Vec::new();
 buf.push(0);
 buf.extend_from_slice(my_session_public.as_bytes());
-
-
-
-
-
 let socket_address = ipaddr+":"+&port.to_string();
 UDPCON.get().write().unwrap().send_to(&buf, socket_address);
 DataObject::new()
