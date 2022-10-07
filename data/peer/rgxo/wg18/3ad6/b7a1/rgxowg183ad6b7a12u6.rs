@@ -163,6 +163,7 @@ impl UdpStream {
   
   fn request_resend(&self, msgid:i64) {
     let id = self.data.get_i64("id");
+    println!("request resend of {} from {}", msgid, id);
     let mut bytes = Vec::new();
     bytes.push(RESEND);
     bytes.extend_from_slice(&id.to_be_bytes());
