@@ -566,7 +566,7 @@ fn do_listen(){
               let n = msg_id - out_off;
               let mut i = 0;
               while i <= n {
-                //println!("removing packet {}", out_off);
+                println!("removing packet {}", out_off);
                 out.remove_property(0);
                 out_off += 1;
                 i += 1;
