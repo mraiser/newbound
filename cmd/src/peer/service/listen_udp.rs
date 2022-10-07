@@ -147,9 +147,9 @@ impl UdpStream {
       let sock = heap.try_clone().unwrap();
 
       // FIXME - loop to support more than 491
-      let bytes = DataBytes::from_bytes(&bytes);
-      out.push_bytes(bytes);
-      sock.send_to(&buf, self.src).unwrap();
+      let db = DataBytes::from_bytes(&bytes);
+      out.push_bytes(db);
+      sock.send_to(&bytes, self.src).unwrap();
       println!("write {}", msgid);
       msgid += 1;
 
