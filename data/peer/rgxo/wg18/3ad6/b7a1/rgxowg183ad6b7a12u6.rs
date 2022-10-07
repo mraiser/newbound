@@ -389,8 +389,6 @@ fn do_listen(){
         let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
         let msg_id = i64::from_be_bytes(msg_id);
         let buf = &buf[17..];
-        
-        println!("CON {} MSG {}", id, msg_id);
 
         let mut heap = P2PHEAP.get().write().unwrap();
         let con = heap.get(id as usize);
@@ -408,6 +406,8 @@ fn do_listen(){
           }
           let db = DataBytes::from_bytes(&buf.to_vec());
           inv.push_bytes(db);
+        
+          println!("CMD CON {} MSG {}", id, msg_id);
         }        
       },
       _ => {
