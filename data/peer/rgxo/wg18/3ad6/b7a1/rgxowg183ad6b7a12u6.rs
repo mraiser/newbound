@@ -23,6 +23,8 @@ const CMD:u8 = 5;
 const ACK:u8 = 6;
 const RESEND:u8 = 7;
 
+const MAXPACKETBUFF:i64 = 1000;
+
 #[derive(Debug)]
 pub struct UdpStream {
   src: SocketAddr,
@@ -375,10 +377,15 @@ fn do_listen(){
             let mut heap = P2PHEAP.get().write().unwrap();
             let con = heap.get(conid as usize);
             if let P2PStream::Udp(stream) = &mut con.stream {
-              stream.set_id(conid);
-              //println!("RDY");
-              
-              // FIXME - start connection listen
+              if stream.src == src {
+                stream.set_id(conid);
+                //println!("RDY");
+
+                // FIXME - start connection listen
+              }
+              else {
+                println!("Received RDY from wrong source");
+              }
             }
           }
         }
@@ -393,31 +400,51 @@ fn do_listen(){
         let mut heap = P2PHEAP.get().write().unwrap();
         let con = heap.get(id as usize);
         if let P2PStream::Udp(stream) = &mut con.stream {
+          if stream.src == src {
+            // There can be only one!
+            let _lock = READMUTEX.get().write().unwrap();
+            let in_off = stream.data.get_i64("in_off");
+            let mut inv = stream.data.get_array("in");
+
+            let i = msg_id - in_off;
+            if i < 0 {
+              println!("Ignoring resend of msg {} on udp connection {}", msg_id, id);
+            }
+            else if i > MAXPACKETBUFF {
+              println!("Too many packets... Ignoring msg {} on udp connection {}", msg_id, id);
+            }
+            else {
+              while (inv.len() as i64) < i {
+                inv.push_property(Data::DNull);
+                println!("INV EXPAND");
+              }
               
-          // There can be only one!
-          let _lock = READMUTEX.get().write().unwrap();
-          let in_off = stream.data.get_i64("in_off");
-          let mut inv = stream.data.get_array("in");
-          
-          let i = msg_id - in_off;
-          while (inv.len() as i64) < i {
-            inv.push_property(Data::DNull);
-            println!("INV EXPAND");
+              let db = DataBytes::from_bytes(&buf.to_vec());
+              if (inv.len() as i64) == i { inv.push_bytes(db); }
+              else { inv.put_bytes(i as usize, db); }
+              
+              println!("CMD CON {} MSG {}", id, msg_id);
+              
+              let mut i = 0;
+              while i < inv.len() {
+                if Data::equals(inv.get_property(i), Data::DNull) { break; }
+                i += 1;
+              }
+              if i > 0 {
+                let i = (i as i64) + in_off - 1;
+                println!("send ACK {}", i);
+                
+                let mut bytes = Vec::new();
+                bytes.push(ACK);
+                bytes.extend_from_slice(&id.to_be_bytes());
+                bytes.extend_from_slice(&i.to_be_bytes());
+                sock.send_to(&bytes, &src).unwrap();
+              }
+            }
           }
-          let db = DataBytes::from_bytes(&buf.to_vec());
-          
-          // FIXME - set index to bytes
-          inv.push_bytes(db);
-        
-          println!("CMD CON {} MSG {}", id, msg_id);
-          
-          /*
-          let mut bytes = Vec::new();
-          bytes.push(ACK);
-          bytes.extend_from_slice(&id.to_be_bytes());
-          bytes.extend_from_slice(&msg_id.to_be_bytes());
-          sock.send_to(&bytes, &src).unwrap();
-          */
+          else {
+            println!("Received CMD from wrong source");
+          }
         }        
       },
       ACK => {
@@ -429,24 +456,24 @@ fn do_listen(){
         let mut heap = P2PHEAP.get().write().unwrap();
         let con = heap.get(id as usize);
         if let P2PStream::Udp(stream) = &mut con.stream {
-              
-          // There can be only one!
-          let _lock = WRITEMUTEX.get().write().unwrap();
-          let mut out_off = stream.data.get_i64("out_off");
-          let mut out = stream.data.get_array("out");
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
+          if stream.src == src {
+            // There can be only one!
+            let _lock = WRITEMUTEX.get().write().unwrap();
+            let mut out_off = stream.data.get_i64("out_off");
+            let mut out = stream.data.get_array("out");
+            
+            let n = msg_id - out_off;
+            let i = 0;
+            while i < n {
+              println!("removing packet {}", out_off);
+              out.remove_property(0);
+              out_off += 1;
+            }
+            stream.data.put_i64("out_off", out_off);
+          }
+          else {
+            println!("Received ACK from wrong source");
+          }
         }
       },
       _ => {
