@@ -59,7 +59,7 @@ impl UdpStream {
     // There can be only one!
     let _lock = WRITEMUTEX.get().write().unwrap();
     
-    self.data.put_i64("remote_id", id);
+    self.data.put_i64("id", id);
 
     if self.data.has("hold") { 
       let hold = self.data.get_array("hold");
