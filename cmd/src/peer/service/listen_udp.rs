@@ -97,6 +97,9 @@ impl UdpStream {
   }
 
   pub fn set_id(&mut self, id:i64) {
+    let id2 = self.data.get_i64("id");
+    println!("set id {} / {}", id, id2);
+    
     // There can be only one!
     let _lock = WRITEMUTEX.get().write().unwrap();
     
@@ -115,7 +118,8 @@ impl UdpStream {
   
   pub fn write(&mut self, buf: &[u8]) -> io::Result<usize>
   {
-    println!("begin write");
+    let id = self.data.get_i64("id");
+    println!("begin write {}", id);
     if buf.len() > 491 { panic!("NOT SUPPORTED"); }
     
     // There can be only one!
