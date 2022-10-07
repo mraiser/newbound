@@ -376,7 +376,7 @@ fn do_listen(){
               UDPLOOKUP.get().write().unwrap().insert(remote_id, data_ref);
               buf.extend_from_slice(&remote_id.to_be_bytes());
                 
-              //println!("YO BUFLEN {}", buf.len());
+              println!("YO CON {} = {}", data_ref, remote_id);
               sock.send_to(&buf, &src).unwrap();
             }
           }
@@ -410,13 +410,16 @@ fn do_listen(){
               connections.push_i64(data_ref);
 
               let mut buf = buf2;
-
-              // Send connection ID
+              
+              // Send their connection id
+              buf.extend_from_slice(&remote_id.to_be_bytes());
+ 
+              // Send my connection ID
               let remote_id = rand::thread_rng().gen::<i64>();
               UDPLOOKUP.get().write().unwrap().insert(remote_id, data_ref);
               buf.extend_from_slice(&remote_id.to_be_bytes());
                 
-              //println!("SUP BUFLEN {}", buf.len());
+              println!("SUP CON {} = {}", data_ref, remote_id);
               sock.send_to(&buf, &src).unwrap();
               
               // FIXME - start connection listen
@@ -425,7 +428,7 @@ fn do_listen(){
         }
       },
       RDY => {
-        if amt == 121 {
+        if amt == 129 {
           let res = welcome(RDY, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private.to_owned());
           if res.is_some(){
             let _x = res.unwrap();
@@ -440,8 +443,10 @@ fn do_listen(){
                 let con = con.unwrap();
                 if let P2PStream::Udp(stream) = &mut con.stream {
                   if stream.src == src {
+                    let bytes:[u8; 8] = buf[121..129].try_into().unwrap();
+                    let id = i64::from_be_bytes(bytes);
                     stream.set_id(id);
-                    //println!("RDY");
+                    println!("RDY");
 
                     // FIXME - start connection listen
                   }
