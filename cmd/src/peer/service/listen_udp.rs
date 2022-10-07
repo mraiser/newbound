@@ -174,18 +174,19 @@ impl UdpStream {
       in_off = self.data.get_i64("in_off");
     }
     
+    let beat = Duration::from_millis(100);
     while i < len {
       // FIXME - should timeout?
       while inv.len() == 0 {
-        spin_loop();
-        yield_now();
+        thread::sleep(beat);
       }
 
-      let beat = Duration::from_millis(100);
       while inv.get_property(0).is_null() {
         self.request_resend(in_off);
         thread::sleep(beat);
       }
+      
+      println!("have data");
 
       let bd = inv.get_bytes(0);
       let bytes = bd.get_data();
@@ -204,6 +205,7 @@ impl UdpStream {
       i += n;
     }        
     buf.clone_from_slice(&v);
+    println!("read exact done");
     Ok(())
   }
   
