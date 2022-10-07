@@ -494,6 +494,8 @@ fn do_listen(){
         let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
         let msg_id = i64::from_be_bytes(msg_id);
         
+        println!("received ACK for packet {} on con {}", msg_id, id);
+        
         let mut heap = P2PHEAP.get().write().unwrap();
         let con = heap.get(id as usize);
         if let P2PStream::Udp(stream) = &mut con.stream {
@@ -503,12 +505,15 @@ fn do_listen(){
             let mut out_off = stream.data.get_i64("out_off");
             let mut out = stream.data.get_array("out");
             
+            println!("con {} has {} packets with offset {}", id, out.len(), out_off);
+            
             let n = msg_id - out_off;
-            let i = 0;
+            let mut i = 0;
             while i < n {
               println!("removing packet {}", out_off);
               out.remove_property(0);
               out_off += 1;
+              i += 1;
             }
             stream.data.put_i64("out_off", out_off);
           }
