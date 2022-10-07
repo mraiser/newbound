@@ -77,7 +77,7 @@ const MAXPACKETBUFF:i64 = 1000;
 
 #[derive(Debug)]
 pub struct UdpStream {
-  src: SocketAddr,
+  pub src: SocketAddr,
   data: DataObject,
 }
 

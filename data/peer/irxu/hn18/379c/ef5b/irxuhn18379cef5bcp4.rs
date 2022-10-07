@@ -154,8 +154,8 @@ impl P2PStream {
       P2PStream::Relay(_stream) => {
         panic!("Not implemented");
       },
-      P2PStream::Udp(_stream) => {
-        panic!("Not implemented");
+      P2PStream::Udp(stream) => {
+        Ok(stream.src)
       },
     }
   }
