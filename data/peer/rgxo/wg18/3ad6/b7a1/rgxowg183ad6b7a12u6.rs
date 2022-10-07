@@ -481,11 +481,11 @@ fn do_listen(){
         let id = lookupUdp(id);
         if id.is_some() {
           let id = id.unwrap();
-          println!("CMD local id{}", id);
+          println!("CMD local id {}", id);
         
           let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
           let msg_id = i64::from_be_bytes(msg_id);
-          println!("CMD msg id{}", msg_id);
+          println!("CMD msg id {}", msg_id);
           let buf = &buf[17..];
 
           let mut heap = P2PHEAP.get().write().unwrap();
