@@ -185,6 +185,53 @@ fn not_negative_one() -> i64 {
   x
 }
 
+fn handle_connection(data_ref: usize, con: P2PConnection) {
+  let uuid = con.uuid.to_owned();
+  let sessionid = con.sessionid.to_owned();
+  let stream = con.stream.try_clone().unwrap();
+
+  let mut user = get_user(&uuid).unwrap();
+  user.put_i64("last_contact", time());
+
+  let system = DataStore::globals().get_object("system");
+  let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
+
+  let mut session = DataObject::new();
+  session.put_i64("count", 0);
+  session.put_str("id", &sessionid);
+  session.put_str("username", &uuid);
+  session.put_object("user", user.duplicate());
+  let expire = time() + sessiontimeoutmillis;
+  session.put_i64("expire", expire);
+
+  let mut sessions = system.get_object("sessions");
+  sessions.put_object(&sessionid, session.duplicate());
+  
+  let mut connections = user.get_array("connections");
+
+  let remote_addr = stream.peer_addr().unwrap();
+  println!("P2P UDP Connect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
+  user.put_str("address", &remote_addr.ip().to_string());
+  let peer = user_to_peer(user.duplicate(), uuid.to_owned());
+  fire_event("peer", "CONNECT", peer.duplicate());
+  fire_event("peer", "UPDATE", peer.duplicate());
+  
+  // loop
+  while system.get_bool("running") {
+    if !handle_next_message(con.duplicate()) { break; }
+  }
+  // end loop
+  
+  sessions.remove_property(&sessionid);
+  let _x = connections.remove_data(Data::DInt(data_ref as i64));
+  P2PHEAP.get().write().unwrap().decr(data_ref);
+
+  println!("P2P UDP Disconnect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
+  let peer = user_to_peer(user.duplicate(), uuid.to_owned());
+  fire_event("peer", "DISCONNECT", peer.duplicate());
+  fire_event("peer", "UPDATE", peer.duplicate());
+}
+
 fn do_listen(){
   let mut system = DataStore::globals().get_object("system");
   let runtime = system.get_object("apps").get_object("app").get_object("runtime");
@@ -338,7 +385,7 @@ fn do_listen(){
               UDPLOOKUP.get().write().unwrap().insert(remote_id, data_ref);
               buf.extend_from_slice(&remote_id.to_be_bytes());
                 
-              println!("YO CON {} = {}", data_ref, remote_id);
+              //println!("YO CON {} = {}", data_ref, remote_id);
               sock.send_to(&buf, &src).unwrap();
             }
           }
@@ -381,10 +428,12 @@ fn do_listen(){
               UDPLOOKUP.get().write().unwrap().insert(remote_id, data_ref);
               buf.extend_from_slice(&remote_id.to_be_bytes());
                 
-              println!("SUP CON {} = {}", data_ref, remote_id);
+              //println!("SUP CON {} = {}", data_ref, remote_id);
               sock.send_to(&buf, &src).unwrap();
               
-              // FIXME - start connection listen
+              thread::spawn(move || {
+                handle_connection(data_ref as usize, con);
+              });
             }
           }
         }
@@ -402,15 +451,17 @@ fn do_listen(){
               let mut heap = P2PHEAP.get().write().unwrap();
               let con = heap.try_get(id as usize);
               if con.is_some() {
-                let con = con.unwrap();
+                let mut con = con.unwrap().duplicate();
                 if let P2PStream::Udp(stream) = &mut con.stream {
                   if stream.src == src {
                     let bytes:[u8; 8] = buf[121..129].try_into().unwrap();
-                    let id = i64::from_be_bytes(bytes);
-                    stream.set_id(id);
-                    println!("RDY");
+                    let remote_id = i64::from_be_bytes(bytes);
+                    stream.set_id(remote_id);
+                    //println!("RDY");
 
-                    // FIXME - start connection listen
+                    thread::spawn(move || {
+                      handle_connection(id as usize, con);
+                    });
                   }
                   else {
                     println!("Received RDY from wrong source");
@@ -460,7 +511,7 @@ fn do_listen(){
                   if (inv.len() as i64) == i { inv.push_bytes(db); }
                   else { inv.put_bytes(i as usize, db); }
 
-                  println!("CMD CON {} MSG {}", id, msg_id);
+                  //println!("CMD CON {} MSG {}", id, msg_id);
 
                   let mut i = 0;
                   while i < inv.len() {
@@ -469,7 +520,7 @@ fn do_listen(){
                   }
                   if i > 0 {
                     let i = (i as i64) + in_off - 1;
-    //                println!("send ACK {}", i);
+                    //println!("send ACK {}", i);
                     
                     let id = stream.data.get_i64("id");
 
@@ -491,7 +542,7 @@ fn do_listen(){
       ACK => {
         let id: [u8; 8] = buf[1..9].try_into().unwrap();
         let id = i64::from_be_bytes(id);
-        println!("received ACK for con {}", id);
+        //println!("received ACK for con {}", id);
         let id = lookupUdp(id);
         if id.is_some() {
           let id = id.unwrap();
@@ -499,7 +550,7 @@ fn do_listen(){
           let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
           let msg_id = i64::from_be_bytes(msg_id);
 
-          println!("received ACK for packet {} on internal con {}", msg_id, id);
+          //println!("received ACK for packet {} on internal con {}", msg_id, id);
 
           let mut heap = P2PHEAP.get().write().unwrap();
           let con = heap.get(id as usize);
@@ -515,7 +566,7 @@ fn do_listen(){
               let n = msg_id - out_off;
               let mut i = 0;
               while i <= n {
-                println!("removing packet {}", out_off);
+                //println!("removing packet {}", out_off);
                 out.remove_property(0);
                 out_off += 1;
                 i += 1;
