@@ -138,24 +138,25 @@ impl UdpStream {
       hold.push_bytes(bytes);
     }
     else {
-      let mut out = self.data.get_array("out");
-      let mut msgid = self.data.get_i64("next");
-
-      let mut bytes = Vec::new();
-      bytes.push(CMD);
-      bytes.extend_from_slice(&id.to_be_bytes());
-      bytes.extend_from_slice(&msgid.to_be_bytes());
-      bytes.extend_from_slice(buf);
-      
       let heap = UDPCON.get().write().unwrap();
       let sock = heap.try_clone().unwrap();
 
-      // FIXME - loop to support more than 491
-      let db = DataBytes::from_bytes(&bytes);
-      out.push_bytes(db);
-      sock.send_to(&bytes, self.src).unwrap();
-      msgid += 1;
-
+      let mut out = self.data.get_array("out");
+      let mut msgid = self.data.get_i64("next");
+      
+      let blocks: Vec<&[u8]> = buf.chunks(491).collect();
+      for buf in blocks {
+        let mut bytes = Vec::new();
+        bytes.push(CMD);
+        bytes.extend_from_slice(&id.to_be_bytes());
+        bytes.extend_from_slice(&msgid.to_be_bytes());
+        bytes.extend_from_slice(buf);
+        let db = DataBytes::from_bytes(&bytes);
+        out.push_bytes(db);
+        sock.send_to(&bytes, self.src).unwrap();
+        msgid += 1;
+      }
+      
       self.data.put_i64("next", msgid);
     }
     Ok(buf.len())
