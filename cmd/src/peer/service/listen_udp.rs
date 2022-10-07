@@ -223,6 +223,12 @@ fn lookupUdp(id:i64) -> Option<i64> {
   Some(*id.unwrap())
 }
 
+fn not_negative_one() -> i64 {
+  let x = rand::thread_rng().gen::<i64>();
+  if x == -1 { return not_negative_one(); }
+  x
+}
+
 fn do_listen(){
   let mut system = DataStore::globals().get_object("system");
   let runtime = system.get_object("apps").get_object("app").get_object("runtime");
@@ -372,7 +378,7 @@ fn do_listen(){
               connections.push_i64(data_ref);
 
               // Send connection ID
-              let remote_id = rand::thread_rng().gen::<i64>();
+              let remote_id = not_negative_one();
               UDPLOOKUP.get().write().unwrap().insert(remote_id, data_ref);
               buf.extend_from_slice(&remote_id.to_be_bytes());
                 
@@ -415,7 +421,7 @@ fn do_listen(){
               buf.extend_from_slice(&remote_id.to_be_bytes());
  
               // Send my connection ID
-              let remote_id = rand::thread_rng().gen::<i64>();
+              let remote_id = not_negative_one();
               UDPLOOKUP.get().write().unwrap().insert(remote_id, data_ref);
               buf.extend_from_slice(&remote_id.to_be_bytes());
                 
@@ -527,6 +533,7 @@ fn do_listen(){
       ACK => {
         let id: [u8; 8] = buf[1..9].try_into().unwrap();
         let id = i64::from_be_bytes(id);
+        println!("received ACK for con {}", id);
         let id = lookupUdp(id);
         if id.is_some() {
           let id = id.unwrap();
@@ -534,7 +541,7 @@ fn do_listen(){
           let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
           let msg_id = i64::from_be_bytes(msg_id);
 
-          println!("received ACK for packet {} on con {}", msg_id, id);
+          println!("received ACK for packet {} on internal con {}", msg_id, id);
 
           let mut heap = P2PHEAP.get().write().unwrap();
           let con = heap.get(id as usize);
