@@ -449,6 +449,12 @@ fn do_listen(){
           inv.push_bytes(db);
         
           println!("CMD CON {} MSG {}", id, msg_id);
+          
+          let mut bytes = Vec::new();
+          bytes.push(ACK);
+          bytes.extend_from_slice(&id.to_be_bytes());
+          bytes.extend_from_slice(&msg_id.to_be_bytes());
+          sock.send_to(&bytes, &src).unwrap();
         }        
       },
       _ => {
