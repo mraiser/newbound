@@ -439,52 +439,55 @@ fn do_listen(){
         let buf = &buf[17..];
 
         let mut heap = P2PHEAP.get().write().unwrap();
-        let con = heap.get(id as usize);
-        if let P2PStream::Udp(stream) = &mut con.stream {
-          if stream.src == src {
-            // There can be only one!
-            let _lock = READMUTEX.get().write().unwrap();
-            let in_off = stream.data.get_i64("in_off");
-            let mut inv = stream.data.get_array("in");
+        let con = heap.try_get(id as usize);
+        if con.is_some() {
+          let con = con.unwrap();
+          if let P2PStream::Udp(stream) = &mut con.stream {
+            if stream.src == src {
+              // There can be only one!
+              let _lock = READMUTEX.get().write().unwrap();
+              let in_off = stream.data.get_i64("in_off");
+              let mut inv = stream.data.get_array("in");
 
-            let i = msg_id - in_off;
-            if i < 0 {
-              println!("Ignoring resend of msg {} on udp connection {}", msg_id, id);
-            }
-            else if i > MAXPACKETBUFF {
-              println!("Too many packets... Ignoring msg {} on udp connection {}", msg_id, id);
+              let i = msg_id - in_off;
+              if i < 0 {
+                println!("Ignoring resend of msg {} on udp connection {}", msg_id, id);
+              }
+              else if i > MAXPACKETBUFF {
+                println!("Too many packets... Ignoring msg {} on udp connection {}", msg_id, id);
+              }
+              else {
+                while (inv.len() as i64) < i {
+                  inv.push_property(Data::DNull);
+                  println!("INV EXPAND");
+                }
+
+                let db = DataBytes::from_bytes(&buf.to_vec());
+                if (inv.len() as i64) == i { inv.push_bytes(db); }
+                else { inv.put_bytes(i as usize, db); }
+
+  //              println!("CMD CON {} MSG {}", id, msg_id);
+
+                let mut i = 0;
+                while i < inv.len() {
+                  if Data::equals(inv.get_property(i), Data::DNull) { break; }
+                  i += 1;
+                }
+                if i > 0 {
+                  let i = (i as i64) + in_off - 1;
+  //                println!("send ACK {}", i);
+
+                  let mut bytes = Vec::new();
+                  bytes.push(ACK);
+                  bytes.extend_from_slice(&id.to_be_bytes());
+                  bytes.extend_from_slice(&i.to_be_bytes());
+                  sock.send_to(&bytes, &src).unwrap();
+                }
+              }
             }
             else {
-              while (inv.len() as i64) < i {
-                inv.push_property(Data::DNull);
-                println!("INV EXPAND");
-              }
-              
-              let db = DataBytes::from_bytes(&buf.to_vec());
-              if (inv.len() as i64) == i { inv.push_bytes(db); }
-              else { inv.put_bytes(i as usize, db); }
-              
-//              println!("CMD CON {} MSG {}", id, msg_id);
-              
-              let mut i = 0;
-              while i < inv.len() {
-                if Data::equals(inv.get_property(i), Data::DNull) { break; }
-                i += 1;
-              }
-              if i > 0 {
-                let i = (i as i64) + in_off - 1;
-//                println!("send ACK {}", i);
-                
-                let mut bytes = Vec::new();
-                bytes.push(ACK);
-                bytes.extend_from_slice(&id.to_be_bytes());
-                bytes.extend_from_slice(&i.to_be_bytes());
-                sock.send_to(&bytes, &src).unwrap();
-              }
+              println!("Received CMD from wrong source");
             }
-          }
-          else {
-            println!("Received CMD from wrong source");
           }
         }        
       },

@@ -534,11 +534,11 @@ fn do_listen(ipaddr:String, port:i64) -> i64 {
 
 pub fn handle_connection(con:P2PConnection) {
   let uuid = con.uuid.to_owned();
-  let mut user = get_user(&uuid).unwrap();
   let sessionid = con.sessionid.to_owned();
-  //let cipher = con.cipher.to_owned();
   let stream = con.stream.try_clone().unwrap();
-  //let mut res = con.res.duplicate();
+
+  let mut user = get_user(&uuid).unwrap();
+  user.put_i64("last_contact", time());
 
   let system = DataStore::globals().get_object("system");
   let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
@@ -558,7 +558,6 @@ pub fn handle_connection(con:P2PConnection) {
   let mut connections = user.get_array("connections");
   connections.push_i64(data_ref as i64);
 
-  user.put_i64("last_contact", time());
   let remote_addr = stream.peer_addr().unwrap();
   println!("P2P TCP Connect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
   user.put_str("address", &remote_addr.ip().to_string());
