@@ -151,8 +151,10 @@ impl UdpStream {
       let _lock = READMUTEX.get().write().unwrap();
       
       if bytes.len() > 0 { bd.set_data(&bytes); }
-      else { inv.remove_property(0); }
-      in_off += 1;
+      else { 
+        in_off += 1;
+        inv.remove_property(0); 
+      }
       self.data.put_i64("in_off", in_off);
 
       i += n;
