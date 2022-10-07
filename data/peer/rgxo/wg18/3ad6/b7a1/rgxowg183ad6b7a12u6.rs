@@ -66,6 +66,7 @@ impl UdpStream {
       for bytes in hold.objects(){
         let bytes = bytes.bytes();
         let _x = self.write(&bytes.get_data()).unwrap();
+        println!("retry write");
       }
       self.data.remove_property("hold");
     }
@@ -73,6 +74,7 @@ impl UdpStream {
   
   pub fn write(&mut self, buf: &[u8]) -> io::Result<usize>
   {
+    println!("begin write");
     if buf.len() > 491 { panic!("NOT SUPPORTED"); }
     
     // There can be only one!
@@ -84,6 +86,7 @@ impl UdpStream {
       let mut hold = self.data.get_array("hold");
       let bytes = DataBytes::from_bytes(&buf.to_vec());
       hold.push_bytes(bytes);
+      println!("hold");
     }
     else {
       let mut out = self.data.get_array("out");
@@ -106,6 +109,7 @@ impl UdpStream {
 
       self.data.put_i64("next", msgid);
     }
+    println!("end write");
     Ok(buf.len())
   }
   
