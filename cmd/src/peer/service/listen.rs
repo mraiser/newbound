@@ -147,8 +147,8 @@ impl P2PStream {
         }
         panic!("No such relay {}", from);
       },
-      P2PStream::Udp(_stream) => {
-        panic!("Not implemented");
+      P2PStream::Udp(stream) => {
+        stream.write(buf)
       },
     }
   }
@@ -180,8 +180,8 @@ impl P2PStream {
         buf.clone_from_slice(&v);
         Ok(())
       },
-      P2PStream::Udp(_stream) => {
-        panic!("Not implemented");
+      P2PStream::Udp(stream) => {
+        stream.read_exact(buf)
       },
     }
   }
