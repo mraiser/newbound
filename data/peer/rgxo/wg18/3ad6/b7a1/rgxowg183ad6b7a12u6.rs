@@ -125,6 +125,7 @@ impl UdpStream {
       let _lock = READMUTEX.get().write().unwrap();
       in_off = self.data.get_i64("in_off");
     }
+    println!("start read {}", in_off);
     
     let beat = Duration::from_millis(100);
     while i < len {
@@ -138,7 +139,7 @@ impl UdpStream {
         thread::sleep(beat);
       }
       
-      println!("have data");
+      println!("have data {}", in_off);
 
       let bd = inv.get_bytes(0);
       let bytes = bd.get_data();
@@ -157,7 +158,7 @@ impl UdpStream {
       i += n;
     }        
     buf.clone_from_slice(&v);
-    println!("read exact done");
+    println!("read exact done {}", in_off);
     Ok(())
   }
   
