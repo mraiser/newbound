@@ -45,7 +45,7 @@ impl UdpStream {
   }
   
   pub fn blank(src:SocketAddr) -> Self {
-    UdpStream::new(src, 0)
+    UdpStream::new(src, -1)
   }
   
   pub fn duplicate(&self) -> UdpStream {
@@ -85,7 +85,7 @@ impl UdpStream {
     let _lock = WRITEMUTEX.get().write().unwrap();
     
     let id = self.data.get_i64("id");
-    if id == 0 {
+    if id == -1 {
       if !self.data.has("hold") { self.data.put_array("hold", DataArray::new()); }
       let mut hold = self.data.get_array("hold");
       let bytes = DataBytes::from_bytes(&buf.to_vec());
