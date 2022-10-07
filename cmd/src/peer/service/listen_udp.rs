@@ -150,6 +150,7 @@ impl UdpStream {
       let bytes = DataBytes::from_bytes(&bytes);
       out.push_bytes(bytes);
       sock.send_to(&buf, self.src).unwrap();
+      println!("write {}", msgid);
       msgid += 1;
 
       self.data.put_i64("next", msgid);
