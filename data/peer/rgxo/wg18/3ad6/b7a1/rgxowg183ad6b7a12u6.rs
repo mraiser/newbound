@@ -499,6 +499,8 @@ fn do_listen(){
                 let in_off = stream.data.get_i64("in_off");
                 let mut inv = stream.data.get_array("in");
 
+                println!("CMD msg id {} in_off {}", msg_id, in_off);
+                
                 let i = msg_id - in_off;
                 if i < 0 {
                   println!("Ignoring resend of msg {} on udp connection {}", msg_id, id);
