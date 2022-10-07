@@ -56,9 +56,6 @@ impl UdpStream {
   }
 
   pub fn set_id(&mut self, id:i64) {
-    let id2 = self.data.get_i64("id");
-    println!("set id {} / {}", id, id2);
-    
     // There can be only one!
     let _lock = WRITEMUTEX.get().write().unwrap();
     
@@ -69,7 +66,6 @@ impl UdpStream {
       for bytes in hold.objects(){
         let bytes = bytes.bytes();
         let _x = self.write(&bytes.get_data()).unwrap();
-        println!("retry write");
       }
       self.data.remove_property("hold");
     }
@@ -77,8 +73,6 @@ impl UdpStream {
   
   pub fn write(&mut self, buf: &[u8]) -> io::Result<usize>
   {
-    let id = self.data.get_i64("id");
-    println!("begin write {}", id);
     if buf.len() > 491 { panic!("NOT SUPPORTED"); }
     
     // There can be only one!
@@ -90,7 +84,6 @@ impl UdpStream {
       let mut hold = self.data.get_array("hold");
       let bytes = DataBytes::from_bytes(&buf.to_vec());
       hold.push_bytes(bytes);
-      println!("hold");
     }
     else {
       let mut out = self.data.get_array("out");
@@ -109,12 +102,10 @@ impl UdpStream {
       let db = DataBytes::from_bytes(&bytes);
       out.push_bytes(db);
       sock.send_to(&bytes, self.src).unwrap();
-      println!("write {}", msgid);
       msgid += 1;
 
       self.data.put_i64("next", msgid);
     }
-    println!("end write");
     Ok(buf.len())
   }
   
