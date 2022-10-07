@@ -25,9 +25,7 @@ use crate::peer::service::listen::P2PHEAP;
 use ndata::dataarray::DataArray;
 use std::net::SocketAddr;
 use std::thread;
-use std::hint::spin_loop;
 use std::time::Duration;
-use std::thread::yield_now;
 use ndata::data::Data;
 use rand::Rng;
 use std::collections::HashMap;
@@ -225,7 +223,7 @@ impl UdpStream {
   }
 }
 
-fn lookupUdp(id:i64) -> Option<i64> {
+fn lookup_udp(id:i64) -> Option<i64> {
   let heap = UDPLOOKUP.get().write().unwrap();
   let id = heap.get(&id);
   if id.is_none() { return None; }
@@ -260,7 +258,7 @@ fn handle_connection(data_ref: usize, con: P2PConnection) {
   let mut sessions = system.get_object("sessions");
   sessions.put_object(&sessionid, session.duplicate());
   
-  let mut connections = user.get_array("connections");
+  let connections = user.get_array("connections");
 
   let remote_addr = stream.peer_addr().unwrap();
   println!("P2P UDP Connect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
@@ -498,7 +496,7 @@ fn do_listen(){
             let _x = res.unwrap();
             let bytes:[u8; 8] = buf[113..121].try_into().unwrap();
             let id = i64::from_be_bytes(bytes);
-            let id = lookupUdp(id);
+            let id = lookup_udp(id);
             if id.is_some() {
               let id = id.unwrap();
               let mut heap = P2PHEAP.get().write().unwrap();
@@ -529,7 +527,7 @@ fn do_listen(){
         let id: [u8; 8] = buf[1..9].try_into().unwrap();
         let id = i64::from_be_bytes(id);
         //println!("CMD remote id {}", id);
-        let id = lookupUdp(id);
+        let id = lookup_udp(id);
         if id.is_some() {
           let id = id.unwrap();
           //println!("CMD local id {}", id);
@@ -606,7 +604,7 @@ fn do_listen(){
         let id: [u8; 8] = buf[1..9].try_into().unwrap();
         let id = i64::from_be_bytes(id);
         //println!("received ACK for remote con {}", id);
-        let id = lookupUdp(id);
+        let id = lookup_udp(id);
         if id.is_some() {
           let id = id.unwrap();
           //println!("received ACK for local con {}", id);
