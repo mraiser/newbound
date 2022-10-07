@@ -477,12 +477,15 @@ fn do_listen(){
       CMD => {
         let id: [u8; 8] = buf[1..9].try_into().unwrap();
         let id = i64::from_be_bytes(id);
+        println!("CMD remote id {}", id);
         let id = lookupUdp(id);
         if id.is_some() {
           let id = id.unwrap();
+          println!("CMD local id{}", id);
         
           let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
           let msg_id = i64::from_be_bytes(msg_id);
+          println!("CMD msg id{}", msg_id);
           let buf = &buf[17..];
 
           let mut heap = P2PHEAP.get().write().unwrap();
@@ -549,15 +552,16 @@ fn do_listen(){
       ACK => {
         let id: [u8; 8] = buf[1..9].try_into().unwrap();
         let id = i64::from_be_bytes(id);
-        //println!("received ACK for con {}", id);
+        println!("received ACK for remote con {}", id);
         let id = lookupUdp(id);
         if id.is_some() {
           let id = id.unwrap();
+          println!("received ACK for local con {}", id);
         
           let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
           let msg_id = i64::from_be_bytes(msg_id);
 
-          //println!("received ACK for packet {} on internal con {}", msg_id, id);
+          println!("received ACK for packet {} on internal con {}", msg_id, id);
 
           let mut heap = P2PHEAP.get().write().unwrap();
           let con = heap.get(id as usize);
