@@ -386,7 +386,7 @@ fn do_listen(){
       CMD => {
         let id: [u8; 8] = buf[1..9].try_into().unwrap();
         let id = i64::from_be_bytes(id);
-        let msg_id: [u8; 8] = buf[1..9].try_into().unwrap();
+        let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
         let msg_id = i64::from_be_bytes(msg_id);
         println!("CON {} MSG {}", id, msg_id);
 
