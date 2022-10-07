@@ -125,8 +125,6 @@ impl UdpStream {
   
   pub fn write(&mut self, buf: &[u8]) -> io::Result<usize>
   {
-    if buf.len() > 491 { panic!("NOT SUPPORTED"); }
-    
     // There can be only one!
     let _lock = WRITEMUTEX.get().write().unwrap();
     
