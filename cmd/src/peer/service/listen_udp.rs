@@ -309,7 +309,7 @@ fn do_listen(){
           // FIXME - If we have their pubkey, skip to YO
           let (_cipher, buf) = helo(WELCOME, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned());
           
-          println!("HELO BUFLEN {}", buf.len());
+          //println!("HELO BUFLEN {}", buf.len());
           sock.send_to(&buf, &src).unwrap();
         }
       },
@@ -323,7 +323,7 @@ fn do_listen(){
             let bytes = encrypt(&cipher, "What's good, yo?".as_bytes());
             buf.extend_from_slice(&bytes);
 
-            println!("WELCOME BUFLEN {}", buf.len());
+            //println!("WELCOME BUFLEN {}", buf.len());
             sock.send_to(&buf, &src).unwrap();
           }
         }
@@ -360,7 +360,7 @@ fn do_listen(){
               // Send connection ID
               buf.extend_from_slice(&data_ref.to_be_bytes());
                 
-              println!("YO BUFLEN {}", buf.len());
+              //println!("YO BUFLEN {}", buf.len());
               sock.send_to(&buf, &src).unwrap();
             }
           }
@@ -398,7 +398,7 @@ fn do_listen(){
               // Send connection ID
               buf.extend_from_slice(&data_ref.to_be_bytes());
                 
-              println!("SUP BUFLEN {}", buf.len());
+              //println!("SUP BUFLEN {}", buf.len());
               sock.send_to(&buf, &src).unwrap();
               
               // FIXME - start connection listen
@@ -417,7 +417,7 @@ fn do_listen(){
             let con = heap.get(conid as usize);
             if let P2PStream::Udp(stream) = &mut con.stream {
               stream.set_id(conid);
-              println!("RDY");
+              //println!("RDY");
               
               // FIXME - start connection listen
             }

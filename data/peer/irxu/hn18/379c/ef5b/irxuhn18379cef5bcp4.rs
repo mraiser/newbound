@@ -45,6 +45,14 @@ impl P2PStream {
     }
   }
   
+  pub fn is_udp(&self) -> bool {
+    match self {
+      P2PStream::Tcp(_stream) => false,
+      P2PStream::Relay(_stream) => false,
+      P2PStream::Udp(_stream) => true,
+    }
+  }
+  
   pub fn is_relay(&self) -> bool {
     match self {
       P2PStream::Tcp(_stream) => false,
@@ -196,6 +204,20 @@ pub fn get_tcp(user:DataObject) -> Option<P2PConnection> {
     let conid = con.int();
     let con = heap.get(conid as usize);
     if con.stream.is_tcp() {
+      return Some(con.duplicate());
+    }
+  }
+  None
+}
+
+pub fn get_udp(user:DataObject) -> Option<P2PConnection> {
+  let mut heap = P2PHEAP.get().write().unwrap();
+  let cons = user.get_array("connections");
+//  println!("heap {:?} cons {}", heap, cons.to_string());
+  for con in cons.objects(){
+    let conid = con.int();
+    let con = heap.get(conid as usize);
+    if con.stream.is_udp() {
       return Some(con.duplicate());
     }
   }

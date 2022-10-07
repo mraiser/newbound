@@ -3,6 +3,7 @@ use flowlang::datastore::DataStore;
 use ndata::dataarray::DataArray;
 use crate::peer::service::listen::get_tcp;
 use crate::peer::service::listen::get_relay;
+use crate::peer::service::listen::get_udp;
 
 pub fn execute(_o: DataObject) -> DataObject {
 let ax = peers();
@@ -47,8 +48,9 @@ pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
   o.put_str("id", &id);
   o.put_str("name", &o.get_string("displayname"));
   
+  // FIXME - Each call gets the same lock
   let tcp = get_tcp(o.duplicate()).is_some();
-  let udp = false;
+  let udp = get_udp(o.duplicate()).is_some();
   let relay = get_relay(o.duplicate()).is_some();
   let connected = tcp || udp || relay;
   
