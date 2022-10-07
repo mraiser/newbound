@@ -125,7 +125,7 @@ impl UdpStream {
       let _lock = READMUTEX.get().write().unwrap();
       in_off = self.data.get_i64("in_off");
     }
-    println!("start read {}", in_off);
+    //println!("start read {}", in_off);
     
     let beat = Duration::from_millis(100);
     while i < len {
@@ -139,7 +139,7 @@ impl UdpStream {
         thread::sleep(beat);
       }
       
-      println!("have data {}", in_off);
+      //println!("have data {}", in_off);
 
       let bd = inv.get_bytes(0);
       let bytes = bd.get_data();
@@ -160,7 +160,7 @@ impl UdpStream {
       i += n;
     }        
     buf.clone_from_slice(&v);
-    println!("read exact done {}", in_off);
+    //println!("read exact done {}", in_off);
     Ok(())
   }
   
@@ -480,15 +480,15 @@ fn do_listen(){
       CMD => {
         let id: [u8; 8] = buf[1..9].try_into().unwrap();
         let id = i64::from_be_bytes(id);
-        println!("CMD remote id {}", id);
+        //println!("CMD remote id {}", id);
         let id = lookupUdp(id);
         if id.is_some() {
           let id = id.unwrap();
-          println!("CMD local id {}", id);
+          //println!("CMD local id {}", id);
         
           let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
           let msg_id = i64::from_be_bytes(msg_id);
-          println!("CMD msg id {}", msg_id);
+          //println!("CMD msg id {}", msg_id);
           let buf = &buf[17..];
 
           let mut heap = P2PHEAP.get().write().unwrap();
@@ -502,7 +502,7 @@ fn do_listen(){
                 let in_off = stream.data.get_i64("in_off");
                 let mut inv = stream.data.get_array("in");
 
-                println!("CMD msg id {} in_off {}", msg_id, in_off);
+                //println!("CMD msg id {} in_off {}", msg_id, in_off);
                 
                 let i = msg_id - in_off;
                 if i < 0 {
@@ -557,16 +557,16 @@ fn do_listen(){
       ACK => {
         let id: [u8; 8] = buf[1..9].try_into().unwrap();
         let id = i64::from_be_bytes(id);
-        println!("received ACK for remote con {}", id);
+        //println!("received ACK for remote con {}", id);
         let id = lookupUdp(id);
         if id.is_some() {
           let id = id.unwrap();
-          println!("received ACK for local con {}", id);
+          //println!("received ACK for local con {}", id);
         
           let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
           let msg_id = i64::from_be_bytes(msg_id);
 
-          println!("received ACK for packet {} on internal con {}", msg_id, id);
+          //println!("received ACK for packet {} on internal con {}", msg_id, id);
 
           let mut heap = P2PHEAP.get().write().unwrap();
           let con = heap.get(id as usize);
@@ -582,7 +582,7 @@ fn do_listen(){
               let n = msg_id - out_off;
               let mut i = 0;
               while i <= n {
-                println!("removing packet {}", out_off);
+                //println!("removing packet {}", out_off);
                 out.remove_property(0);
                 out_off += 1;
                 i += 1;
