@@ -464,7 +464,7 @@ fn do_listen(){
               if (inv.len() as i64) == i { inv.push_bytes(db); }
               else { inv.put_bytes(i as usize, db); }
               
-              println!("CMD CON {} MSG {}", id, msg_id);
+//              println!("CMD CON {} MSG {}", id, msg_id);
               
               let mut i = 0;
               while i < inv.len() {
@@ -473,7 +473,7 @@ fn do_listen(){
               }
               if i > 0 {
                 let i = (i as i64) + in_off - 1;
-                println!("send ACK {}", i);
+//                println!("send ACK {}", i);
                 
                 let mut bytes = Vec::new();
                 bytes.push(ACK);
@@ -494,7 +494,7 @@ fn do_listen(){
         let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
         let msg_id = i64::from_be_bytes(msg_id);
         
-        println!("received ACK for packet {} on con {}", msg_id, id);
+//        println!("received ACK for packet {} on con {}", msg_id, id);
         
         let mut heap = P2PHEAP.get().write().unwrap();
         let con = heap.get(id as usize);
@@ -505,12 +505,12 @@ fn do_listen(){
             let mut out_off = stream.data.get_i64("out_off");
             let mut out = stream.data.get_array("out");
             
-            println!("con {} has {} packets with offset {}", id, out.len(), out_off);
+//            println!("con {} has {} packets with offset {}", id, out.len(), out_off);
             
             let n = msg_id - out_off;
             let mut i = 0;
             while i <= n {
-              println!("removing packet {}", out_off);
+//              println!("removing packet {}", out_off);
               out.remove_property(0);
               out_off += 1;
               i += 1;
