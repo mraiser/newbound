@@ -511,7 +511,12 @@ fn do_listen(){
 
                   let db = DataBytes::from_bytes(&buf.to_vec());
                   if (inv.len() as i64) == i { inv.push_bytes(db); }
-                  else { inv.put_bytes(i as usize, db); }
+                  else {
+                    if !inv.get_property(i as usize).is_null(){
+                      println!("Duplicate of msg {} on udp connection {}", msg_id, id);
+                    }
+                    inv.put_bytes(i as usize, db); 
+                  }
 
                   //println!("CMD CON {} MSG {}", id, msg_id);
 
