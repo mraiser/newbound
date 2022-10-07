@@ -398,23 +398,56 @@ fn do_listen(){
           let _lock = READMUTEX.get().write().unwrap();
           let in_off = stream.data.get_i64("in_off");
           let mut inv = stream.data.get_array("in");
-       
+          
           let i = msg_id - in_off;
           while (inv.len() as i64) < i {
             inv.push_property(Data::DNull);
             println!("INV EXPAND");
           }
           let db = DataBytes::from_bytes(&buf.to_vec());
+          
+          // FIXME - set index to bytes
           inv.push_bytes(db);
         
           println!("CMD CON {} MSG {}", id, msg_id);
           
+          /*
           let mut bytes = Vec::new();
           bytes.push(ACK);
           bytes.extend_from_slice(&id.to_be_bytes());
           bytes.extend_from_slice(&msg_id.to_be_bytes());
           sock.send_to(&bytes, &src).unwrap();
+          */
         }        
+      },
+      ACK => {
+        let id: [u8; 8] = buf[1..9].try_into().unwrap();
+        let id = i64::from_be_bytes(id);
+        let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
+        let msg_id = i64::from_be_bytes(msg_id);
+        
+        let mut heap = P2PHEAP.get().write().unwrap();
+        let con = heap.get(id as usize);
+        if let P2PStream::Udp(stream) = &mut con.stream {
+              
+          // There can be only one!
+          let _lock = WRITEMUTEX.get().write().unwrap();
+          let mut out_off = stream.data.get_i64("out_off");
+          let mut out = stream.data.get_array("out");
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+        }
       },
       _ => {
         println!("Unknown UDP command {} len {}", cmd, buf.len());
