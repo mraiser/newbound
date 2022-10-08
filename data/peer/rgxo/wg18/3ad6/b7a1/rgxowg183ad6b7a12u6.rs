@@ -201,6 +201,7 @@ fn handle_connection(data_ref: usize, con: P2PConnection) {
   let system = DataStore::globals().get_object("system");
   let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
 
+  // FIXME - Make session  creation its own thing. Merge with appserver
   let mut session = DataObject::new();
   session.put_i64("count", 0);
   session.put_str("id", &sessionid);

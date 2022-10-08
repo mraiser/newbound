@@ -1,3 +1,18 @@
+// Kill any connection with no response over 2x poll period
+{
+  let mut heap = P2PHEAP.get().write().unwrap();
+  let pcons = heap.keys();
+  for id in pcons {
+    let con = heap.get(id);
+  }
+}
+
+
+// Ping every live connection and update user data
+// If no live connection, attempt UDP (or TCP?) 
+// Upgrade relay to UDP
+// Upgrade UDP to TCP
+
 let users = users();
 let mut ask = DataArray::new();
 //println!("PASS 1");
