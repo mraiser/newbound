@@ -49,7 +49,7 @@ o.put_i64("http_port", http_port);
 let mut cons = DataObject::new();
 o.put_object("connections", cons.duplicate());
 
-if !uuid.clone().is_null(){
+if !salt.clone().is_null(){
   let salt = salt.string();
   let users = users();
   let mut map = HashMap::new();
