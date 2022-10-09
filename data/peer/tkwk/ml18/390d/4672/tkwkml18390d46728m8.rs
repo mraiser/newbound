@@ -36,7 +36,7 @@ if !salt.clone().is_null(){
       let res = hasher.finalize();
       let hash = to_hex(&res);
       //println!("INFO hash {} {}", uuid, hash);
-      map.insert(&salt, user.object());
+      map.insert(hash, user.object());
     }
   }
   

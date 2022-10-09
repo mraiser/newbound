@@ -121,7 +121,7 @@ for (uuid, user) in users.objects(){
           user.put_i64("p2p_port", o.get_i64("p2p_port"));
           
           let cons = o.get_object("connections");
-          println!("CONS {}", cons.to_string());
+          //println!("CONS {}", cons.to_string());
           user.put_object("peers", cons.duplicate());
           
           let users = system.get_object("users");
