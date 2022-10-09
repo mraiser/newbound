@@ -308,6 +308,23 @@ impl P2PConnection {
   }
 }
 
+pub fn get_best(user:DataObject) -> Option<P2PConnection> {
+  let mut best = None;
+  let mut heap = P2PHEAP.get().write().unwrap();
+  let cons = user.get_array("connections");
+//  println!("heap {:?} cons {}", heap, cons.to_string());
+  for con in cons.objects(){
+    let conid = con.int();
+    let con = heap.get(conid as usize);
+    if con.stream.is_tcp() {
+      return Some(con.duplicate());
+    }
+    else if (&best).is_none() { best = Some(con.duplicate()); }
+    else if (&best).as_ref().unwrap().stream.is_relay() && con.stream.is_udp() { best = Some(con.duplicate()); }
+  }
+  best
+}
+
 pub fn get_tcp(user:DataObject) -> Option<P2PConnection> {
   let mut heap = P2PHEAP.get().write().unwrap();
   let cons = user.get_array("connections");

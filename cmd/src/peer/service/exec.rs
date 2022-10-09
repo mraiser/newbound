@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use std::thread;
 use ndata::data::Data;
+use crate::peer::service::listen::get_best;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("uuid");
@@ -38,8 +39,7 @@ d.put_str("cmd", &cmd);
 d.put_i64("pid", pid);
 d.put_object("params", params);
 
-let conid = cons.get_i64(0);
-let con = P2PHEAP.get().write().unwrap().get(conid as usize).duplicate();
+let con = get_best(user).unwrap();
 let cipher = con.cipher;
 let mut stream = con.stream;
 let mut res = con.res;
