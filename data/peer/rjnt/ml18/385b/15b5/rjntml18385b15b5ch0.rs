@@ -36,7 +36,7 @@ for (uuid, user) in users.objects(){
     let hash = to_hex(&res);
     ask.push_str(&hash);
     
-    println!("INFO hash {} {}", uuid, hash);
+    println!("MAINT hash {} {}", uuid, hash);
     
     if get_tcp(user.duplicate()).is_none() {
       if user.has("keepalive") && Data::as_string(user.get_property("keepalive")) == "true" {
