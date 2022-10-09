@@ -25,11 +25,27 @@ let mut cons = DataObject::new();
 o.put_object("connections", cons.duplicate());
 
 if !uuid.clone().is_null(){
-  for uuid in DataArray::from_string(&Data::as_string(uuid)).objects() {
-    let uuid = uuid.string();
-    let u = get_user(&uuid);
+  let salt = salt.string();
+  let users = users();
+  let mut map = HashMap::new();
+  for (uuid, user) in users.objects() {
+    if uuid.len() == 36 {
+      let mut hasher = Blake2b80::new();
+      hasher.update(salt.to_owned().as_bytes());
+      hasher.update(uuid.as_bytes());
+      let res = hasher.finalize();
+      let hash = to_hex(&res);
+      map.insert(&salt, user.object());
+    }
+  }
+  
+  for uhash in DataArray::from_string(&Data::as_string(uuid)).objects() {
+    let uhash = uhash.string();
+    let u = map.get(&uhash);
     if u.is_some(){
-      let p = user_to_peer(u.unwrap(), uuid.to_owned());
+      let u = u.unwrap();
+      let uuid = u.get_string("id");
+      let p = user_to_peer(u.duplicate(), uuid.to_owned());
       if p.get_bool("tcp") { cons.put_str(&uuid, &("tcp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
       else if p.get_bool("udp") { cons.put_str(&uuid, &("udp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
       else if p.get_bool("relay") { cons.put_str(&uuid, "relay#"); }

@@ -10,22 +10,32 @@ pub struct RelayStream {
   from: String,
   to: String,
   buf: DataArray,
+  data: DataObject,
 }
 
 impl RelayStream {
   pub fn new(from:String, to:String) -> RelayStream {
+    let mut o = DataObject::new();
+    o.put_i64("last_contact", time());
     RelayStream{
       from:from,
       to:to,
       buf:DataArray::new(),
+      data:o,
     }
   }
+  
   pub fn duplicate(&self) -> RelayStream {
     RelayStream{
       from:self.from.to_owned(),
       to:self.to.to_owned(),
       buf:self.buf.duplicate(),
+      data:self.data.duplicate(),
     }
+  }
+  
+  pub fn last_contact(&self) -> i64 {
+    self.data.get_i64("last_contact")
   }
 }
 
@@ -160,6 +170,21 @@ impl P2PStream {
     }
   }
   
+  pub fn shutdown(&self, sd:Shutdown) -> io::Result<()> {
+    match self {
+      P2PStream::Tcp(stream) => {
+        stream.shutdown(sd)
+      },
+      P2PStream::Relay(_stream) => {
+        Ok(())
+      },
+      P2PStream::Udp(stream) => {
+        stream.duplicate().data.put_bool("dead", true);
+        Ok(())
+      },
+    }
+  }
+  
   pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
     match self {
       P2PStream::Tcp(stream) => {
@@ -173,6 +198,20 @@ impl P2PStream {
       },
     }
   }
+  
+  pub fn last_contact(&self) -> i64 {
+    match self {
+      P2PStream::Tcp(stream) => {
+        time()
+      },
+      P2PStream::Relay(stream) => {
+        stream.last_contact()
+      },
+      P2PStream::Udp(stream) => {
+        stream.last_contact()
+      },
+    }
+  }
 }
 
 #[derive(Debug)]
@@ -182,6 +221,7 @@ pub struct P2PConnection {
   pub cipher: Aes256,
   pub uuid: String,
   pub res: DataObject,
+  pub pending: DataArray,
 }
 
 impl P2PConnection {
@@ -192,7 +232,30 @@ impl P2PConnection {
       cipher: self.cipher.to_owned(),
       uuid: self.uuid.to_owned(),
       res: self.res.duplicate(),
+      pending: self.pending.duplicate(),
     }
+  }
+  
+  pub fn shutdown(&self, uuid:&str, conid:i64, sd:Shutdown) -> io::Result<()> {
+    let user = get_user(uuid).unwrap();
+    user.get_array("connections").remove_data(Data::DInt(conid));
+    let mut con = P2PHEAP.get().write().unwrap().get(conid as usize).duplicate();
+    P2PHEAP.get().write().unwrap().decr(conid as usize);
+    let x = self.stream.shutdown(sd);
+    fire_event("peer", "UPDATE", user_to_peer(user.duplicate(), uuid.to_string()));
+    fire_event("peer", "DISCONNECT", user_to_peer(user.duplicate(), uuid.to_string()));
+    let mut o = DataObject::new();
+    o.put_str("status", "err");
+    o.put_str("msg", "Connection closed");
+    for pid in con.pending.objects() {
+      let pid = pid.int();
+      con.res.put_object(&pid.to_string(), o.duplicate());
+    }
+    x
+  }
+  
+  pub fn last_contact(&self) -> i64 {
+    self.stream.last_contact()
   }
 }
 
@@ -285,6 +348,7 @@ pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
       cipher: cipher,
       uuid: to.to_string(),
       res: DataObject::new(),
+      pending: DataArray::new(),
     };
     
     let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
@@ -432,6 +496,7 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<P2PConn
         cipher: cipher,
         uuid: uuid.to_owned(),
         res: DataObject::new(),
+        pending: DataArray::new(),
       };
   
       if saveme {
@@ -582,6 +647,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     let con = relay(&uuid, &uuid2, true).unwrap();  
 	if let P2PStream::Relay(mut stream) = con.stream.try_clone().unwrap() {
       stream.buf.push_bytes(DataBytes::from_bytes(&buf.to_vec()));
+      stream.data.put_i64("last_contact", time());
       handle_next_message(con);
     }
   }

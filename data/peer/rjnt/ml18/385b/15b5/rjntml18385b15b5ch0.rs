@@ -1,9 +1,17 @@
+let pollx2 = 60000;
+
 // Kill any connection with no response over 2x poll period
+let mut live = Vec::new();
 {
+  let now = time();
   let mut heap = P2PHEAP.get().write().unwrap();
   let pcons = heap.keys();
   for id in pcons {
     let con = heap.get(id);
+    if con.last_contact() < now - pollx2 {
+      con.shutdown(&con.uuid, id as i64, Shutdown::Both);
+    }
+    else { live.push(con.duplicate()); }
   }
 }
 
@@ -15,14 +23,20 @@
 
 let users = users();
 let mut ask = DataArray::new();
-//println!("PASS 1");
+let salt = unique_session_id();
+
 for (uuid, user) in users.objects(){
   if uuid.len() == 36 {
     let user = user.object();
-    //println!("USER {}", user.to_string());
+    
+    let mut hasher = Blake2b80::new();
+    hasher.update(salt.as_bytes());
+    hasher.update(uuid.as_bytes());
+    let res = hasher.finalize();
+    ask.push_str(&to_hex(&res));
+    
     if get_tcp(user.duplicate()).is_none() {
       if user.has("keepalive") && Data::as_string(user.get_property("keepalive")) == "true" {
-        ask.push_str(&uuid);
         if user.has("address") && user.has("port") {
           let ipaddr = user.get_string("address");
           let port = Data::as_string(user.get_property("port")).parse::<i64>().unwrap();
@@ -35,6 +49,11 @@ for (uuid, user) in users.objects(){
   }
 }
 
+
+
+
+
+
 //println!("PASS 2");
 let adr = ask.data_ref;
 for (uuid, user) in users.objects(){
@@ -43,11 +62,15 @@ for (uuid, user) in users.objects(){
     //println!("USER A {}", user.to_string());
     if user.get_array("connections").len() > 0 {
       user.put_bool("connected", true);
+      let salt = salt.to_owned();
       thread::spawn(move || {
+        let system = DataStore::globals().get_object("system");
+        
         let ask = DataArray::get(adr);
         let t1 = time();
         let mut d = DataObject::new();
         d.put_array("uuid", ask);
+        d.put_str("salt", &salt);
         let o = exec(user.get_string("id"), "peer".to_string(), "info".to_string(), d);
         //println!("INFO {}", o.to_string());
         if o.get_string("status") == "ok" {
@@ -69,7 +92,7 @@ for (uuid, user) in users.objects(){
           let cons = o.get_object("connections");
           user.put_object("peers", cons.duplicate());
           
-          let users = DataStore::globals().get_object("system").get_object("users");
+          let users = system.get_object("users");
           for (uuid2,_u) in users.objects() {
             if uuid2.len() == 36 && uuid != uuid2 {
               let b = cons.has(&uuid2) && cons.get_string(&uuid2).starts_with("tcp#");
@@ -87,7 +110,7 @@ for (uuid, user) in users.objects(){
     else {
       user.put_bool("connected", false);
       /*
-      let users = DataStore::globals().get_object("system").get_object("users");
+      let users = system.get_object("users");
       for (uuid2,_u) in users.objects() {
         if uuid2.len() == 36 && uuid != uuid2 {
           relay(&uuid, &uuid2, false);

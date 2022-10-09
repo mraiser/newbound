@@ -5,17 +5,24 @@ use flowlang::datastore::DataStore;
 use ndata::data::Data;
 use flowlang::appserver::get_user;
 use crate::peer::peer::peers::user_to_peer;
+use crate::security::security::users::users;
+use blake2::{Blake2b, Digest, digest::consts::U10};
+use flowlang::generated::flowlang::system::unique_session_id::unique_session_id;
+use crate::peer::service::listen::to_hex;
+use std::collections::HashMap;
 
+type Blake2b80 = Blake2b<U10>;
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("nn_sessionid");
 let a1 = o.get_property("uuid");
-let ax = info(a0, a1);
+let a2 = o.get_property("salt");
+let ax = info(a0, a1, a2);
 let mut o = DataObject::new();
 o.put_object("a", ax);
 o
 }
 
-pub fn info(nn_sessionid:String, uuid:Data) -> DataObject {
+pub fn info(nn_sessionid:String, uuid:Data, salt:Data) -> DataObject {
 let mut o = DataObject::new();
 let mut a = DataArray::new();
 o.put_array("addresses", a.duplicate());
@@ -43,11 +50,27 @@ let mut cons = DataObject::new();
 o.put_object("connections", cons.duplicate());
 
 if !uuid.clone().is_null(){
-  for uuid in DataArray::from_string(&Data::as_string(uuid)).objects() {
-    let uuid = uuid.string();
-    let u = get_user(&uuid);
+  let salt = salt.string();
+  let users = users();
+  let mut map = HashMap::new();
+  for (uuid, user) in users.objects() {
+    if uuid.len() == 36 {
+      let mut hasher = Blake2b80::new();
+      hasher.update(salt.to_owned().as_bytes());
+      hasher.update(uuid.as_bytes());
+      let res = hasher.finalize();
+      let hash = to_hex(&res);
+      map.insert(&salt, user.object());
+    }
+  }
+  
+  for uhash in DataArray::from_string(&Data::as_string(uuid)).objects() {
+    let uhash = uhash.string();
+    let u = map.get(&uhash);
     if u.is_some(){
-      let p = user_to_peer(u.unwrap(), uuid.to_owned());
+      let u = u.unwrap();
+      let uuid = u.get_string("id");
+      let p = user_to_peer(u.duplicate(), uuid.to_owned());
       if p.get_bool("tcp") { cons.put_str(&uuid, &("tcp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
       else if p.get_bool("udp") { cons.put_str(&uuid, &("udp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
       else if p.get_bool("relay") { cons.put_str(&uuid, "relay#"); }

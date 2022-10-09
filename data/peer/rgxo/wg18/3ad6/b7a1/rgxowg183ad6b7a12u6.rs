@@ -30,7 +30,7 @@ const MAXPACKETBUFF:i64 = 1000;
 #[derive(Debug)]
 pub struct UdpStream {
   pub src: SocketAddr,
-  data: DataObject,
+  pub data: DataObject,
 }
 
 impl UdpStream {
@@ -42,6 +42,8 @@ impl UdpStream {
     a.put_i64("next", 0);
     a.put_array("in", DataArray::new());
     a.put_array("out", DataArray::new());
+    a.put_bool("dead", false);
+    a.put_i64("last_contact", time());
     UdpStream{
       src: src,
       data: a,
@@ -113,6 +115,8 @@ impl UdpStream {
   }
   
   pub fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
+    if self.data.get_bool("dead") { return Err(Error::new(ErrorKind::ConnectionReset, "Connection closed")); }
+    
     let mut inv = self.data.get_array("in");
     
     let len = buf.len();
@@ -174,6 +178,10 @@ impl UdpStream {
     let heap = UDPCON.get().write().unwrap();
     let sock = heap.try_clone().unwrap();
     sock.send_to(&bytes, self.src).unwrap();
+  }
+  
+  pub fn last_contact(&self) -> i64 {
+    self.data.get_i64("last_contact")
   }
 }
 
@@ -381,6 +389,7 @@ fn do_listen(){
                 cipher: cipher.to_owned(),
                 uuid: uuid.to_owned(),
                 res: DataObject::new(),
+                pending: DataArray::new(),
               };
               let data_ref = P2PHEAP.get().write().unwrap().push(con.duplicate()) as i64;
               let mut connections = user.get_array("connections");
@@ -419,6 +428,7 @@ fn do_listen(){
                 cipher: cipher.to_owned(),
                 uuid: uuid.to_owned(),
                 res: DataObject::new(),
+                pending: DataArray::new(),
               };
               let data_ref = P2PHEAP.get().write().unwrap().push(con.duplicate()) as i64;
               let mut connections = user.get_array("connections");
@@ -498,6 +508,8 @@ fn do_listen(){
             let con = con.unwrap();
             if let P2PStream::Udp(stream) = &mut con.stream {
               if stream.src == src {
+			    stream.data.put_i64("last_contact", time());
+
                 // There can be only one!
                 let _lock = READMUTEX.get().write().unwrap();
                 let in_off = stream.data.get_i64("in_off");

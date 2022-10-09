@@ -22,6 +22,10 @@ let con = P2PHEAP.get().write().unwrap().get(conid as usize).duplicate();
 let cipher = con.cipher;
 let mut stream = con.stream;
 let mut res = con.res;
+
+let mut pending = con.pending;
+pending.push_i64(pid);
+
 let s = "cmd ".to_string() + &d.to_string();
 let buf = encrypt(&cipher, s.as_bytes());
 let len = buf.len() as i16;
@@ -29,17 +33,17 @@ let mut bytes = len.to_be_bytes().to_vec();
 bytes.extend_from_slice(&buf);
 let _x = stream.write(&bytes).unwrap();
 
-let pid = &pid.to_string();
-
 // FIXME - should timeout
 let beat = Duration::from_millis(100);
-while ! res.has(pid) {
+let pidstr = &pid.to_string();
+while ! res.has(pidstr) {
   thread::sleep(beat);
   wait();
 }
 
-let o = res.get_object(pid);
-res.remove_property(pid);
+let o = res.get_object(pidstr);
+res.remove_property(pidstr);
+pending.remove_data(Data::DInt(pid));
 
 o
 }

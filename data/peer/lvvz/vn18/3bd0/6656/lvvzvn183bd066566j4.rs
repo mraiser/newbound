@@ -1,0 +1,13 @@
+if user.has("id") {
+  let username = user.get_string("id");
+  if username.len() == 36 {
+    let mut connections = user.get_array("connections");
+    println!("Peer {} session expire, cons {}", username, connections.to_string());
+    for con in connections.objects(){
+      let conid = con.int();
+      let con = P2PHEAP.get().write().unwrap().get(conid as usize).duplicate();
+      con.shutdown(&username, conid, Shutdown::Both).expect("shutdown call failed");
+    }
+  }
+}
+DataObject::new()
