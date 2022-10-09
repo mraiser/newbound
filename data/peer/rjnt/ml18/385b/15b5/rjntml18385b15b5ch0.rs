@@ -33,7 +33,10 @@ for (uuid, user) in users.objects(){
     hasher.update(salt.as_bytes());
     hasher.update(uuid.as_bytes());
     let res = hasher.finalize();
-    ask.push_str(&to_hex(&res));
+    let hash = to_hex(&res);
+    ask.push_str(&hash);
+    
+    println!("INFO hash {} {}", uuid, hash);
     
     if get_tcp(user.duplicate()).is_none() {
       if user.has("keepalive") && Data::as_string(user.get_property("keepalive")) == "true" {
