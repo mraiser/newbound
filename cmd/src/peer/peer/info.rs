@@ -60,7 +60,7 @@ if !salt.clone().is_null(){
       hasher.update(uuid.as_bytes());
       let res = hasher.finalize();
       let hash = to_hex(&res);
-      println!("INFO hash {} {}", uuid, hash);
+      //println!("INFO hash {} {}", uuid, hash);
       map.insert(&salt, user.object());
     }
   }

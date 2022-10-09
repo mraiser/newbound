@@ -64,7 +64,7 @@ for (uuid, user) in users.objects(){
     let hash = to_hex(&res);
     ask.push_str(&hash);
     
-    println!("MAINT hash {} {}", uuid, hash);
+    //println!("MAINT hash {} {}", uuid, hash);
     
     if get_tcp(user.duplicate()).is_none() {
       if user.has("keepalive") && Data::as_string(user.get_property("keepalive")) == "true" {
@@ -121,6 +121,7 @@ for (uuid, user) in users.objects(){
           user.put_i64("p2p_port", o.get_i64("p2p_port"));
           
           let cons = o.get_object("connections");
+          println!("CONS {}", cons.to_string());
           user.put_object("peers", cons.duplicate());
           
           let users = system.get_object("users");
