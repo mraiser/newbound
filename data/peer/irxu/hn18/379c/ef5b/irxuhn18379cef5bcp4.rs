@@ -237,6 +237,7 @@ impl P2PConnection {
   }
   
   pub fn shutdown(&self, uuid:&str, conid:i64, sd:Shutdown) -> io::Result<()> {
+    println!("SHUTDOWN {} {}", conid, uuid);
     let user = get_user(uuid).unwrap();
     user.get_array("connections").remove_data(Data::DInt(conid));
     let mut con = P2PHEAP.get().write().unwrap().get(conid as usize).duplicate();
