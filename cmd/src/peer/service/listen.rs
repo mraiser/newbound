@@ -36,6 +36,7 @@ use ndata::dataarray::DataArray;
 use ndata::databytes::DataBytes;
 use crate::peer::service::listen_udp::UdpStream;
 use std::net::Shutdown;
+use std::time::Duration;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("ipaddr");
@@ -182,9 +183,13 @@ impl P2PStream {
         let mut i = 0;
         let mut v = Vec::new();
         while i < len {
+          let mut timeout = 0;
+          let beat = Duration::from_millis(100);
           while stream.buf.len() == 0 {
-            spin_loop();
-            yield_now();
+            // TIGHTLOOP
+            thread::sleep(beat);
+            timeout += 1;
+            if timeout > 100 { println!("Unusually long wait in peer:service:listen:p2p_stream:relay:read_exact [{}]", stream.data.get_i64("remote_id")); }
           }
           
           let bd = &mut stream.buf.get_bytes(0);

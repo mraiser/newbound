@@ -182,13 +182,21 @@ impl UdpStream {
     let beat = Duration::from_millis(100);
     while i < len {
       // FIXME - should timeout?
+      let mut timeout = 0;
       while inv.len() == 0 {
+        // TIGHTLOOP
         thread::sleep(beat);
+        timeout += 1;
+        if timeout > 100 { println!("Unusually long wait in peer:service:listen_udp:read_exact 1 [{}]", self.data.get_i64("remote_id")); }
       }
 
+      let mut timeout = 0;
       while inv.get_property(0).is_null() {
         self.request_resend(in_off);
+        // TIGHTLOOP
         thread::sleep(beat);
+        timeout += 1;
+        if timeout > 100 { println!("Unusually long wait in peer:service:listen_udp:read_exact 2 [{}]", self.data.get_i64("remote_id")); }
       }
       
       //println!("have data {}", in_off);

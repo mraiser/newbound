@@ -55,10 +55,15 @@ bytes.extend_from_slice(&buf);
 let _x = stream.write(&bytes).unwrap();
 
 // FIXME - should timeout
-let beat = Duration::from_millis(100);
 let pidstr = &pid.to_string();
+let mut timeout = 0;
+let beat = Duration::from_millis(100);
 while ! res.has(pidstr) {
+  // TIGHTLOOP
   thread::sleep(beat);
+  timeout += 1;
+  if timeout > 100 { println!("Unusually long wait in peer:service:exec [{}]", pid); }
+  
   wait();
 }
 
