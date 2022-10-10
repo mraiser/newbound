@@ -187,7 +187,7 @@ impl UdpStream {
         // TIGHTLOOP
         thread::sleep(beat);
         timeout += 1;
-        if timeout > 100 { println!("Unusually long wait in peer:service:listen_udp:read_exact 1 [{}]", self.data.get_i64("remote_id")); }
+        if timeout > 100 { println!("Unusually long wait in peer:service:listen_udp:read_exact 1 [{}]", self.data.get_i64("id")); }
       }
 
       let mut timeout = 0;
@@ -196,7 +196,7 @@ impl UdpStream {
         // TIGHTLOOP
         thread::sleep(beat);
         timeout += 1;
-        if timeout > 100 { println!("Unusually long wait in peer:service:listen_udp:read_exact 2 [{}]", self.data.get_i64("remote_id")); }
+        if timeout > 100 { println!("Unusually long wait in peer:service:listen_udp:read_exact 2 [{}]", self.data.get_i64("id")); }
       }
       
       //println!("have data {}", in_off);

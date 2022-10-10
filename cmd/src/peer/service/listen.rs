@@ -189,7 +189,7 @@ impl P2PStream {
             // TIGHTLOOP
             thread::sleep(beat);
             timeout += 1;
-            if timeout > 100 { println!("Unusually long wait in peer:service:listen:p2p_stream:relay:read_exact [{}]", stream.data.get_i64("remote_id")); }
+            if timeout > 100 { println!("Unusually long wait in peer:service:listen:p2p_stream:relay:read_exact [{}]", stream.data.get_i64("id")); }
           }
           
           let bd = &mut stream.buf.get_bytes(0);
