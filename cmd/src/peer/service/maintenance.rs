@@ -124,16 +124,18 @@ for (uuid, user) in users.objects(){
           //println!("CONS {}", cons.to_string());
           user.put_object("peers", cons.duplicate());
           
-          let users = system.get_object("users");
-          for (uuid2,_u) in users.objects() {
-            if uuid2.len() == 36 && uuid != uuid2 {
-              let b = cons.has(&uuid2) && cons.get_string(&uuid2).starts_with("tcp#");
-              //println!("SUSPECT 3 {} -> {}", uuid,uuid2);
-              if b { relay(&uuid, &uuid2, b); }
+          if get_tcp(user.duplicate()).is_some() {
+            let users = system.get_object("users");
+            for (uuid2,_u) in users.objects() {
+              if uuid2.len() == 36 && uuid != uuid2 {
+                let b = cons.has(&uuid2) && cons.get_string(&uuid2).starts_with("tcp#");
+                //println!("SUSPECT 3 {} -> {}", uuid,uuid2);
+                // FIXME - remove if?
+                if b { relay(&uuid, &uuid2, b); }
+              }
             }
-          }
-          //println!("USER B {}", user.to_string());
-          
+            //println!("USER B {}", user.to_string());
+          }        
           // Fixme - notify if something changes (latency?)
           fire_event("peer", "UPDATE", user_to_peer(user, uuid));
         }
