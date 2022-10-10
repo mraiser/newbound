@@ -291,6 +291,7 @@ impl P2PConnection {
   }
   
   pub fn shutdown(&self, uuid:&str, conid:i64, sd:Shutdown) -> io::Result<()> {
+    // FIXME - remove session
     println!("SHUTDOWN {} {}", conid, uuid);
     let user = get_user(uuid).unwrap();
     user.get_array("connections").remove_data(Data::DInt(conid));
@@ -386,9 +387,7 @@ pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
       if stream.from == from && stream.to == to {
 //        println!("RELAY B {} -> {} {}", from,to,connected);
         if connected { return Some(con.duplicate()); }
-        // FIXME - remove session
-        cons.remove_data(Data::DInt(conid as i64));
-        heap.decr(conid);
+        con.shutdown(to, conid as i64, Shutdown::Both);
       }
     }
   }
@@ -425,6 +424,7 @@ pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
     
     let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
 
+    // FIXME - Make session creation its own thing
     let mut session = DataObject::new();
     session.put_i64("count", 0);
     session.put_str("id", &sessionid);
@@ -438,6 +438,9 @@ pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
     
 	cons.push_i64(heap.push(con.duplicate())as i64);
 //    println!("RELAY D {} -> {} {}", from,to,connected);
+    
+    fire_event("peer", "UPDATE", user_to_peer(user.duplicate(), to.to_string()));
+    fire_event("peer", "CONNECT", user_to_peer(user.duplicate(), to.to_string()));
     return Some(con.duplicate());
   }
 //  println!("RELAY E {} -> {} {}", from,to,connected);
