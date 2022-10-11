@@ -37,6 +37,7 @@ use ndata::databytes::DataBytes;
 use crate::peer::service::listen_udp::UdpStream;
 use std::net::Shutdown;
 use std::time::Duration;
+use std::collections::HashMap;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("ipaddr");
@@ -377,12 +378,11 @@ pub fn get_relay(user:DataObject) -> Option<P2PConnection> {
 pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
 //  println!("RELAY A {} -> {} {}", from,to,connected);
   //FIXME - Fire peer UPDATE, CONNECT & DISCONNECT events
-  let mut heap = P2PHEAP.get().write().unwrap();
   let user = get_user(to).unwrap();
   let mut cons = user.get_array("connections");
   for con in cons.objects(){
     let conid = con.int() as usize;
-    let con = heap.get(conid);
+    let con = P2PHEAP.get().write().unwrap().get(conid).duplicate();
     if let P2PStream::Relay(stream) = &con.stream {
       if stream.from == from && stream.to == to {
 //        println!("RELAY B {} -> {} {}", from,to,connected);
@@ -436,7 +436,7 @@ pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
     let mut sessions = system.get_object("sessions");
     sessions.put_object(&sessionid, session.duplicate());
     
-	cons.push_i64(heap.push(con.duplicate())as i64);
+	cons.push_i64(P2PHEAP.get().write().unwrap().push(con.duplicate())as i64);
 //    println!("RELAY D {} -> {} {}", from,to,connected);
     
     fire_event("peer", "UPDATE", user_to_peer(user.duplicate(), to.to_string()));
