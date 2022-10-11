@@ -47,8 +47,8 @@ if !salt.clone().is_null(){
       let u = u.unwrap();
       let uuid = u.get_string("id");
       let p = user_to_peer(u.duplicate(), uuid.to_owned());
-      if p.get_bool("tcp") { cons.put_str(&uuid, &("tcp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
-      else if p.get_bool("udp") { cons.put_str(&uuid, &("udp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
+      if p.has("p2p_port") && p.get_bool("tcp") { cons.put_str(&uuid, &("tcp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
+      else if p.has("p2p_port") && p.get_bool("udp") { cons.put_str(&uuid, &("udp#".to_string()+&p.get_string("address")+"#"+&p.get_i64("p2p_port").to_string())); }
       else if p.get_bool("relay") { cons.put_str(&uuid, "relay#"); }
     }
   }
