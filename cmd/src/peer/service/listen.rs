@@ -671,6 +671,7 @@ pub fn handle_connection(con:P2PConnection) {
     }
   }
   
+  //FIXME - use con.shutdown()
   sessions.remove_property(&sessionid);
   let _x = connections.remove_data(Data::DInt(data_ref as i64));
   P2PHEAP.get().write().unwrap().decr(data_ref);
