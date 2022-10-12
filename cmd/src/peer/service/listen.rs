@@ -190,7 +190,7 @@ impl P2PStream {
             // TIGHTLOOP
             thread::sleep(beat);
             timeout += 1;
-            if timeout > 1000 { println!("Unusually long wait in peer:service:listen:p2p_stream:relay:read_exact [{}]", stream.data.get_i64("id")); }
+            if timeout > 1000 { println!("Unusually long wait in peer:service:listen:p2p_stream:relay:read_exact [{}]", stream.data.get_i64("id")); timeout = 0; }
           }
           
           let bd = &mut stream.buf.get_bytes(0);
@@ -293,7 +293,7 @@ impl P2PConnection {
   
   pub fn shutdown(&self, uuid:&str, conid:i64, sd:Shutdown) -> io::Result<()> {
     // FIXME - remove session
-    println!("SHUTDOWN {} {}", conid, uuid);
+    println!("BEGIN SHUTDOWN {} {}", conid, uuid);
     let user = get_user(uuid).unwrap();
     user.get_array("connections").remove_data(Data::DInt(conid));
     let mut con = P2PHEAP.get().write().unwrap().get(conid as usize).duplicate();
@@ -308,6 +308,7 @@ impl P2PConnection {
       let pid = pid.int();
       con.res.put_object(&pid.to_string(), o.duplicate());
     }
+    println!("END SHUTDOWN {} {}", conid, uuid);
     x
   }
   
