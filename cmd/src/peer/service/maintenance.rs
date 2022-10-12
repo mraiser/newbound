@@ -46,6 +46,7 @@ let mut live = Vec::new();
   }
 }
 
+println!("more maintenance");
 
 // Ping every live connection and update user data
 // If no live connection, attempt UDP (or TCP?) 
@@ -86,7 +87,7 @@ for (uuid, user) in users.objects(){
 
 
 
-
+println!("last maintenance");
 
 //println!("PASS 2");
 let adr = ask.data_ref;
