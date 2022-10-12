@@ -121,6 +121,20 @@ impl P2PStream {
       P2PStream::Udp(_stream) => false,
     }
   }
+
+  pub fn mode(&self) -> String {
+    match self {
+      P2PStream::Tcp(_stream) => {
+        "TCP".to_string()
+      },
+      P2PStream::Relay(_stream) => {
+        "RELAY".to_string()
+      },
+      P2PStream::Udp(_stream) => {
+        "UDP".to_string()
+      },
+    }
+  }
   
   pub fn try_clone(&self) -> io::Result<P2PStream> {
     match self {
@@ -221,6 +235,20 @@ impl P2PStream {
       },
       P2PStream::Udp(stream) => {
         Ok(stream.src)
+      },
+    }
+  }
+  
+  pub fn describe(&self) -> String {
+    match self {
+      P2PStream::Tcp(stream) => {
+        stream.peer_addr().unwrap().to_string()
+      },
+      P2PStream::Relay(stream) => {
+        format!("via {} to {}", stream.from, stream.to)
+      },
+      P2PStream::Udp(stream) => {
+        stream.src.to_string()
       },
     }
   }
@@ -360,22 +388,20 @@ impl P2PConnection {
     
     fire_event("peer", "UPDATE", user_to_peer(user.duplicate(), uuid.to_string()));
     fire_event("peer", "CONNECT", user_to_peer(user.duplicate(), uuid.to_string()));
+    println!("P2P {} Connect {} / {} / {} / {}", con.stream.mode(), con.stream.describe(), sessionid, user.get_string("displayname"), uuid);
+
     (conid, con)
   }
   
   pub fn shutdown(&self, uuid:&str, conid:i64) -> io::Result<()> {
-    // FIXME - remove session
-    println!("BEGIN SHUTDOWN {} {}", conid, uuid);
     let user = get_user(uuid).unwrap();
     user.get_array("connections").remove_data(Data::DInt(conid));
-    println!("SHUTDOWN A {} {}", conid, uuid);
     let mut con = P2PCONS.get().write().unwrap().get(conid as usize).duplicate();
-    println!("SHUTDOWN B {} {}", conid, uuid);
     P2PCONS.get().write().unwrap().decr(conid as usize);
-    println!("SHUTDOWN C {} {}", conid, uuid);
     let x = self.stream.shutdown();
     fire_event("peer", "UPDATE", user_to_peer(user.duplicate(), uuid.to_string()));
     fire_event("peer", "DISCONNECT", user_to_peer(user.duplicate(), uuid.to_string()));
+    
     let mut o = DataObject::new();
     o.put_str("status", "err");
     o.put_str("msg", "Connection closed");
@@ -393,7 +419,9 @@ impl P2PConnection {
       }
     }
     
-    println!("END SHUTDOWN {} {}", conid, uuid);
+    // FIXME - remove session
+    
+    println!("P2P {} Disconnect {} / {} / {} / {}", con.stream.mode(), con.stream.describe(), self.sessionid, user.get_string("displayname"), uuid);
     x
   }
   
