@@ -1,6 +1,3 @@
-println!("begin maintenance");
-
-
 let pollx2 = 60000;
 
 // Kill any connection with no response over 2x poll period
@@ -17,10 +14,8 @@ let mut live = Vec::new();
   }
 }
 
-println!("more maintenance");
-
-// Ping every live connection and update user data
-// If no live connection, attempt UDP (or TCP?) 
+// Ping every connected user and update user data
+// If keepalive but no live connection, connect TCP
 // Upgrade relay to UDP
 // Upgrade UDP to TCP
 
@@ -39,8 +34,6 @@ for (uuid, user) in users.objects(){
     let hash = to_hex(&res);
     ask.push_str(&hash);
     
-    //println!("MAINT hash {} {}", uuid, hash);
-    
     if get_tcp(user.duplicate()).is_none() {
       if user.has("keepalive") && Data::as_string(user.get_property("keepalive")) == "true" {
         if user.has("address") && user.has("port") {
@@ -55,17 +48,10 @@ for (uuid, user) in users.objects(){
   }
 }
 
-
-
-
-println!("last maintenance");
-
-//println!("PASS 2");
 let adr = ask.data_ref;
 for (uuid, user) in users.objects(){
   if uuid.len() == 36 {
     let mut user = user.object();
-    //println!("USER A {}", user.to_string());
     if user.get_array("connections").len() > 0 {
       user.put_bool("connected", true);
       let salt = salt.to_owned();
@@ -78,7 +64,6 @@ for (uuid, user) in users.objects(){
         d.put_array("uuid", ask);
         d.put_str("salt", &salt);
         let o = exec(user.get_string("id"), "peer".to_string(), "info".to_string(), d);
-        //println!("INFO {}", o.to_string());
         if o.get_string("status") == "ok" {
           let o = o.get_object("data");
           let t2 = time();
@@ -96,7 +81,6 @@ for (uuid, user) in users.objects(){
           user.put_i64("p2p_port", o.get_i64("p2p_port"));
           
           let cons = o.get_object("connections");
-          //println!("CONS {}", cons.to_string());
           user.put_object("peers", cons.duplicate());
           
           if get_tcp(user.duplicate()).is_some() {
@@ -104,12 +88,9 @@ for (uuid, user) in users.objects(){
             for (uuid2,_u) in users.objects() {
               if uuid2.len() == 36 && uuid != uuid2 {
                 let b = cons.has(&uuid2) && cons.get_string(&uuid2).starts_with("tcp#");
-                //println!("SUSPECT 3 {} -> {}", uuid,uuid2);
-                // FIXME - remove if?
-                if b { relay(&uuid, &uuid2, b); }
+                relay(&uuid, &uuid2, b);
               }
             }
-            //println!("USER B {}", user.to_string());
           }        
           // Fixme - notify if something changes (latency?)
           fire_event("peer", "UPDATE", user_to_peer(user, uuid));
@@ -118,20 +99,10 @@ for (uuid, user) in users.objects(){
     }
     else {
       user.put_bool("connected", false);
-      /*
-      let users = system.get_object("users");
-      for (uuid2,_u) in users.objects() {
-        if uuid2.len() == 36 && uuid != uuid2 {
-          relay(&uuid, &uuid2, false);
-        }
-      }
-      */
-      // FIXME - notify on relay add
+      // Fixme - notify if something changes (latency?)
       fire_event("peer", "UPDATE", user_to_peer(user, uuid));
     }
   }
 }
-
-println!("end maintenance");
 
 "OK".to_string()
