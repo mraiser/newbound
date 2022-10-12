@@ -30,14 +30,11 @@ use flowlang::appserver::fire_event;
 use crate::peer::peer::peers::user_to_peer;
 use std::io;
 use std::net::SocketAddr;
-use std::hint::spin_loop;
-use std::thread::yield_now;
 use ndata::dataarray::DataArray;
 use ndata::databytes::DataBytes;
 use crate::peer::service::listen_udp::UdpStream;
 use std::net::Shutdown;
 use std::time::Duration;
-use std::collections::HashMap;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("ipaddr");
@@ -165,7 +162,7 @@ impl P2PStream {
           let user = user.unwrap();
           let con = get_tcp(user);
           if con.is_some(){
-            let mut con = con.unwrap();
+            let con = con.unwrap();
             let cipher = con.cipher;
             let mut stream = con.stream;
             let mut bytes = ("fwd ".to_string()+&to).as_bytes().to_vec();
@@ -286,7 +283,8 @@ impl P2PStream {
   
   pub fn last_contact(&self) -> i64 {
     match self {
-      P2PStream::Tcp(stream) => {
+      P2PStream::Tcp(_stream) => { 
+        // FIXME
         time()
       },
       P2PStream::Relay(stream) => {
@@ -493,21 +491,21 @@ pub fn get_relay(user:DataObject) -> Option<P2PConnection> {
 
 pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
   let user = get_user(to).unwrap();
-  let mut cons = user.get_array("connections");
+  let cons = user.get_array("connections");
   for con in cons.objects(){
     let conid = con.int();
     let con = P2PConnection::get(conid);
     if let P2PStream::Relay(stream) = &con.stream {
       if stream.from == from && stream.to == to {
         if connected { return Some(con.duplicate()); }
-        con.shutdown(to, conid as i64);
+        let _x = con.shutdown(to, conid as i64);
       }
     }
   }
   if connected {
     let stream = RelayStream::new(from.to_string(), to.to_string());
     let stream = P2PStream::Relay(stream);
-    let (condif, con) = P2PConnection::begin(to.to_string(), stream);
+    let (_conid, con) = P2PConnection::begin(to.to_string(), stream);
     return Some(con.duplicate());
   }
   None
@@ -692,7 +690,7 @@ pub fn handle_connection(conid:i64, con:P2PConnection) {
   }
   // end loop
   
-  con.shutdown(&con.uuid, conid);
+  let _x = con.shutdown(&con.uuid, conid);
 }
 
 pub fn handle_next_message(con:P2PConnection) -> bool {
@@ -746,7 +744,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
 
     let con = get_tcp(get_user(&uuid2).unwrap());
     if con.is_some() {
-      let mut con = con.unwrap();
+      let con = con.unwrap();
       let cipher = con.cipher;
       let mut stream = con.stream;
 

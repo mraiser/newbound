@@ -1,7 +1,7 @@
 if user.has("id") {
   let username = user.get_string("id");
   if username.len() == 36 {
-    let mut connections = user.get_array("connections");
+    let connections = user.get_array("connections");
     println!("Peer {} session expire, cons {}", username, connections.to_string());
     for con in connections.objects(){
       let conid = con.int();

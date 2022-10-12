@@ -11,7 +11,6 @@ use crate::peer::peer::peers::user_to_peer;
 use flowlang::datastore::DataStore;
 use crate::peer::service::listen::relay;
 use crate::peer::service::listen::get_tcp;
-use std::net::Shutdown;
 use blake2::{Blake2b, Digest, digest::consts::U10};
 use flowlang::generated::flowlang::system::unique_session_id::unique_session_id;
 use crate::peer::service::listen::to_hex;
@@ -36,7 +35,7 @@ let mut live = Vec::new();
   for id in pcons {
     let con = P2PConnection::get(id);
     if con.last_contact() < now - pollx2 {
-      con.shutdown(&con.uuid, id as i64);
+      let _x = con.shutdown(&con.uuid, id as i64);
     }
     else { live.push(con.duplicate()); }
   }

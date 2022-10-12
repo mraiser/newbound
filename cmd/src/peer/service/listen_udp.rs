@@ -19,7 +19,6 @@ use flowlang::appserver::get_user;
 use crate::peer::service::listen::to_hex;
 use flowlang::appserver::set_user;
 use crate::peer::service::listen::P2PConnection;
-use flowlang::generated::flowlang::system::unique_session_id::unique_session_id;
 use crate::peer::service::listen::P2PStream;
 use ndata::dataarray::DataArray;
 use std::net::SocketAddr;
@@ -29,9 +28,6 @@ use ndata::data::Data;
 use rand::Rng;
 use std::collections::HashMap;
 use flowlang::generated::flowlang::system::time::time;
-use crate::peer::peer::peers::user_to_peer;
-use flowlang::appserver::fire_event;
-use crate::peer::service::listen::handle_next_message;
 use std::io::Error;
 use std::io::ErrorKind;
 use crate::peer::service::listen::handle_connection;
@@ -377,7 +373,7 @@ fn do_listen(){
         if amt == 129 {
           let res = welcome(SUP, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private.to_owned());
           if res.is_some(){
-            let (uuid, user, cipher, buf2) = res.unwrap();
+            let (uuid, _user, cipher, buf2) = res.unwrap();
 
             // check their proof of crypto
             let bytes = decrypt(&cipher, &buf[113..129]);
@@ -391,7 +387,7 @@ fn do_listen(){
               let bytes = encrypt(&cipher, "All is good now!".as_bytes());
               buf.extend_from_slice(&bytes);
 
-              let (conid, con) = P2PConnection::begin(uuid, P2PStream::Udp(UdpStream::blank(src)));
+              let (conid, _con) = P2PConnection::begin(uuid, P2PStream::Udp(UdpStream::blank(src)));
 
               // Send connection ID
               let remote_id = not_negative_one();
@@ -408,7 +404,7 @@ fn do_listen(){
         if amt == 137 {
           let res = welcome(RDY, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private.to_owned());
           if res.is_some(){
-            let (uuid, user, cipher, buf2) = res.unwrap();
+            let (uuid, _user, cipher, buf2) = res.unwrap();
 
             // check their proof of crypto
             let bytes = decrypt(&cipher, &buf[113..129]);

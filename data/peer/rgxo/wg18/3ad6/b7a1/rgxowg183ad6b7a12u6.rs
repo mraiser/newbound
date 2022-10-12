@@ -329,7 +329,7 @@ fn do_listen(){
         if amt == 129 {
           let res = welcome(SUP, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private.to_owned());
           if res.is_some(){
-            let (uuid, user, cipher, buf2) = res.unwrap();
+            let (uuid, _user, cipher, buf2) = res.unwrap();
 
             // check their proof of crypto
             let bytes = decrypt(&cipher, &buf[113..129]);
@@ -343,7 +343,7 @@ fn do_listen(){
               let bytes = encrypt(&cipher, "All is good now!".as_bytes());
               buf.extend_from_slice(&bytes);
 
-              let (conid, con) = P2PConnection::begin(uuid, P2PStream::Udp(UdpStream::blank(src)));
+              let (conid, _con) = P2PConnection::begin(uuid, P2PStream::Udp(UdpStream::blank(src)));
 
               // Send connection ID
               let remote_id = not_negative_one();
@@ -360,7 +360,7 @@ fn do_listen(){
         if amt == 137 {
           let res = welcome(RDY, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private.to_owned());
           if res.is_some(){
-            let (uuid, user, cipher, buf2) = res.unwrap();
+            let (uuid, _user, cipher, buf2) = res.unwrap();
 
             // check their proof of crypto
             let bytes = decrypt(&cipher, &buf[113..129]);
