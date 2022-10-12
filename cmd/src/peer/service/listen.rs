@@ -242,7 +242,9 @@ impl P2PStream {
   pub fn describe(&self) -> String {
     match self {
       P2PStream::Tcp(stream) => {
-        stream.peer_addr().unwrap().to_string()
+        let x = stream.peer_addr();
+        if x.is_err() { return "CLOSED".to_string(); }
+        x.unwrap().to_string()
       },
       P2PStream::Relay(stream) => {
         format!("via {} to {}", stream.from, stream.to)
