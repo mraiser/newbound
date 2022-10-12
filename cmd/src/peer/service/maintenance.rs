@@ -11,11 +11,11 @@ use crate::peer::peer::peers::user_to_peer;
 use flowlang::datastore::DataStore;
 use crate::peer::service::listen::relay;
 use crate::peer::service::listen::get_tcp;
-use crate::peer::service::listen::P2PHEAP;
 use std::net::Shutdown;
 use blake2::{Blake2b, Digest, digest::consts::U10};
 use flowlang::generated::flowlang::system::unique_session_id::unique_session_id;
 use crate::peer::service::listen::to_hex;
+use crate::peer::service::listen::P2PConnection;
 
 type Blake2b80 = Blake2b<U10>;
 pub fn execute(_o: DataObject) -> DataObject {
@@ -35,10 +35,9 @@ let pollx2 = 60000;
 let mut live = Vec::new();
 {
   let now = time();
-  let mut heap = P2PHEAP.get().write().unwrap();
-  let pcons = heap.keys();
+  let pcons = P2PConnection::list();
   for id in pcons {
-    let con = heap.get(id);
+    let con = P2PConnection::get(id);
     if con.last_contact() < now - pollx2 {
       con.shutdown(&con.uuid, id as i64);
     }

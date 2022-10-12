@@ -5,7 +5,7 @@ if user.has("id") {
     println!("Peer {} session expire, cons {}", username, connections.to_string());
     for con in connections.objects(){
       let conid = con.int();
-      let con = P2PHEAP.get().write().unwrap().get(conid as usize).duplicate();
+      let con = P2PConnection::get(conid).duplicate();
       con.shutdown(&username, conid).expect("shutdown call failed");
     }
   }

@@ -1,9 +1,9 @@
-  START.call_once(|| { P2PHEAP.set(RwLock::new(Heap::new())); });
+  START.call_once(|| { P2PCONS.set(RwLock::new(Heap::new())); });
   do_listen(ipaddr, port)
 }
 
 static START: Once = Once::new();
-pub static P2PHEAP:Storage<RwLock<Heap<P2PConnection>>> = Storage::new();
+static P2PCONS:Storage<RwLock<Heap<P2PConnection>>> = Storage::new();
 
 #[derive(Debug)]
 pub struct RelayStream {
@@ -100,7 +100,7 @@ impl P2PStream {
           let user = user.unwrap();
           let con = get_tcp(user);
           if con.is_some(){
-            let con = con.unwrap();
+            let mut con = con.unwrap();
             let cipher = con.cipher;
             let mut stream = con.stream;
             let mut bytes = ("fwd ".to_string()+&to).as_bytes().to_vec();
@@ -230,6 +230,23 @@ pub struct P2PConnection {
 }
 
 impl P2PConnection {
+  pub fn get(conid:i64) -> P2PConnection {
+    P2PCONS.get().write().unwrap().get(conid as usize).duplicate()
+  }
+  
+  pub fn try_get(conid:i64) -> Option<P2PConnection> {
+    let x = P2PCONS.get().write().unwrap().try_get(conid as usize)?.duplicate();
+    Some(x)
+  }
+  
+  pub fn list() -> Vec<i64> {
+    let mut v = Vec::new();
+    for i in P2PCONS.get().write().unwrap().keys() {
+      v.push(i as i64);
+    }
+    v
+  }
+  
   pub fn duplicate(&self) -> P2PConnection {
     P2PConnection{
       stream: self.stream.try_clone().unwrap(),
@@ -287,7 +304,7 @@ impl P2PConnection {
     let mut sessions = system.get_object("sessions");
     sessions.put_object(&sessionid, session.duplicate());
     
-    let conid = P2PHEAP.get().write().unwrap().push(con.duplicate())as i64;
+    let conid = P2PCONS.get().write().unwrap().push(con.duplicate())as i64;
 	cons.push_i64(conid);
     
     fire_event("peer", "UPDATE", user_to_peer(user.duplicate(), uuid.to_string()));
@@ -301,9 +318,9 @@ impl P2PConnection {
     let user = get_user(uuid).unwrap();
     user.get_array("connections").remove_data(Data::DInt(conid));
     println!("SHUTDOWN A {} {}", conid, uuid);
-    let mut con = P2PHEAP.get().write().unwrap().get(conid as usize).duplicate();
+    let mut con = P2PCONS.get().write().unwrap().get(conid as usize).duplicate();
     println!("SHUTDOWN B {} {}", conid, uuid);
-    P2PHEAP.get().write().unwrap().decr(conid as usize);
+    P2PCONS.get().write().unwrap().decr(conid as usize);
     println!("SHUTDOWN C {} {}", conid, uuid);
     let x = self.stream.shutdown();
     fire_event("peer", "UPDATE", user_to_peer(user.duplicate(), uuid.to_string()));
@@ -336,7 +353,7 @@ impl P2PConnection {
 
 pub fn get_best(user:DataObject) -> Option<P2PConnection> {
   let mut best = None;
-  let mut heap = P2PHEAP.get().write().unwrap();
+  let mut heap = P2PCONS.get().write().unwrap();
   let cons = user.get_array("connections");
 //  println!("heap {:?} cons {}", heap, cons.to_string());
   for con in cons.objects(){
@@ -352,7 +369,7 @@ pub fn get_best(user:DataObject) -> Option<P2PConnection> {
 }
 
 pub fn get_tcp(user:DataObject) -> Option<P2PConnection> {
-  let mut heap = P2PHEAP.get().write().unwrap();
+  let mut heap = P2PCONS.get().write().unwrap();
   let cons = user.get_array("connections");
 //  println!("heap {:?} cons {}", heap, cons.to_string());
   for con in cons.objects(){
@@ -366,7 +383,7 @@ pub fn get_tcp(user:DataObject) -> Option<P2PConnection> {
 }
 
 pub fn get_udp(user:DataObject) -> Option<P2PConnection> {
-  let mut heap = P2PHEAP.get().write().unwrap();
+  let mut heap = P2PCONS.get().write().unwrap();
   let cons = user.get_array("connections");
 //  println!("heap {:?} cons {}", heap, cons.to_string());
   for con in cons.objects(){
@@ -380,7 +397,7 @@ pub fn get_udp(user:DataObject) -> Option<P2PConnection> {
 }
 
 pub fn get_relay(user:DataObject) -> Option<P2PConnection> {
-  let mut heap = P2PHEAP.get().write().unwrap();
+  let mut heap = P2PCONS.get().write().unwrap();
   let cons = user.get_array("connections");
 //  println!("heap {:?} cons {}", heap, cons.to_string());
   for con in cons.objects(){
@@ -397,8 +414,8 @@ pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
   let user = get_user(to).unwrap();
   let mut cons = user.get_array("connections");
   for con in cons.objects(){
-    let conid = con.int() as usize;
-    let con = P2PHEAP.get().write().unwrap().get(conid).duplicate();
+    let conid = con.int();
+    let con = P2PConnection::get(conid);
     if let P2PStream::Relay(stream) = &con.stream {
       if stream.from == from && stream.to == to {
         if connected { return Some(con.duplicate()); }
@@ -648,7 +665,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
 
     let con = get_tcp(get_user(&uuid2).unwrap());
     if con.is_some() {
-      let con = con.unwrap();
+      let mut con = con.unwrap();
       let cipher = con.cipher;
       let mut stream = con.stream;
 

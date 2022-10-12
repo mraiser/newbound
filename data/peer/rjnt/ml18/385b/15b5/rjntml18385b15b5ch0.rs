@@ -7,10 +7,9 @@ let pollx2 = 60000;
 let mut live = Vec::new();
 {
   let now = time();
-  let mut heap = P2PHEAP.get().write().unwrap();
-  let pcons = heap.keys();
+  let pcons = P2PConnection::list();
   for id in pcons {
-    let con = heap.get(id);
+    let con = P2PConnection::get(id);
     if con.last_contact() < now - pollx2 {
       con.shutdown(&con.uuid, id as i64);
     }

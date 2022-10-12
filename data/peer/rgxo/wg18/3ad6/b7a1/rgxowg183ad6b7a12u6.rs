@@ -404,8 +404,7 @@ fn do_listen(){
             let id = lookup_udp(id);
             if id.is_some() {
               let id = id.unwrap();
-              let mut heap = P2PHEAP.get().write().unwrap();
-              let con = heap.try_get(id as usize);
+              let con = P2PConnection::try_get(id);
               if con.is_some() {
                 let mut con = con.unwrap().duplicate();
                 if let P2PStream::Udp(stream) = &mut con.stream {
@@ -442,10 +441,9 @@ fn do_listen(){
           //println!("CMD msg id {}", msg_id);
           let buf = &buf[17..];
 
-          let mut heap = P2PHEAP.get().write().unwrap();
-          let con = heap.try_get(id as usize);
+          let con = P2PConnection::try_get(id);
           if con.is_some() {
-            let con = con.unwrap();
+            let mut con = con.unwrap();
             if let P2PStream::Udp(stream) = &mut con.stream {
               if stream.src == src {
 			    stream.data.put_i64("last_contact", time());
@@ -521,8 +519,7 @@ fn do_listen(){
 
           //println!("received ACK for packet {} on internal con {}", msg_id, id);
 
-          let mut heap = P2PHEAP.get().write().unwrap();
-          let con = heap.get(id as usize);
+          let mut con = P2PConnection::get(id);
           if let P2PStream::Udp(stream) = &mut con.stream {
             if stream.src == src {
               // There can be only one!

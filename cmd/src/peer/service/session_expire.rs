@@ -1,9 +1,8 @@
 use ndata::dataobject::*;
 use ndata::dataarray::DataArray;
-use crate::peer::service::listen::P2PHEAP;
 use std::net::Shutdown;use flowlang::appserver::fire_event;
 use crate::peer::peer::peers::user_to_peer;
-
+use crate::peer::service::listen::P2PConnection;
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_object("user");
 let ax = session_expire(a0);
@@ -20,7 +19,7 @@ if user.has("id") {
     println!("Peer {} session expire, cons {}", username, connections.to_string());
     for con in connections.objects(){
       let conid = con.int();
-      let con = P2PHEAP.get().write().unwrap().get(conid as usize).duplicate();
+      let con = P2PConnection::get(conid).duplicate();
       con.shutdown(&username, conid).expect("shutdown call failed");
     }
   }
