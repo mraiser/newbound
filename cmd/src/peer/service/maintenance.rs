@@ -113,10 +113,10 @@ for (uuid, user) in users.objects(){
           
           if get_tcp(user.duplicate()).is_some() {
             let users = system.get_object("users");
-            for (uuid2,_u) in users.objects() {
-              if uuid2.len() == 36 && uuid != uuid2 {
+            for (uuid2,u) in users.objects() {
+              if uuid2.len() == 36 && uuid != uuid2 && !u.object().get_bool("connected") {
                 let b = cons.has(&uuid2) && cons.get_string(&uuid2).starts_with("tcp#");
-                relay(&uuid, &uuid2, b);
+                if b { relay(&uuid, &uuid2, b); }
               }
             }
           }        
