@@ -40,7 +40,7 @@ while ! res.has(pidstr) {
   // TIGHTLOOP
   thread::sleep(beat);
   timeout += 1;
-  if timeout > 1000 { println!("Unusually long wait in peer:service:exec [{}]", pid); }
+  if timeout > 1000 { println!("Unusually long wait in peer:service:exec [{}]", pid); timeout = 0; }
   
   wait();
 }

@@ -296,8 +296,11 @@ impl P2PConnection {
     println!("BEGIN SHUTDOWN {} {}", conid, uuid);
     let user = get_user(uuid).unwrap();
     user.get_array("connections").remove_data(Data::DInt(conid));
+    println!("SHUTDOWN A {} {}", conid, uuid);
     let mut con = P2PHEAP.get().write().unwrap().get(conid as usize).duplicate();
+    println!("SHUTDOWN B {} {}", conid, uuid);
     P2PHEAP.get().write().unwrap().decr(conid as usize);
+    println!("SHUTDOWN C {} {}", conid, uuid);
     let x = self.stream.shutdown(sd);
     fire_event("peer", "UPDATE", user_to_peer(user.duplicate(), uuid.to_string()));
     fire_event("peer", "DISCONNECT", user_to_peer(user.duplicate(), uuid.to_string()));
