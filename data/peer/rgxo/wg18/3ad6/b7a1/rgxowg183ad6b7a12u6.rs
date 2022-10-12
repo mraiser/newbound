@@ -206,55 +206,6 @@ fn not_negative_one() -> i64 {
   x
 }
 
-fn handle_connection(data_ref: usize, con: P2PConnection) {
-  let uuid = con.uuid.to_owned();
-  let sessionid = con.sessionid.to_owned();
-  let stream = con.stream.try_clone().unwrap();
-
-  let mut user = get_user(&uuid).unwrap();
-  user.put_i64("last_contact", time());
-
-  let system = DataStore::globals().get_object("system");
-  let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
-
-  // FIXME - Make session  creation its own thing. Merge with appserver
-  let mut session = DataObject::new();
-  session.put_i64("count", 0);
-  session.put_str("id", &sessionid);
-  session.put_str("username", &uuid);
-  session.put_object("user", user.duplicate());
-  let expire = time() + sessiontimeoutmillis;
-  session.put_i64("expire", expire);
-
-  let mut sessions = system.get_object("sessions");
-  sessions.put_object(&sessionid, session.duplicate());
-  
-  let connections = user.get_array("connections");
-
-  let remote_addr = stream.peer_addr().unwrap();
-  println!("P2P UDP Connect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
-  user.put_str("address", &remote_addr.ip().to_string());
-  let peer = user_to_peer(user.duplicate(), uuid.to_owned());
-  fire_event("peer", "CONNECT", peer.duplicate());
-  fire_event("peer", "UPDATE", peer.duplicate());
-  
-  // loop
-  while system.get_bool("running") {
-    if !handle_next_message(con.duplicate()) { break; }
-  }
-  // end loop
-  
-  // FIXME - Call con.shutdown
-  sessions.remove_property(&sessionid);
-  let _x = connections.remove_data(Data::DInt(data_ref as i64));
-  P2PHEAP.get().write().unwrap().decr(data_ref);
-
-  println!("P2P UDP Disconnect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
-  let peer = user_to_peer(user.duplicate(), uuid.to_owned());
-  fire_event("peer", "DISCONNECT", peer.duplicate());
-  fire_event("peer", "UPDATE", peer.duplicate());
-}
-
 fn do_listen(){
   let mut system = DataStore::globals().get_object("system");
   let runtime = system.get_object("apps").get_object("app").get_object("runtime");
@@ -392,21 +343,11 @@ fn do_listen(){
               let bytes = encrypt(&cipher, "All is good now!".as_bytes());
               buf.extend_from_slice(&bytes);
 
-              let con = P2PConnection{
-                stream: P2PStream::Udp(UdpStream::blank(src)),
-                sessionid: unique_session_id(),
-                cipher: cipher.to_owned(),
-                uuid: uuid.to_owned(),
-                res: DataObject::new(),
-                pending: DataArray::new(),
-              };
-              let data_ref = P2PHEAP.get().write().unwrap().push(con.duplicate()) as i64;
-              let mut connections = user.get_array("connections");
-              connections.push_i64(data_ref);
+              let (conid, con) = P2PConnection::begin(uuid, P2PStream::Udp(UdpStream::blank(src)));
 
               // Send connection ID
               let remote_id = not_negative_one();
-              UDPLOOKUP.get().write().unwrap().insert(remote_id, data_ref);
+              UDPLOOKUP.get().write().unwrap().insert(remote_id, conid);
               buf.extend_from_slice(&remote_id.to_be_bytes());
                 
               //println!("YO CON {} = {}", data_ref, remote_id);
@@ -431,17 +372,7 @@ fn do_listen(){
               let bytes:[u8; 8] = buf[129..137].try_into().unwrap();
               let remote_id = i64::from_be_bytes(bytes);
                             
-              let con = P2PConnection{
-                stream: P2PStream::Udp(UdpStream::new(src, remote_id)),
-                sessionid: unique_session_id(),
-                cipher: cipher.to_owned(),
-                uuid: uuid.to_owned(),
-                res: DataObject::new(),
-                pending: DataArray::new(),
-              };
-              let data_ref = P2PHEAP.get().write().unwrap().push(con.duplicate()) as i64;
-              let mut connections = user.get_array("connections");
-              connections.push_i64(data_ref);
+              let (conid, con) = P2PConnection::begin(uuid, P2PStream::Udp(UdpStream::new(src, remote_id)));
 
               let mut buf = buf2;
               
@@ -450,14 +381,14 @@ fn do_listen(){
  
               // Send my connection ID
               let remote_id = not_negative_one();
-              UDPLOOKUP.get().write().unwrap().insert(remote_id, data_ref);
+              UDPLOOKUP.get().write().unwrap().insert(remote_id, conid);
               buf.extend_from_slice(&remote_id.to_be_bytes());
                 
               //println!("SUP CON {} = {}", data_ref, remote_id);
               sock.send_to(&buf, &src).unwrap();
               
               thread::spawn(move || {
-                handle_connection(data_ref as usize, con);
+                handle_connection(conid, con);
               });
             }
           }
@@ -485,7 +416,7 @@ fn do_listen(){
                     //println!("RDY");
 
                     thread::spawn(move || {
-                      handle_connection(id as usize, con);
+                      handle_connection(id, con);
                     });
                   }
                   else {

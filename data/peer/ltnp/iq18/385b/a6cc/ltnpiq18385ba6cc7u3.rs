@@ -8,7 +8,8 @@ if stream.is_ok() {
   let con = handshake(&mut stream, Some(uuid));
   if con.is_some() {
     thread::spawn(move || {
-      handle_connection(con.unwrap());
+      let (conid, con) = con.unwrap();
+      handle_connection(conid, con);
     });
     return true;
   }

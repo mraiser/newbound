@@ -12,7 +12,7 @@ let mut live = Vec::new();
   for id in pcons {
     let con = heap.get(id);
     if con.last_contact() < now - pollx2 {
-      con.shutdown(&con.uuid, id as i64, Shutdown::Both);
+      con.shutdown(&con.uuid, id as i64);
     }
     else { live.push(con.duplicate()); }
   }

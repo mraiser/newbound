@@ -6,7 +6,7 @@ if user.has("id") {
     for con in connections.objects(){
       let conid = con.int();
       let con = P2PHEAP.get().write().unwrap().get(conid as usize).duplicate();
-      con.shutdown(&username, conid, Shutdown::Both).expect("shutdown call failed");
+      con.shutdown(&username, conid).expect("shutdown call failed");
     }
   }
 }

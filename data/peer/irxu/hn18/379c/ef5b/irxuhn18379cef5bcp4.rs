@@ -174,10 +174,10 @@ impl P2PStream {
     }
   }
   
-  pub fn shutdown(&self, sd:Shutdown) -> io::Result<()> {
+  pub fn shutdown(&self) -> io::Result<()> {
     match self {
       P2PStream::Tcp(stream) => {
-        stream.shutdown(sd)
+        stream.shutdown(Shutdown::Both)
       },
       P2PStream::Relay(_stream) => {
         Ok(())
@@ -226,6 +226,7 @@ pub struct P2PConnection {
   pub uuid: String,
   pub res: DataObject,
   pub pending: DataArray,
+  pub x: bool,
 }
 
 impl P2PConnection {
@@ -237,10 +238,64 @@ impl P2PConnection {
       uuid: self.uuid.to_owned(),
       res: self.res.duplicate(),
       pending: self.pending.duplicate(),
+      x: self.x,
     }
   }
+    
+  pub fn begin(uuid:String, stream:P2PStream) -> (i64, P2PConnection) {
+    let user = get_user(&uuid).unwrap();
+    let mut cons = user.get_array("connections");
+    
+    // FIXME - move cipher generation to its own function
+    let system = DataStore::globals().get_object("system");
+    let runtime = system.get_object("apps").get_object("app").get_object("runtime");
+    let my_private = runtime.get_string("privatekey");
+    let my_private = decode_hex(&my_private).unwrap();
+    let my_private: [u8; 32] = my_private.try_into().expect("slice with incorrect length");
+    let my_private = StaticSecret::from(my_private);
+    
+    let peer_public = user.get_string("publickey");
+    let peer_public = decode_hex(&peer_public).unwrap();
+    let peer_public: [u8; 32] = peer_public.try_into().expect("slice with incorrect length");
+    let peer_public = PublicKey::from(peer_public);
+    let shared_secret = my_private.diffie_hellman(&peer_public);
+    let key = GenericArray::from(shared_secret.to_bytes());
+    let cipher = Aes256::new(&key);
+    
+    let sessionid = unique_session_id();
+    let con = P2PConnection{
+      stream: stream,
+      sessionid: sessionid.to_owned(),
+      cipher: cipher,
+      uuid: uuid.to_string(),
+      res: DataObject::new(),
+      pending: DataArray::new(),
+      x: true,
+    };
+    
+    let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
+
+    // FIXME - Make session creation its own thing
+    let mut session = DataObject::new();
+    session.put_i64("count", 0);
+    session.put_str("id", &sessionid);
+    session.put_str("username", &uuid);
+    session.put_object("user", user.duplicate());
+    let expire = time() + sessiontimeoutmillis;
+    session.put_i64("expire", expire);
+
+    let mut sessions = system.get_object("sessions");
+    sessions.put_object(&sessionid, session.duplicate());
+    
+    let conid = P2PHEAP.get().write().unwrap().push(con.duplicate())as i64;
+	cons.push_i64(conid);
+    
+    fire_event("peer", "UPDATE", user_to_peer(user.duplicate(), uuid.to_string()));
+    fire_event("peer", "CONNECT", user_to_peer(user.duplicate(), uuid.to_string()));
+    (conid, con)
+  }
   
-  pub fn shutdown(&self, uuid:&str, conid:i64, sd:Shutdown) -> io::Result<()> {
+  pub fn shutdown(&self, uuid:&str, conid:i64) -> io::Result<()> {
     // FIXME - remove session
     println!("BEGIN SHUTDOWN {} {}", conid, uuid);
     let user = get_user(uuid).unwrap();
@@ -250,7 +305,7 @@ impl P2PConnection {
     println!("SHUTDOWN B {} {}", conid, uuid);
     P2PHEAP.get().write().unwrap().decr(conid as usize);
     println!("SHUTDOWN C {} {}", conid, uuid);
-    let x = self.stream.shutdown(sd);
+    let x = self.stream.shutdown();
     fire_event("peer", "UPDATE", user_to_peer(user.duplicate(), uuid.to_string()));
     fire_event("peer", "DISCONNECT", user_to_peer(user.duplicate(), uuid.to_string()));
     let mut o = DataObject::new();
@@ -260,6 +315,16 @@ impl P2PConnection {
       let pid = pid.int();
       con.res.put_object(&pid.to_string(), o.duplicate());
     }
+    
+    if self.stream.is_tcp(){
+      let users = DataStore::globals().get_object("system").get_object("users");
+      for (uuid2,_u) in users.objects() {
+        if uuid2.len() == 36 && uuid != uuid2 {
+          relay(&uuid, &uuid2, false);
+        }
+      }
+    }
+    
     println!("END SHUTDOWN {} {}", conid, uuid);
     x
   }
@@ -329,8 +394,6 @@ pub fn get_relay(user:DataObject) -> Option<P2PConnection> {
 }
 
 pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
-//  println!("RELAY A {} -> {} {}", from,to,connected);
-  //FIXME - Fire peer UPDATE, CONNECT & DISCONNECT events
   let user = get_user(to).unwrap();
   let mut cons = user.get_array("connections");
   for con in cons.objects(){
@@ -338,69 +401,21 @@ pub fn relay(from:&str, to:&str, connected:bool) -> Option<P2PConnection>{
     let con = P2PHEAP.get().write().unwrap().get(conid).duplicate();
     if let P2PStream::Relay(stream) = &con.stream {
       if stream.from == from && stream.to == to {
-//        println!("RELAY B {} -> {} {}", from,to,connected);
         if connected { return Some(con.duplicate()); }
-        con.shutdown(to, conid as i64, Shutdown::Both);
+        con.shutdown(to, conid as i64);
       }
     }
   }
   if connected {
-//    println!("RELAY C {} -> {} {}", from,to,connected);
-    // FIXME - move cipher generation to its own function
-    let system = DataStore::globals().get_object("system");
-    let runtime = system.get_object("apps").get_object("app").get_object("runtime");
-    let my_private = runtime.get_string("privatekey");
-    let my_private = decode_hex(&my_private).unwrap();
-    let my_private: [u8; 32] = my_private.try_into().expect("slice with incorrect length");
-    let my_private = StaticSecret::from(my_private);
-    
-    let peer_public = user.get_string("publickey");
-    let peer_public = decode_hex(&peer_public).unwrap();
-    let peer_public: [u8; 32] = peer_public.try_into().expect("slice with incorrect length");
-    let peer_public = PublicKey::from(peer_public);
-    let shared_secret = my_private.diffie_hellman(&peer_public);
-    let key = GenericArray::from(shared_secret.to_bytes());
-    let cipher = Aes256::new(&key);
-    
     let stream = RelayStream::new(from.to_string(), to.to_string());
     let stream = P2PStream::Relay(stream);
-    
-    let sessionid = unique_session_id();
-    let con = P2PConnection{
-      stream: stream,
-      sessionid: sessionid.to_owned(),
-      cipher: cipher,
-      uuid: to.to_string(),
-      res: DataObject::new(),
-      pending: DataArray::new(),
-    };
-    
-    let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
-
-    // FIXME - Make session creation its own thing
-    let mut session = DataObject::new();
-    session.put_i64("count", 0);
-    session.put_str("id", &sessionid);
-    session.put_str("username", &to);
-    session.put_object("user", user.duplicate());
-    let expire = time() + sessiontimeoutmillis;
-    session.put_i64("expire", expire);
-
-    let mut sessions = system.get_object("sessions");
-    sessions.put_object(&sessionid, session.duplicate());
-    
-	cons.push_i64(P2PHEAP.get().write().unwrap().push(con.duplicate())as i64);
-//    println!("RELAY D {} -> {} {}", from,to,connected);
-    
-    fire_event("peer", "UPDATE", user_to_peer(user.duplicate(), to.to_string()));
-    fire_event("peer", "CONNECT", user_to_peer(user.duplicate(), to.to_string()));
+    let (condif, con) = P2PConnection::begin(to.to_string(), stream);
     return Some(con.duplicate());
   }
-//  println!("RELAY E {} -> {} {}", from,to,connected);
   None
 }
 
-pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<P2PConnection> {
+pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P2PConnection)> {
   let system = DataStore::globals().get_object("system");
   let runtime = system.get_object("apps").get_object("app").get_object("runtime");
   let my_uuid = runtime.get_string("uuid");
@@ -518,21 +533,14 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<P2PConn
     }
     
     if isok {
-      let con = P2PConnection{
-        stream: stream.try_clone().unwrap(),
-        sessionid: unique_session_id(),
-        cipher: cipher,
-        uuid: uuid.to_owned(),
-        res: DataObject::new(),
-        pending: DataArray::new(),
-      };
+      let (conid, con) = P2PConnection::begin(uuid.to_owned(), stream.try_clone().unwrap());
   
       if saveme {
         user.put_str("publickey", &peer_public_string);
         set_user(&uuid, user.duplicate());
       }
       
-      return Some(con);
+      return Some((conid, con));
     }
   }
   None
@@ -570,69 +578,23 @@ fn do_listen(ipaddr:String, port:i64) -> i64 {
       
       let con = handshake(&mut stream, None);
       if con.is_some() {
-        handle_connection(con.unwrap());
+        let (conid, con) = con.unwrap();
+        handle_connection(conid, con);
       }
     });
   }
   port.into()
 }
 
-pub fn handle_connection(con:P2PConnection) {
-  let uuid = con.uuid.to_owned();
-  let sessionid = con.sessionid.to_owned();
-  let stream = con.stream.try_clone().unwrap();
-
-  let mut user = get_user(&uuid).unwrap();
-  user.put_i64("last_contact", time());
-
-  let system = DataStore::globals().get_object("system");
-  let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
-
-  let mut session = DataObject::new();
-  session.put_i64("count", 0);
-  session.put_str("id", &sessionid);
-  session.put_str("username", &uuid);
-  session.put_object("user", user.duplicate());
-  let expire = time() + sessiontimeoutmillis;
-  session.put_i64("expire", expire);
-
-  let mut sessions = system.get_object("sessions");
-  sessions.put_object(&sessionid, session.duplicate());
-
-  let data_ref = P2PHEAP.get().write().unwrap().push(con.duplicate());
-  let mut connections = user.get_array("connections");
-  connections.push_i64(data_ref as i64);
-
-  let remote_addr = stream.peer_addr().unwrap();
-  println!("P2P TCP Connect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
-  user.put_str("address", &remote_addr.ip().to_string());
-  let peer = user_to_peer(user.duplicate(), uuid.to_owned());
-  fire_event("peer", "CONNECT", peer.duplicate());
-  fire_event("peer", "UPDATE", peer.duplicate());
-  
+pub fn handle_connection(conid:i64, con:P2PConnection) {
   // loop
+  let system = DataStore::globals().get_object("system");
   while system.get_bool("running") {
     if !handle_next_message(con.duplicate()) { break; }
   }
   // end loop
-
-  let users = DataStore::globals().get_object("system").get_object("users");
-  for (uuid2,_u) in users.objects() {
-    if uuid2.len() == 36 && uuid != uuid2 {
-//      println!("SUSPECT 1 {} -> {}", uuid,uuid);
-      relay(&uuid, &uuid2, false);
-    }
-  }
   
-  //FIXME - use con.shutdown()
-  sessions.remove_property(&sessionid);
-  let _x = connections.remove_data(Data::DInt(data_ref as i64));
-  P2PHEAP.get().write().unwrap().decr(data_ref);
-
-  println!("P2P TCP Disconnect {} / {} / {} / {}", remote_addr, sessionid, user.get_string("displayname"), uuid);
-  let peer = user_to_peer(user.duplicate(), uuid.to_owned());
-  fire_event("peer", "DISCONNECT", peer.duplicate());
-  fire_event("peer", "UPDATE", peer.duplicate());
+  con.shutdown(&con.uuid, conid);
 }
 
 pub fn handle_next_message(con:P2PConnection) -> bool {
