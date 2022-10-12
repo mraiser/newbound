@@ -79,6 +79,8 @@ impl UdpStream {
   
   pub fn write(&mut self, buf: &[u8]) -> io::Result<usize>
   {
+    if self.data.get_bool("dead") { return Err(Error::new(ErrorKind::ConnectionReset, "Connection closed")); }
+    
     // There can be only one!
     let _lock = WRITEMUTEX.get().write().unwrap();
     
@@ -136,6 +138,8 @@ impl UdpStream {
       // FIXME - should timeout?
       let mut timeout = 0;
       while inv.len() == 0 {
+        if self.data.get_bool("dead") { return Err(Error::new(ErrorKind::ConnectionReset, "Connection closed")); }
+        
         // TIGHTLOOP
         thread::sleep(beat);
         timeout += 1;
@@ -144,7 +148,9 @@ impl UdpStream {
 
       let mut timeout = 0;
       while inv.get_property(0).is_null() {
+        if self.data.get_bool("dead") { return Err(Error::new(ErrorKind::ConnectionReset, "Connection closed")); }
         self.request_resend(in_off);
+        
         // TIGHTLOOP
         thread::sleep(beat);
         timeout += 1;
@@ -177,6 +183,8 @@ impl UdpStream {
   }
   
   fn request_resend(&self, msgid:i64) {
+    if self.data.get_bool("dead") { return; }
+    
     let id = self.data.get_i64("id");
     println!("request resend of {} from {}", msgid, id);
     let mut bytes = Vec::new();
