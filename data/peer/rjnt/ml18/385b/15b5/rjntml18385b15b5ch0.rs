@@ -1,3 +1,6 @@
+println!("begin maintenance");
+
+
 let pollx2 = 60000;
 
 // Kill any connection with no response over 2x poll period
@@ -128,4 +131,7 @@ for (uuid, user) in users.objects(){
     }
   }
 }
+
+println!("end maintenance");
+
 "OK".to_string()
