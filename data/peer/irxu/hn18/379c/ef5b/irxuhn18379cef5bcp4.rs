@@ -348,8 +348,14 @@ impl P2PConnection {
   pub fn shutdown(&self, uuid:&str, conid:i64) -> io::Result<()> {
     let user = get_user(uuid).unwrap();
     user.get_array("connections").remove_data(Data::DInt(conid));
-    let mut con = P2PCONS.get().write().unwrap().get(conid as usize).duplicate();
-    P2PCONS.get().write().unwrap().decr(conid as usize);
+    let mut con;
+    {
+      let mut heap = P2PCONS.get().write().unwrap();
+      let x = heap.try_get(conid as usize);
+      if x.is_none() { return Ok(()); }
+      con = x.unwrap().duplicate();
+      heap.decr(conid as usize);
+    }
     let x = self.stream.shutdown();
     fire_event("peer", "UPDATE", user_to_peer(user.duplicate(), uuid.to_string()));
     fire_event("peer", "DISCONNECT", user_to_peer(user.duplicate(), uuid.to_string()));
