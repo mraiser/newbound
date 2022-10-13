@@ -346,6 +346,7 @@ fn do_listen(){
     None
   }
   
+  let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
   while system.get_bool("running") {
     let sock = UDPCON.get().write().unwrap().try_clone().unwrap();
     let (amt, src) = sock.recv_from(&mut buf).unwrap();
@@ -498,7 +499,9 @@ fn do_listen(){
             let mut con = con.unwrap();
             if let P2PStream::Udp(stream) = &mut con.stream {
               if stream.src == src {
-			    stream.data.put_i64("last_contact", time());
+                let now = time();
+			    stream.data.put_i64("last_contact", now);
+                system.get_object("sessions").get_object(&con.sessionid).put_i64("expire", now + sessiontimeoutmillis);
 
                 // There can be only one!
                 let _lock = READMUTEX.get().write().unwrap();
