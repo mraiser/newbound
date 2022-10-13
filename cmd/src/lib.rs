@@ -6,7 +6,7 @@ use flowlang::rustcmd::*;
 
 #[derive(Debug)]
 pub struct Initializer {
-    pub data_ref: (&'static str, (((usize,usize),(usize,usize)),((usize,usize),(usize,usize)),((usize,usize),(usize,usize)))),
+    pub data_ref: (&'static str, (((u64,u64),(u64,u64)),((u64,u64),(u64,u64)),((u64,u64),(u64,u64)))),
     pub cmds: Vec<(String, Transform, String)>,
 }
 

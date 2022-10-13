@@ -45,7 +45,6 @@ pub fn listen_udp(ipaddr:String, port:i64) -> i64 {
   let socket_address = ipaddr+":"+&port.to_string();
   START.call_once(|| { 
     UDPCON.set(RwLock::new(UdpSocket::bind(socket_address).unwrap())); 
-    UDPLOOKUP.set(RwLock::new(HashMap::new())); 
     READMUTEX.set(RwLock::new(true)); 
     WRITEMUTEX.set(RwLock::new(true)); 
     println!("P2P UDP listening on port {}", port);
@@ -56,7 +55,6 @@ pub fn listen_udp(ipaddr:String, port:i64) -> i64 {
 
 static START: Once = Once::new();
 pub static UDPCON:Storage<RwLock<UdpSocket>> = Storage::new();
-pub static UDPLOOKUP:Storage<RwLock<HashMap<i64, i64>>> = Storage::new();
 static READMUTEX:Storage<RwLock<bool>> = Storage::new();
 static WRITEMUTEX:Storage<RwLock<bool>> = Storage::new();
 
@@ -245,19 +243,6 @@ impl UdpStream {
   }
 }
 
-fn lookup_udp(id:i64) -> Option<i64> {
-  let heap = UDPLOOKUP.get().write().unwrap();
-  let id = heap.get(&id);
-  if id.is_none() { return None; }
-  Some(*id.unwrap())
-}
-
-fn not_negative_one() -> i64 {
-  let x = rand::thread_rng().gen::<i64>();
-  if x == -1 { return not_negative_one(); }
-  x
-}
-
 fn do_listen(){
   let mut system = DataStore::globals().get_object("system");
   let runtime = system.get_object("apps").get_object("app").get_object("runtime");
@@ -399,9 +384,7 @@ fn do_listen(){
               let (conid, _con) = P2PConnection::begin(uuid, P2PStream::Udp(UdpStream::blank(src)));
 
               // Send connection ID
-              let remote_id = not_negative_one();
-              UDPLOOKUP.get().write().unwrap().insert(remote_id, conid);
-              buf.extend_from_slice(&remote_id.to_be_bytes());
+              buf.extend_from_slice(&conid.to_be_bytes());
                 
               //println!("YO CON {} = {}", data_ref, remote_id);
               sock.send_to(&buf, &src).unwrap();
@@ -433,11 +416,9 @@ fn do_listen(){
               buf.extend_from_slice(&remote_id.to_be_bytes());
  
               // Send my connection ID
-              let remote_id = not_negative_one();
-              UDPLOOKUP.get().write().unwrap().insert(remote_id, conid);
-              buf.extend_from_slice(&remote_id.to_be_bytes());
+              buf.extend_from_slice(&conid.to_be_bytes());
                 
-              //println!("SUP CON {} = {}", data_ref, remote_id);
+              //println!("SUP CON {} = {}", data_ref, conid);
               sock.send_to(&buf, &src).unwrap();
               
               thread::spawn(move || {
@@ -454,26 +435,22 @@ fn do_listen(){
             let _x = res.unwrap();
             let bytes:[u8; 8] = buf[113..121].try_into().unwrap();
             let id = i64::from_be_bytes(bytes);
-            let id = lookup_udp(id);
-            if id.is_some() {
-              let id = id.unwrap();
-              let con = P2PConnection::try_get(id);
-              if con.is_some() {
-                let mut con = con.unwrap().duplicate();
-                if let P2PStream::Udp(stream) = &mut con.stream {
-                  if stream.src == src {
-                    let bytes:[u8; 8] = buf[121..129].try_into().unwrap();
-                    let remote_id = i64::from_be_bytes(bytes);
-                    stream.set_id(remote_id);
-                    //println!("RDY");
+            let con = P2PConnection::try_get(id);
+            if con.is_some() {
+              let mut con = con.unwrap().duplicate();
+              if let P2PStream::Udp(stream) = &mut con.stream {
+                if stream.src == src {
+                  let bytes:[u8; 8] = buf[121..129].try_into().unwrap();
+                  let remote_id = i64::from_be_bytes(bytes);
+                  stream.set_id(remote_id);
+                  //println!("RDY");
 
-                    thread::spawn(move || {
-                      handle_connection(id, con);
-                    });
-                  }
-                  else {
-                    println!("Received RDY from wrong source");
-                  }
+                  thread::spawn(move || {
+                    handle_connection(id, con);
+                  });
+                }
+                else {
+                  println!("Received RDY from wrong source");
                 }
               }
             }
@@ -483,120 +460,97 @@ fn do_listen(){
       CMD => {
         let id: [u8; 8] = buf[1..9].try_into().unwrap();
         let id = i64::from_be_bytes(id);
-        //println!("CMD remote id {}", id);
-        let id = lookup_udp(id);
-        if id.is_some() {
-          let id = id.unwrap();
-          //println!("CMD local id {}", id);
-        
-          let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
-          let msg_id = i64::from_be_bytes(msg_id);
-          //println!("CMD msg id {}", msg_id);
-          let buf = &buf[17..];
+        let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
+        let msg_id = i64::from_be_bytes(msg_id);
+        let buf = &buf[17..];
 
-          let con = P2PConnection::try_get(id);
-          if con.is_some() {
-            let mut con = con.unwrap();
-            if let P2PStream::Udp(stream) = &mut con.stream {
-              if stream.src == src {
-                let now = time();
-			    stream.data.put_i64("last_contact", now);
-                system.get_object("sessions").get_object(&con.sessionid).put_i64("expire", now + sessiontimeoutmillis);
+        let con = P2PConnection::try_get(id);
+        if con.is_some() {
+          let mut con = con.unwrap();
+          if let P2PStream::Udp(stream) = &mut con.stream {
+            if stream.src == src {
+              let now = time();
+              stream.data.put_i64("last_contact", now);
+              system.get_object("sessions").get_object(&con.sessionid).put_i64("expire", now + sessiontimeoutmillis);
 
-                // There can be only one!
-                let _lock = READMUTEX.get().write().unwrap();
-                let in_off = stream.data.get_i64("in_off");
-                let mut inv = stream.data.get_array("in");
+              // There can be only one!
+              let _lock = READMUTEX.get().write().unwrap();
+              let in_off = stream.data.get_i64("in_off");
+              let mut inv = stream.data.get_array("in");
 
-                //println!("CMD msg id {} in_off {}", msg_id, in_off);
-                
-                let i = msg_id - in_off;
-                if i < 0 {
-                  println!("Ignoring resend of msg {} on udp connection {}", msg_id, id);
-                }
-                else if i > MAXPACKETBUFF {
-                  println!("Too many packets... Ignoring msg {} on udp connection {}", msg_id, id);
-                }
-                else {
-                  while (inv.len() as i64) < i {
-                    inv.push_property(Data::DNull);
-                    println!("INV EXPAND");
-                  }
-
-                  let db = DataBytes::from_bytes(&buf.to_vec());
-                  if (inv.len() as i64) == i { inv.push_bytes(db); }
-                  else {
-                    if !inv.get_property(i as usize).is_null(){
-                      println!("Duplicate of msg {} on udp connection {}", msg_id, id);
-                    }
-                    inv.put_bytes(i as usize, db); 
-                  }
-
-                  //println!("CMD CON {} MSG {}", id, msg_id);
-
-                  let mut i = 0;
-                  while i < inv.len() {
-                    if Data::equals(inv.get_property(i), Data::DNull) { break; }
-                    i += 1;
-                  }
-                  if i > 0 {
-                    let i = (i as i64) + in_off - 1;
-                    //println!("send ACK {}", i);
-                    
-                    let id = stream.data.get_i64("id");
-
-                    let mut bytes = Vec::new();
-                    bytes.push(ACK);
-                    bytes.extend_from_slice(&id.to_be_bytes());
-                    bytes.extend_from_slice(&i.to_be_bytes());
-                    sock.send_to(&bytes, &src).unwrap();
-                  }
-                }
+              let i = msg_id - in_off;
+              if i < 0 {
+                println!("Ignoring resend of msg {} on udp connection {}", msg_id, id);
+              }
+              else if i > MAXPACKETBUFF {
+                println!("Too many packets... Ignoring msg {} on udp connection {}", msg_id, id);
               }
               else {
-                println!("Received CMD from wrong source");
+                while (inv.len() as i64) < i {
+                  inv.push_property(Data::DNull);
+                  println!("INV EXPAND");
+                }
+
+                let db = DataBytes::from_bytes(&buf.to_vec());
+                if (inv.len() as i64) == i { inv.push_bytes(db); }
+                else {
+                  if !inv.get_property(i as usize).is_null(){
+                    println!("Duplicate of msg {} on udp connection {}", msg_id, id);
+                  }
+                  inv.put_bytes(i as usize, db); 
+                }
+
+                let mut i = 0;
+                while i < inv.len() {
+                  if Data::equals(inv.get_property(i), Data::DNull) { break; }
+                  i += 1;
+                }
+                if i > 0 {
+                  let i = (i as i64) + in_off - 1;
+                  //println!("send ACK {}", i);
+
+                  let id = stream.data.get_i64("id");
+
+                  let mut bytes = Vec::new();
+                  bytes.push(ACK);
+                  bytes.extend_from_slice(&id.to_be_bytes());
+                  bytes.extend_from_slice(&i.to_be_bytes());
+                  sock.send_to(&bytes, &src).unwrap();
+                }
               }
             }
-          }        
+            else {
+              println!("Received CMD from wrong source");
+            }
+          }
         }
       },
       ACK => {
         let id: [u8; 8] = buf[1..9].try_into().unwrap();
         let id = i64::from_be_bytes(id);
-        //println!("received ACK for remote con {}", id);
-        let id = lookup_udp(id);
-        if id.is_some() {
-          let id = id.unwrap();
-          //println!("received ACK for local con {}", id);
-        
-          let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
-          let msg_id = i64::from_be_bytes(msg_id);
+        let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
+        let msg_id = i64::from_be_bytes(msg_id);
 
-          //println!("received ACK for packet {} on internal con {}", msg_id, id);
+        let mut con = P2PConnection::get(id);
+        if let P2PStream::Udp(stream) = &mut con.stream {
+          if stream.src == src {
+            // There can be only one!
+            let _lock = WRITEMUTEX.get().write().unwrap();
+            let mut out_off = stream.data.get_i64("out_off");
+            let mut out = stream.data.get_array("out");
 
-          let mut con = P2PConnection::get(id);
-          if let P2PStream::Udp(stream) = &mut con.stream {
-            if stream.src == src {
-              // There can be only one!
-              let _lock = WRITEMUTEX.get().write().unwrap();
-              let mut out_off = stream.data.get_i64("out_off");
-              let mut out = stream.data.get_array("out");
-
-  //            println!("con {} has {} packets with offset {}", id, out.len(), out_off);
-
-              let n = msg_id - out_off;
-              let mut i = 0;
-              while i <= n {
-                //println!("removing packet {}", out_off);
-                out.remove_property(0);
-                out_off += 1;
-                i += 1;
-              }
-              stream.data.put_i64("out_off", out_off);
+            let n = msg_id - out_off;
+            let mut i = 0;
+            while i <= n {
+              //println!("removing packet {}", out_off);
+              out.remove_property(0);
+              out_off += 1;
+              i += 1;
             }
-            else {
-              println!("Received ACK from wrong source");
-            }
+            stream.data.put_i64("out_off", out_off);
+          }
+          else {
+            println!("Received ACK from wrong source");
           }
         }
       },
