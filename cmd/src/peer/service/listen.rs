@@ -8,7 +8,6 @@ use std::sync::Once;
 use state::Storage;
 use std::sync::RwLock;
 use std::net::TcpListener;
-use ndata::heap::Heap;
 use ndata::data::*;
 use flowlang::datastore::DataStore;
 use flowlang::appserver::get_user;
@@ -452,7 +451,7 @@ impl P2PConnection {
 
 pub fn get_best(user:DataObject) -> Option<P2PConnection> {
   let mut best = None;
-  let mut heap = P2PCONS.get().write().unwrap();
+  let heap = P2PCONS.get().write().unwrap();
   let cons = user.get_array("connections");
 //  println!("heap {:?} cons {}", heap, cons.to_string());
   for con in cons.objects(){
@@ -468,7 +467,7 @@ pub fn get_best(user:DataObject) -> Option<P2PConnection> {
 }
 
 pub fn get_tcp(user:DataObject) -> Option<P2PConnection> {
-  let mut heap = P2PCONS.get().write().unwrap();
+  let heap = P2PCONS.get().write().unwrap();
   let cons = user.get_array("connections");
 //  println!("heap {:?} cons {}", heap, cons.to_string());
   for con in cons.objects(){
@@ -482,7 +481,7 @@ pub fn get_tcp(user:DataObject) -> Option<P2PConnection> {
 }
 
 pub fn get_udp(user:DataObject) -> Option<P2PConnection> {
-  let mut heap = P2PCONS.get().write().unwrap();
+  let heap = P2PCONS.get().write().unwrap();
   let cons = user.get_array("connections");
 //  println!("heap {:?} cons {}", heap, cons.to_string());
   for con in cons.objects(){
@@ -496,7 +495,7 @@ pub fn get_udp(user:DataObject) -> Option<P2PConnection> {
 }
 
 pub fn get_relay(user:DataObject) -> Option<P2PConnection> {
-  let mut heap = P2PCONS.get().write().unwrap();
+  let heap = P2PCONS.get().write().unwrap();
   let cons = user.get_array("connections");
 //  println!("heap {:?} cons {}", heap, cons.to_string());
   for con in cons.objects(){
