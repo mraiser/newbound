@@ -3,15 +3,17 @@ pub mod security;
 pub mod dev;
 pub mod app;
 use flowlang::rustcmd::*;
+use ndata::NDataConfig;
 
 #[derive(Debug)]
 pub struct Initializer {
-    pub data_ref: (&'static str, (((u64,u64),(u64,u64)),((u64,u64),(u64,u64)),((u64,u64),(u64,u64)))),
+    pub data_ref: (&'static str, NDataConfig),
     pub cmds: Vec<(String, Transform, String)>,
 }
 
 #[no_mangle]
 pub fn mirror(state: &mut Initializer) {
+    #[cfg(feature = "reload")]
     flowlang::mirror(state.data_ref);
     state.cmds.clear();
     state.cmds.push(("lvvzvn183bd066566j4".to_string(), peer::service::session_expire::execute, "".to_string()));
