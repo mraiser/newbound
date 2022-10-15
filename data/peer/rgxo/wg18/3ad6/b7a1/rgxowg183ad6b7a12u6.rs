@@ -522,8 +522,8 @@ fn do_listen(){
             // There can be only one!
             // FIXME - Is lock necessary? We're in the only thread that removes packets from out.
             let _lock = WRITEMUTEX.get().write().unwrap();
-            let mut out_off = stream.data.get_i64("out_off");
-            let mut out = stream.data.get_array("out");
+            let out_off = stream.data.get_i64("out_off");
+            let out = stream.data.get_array("out");
 
             let n = msg_id - out_off;
             if n<0 {
