@@ -510,6 +510,35 @@ fn do_listen(){
           }
         }
       },
+      RESEND => {
+        let id: [u8; 8] = buf[1..9].try_into().unwrap();
+        let id = i64::from_be_bytes(id);
+        let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
+        let msg_id = i64::from_be_bytes(msg_id);
+
+        let mut con = P2PConnection::get(id);
+        if let P2PStream::Udp(stream) = &mut con.stream {
+          if stream.src == src {
+            // There can be only one!
+            // FIXME - Is lock necessary? We're in the only thread that removes packets from out.
+            let _lock = WRITEMUTEX.get().write().unwrap();
+            let mut out_off = stream.data.get_i64("out_off");
+            let mut out = stream.data.get_array("out");
+
+            let n = msg_id - out_off;
+            if n<0 {
+              println!("Ignoring request for resend of msg {} on udp connection {}", msg_id, id);
+            }
+            else {
+              let bytes = out.get_bytes(n as usize);
+              sock.send_to(&bytes.get_data(), &src).unwrap();
+            }
+          }
+          else {
+            println!("Received ACK from wrong source");
+          }
+        }
+      },
       _ => {
         println!("Unknown UDP command {} len {}", cmd, buf.len());
       },
