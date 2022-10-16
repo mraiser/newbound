@@ -16,6 +16,7 @@ pub fn mirror(state: &mut Initializer) {
     #[cfg(feature = "reload")]
     flowlang::mirror(state.data_ref);
     state.cmds.clear();
+    state.cmds.push(("uykmrm183dbd15cdeu7b".to_string(), dev::dev::lib_archive::execute, "".to_string()));
     state.cmds.push(("lvvzvn183bd066566j4".to_string(), peer::service::session_expire::execute, "".to_string()));
     state.cmds.push(("gloivk183adf03115od".to_string(), peer::service::udp_connect::execute, "".to_string()));
     state.cmds.push(("rgxowg183ad6b7a12u6".to_string(), peer::service::listen_udp::execute, "".to_string()));

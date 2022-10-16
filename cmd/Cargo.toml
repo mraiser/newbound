@@ -11,8 +11,8 @@ serde_support = ["serde","serde_json","flowlang/serde_support","ndata/serde_supp
 reload = ["flowlang/reload","ndata/reload"]
 
 [dependencies]
-flowlang = { version = "0.1.38" }
-#flowlang = { path = "../../../rust/flow" }
+#flowlang = { version = "0.1.38" }
+flowlang = { path = "../../../rust/flow" }
 ndata="0.2.16"
 #ndata = { path = "../../../rust/ndata" }
 state="0.5.3"
