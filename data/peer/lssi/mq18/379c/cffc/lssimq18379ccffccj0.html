@@ -1,4 +1,4 @@
-<div class='data-control' data-control='botmanager:ui:{}'></div>
+<div class='data-control' data-control='app:ui:{}'></div>
 <div class='viewer'></div>
 <div class="wrap" style="display:none;">
   <div class='topleftcorner'>
@@ -15,11 +15,89 @@
       <div class='localpeerport'></div>
       <div class='localhttpport'></div>
     </div>
-    <button class="addpeerbutton coloredbutton"><img src='../app/asset/app/person_add_icon.png' class='mediumicon'></button>
+    <button class='addpeerbutton coloredbutton popupmenu' data-popup='{"selector":".addusercard","closeselector":".close-add-user","modal":true}'><img src='../app/asset/app/person_add_icon.png' class='mediumicon'></button>
     <button class="accesscodebutton coloredbutton"><img src='../app/asset/app/shield_icon.png' class='mediumicon'></button>
     <button class="lanbutton mdl-button coloredbutton"><img src='../app/asset/app/wifi_icon.png' class='mediumicon'></button>
     <button class="updateallpeersbutton coloredbutton"><img src='../app/asset/app/upload_icon.png' class='mediumicon'></button>
   </div>
+  
+  <div class='card hideme addusercard'>
+    <div class='dialog-header'>
+      <div class='padme'>
+        Add Connection
+        <img src='../app/asset/app/close-white.png' class='upper-right close-add-user roundbutton-small out10'>
+      </div>
+      <div class = "navbar navbar-dark addusernavbar">
+        <div class = "navbar-tab autab autab1 selected" data-id='autab1'>Invite</div>
+        <div class = "navbar-tab autab autab2" data-id='autab2'>Accept</div>
+        <div class = "navbar-tab autab autab3" data-id='autab3'>Manual</div>
+      </div>
+    </div>
+    
+
+    <div class='tab-content autab1 selected' id='autab1'>
+      <div class='padme'>
+        Generate an invitation code
+        <br><br>
+        <div class='textinputlabel'>Select Group</div>
+        <select class='textinput groupselect adduser-invite-groupselect'></select>
+      </div>
+      <div class="card-button-wrap bottomhugger">
+        <button id="createtheinvite"  class="clearbutton">Generate Invite</button>
+      </div>
+    </div>
+
+
+    <div class='tab-content autab2' id='autab2'>
+      <div class='padme'>
+        Accept an invitation code
+        <br><br>
+        <div class='textinputlabel'>Enter Invite Code</div>
+        <input type='text' class='textinput'>
+        <br><br>
+        <div class='textinputlabel'>Select Group</div>
+        <select class='textinput groupselect adduser-accept-groupselect'></select>
+      </div>
+      <div class="card-button-wrap bottomhugger">
+        <button id="accepttheinvite"  class="clearbutton">Accept Invite</button>
+      </div>
+    </div>
+
+
+    <div class='tab-content autab3' id='autab3'>
+      <div class='padme'>
+        Connect to device
+        <br><br>
+        <table border='0' cellpadding='0' cellspacing='0' width='100%'>
+          <tr>
+            <td style='vertical-align:top;'>
+              <div class='textinputlabel'>Device UUID</div>
+              <input type='text' class='textinput'>
+              <br><br>
+              <div class='textinputlabel'>Select Group</div>
+              <select class='textinput groupselect adduser-accept-groupselect'></select>
+            </td>
+            <td width='20'></td>
+            <td>
+              <div class='textinputlabel'>Access Code (if you have one)</div>
+              <input type='text' class='textinput'>
+              <br><br>
+              <div class='textinputlabel'>IP Address (if you have it)</div>
+              <input type='text' class='textinput'>
+              <br><br>
+              <div class='textinputlabel'>Port Number (if you have it)</div>
+              <input type='number' class='textinput'>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <div class="card-button-wrap bottomhugger">
+        <button id="accepttheinvite"  class="clearbutton">Accept Invite</button>
+      </div>
+    </div>
+    
+  
+  </div>  
 </div>
 <div id="headsupdisplay" class="wrap">
   

@@ -6,6 +6,8 @@ me.children = [];
 me.uiReady = function(ui){
   me.ui = ui;
   $(ME).find('.wrap').css('display', 'block');
+  ui.initNavbar(ME);
+  ui.initPopups(ME);
 };
 
 me.ready = function(){
@@ -55,7 +57,25 @@ me.ready = function(){
                   $(ME).find('.localpeerid').text(result.data.uuid);
                   $(ME).find('.localpeerport').text("P2P Port: "+result.data.p2p_port);
                   $(ME).find('.localhttpport').text("HTTP Port: "+result.data.http_port);
+                  
+                  json('../security/groups', null, function(result){
+                    if (result.status != 'ok') alert(result.msg);
+                    else {
+                      me.groups = result.data;
+                      result.data.sort();
+                      var newhtml = '';
+                      for (var i in result.data) {
+                        newhtml += '<option>'+result.data[i]+'</option>';
+                      }
+                      $(ME).find('.groupselect').html(newhtml);
+                    }
+                  });
                 });
+              });
+
+              $(renderer.domElement).click(function(event){
+                var model = findClick(event);
+                if (model && model.click) return model.click(event);
               });
 
               me.animate();
@@ -122,11 +142,6 @@ me.animate = function () {
   me.spotLight.position.copy(me.camera.position);
   me.render();
 };
-
-$(ME).click(function(event){
-  var model = findClick(event);
-  if (model && model.click) return model.click(event);
-});
 
 function findClick(event){
   event.three = {};

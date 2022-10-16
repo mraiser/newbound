@@ -24,7 +24,7 @@ use aes::cipher::BlockDecrypt;
 use rand::rngs::OsRng;
 use flowlang::generated::flowlang::system::time::time;
 use flowlang::generated::flowlang::file::write_properties::write_properties;
-use flowlang::appserver::handle_command;
+use crate::app::service::init::handle_command;
 use flowlang::appserver::fire_event;
 use crate::peer::peer::peers::user_to_peer;
 use std::io;

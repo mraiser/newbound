@@ -44,3 +44,17 @@
   color:white;
   display:none;
 }
+
+.addusercard {
+  width:600px;
+  height:400px;
+}
+
+.bottomhugger{
+  position:absolute !important;
+  bottom:0px;
+}
+
+.autab {
+  padding-top:0px !important;
+}
