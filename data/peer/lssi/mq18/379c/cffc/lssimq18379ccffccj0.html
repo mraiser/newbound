@@ -27,15 +27,15 @@
         Add Connection
         <img src='../app/asset/app/close-white.png' class='upper-right close-add-user roundbutton-small out10'>
       </div>
-      <div class = "navbar navbar-dark addusernavbar">
+      <!-- div class = "navbar navbar-dark addusernavbar">
         <div class = "navbar-tab autab autab1 selected" data-id='autab1'>Invite</div>
         <div class = "navbar-tab autab autab2" data-id='autab2'>Accept</div>
         <div class = "navbar-tab autab autab3" data-id='autab3'>Manual</div>
-      </div>
+      </div -->
     </div>
     
 
-    <div class='tab-content autab1 selected' id='autab1'>
+    <!--div class='tab-content autab1 selected' id='autab1'>
       <div class='padme'>
         Generate an invitation code
         <br><br>
@@ -61,38 +61,25 @@
       <div class="card-button-wrap bottomhugger">
         <button id="accepttheinvite"  class="clearbutton">Accept Invite</button>
       </div>
-    </div>
+    </div -->
 
 
-    <div class='tab-content autab3' id='autab3'>
+    <div class='tab-content autab3 selected' id='autab3'>
       <div class='padme'>
-        Connect to device
+        <div class='textinputlabel'>Device UUID</div>
+        <input type='text' class='textinput'>
         <br><br>
-        <table border='0' cellpadding='0' cellspacing='0' width='100%'>
-          <tr>
-            <td style='vertical-align:top;'>
-              <div class='textinputlabel'>Device UUID</div>
-              <input type='text' class='textinput'>
-              <br><br>
-              <div class='textinputlabel'>Select Group</div>
-              <select class='textinput groupselect adduser-accept-groupselect'></select>
-            </td>
-            <td width='20'></td>
-            <td>
-              <div class='textinputlabel'>Access Code (if you have one)</div>
-              <input type='text' class='textinput'>
-              <br><br>
-              <div class='textinputlabel'>IP Address (if you have it)</div>
-              <input type='text' class='textinput'>
-              <br><br>
-              <div class='textinputlabel'>Port Number (if you have it)</div>
-              <input type='number' class='textinput'>
-            </td>
-          </tr>
-        </table>
+        <div class='textinputlabel'>Select Group</div>
+        <select class='textinput groupselect adduser-accept-groupselect'></select>
+        <br><br>
+        <div class='textinputlabel'>IP Address (if you have it)</div>
+        <input type='text' class='textinput'>
+        <br><br>
+        <div class='textinputlabel'>Port Number (if you have it)</div>
+        <input type='number' class='textinput'>
       </div>
-      <div class="card-button-wrap bottomhugger">
-        <button id="accepttheinvite"  class="clearbutton">Accept Invite</button>
+      <div class="card-button-wrap">
+        <button id="addconnection"  class="clearbutton">Add Connection</button>
       </div>
     </div>
     

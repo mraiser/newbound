@@ -88,7 +88,6 @@ pub fn http_listen() {
   for stream in listener.incoming() {
     let mut stream = stream.unwrap();
     thread::spawn(move || {
-      let system = DataStore::globals().get_object("system");
       let remote_addr = stream.peer_addr().unwrap();
       let mut line = read_line(&mut stream);
       let count = line.len();
@@ -379,7 +378,7 @@ pub fn http_listen() {
     //      if (expires != -1) h.put("Expires", toHTTPDate(new Date(expires)));
 
           let session_id = request.get_object("session").get_string("id");
-          let later = now + system.get_object("config").get_i64("sessiontimeoutmillis");
+          let later = now + 31536000000; // system.get_object("config").get_i64("sessiontimeoutmillis");
           let cookie = "sessionid=".to_string()+&session_id+"; Path=/; Expires="+&RFC2822Date::new(later).to_string();
           headers.put_str("Set-Cookie", &cookie);
 

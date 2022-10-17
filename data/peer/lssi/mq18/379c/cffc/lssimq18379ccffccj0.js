@@ -6,7 +6,7 @@ me.children = [];
 me.uiReady = function(ui){
   me.ui = ui;
   $(ME).find('.wrap').css('display', 'block');
-  ui.initNavbar(ME);
+  //ui.initNavbar(ME);
   ui.initPopups(ME);
 };
 
@@ -67,7 +67,7 @@ me.ready = function(){
                       for (var i in result.data) {
                         newhtml += '<option>'+result.data[i]+'</option>';
                       }
-                      $(ME).find('.groupselect').html(newhtml);
+                      $(ME).find('.groupselect').html(newhtml).val('anonymous');
                     }
                   });
                 });

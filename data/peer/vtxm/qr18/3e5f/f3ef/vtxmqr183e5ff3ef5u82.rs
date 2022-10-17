@@ -21,7 +21,7 @@ static START: Once = Once::new();
 static mut DISCOVERYCON:Storage<RwLock<UdpSocket>> = Storage::new();
 
 fn do_send() {
-  let mut system = DataStore::globals().get_object("system");
+  let system = DataStore::globals().get_object("system");
   let runtime = system.get_object("apps").get_object("app").get_object("runtime");
   let meta = system.get_object("apps").get_object("peer").get_object("runtime");
   let config = system.get_object("config");
@@ -46,8 +46,11 @@ fn do_send() {
 
 fn do_listen() {
   let mut system = DataStore::globals().get_object("system");
+  if !system.has("discovery") { system.put_object("discovery", DataObject::new()); }
+  let mut discovery = system.get_object("discovery");
   let runtime = system.get_object("apps").get_object("app").get_object("runtime");
   let my_uuid = runtime.get_string("uuid");
+  // FIXME - We only need 40
   let mut buf = [0; 508]; 
   while system.get_bool("running") {
     let sock;
@@ -56,18 +59,29 @@ fn do_listen() {
     let buf = &mut buf[..amt];
     let s = String::from_utf8(buf[0..36].to_vec()).unwrap();
     if s != my_uuid { 
+      let bytes: [u8; 2] = buf[36..38].try_into().unwrap();
+      let p2pport = u16::from_be_bytes(bytes) as usize;
+      let bytes: [u8; 2] = buf[38..40].try_into().unwrap();
+      let httpport = u16::from_be_bytes(bytes) as usize;
+      let ipaddress = src.ip().to_string();
+        
+      let mut o = DataObject::new();
+      o.put_i64("p2pport", p2pport as i64);
+      o.put_i64("httpport", httpport as i64);
+      o.put_str("address", &ipaddress);
+      o.put_str("uuid", &s);
+      
+      let src = ipaddress.to_owned()+":"+&p2pport.to_string();
+      discovery.put_object(&src, o);
+
       let user = get_user(&s);
       if user.is_some() {
-        let mut user = user.unwrap();
-        if get_udp(user.duplicate()).is_none() && get_tcp(user.duplicate()).is_none() {
-          let bytes: [u8; 2] = buf[36..38].try_into().unwrap();
-          let p2pport = u16::from_be_bytes(bytes) as usize;
-          let bytes: [u8; 2] = buf[38..40].try_into().unwrap();
-          let httpport = u16::from_be_bytes(bytes) as usize;
-          let ipaddress = src.ip().to_string();
-          
-          let _x = udp_connect(ipaddress, p2pport as i64);
-        }        
+        let user = user.unwrap();
+        if user.has("keepalive") && Data::as_string(user.get_property("keepalive")) == "true" {
+          if get_udp(user.duplicate()).is_none() && get_tcp(user.duplicate()).is_none() {
+            let _x = udp_connect(ipaddress, p2pport as i64);
+          }        
+        }
       }
     }
   }
