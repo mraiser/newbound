@@ -24,5 +24,7 @@ thread::spawn(move || {
 thread::spawn(move || {
   listen_udp(ipaddr, port);
 });
+
+discovery();
   
 meta

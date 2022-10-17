@@ -138,6 +138,7 @@ impl UdpStream {
       let mut out = self.data.get_array("out");
       let mut msgid = self.data.get_i64("next");
       
+      // FIXME - Support payloads up to 67K?
       let blocks: Vec<&[u8]> = buf.chunks(491).collect();
       for buf in blocks {
         let mut bytes = Vec::new();

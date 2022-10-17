@@ -5,6 +5,7 @@ use flowlang::datastore::DataStore;
 use flowlang::generated::flowlang::file::write_properties::write_properties;
 use crate::peer::service::listen::listen;
 use crate::peer::service::listen_udp::listen_udp;
+use crate::peer::service::discovery::discovery;
 
 pub fn execute(_o: DataObject) -> DataObject {
 let ax = init();
@@ -40,6 +41,8 @@ thread::spawn(move || {
 thread::spawn(move || {
   listen_udp(ipaddr, port);
 });
+
+discovery();
   
 meta
 }

@@ -6,3 +6,4 @@ pub mod exec;
 pub mod listen_udp;
 pub mod udp_connect;
 pub mod session_expire;
+pub mod discovery;
