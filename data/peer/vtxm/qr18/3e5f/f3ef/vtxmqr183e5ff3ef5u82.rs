@@ -59,15 +59,20 @@ fn do_listen() {
       let user = get_user(&s);
       if user.is_some() {
         let mut user = user.unwrap();
-        let bytes: [u8; 2] = buf[36..38].try_into().unwrap();
-        let p2pport = u16::from_be_bytes(bytes) as usize;
-        let bytes: [u8; 2] = buf[38..40].try_into().unwrap();
-        let httpport = u16::from_be_bytes(bytes) as usize;
-        let ipaddress = src.ip().to_string();
-        user.put_i64("port", p2pport as i64);
-        user.put_i64("p2pport", p2pport as i64);
-        user.put_i64("httpport", httpport as i64);
-        user.put_str("address", &ipaddress);
+        if get_udp(user.duplicate()).is_none() && get_tcp(user.duplicate()).is_none() {
+          let bytes: [u8; 2] = buf[36..38].try_into().unwrap();
+          let p2pport = u16::from_be_bytes(bytes) as usize;
+          let bytes: [u8; 2] = buf[38..40].try_into().unwrap();
+          let httpport = u16::from_be_bytes(bytes) as usize;
+          let ipaddress = src.ip().to_string();
+          
+          let _x = udp_connect(ipaddress, p2pport as i64);
+        }        
+        
+//        user.put_i64("port", p2pport as i64);
+//        user.put_i64("p2pport", p2pport as i64);
+//        user.put_i64("httpport", httpport as i64);
+//        user.put_str("address", &ipaddress);
       }
     }
   }
