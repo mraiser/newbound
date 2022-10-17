@@ -68,11 +68,6 @@ fn do_listen() {
           
           let _x = udp_connect(ipaddress, p2pport as i64);
         }        
-        
-//        user.put_i64("port", p2pport as i64);
-//        user.put_i64("p2pport", p2pport as i64);
-//        user.put_i64("httpport", httpport as i64);
-//        user.put_str("address", &ipaddress);
       }
     }
   }

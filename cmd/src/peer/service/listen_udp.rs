@@ -395,7 +395,7 @@ fn do_listen(){
         if amt == 137 {
           let res = welcome(RDY, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private.to_owned());
           if res.is_some(){
-            let (uuid, _user, cipher, buf2) = res.unwrap();
+            let (uuid, mut user, cipher, buf2) = res.unwrap();
 
             // check their proof of crypto
             let bytes = decrypt(&cipher, &buf[113..129]);
@@ -423,6 +423,12 @@ fn do_listen(){
               thread::spawn(move || {
                 handle_connection(conid, con);
               });
+              
+              let p2pport = src.port();
+              let ipaddr = src.ip().to_string();
+              user.put_i64("port", p2pport as i64);
+              user.put_i64("p2pport", p2pport as i64);
+              user.put_str("address", &ipaddr);
             }
           }
         }
@@ -431,7 +437,7 @@ fn do_listen(){
         if amt == 129 {
           let res = welcome(RDY, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private.to_owned());
           if res.is_some(){
-            let _x = res.unwrap();
+            let (_uuid, mut user, _cipher, _buf2) = res.unwrap();
             let bytes:[u8; 8] = buf[113..121].try_into().unwrap();
             let id = i64::from_be_bytes(bytes);
             let con = P2PConnection::try_get(id);
@@ -447,6 +453,12 @@ fn do_listen(){
                   thread::spawn(move || {
                     handle_connection(id, con);
                   });
+              
+                  let p2pport = src.port();
+                  let ipaddr = src.ip().to_string();
+                  user.put_i64("port", p2pport as i64);
+                  user.put_i64("p2pport", p2pport as i64);
+                  user.put_str("address", &ipaddr);
                 }
                 else {
                   println!("Received RDY from wrong source");
