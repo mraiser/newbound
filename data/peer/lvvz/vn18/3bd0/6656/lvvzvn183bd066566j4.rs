@@ -1,4 +1,4 @@
-//FIXME - NOT USED, REMOVE - Param should be sessionid not user
+//FIXME - Param should be sessionid not user. Don't kill all their cons because a session died!!!
 if user.has("id") {
   let username = user.get_string("id");
   if username.len() == 36 {

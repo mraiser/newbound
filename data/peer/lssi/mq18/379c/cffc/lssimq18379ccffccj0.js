@@ -53,6 +53,7 @@ me.ready = function(){
                   addPeer(p);
                 }
                 send_info(null, null, null, function(result){
+                  me.info = result.data;
                   $(ME).find('.localpeername').text(result.data.name);
                   $(ME).find('.localpeerid').text(result.data.uuid);
                   $(ME).find('.localpeerport').text("P2P Port: "+result.data.p2p_port);
@@ -86,6 +87,32 @@ me.ready = function(){
     });
   });
 };
+
+$(ME).find('#addconnection').click(function(){
+  var el_uuid = $(ME).find('.adduseruuid');
+  el_uuid.parent().css('border', 'none');
+  var uuid = el_uuid.val();
+  const regexExp = /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/gi;
+  if (!regexExp.test(uuid)) {
+    el_uuid.parent().css('border', 'thin red solid');
+    document.body.api.ui.snackbar({"message":"A valid device ID is required"});
+  }
+  else if (uuid == me.info.uuid) {
+    el_uuid.parent().css('border', 'thin red solid');
+    document.body.api.ui.snackbar({"message":"You cannot connect to yourself"});
+  }
+  else {
+    var rando = guid();
+    var group = JSON.stringify([$(ME).find('.addusergroup').val()]);
+    var params = "id="+encodeURIComponent(uuid)
+      + "&displayname="+encodeURIComponent(uuid)
+      + "&password="+encodeURIComponent(rando)
+      + "&groups="+encodeURIComponent(group);
+    json('../security/setuser', params, function(result){
+      console.log(result);
+    });
+  }
+});
 
 String.prototype.hashCode = function() {
   var hash = 0, i, chr;
