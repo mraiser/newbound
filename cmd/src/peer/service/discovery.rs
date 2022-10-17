@@ -50,11 +50,13 @@ fn do_send() {
   let config = system.get_object("config");
   
   let my_uuid = runtime.get_string("uuid");
+  let my_name = config.get_string("machineid");
   let p2pport = Data::as_string(meta.get_property("port")).parse::<u16>().unwrap();
   let httpport = Data::as_string(config.get_property("http_port")).parse::<u16>().unwrap();
   let mut buf = my_uuid.as_bytes().to_vec();
   buf.extend_from_slice(&p2pport.to_be_bytes());
   buf.extend_from_slice(&httpport.to_be_bytes());
+  buf.extend_from_slice(&my_name.as_bytes());
   
   let broad = "255.255.255.255:5770";
   let beat = Duration::from_millis(10000);
@@ -73,7 +75,6 @@ fn do_listen() {
   let mut discovery = system.get_object("discovery");
   let runtime = system.get_object("apps").get_object("app").get_object("runtime");
   let my_uuid = runtime.get_string("uuid");
-  // FIXME - We only need 40
   let mut buf = [0; 508]; 
   while system.get_bool("running") {
     let sock;
@@ -86,6 +87,7 @@ fn do_listen() {
       let p2pport = u16::from_be_bytes(bytes) as usize;
       let bytes: [u8; 2] = buf[38..40].try_into().unwrap();
       let httpport = u16::from_be_bytes(bytes) as usize;
+      let displayname = String::from_utf8(buf[40..].to_vec()).unwrap();
       let ipaddress = src.ip().to_string();
         
       let mut o = DataObject::new();
@@ -93,6 +95,7 @@ fn do_listen() {
       o.put_i64("httpport", httpport as i64);
       o.put_str("address", &ipaddress);
       o.put_str("uuid", &s);
+      o.put_str("name", &displayname);
       o.put_i64("time", time());
       
       let src = ipaddress.to_owned()+":"+&p2pport.to_string();

@@ -6,7 +6,7 @@ me.children = [];
 me.uiReady = function(ui){
   me.ui = ui;
   $(ME).find('.wrap').css('display', 'block');
-  //ui.initNavbar(ME);
+  ui.initNavbar(ME);
   ui.initPopups(ME);
 };
 
@@ -69,6 +69,16 @@ me.ready = function(){
                         newhtml += '<option>'+result.data[i]+'</option>';
                       }
                       $(ME).find('.groupselect').html(newhtml).val('anonymous');
+                      
+                      json('../peer/discovery', null, function(result){
+                        var newhtml = '<table border="0" cellpadding="0" cellspacing="20">';
+                        for (sip in result.data) {
+                          var rds = result.data[sip];
+                          newhtml += '<tr><td>'+sip+'</td><td>'+rds.name+'</td></tr>';
+                        }
+                        newhtml += '</table>';
+                        $(ME).find('.discovered').html(newhtml);
+                      });
                     }
                   });
                 });
