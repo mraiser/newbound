@@ -70,6 +70,7 @@ fn do_listen() {
       o.put_i64("httpport", httpport as i64);
       o.put_str("address", &ipaddress);
       o.put_str("uuid", &s);
+      o.put_i64("time", time());
       
       let src = ipaddress.to_owned()+":"+&p2pport.to_string();
       discovery.put_object(&src, o);
