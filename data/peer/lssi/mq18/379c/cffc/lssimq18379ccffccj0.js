@@ -12,9 +12,9 @@ me.uiReady = function(ui){
 
 me.ready = function(){
   subscribe_event("peer", "UPDATE", function(data){
-    // FIMXE - Handle previously unseen peers
-    $(ME).find('#peer_'+data.id)[0].DATA = data;
-    console.log(data);
+    var pdiv = $(ME).find('#peer_'+data.id)[0];
+    if (pdiv) pdiv.DATA = data;
+    else addPeer(data);
   });
   
   $.getScript( '../app/asset/peer/three.min.js', function() { 
@@ -128,21 +128,26 @@ $(ME).find('#addconnection').click(function(){
     document.body.api.ui.snackbar({"message":"You cannot connect to yourself"});
   }
   else {
+    $(ME).find('.close-add-user').click();
     var rando = guid();
     var display = $(ME).find('.addusername').val();
     var keepalive = $(ME).find('#useraddkeepalive').prop('checked');
     var group = JSON.stringify([$(ME).find('.addusergroup').val()]);
-    var address = JSON.stringify([$(ME).find('.adduseripaddr').val()]);
-    var port = JSON.stringify([$(ME).find('.adduserport').val()]);
+    var address = $(ME).find('.adduseripaddr').val();
+    var port = $(ME).find('.adduserport').val();
     var params = "id="+encodeURIComponent(uuid)
-      + "&displayname="+encodeURIComponent(uuid)
+      + "&displayname="+encodeURIComponent(display)
       + "&password="+encodeURIComponent(rando)
       + "&groups="+encodeURIComponent(group)
       + "&keepalive="+keepalive
       + "&address="+encodeURIComponent(address)
       + "&port="+encodeURIComponent(port);
     json('../security/setuser', params, function(result){
-      console.log(result);
+      var params = "ipaddr="+encodeURIComponent(address)
+        + "&port="+encodeURIComponent(port);
+      json('../peer/udp_connect', params, function(result){
+        
+      });
     });
   }
 });
