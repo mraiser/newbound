@@ -48,6 +48,7 @@ me.ready = function(){
               camera.lookAt(scene.position);
 
               send_peers(function(result){
+                me.peers = result.data;
                 for (var i in result.data) {
                   var p = result.data[i];
                   addPeer(p);
@@ -69,16 +70,6 @@ me.ready = function(){
                         newhtml += '<option>'+result.data[i]+'</option>';
                       }
                       $(ME).find('.groupselect').html(newhtml).val('anonymous');
-                      
-                      json('../peer/discovery', null, function(result){
-                        var newhtml = '<table border="0" cellpadding="0" cellspacing="20">';
-                        for (sip in result.data) {
-                          var rds = result.data[sip];
-                          newhtml += '<tr><td>'+sip+'</td><td>'+rds.name+'</td></tr>';
-                        }
-                        newhtml += '</table>';
-                        $(ME).find('.discovered').html(newhtml);
-                      });
                     }
                   });
                 });
@@ -97,6 +88,31 @@ me.ready = function(){
     });
   });
 };
+
+$(ME).find('.addpeerbutton').click(function(){
+  json('../peer/discovery', null, function(result){
+    me.discovery = result.data;
+    var newhtml = '';
+    var now = new Date().getTime();
+    for (sip in result.data) {
+      var rds = result.data[sip];
+      if (now - rds.time < 30000 && !getByProperty(me.peers, "id", rds.uuid)) {
+        newhtml += '<tr class="clickme" data-sip="'+sip+'"><td>'+sip+'</td><td>'+rds.name+'</td><td><span class="smalltext">'+rds.uuid+'</span></td></tr>';
+      }
+    }
+    if (newhtml == '') newhtml = '<div class="padme"><i>No new devices found on LAN</i></div>';
+    else newhtml = '<table class="lantable" border="0" cellpadding="0" cellspacing="20">' + newhtml + '</table>';
+    $(ME).find('.discovered').html(newhtml).find('.clickme').click(function(){
+      var sip = $(this).data('sip');
+      var rds = me.discovery[sip];
+      $(ME).find('.autab2').click();
+      $(ME).find('.addusername').val(rds.name);
+      $(ME).find('.adduseruuid').val(rds.uuid);
+      $(ME).find('.adduseripaddr').val(rds.address);
+      $(ME).find('.adduserport').val(rds.p2pport);
+    });
+  });
+});
 
 $(ME).find('#addconnection').click(function(){
   var el_uuid = $(ME).find('.adduseruuid');

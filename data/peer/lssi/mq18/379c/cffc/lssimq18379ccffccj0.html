@@ -33,23 +33,37 @@
       </div>
     </div>
     <div class='tab-content autab1 selected' id='autab1'>
-      <div class='padme'>
         <div class="discovered"></div>
-      </div>
     </div>
     <div class='tab-content autab2' id='autab2'>
       <div class='padme'>
-        <div class='textinputlabel'>Device UUID</div>
-        <div><input type='text' class='textinput adduseruuid'></div>
-        <br>
-        <div class='textinputlabel'>Select Group</div>
-        <select class='textinput groupselect addusergroup'></select>
-        <br><br>
-        <div class='textinputlabel'>IP Address (if you have it)</div>
-        <input type='text' class='textinput'>
-        <br><br>
-        <div class='textinputlabel'>Port Number (if you have it)</div>
-        <input type='number' class='textinput'>
+        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+          <tr>
+            <td style='vertical-align:top;'>
+              <div class='textinputlabel'>Device Name</div>
+              <div><input type='text' class='textinput addusername'></div>
+              <br>
+              <div class='textinputlabel'>Device UUID</div>
+              <div><input type='text' class='textinput adduseruuid'></div>
+              <br>
+              <div class='textinputlabel'>Select Group</div>
+              <select class='textinput groupselect addusergroup'></select>
+            </td>
+            <td width="20"></td>
+            <td style='vertical-align:top;'>
+              <div class='textinputlabel'>IP Address (if you have it)</div>
+              <input type='text' class='textinput adduseripaddr'>
+              <br><br>
+              <div class='textinputlabel'>Port Number (if you have it)</div>
+              <input type='number' class='textinput adduserport'>
+              <br><br>
+              <label class="plaincheckbox">
+                <input type='checkbox' id='useraddkeepalive' checked>
+                <span>Keep Connection Alive</span>
+              </label>
+            </td>
+          </tr>
+        </table>
       </div>
       <div class="card-button-wrap">
         <button id="addconnection"  class="clearbutton">Add Connection</button>

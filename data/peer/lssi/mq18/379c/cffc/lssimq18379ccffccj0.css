@@ -46,7 +46,8 @@
 }
 
 .addusercard {
-  width:340px;
+  width:600px;
+  height:367px;
 }
 
 .bottomhugger{
@@ -56,4 +57,45 @@
 
 .autab {
   padding-top:0px !important;
+}
+
+.lantable {
+  border: thin solid #0002;
+  border-collapse: collapse;
+  white-space: nowrap;
+  width:100%;
+}
+
+.lantable tr {
+  border: thin solid #0002;
+}
+
+.lantable td {
+  cursor:pointer;
+  padding-left:24px;
+  padding-right:24px;
+  padding-top:12px;
+  padding-bottom:12px;
+  text-align:left;
+}
+
+.lantable tr:hover {
+  background-color: #0002;
+}
+
+.smalltext{
+  font-size:x-small;
+}
+
+.discovered{
+  height:100%;
+  overflow-y:scroll;
+}
+
+#autab1{
+  position: absolute;
+  top: 90px;
+  bottom: 0px;
+  left: 0px;
+  right: 0px;
 }
