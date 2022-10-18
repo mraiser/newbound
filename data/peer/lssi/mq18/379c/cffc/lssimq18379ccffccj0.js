@@ -130,7 +130,7 @@ $(ME).find('#addconnection').click(function(){
   else {
     var rando = guid();
     var display = $(ME).find('.addusername').val();
-    var keepalive = $(ME).find('.adduserkeepalive').prop('checked');
+    var keepalive = $(ME).find('#useraddkeepalive').prop('checked');
     var group = JSON.stringify([$(ME).find('.addusergroup').val()]);
     var address = JSON.stringify([$(ME).find('.adduseripaddr').val()]);
     var port = JSON.stringify([$(ME).find('.adduserport').val()]);
