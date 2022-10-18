@@ -130,11 +130,17 @@ $(ME).find('#addconnection').click(function(){
   else {
     var rando = guid();
     var display = $(ME).find('.addusername').val();
+    var keepalive = $(ME).find('.adduserkeepalive').prop('checked');
     var group = JSON.stringify([$(ME).find('.addusergroup').val()]);
+    var address = JSON.stringify([$(ME).find('.adduseripaddr').val()]);
+    var port = JSON.stringify([$(ME).find('.adduserport').val()]);
     var params = "id="+encodeURIComponent(uuid)
       + "&displayname="+encodeURIComponent(uuid)
       + "&password="+encodeURIComponent(rando)
-      + "&groups="+encodeURIComponent(group);
+      + "&groups="+encodeURIComponent(group)
+      + "&keepalive="+keepalive
+      + "&address="+encodeURIComponent(address)
+      + "&port="+encodeURIComponent(port);
     json('../security/setuser', params, function(result){
       console.log(result);
     });
