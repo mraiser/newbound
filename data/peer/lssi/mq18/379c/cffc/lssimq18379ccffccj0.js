@@ -129,6 +129,7 @@ $(ME).find('#addconnection').click(function(){
   }
   else {
     var rando = guid();
+    var display = $(ME).find('.addusername').val();
     var group = JSON.stringify([$(ME).find('.addusergroup').val()]);
     var params = "id="+encodeURIComponent(uuid)
       + "&displayname="+encodeURIComponent(uuid)
