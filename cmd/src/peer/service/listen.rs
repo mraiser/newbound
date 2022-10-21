@@ -496,9 +496,11 @@ impl P2PConnection {
     let beat = Duration::from_millis(100);
     let mut timeout = 0;
     loop {
-      let heap = STREAMWRITERS.get().write().unwrap();
-      let z = heap.get(&x).unwrap().to_owned();
-      if z != -1 { y = z; break; }
+      {
+        let heap = STREAMWRITERS.get().write().unwrap();
+        let z = heap.get(&x).unwrap().to_owned();
+        if z != -1 { y = z; break; }
+      }
       
       timeout += 1;
       if timeout > 300 { println!("No request for stream data in 30 seconds... discarding stream."); return; }
