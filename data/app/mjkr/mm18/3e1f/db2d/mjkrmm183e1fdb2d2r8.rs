@@ -332,6 +332,7 @@ pub fn http_listen() {
           let mut headers:DataObject;
           
           let isfile = response.has("file") && response.get_property("file").is_string();
+          let isbytes = response.has("body") && response.get_property("body").is_bytes();
           
           if isfile { body = response.get_string("file"); }
           else if response.has("body") && response.get_property("body").is_string() { body = response.get_string("body"); }
@@ -360,6 +361,12 @@ pub fn http_listen() {
           if response.has("len") && response.get_property("len").is_int() { len = response.get_i64("len"); }
           else if headers.has("Content-Length") { len = headers.get_i64("Content-Length"); }
           else if isfile { len = fs::metadata(&body).unwrap().len() as i64; }
+          else if isbytes { 
+            let bytes = response.get_bytes("body");
+            let x = bytes.stream_len();
+            if x != 0 { len = x as i64; }
+            else { len = bytes.current_len() as i64; }
+          }
           else { len = body.len() as i64; }
 
           //FIXME
@@ -411,6 +418,17 @@ pub fn http_listen() {
               if x.is_err() { break; }
               if n < chunk_size { break; }
             }
+          }
+          else if isbytes {
+            let bytes = response.get_bytes("body");
+            let _x = stream.write(reshead.as_bytes());
+            let chunk_size = 0x4000;
+            loop {
+              let chunk = bytes.read(chunk_size);
+              let x = stream.write(&chunk);
+              if x.is_err() { break; }
+              if chunk.len() < chunk_size { break; }
+            }              
           }
           else {
             let response = reshead + &body;
@@ -637,15 +655,16 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
     thread::spawn(move || {
       if msg.starts_with("cmd ") {
         let msg = &msg[4..];
-        let d = DataObject::from_string(msg);
+        let mut d = DataObject::from_string(msg);
 
-        let mut params = d.get_object("params");
+        let mut params = d.get_object("params").deep_copy();
 
         for (k,v) in request.objects() {
-          if k != "params" {
+//          if k != "params" {
             params.set_property(&("nn_".to_string()+&k), v);
-          }
+//          }
         }
+        d.put_object("params", params);
 
         let o = handle_command(d, sid);
         websock_message(stream, o.to_string());
@@ -765,12 +784,13 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
             d.put_str("bot", &appname);
             d.put_str("cmd", &cmd);
             d.put_i64("pid", 0);
+            let mut params = params.deep_copy();
             d.put_object("params", params.duplicate());
             
             for (k,v) in request.objects() {
-              if k != "params" {
+//              if k != "params" {
                 params.set_property(&("nn_".to_string()+&k), v);
-              }
+//              }
             }
             
             let d = handle_command(d, session_id.to_owned());
@@ -779,6 +799,11 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
               b = true;
               if r == "File" {
                 res.put_str("file", &d.get_string("data"));
+                res.put_str("mimetype", &mime_type(p));
+              }
+              else if r == "InputStream" {
+                let s = d.to_string();
+                res.put_bytes("body", d.get_bytes("data"));
                 res.put_str("mimetype", &mime_type(p));
               }
               else {
