@@ -46,6 +46,15 @@ me.ready = function(){
 
               camera.position.z = 5;
               camera.lookAt(scene.position);
+              
+              me.camv = new THREE.Vector3();
+              me.recenter = new THREE.Vector3();
+              me.center = new THREE.Vector3();
+              me.center.copy(scene.position);
+              
+              me.distance = 10;
+              me.redistance = 10;
+              me.olddistance = 10;
 
               send_peers(function(result){
                 me.peers = result.data;
@@ -194,17 +203,50 @@ me.add = function(el, lib, ctl, data, cb){
   }, data);
 };
 
+me.focus = function(m){
+  if (m && (m != me.selected)){
+    if (!me.selected) me.olddistance =  me.distance = me.camera.position.distanceTo(me.center);
+    me.selected = m;
+    me.recenter.copy(m.model.position);
+    me.redistance = 1;
+  }
+  else {
+    me.selected = null;
+    me.recenter.set(0,0,0);
+    me.redistance = me.olddistance;
+  }
+};
+
 me.render = function(){
   for (var i in me.children){
     var kid = me.children[i];
     if (kid.render) kid.render();
   }
+
+  if (me.selected){
+    me.recenter.copy(me.selected.model.position);
+    //$('.hudms').text(((me.now+me.timedelta-me.selected.model.data.lastcontact)/1000).toFixed(1)+'s');
+  }
+  if (me.redistance){
+    var delta = me.redistance - me.distance;
+    if (!me.selected && delta < 0.001) me.redistance = null;
+    else {
+      me.distance = (delta * 0.1)+me.distance;
+      me.camera.getWorldDirection(me.camv);
+      me.camv.negate().multiplyScalar(me.distance).add(me.center);
+      me.camera.position.copy(me.camv);
+    }
+  }
+  
+  me.camv.copy(me.recenter).sub(me.center).multiplyScalar(0.1);
+  me.center.add(me.camv);
+  me.camera.lookAt(me.center);
+  me.spotLight.position.copy(me.camera.position);
   me.renderer.render(me.scene, me.camera);
 }
 
 me.animate = function () {
   requestAnimationFrame(me.animate);
-  me.spotLight.position.copy(me.camera.position);
   me.render();
 };
 

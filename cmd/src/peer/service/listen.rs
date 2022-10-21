@@ -53,6 +53,8 @@ pub fn listen(ipaddr:String, port:i64) -> i64 {
 
 static START: Once = Once::new();
 static P2PCONS:Storage<RwLock<HashMap<i64, P2PConnection>>> = Storage::new();
+static STREAMWRITERS:Storage<RwLock<HashMap<i64, i64>>> = Storage::new();
+static STREAMREADERS:Storage<RwLock<HashMap<i64, DataBytes>>> = Storage::new();
 
 #[derive(Debug)]
 pub struct RelayStream {
@@ -306,7 +308,6 @@ pub struct P2PConnection {
   pub uuid: String,
   pub res: DataObject,
   pub pending: DataArray,
-  pub x: bool,
 }
 
 impl P2PConnection {
@@ -335,7 +336,6 @@ impl P2PConnection {
       uuid: self.uuid.to_owned(),
       res: self.res.duplicate(),
       pending: self.pending.duplicate(),
-      x: self.x,
     }
   }
     
@@ -367,7 +367,6 @@ impl P2PConnection {
       uuid: uuid.to_string(),
       res: DataObject::new(),
       pending: DataArray::new(),
-      x: true,
     };
     
     let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
@@ -446,6 +445,74 @@ impl P2PConnection {
   
   pub fn last_contact(&self) -> i64 {
     self.stream.last_contact()
+  }
+  
+  pub fn begin_stream(&mut self) -> i64 {
+    let mut heap = STREAMWRITERS.get().write().unwrap();
+    let x:i64;
+    loop {
+      let y = rand::thread_rng().gen::<i64>();
+      if !heap.contains_key(&y) {
+        x = y;
+        break;
+      }
+    }
+    heap.insert(x, -1);
+    x
+  }
+
+  pub fn join_stream(&mut self, x: i64) -> DataBytes {
+    let db = DataBytes::new();
+    let mut heap = STREAMREADERS.get().write().unwrap();
+    let y:i64;
+    loop {
+      let z = rand::thread_rng().gen::<i64>();
+      if !heap.contains_key(&z) {
+        y = z;
+        break;
+      }
+    }
+    heap.insert(y, db.duplicate());
+    
+    let mut bytes = "s_1 ".as_bytes().to_vec();
+    bytes.extend_from_slice(&x.to_be_bytes());
+    bytes.extend_from_slice(&y.to_be_bytes());
+    let buf = encrypt(&self.cipher, &bytes);
+    let len = buf.len() as i16;
+    let mut bytes = len.to_be_bytes().to_vec();
+    bytes.extend_from_slice(&buf);
+    let _x = self.stream.write(&bytes).unwrap();
+    
+    db
+  }
+  
+  pub fn write_stream(&mut self, x:i64, data:&Vec<u8>) {
+    let y;
+    {
+      let heap = STREAMWRITERS.get().write().unwrap();
+      y = heap.get(&x).unwrap().to_owned();
+    }
+    let mut bytes = "s_2 ".as_bytes().to_vec();
+    bytes.extend_from_slice(&y.to_be_bytes());
+    let len = data.len() as i16;
+    bytes.extend_from_slice(&len.to_be_bytes());
+    bytes.extend_from_slice(data);
+    
+    let buf = encrypt(&self.cipher, &bytes);
+    let len = buf.len() as i16;
+    let mut bytes = len.to_be_bytes().to_vec();
+    bytes.extend_from_slice(&buf);
+    let _x = self.stream.write(&bytes).unwrap();
+  }
+  
+  pub fn end_stream_write(&mut self, x:i64) {
+    let mut heap = STREAMWRITERS.get().write().unwrap();
+    heap.remove(&x);
+  }
+
+  pub fn end_stream_read(&mut self, y:i64) {
+    let mut heap = STREAMREADERS.get().write().unwrap();
+    heap.remove(&y);
   }
 }
 
@@ -741,10 +808,29 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
   let count = session.get_i64("count") + 1;
   session.put_i64("count", count);
 
-  if method == "rcv " {
+  if method == "s_1 " {
+    let bytes: [u8; 8] = bytes[4..12].try_into().unwrap();
+    let x = i64::from_be_bytes(bytes);
+    let bytes: [u8; 8] = bytes[12..20].try_into().unwrap();
+    let y = i64::from_be_bytes(bytes);
+    
+    let mut heap = STREAMWRITERS.get().write().unwrap();
+    heap.insert(x, y);
+  }
+  else if method == "s_2 " {
+    let bytes: [u8; 8] = bytes[4..12].try_into().unwrap();
+    let y = i64::from_be_bytes(bytes);
+    let bytes: [u8; 2] = bytes[12..14].try_into().unwrap();
+    let n = (14 + i16::from_be_bytes(bytes)) as usize;
+    let bytes = &bytes[14..n];
+    
+    let heap = STREAMREADERS.get().write().unwrap();
+    let db = heap.get(&y).unwrap();
+    db.write(bytes);
+  }
+  else if method == "rcv " {
     let uuid2 = std::str::from_utf8(&bytes[4..40]).unwrap();
     let buf = &bytes[40..];
-    
     let bytes: [u8; 2] = buf[0..2].try_into().unwrap();
     let len2 = i16::from_be_bytes(bytes) as usize;
     let mut buf = buf.to_vec();

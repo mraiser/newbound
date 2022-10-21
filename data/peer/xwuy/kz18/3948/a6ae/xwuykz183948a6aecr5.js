@@ -10,6 +10,7 @@ me.ready = me.refresh = function(){
 $(ME).find('.closehud').click(function(){
   var el = $("#headsupdisplay");
   el.animate({width:0}, 300, function(){ el.css('display', 'none').html(''); });
+  $(ME).parent()[0].api.focus(null);
 });
 
 me.update = function(){

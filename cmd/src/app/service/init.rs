@@ -470,11 +470,16 @@ pub fn http_listen() {
   }
 }
 
-fn handle_request(mut request: DataObject, mut stream: TcpStream) -> DataObject {
+pub fn handle_request(request: DataObject, stream: TcpStream) -> DataObject {
+  let session_id = prep_request(request.duplicate());
+  handle_websocket(request.duplicate(), stream, session_id.to_owned());
+  do_get(request, session_id)
+}
+
+pub fn prep_request(mut request: DataObject) -> String {
   let system = DataStore::globals().get_object("system");
 
-  let path = hex_decode(request.get_string("path"));
-  let mut params = request.get_object("params");
+  let params = request.get_object("params");
   let mut headers = request.get_object("headers");
     
   let mut session_id = "".to_string();
@@ -533,10 +538,186 @@ fn handle_request(mut request: DataObject, mut stream: TcpStream) -> DataObject 
   request.put_object("session", session);
   request.put_str("sessionid", &session_id);
   
+  session_id
+}
+
+pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_id:String) -> bool {
+  let headers = request.get_object("headers");
+  if ! headers.has("SEC-WEBSOCKET-KEY") { return false; }
+
+  let key = headers.get_string("SEC-WEBSOCKET-KEY");
+  let key = key.trim();
+  let key = key.to_string()+"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+  let mut checksum = SHA1::new();
+  let _hash = checksum.update(&key);
+  let hash = checksum.finish();
+  let key2: String = Base64::encode(hash).into_iter().collect();
+  let mut response = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n".to_string();
+  response += "Sec-WebSocket-Accept: ";
+  response += key2.trim();
+  response += "\r\n";
+  response += "Sec-WebSocket-Protocol: newbound\r\n\r\n";
+  stream.write(response.as_bytes()).unwrap();
+
+  let subs = DataObject::new();
+  let subref = subs.data_ref;
+  let con = WebsockConnection{
+    stream: stream.try_clone().unwrap(),
+    sub: subs,
+  };
+  let sockref = WEBSOCKHEAP.get().write().unwrap().push(con);
+  request.put_i64("websocket_id", sockref as i64);
+
+  fire_event("app", "WEBSOCK_BEGIN", request.duplicate());
+
+  let base:i64 = 2;
+  let pow7 = base.pow(7);
+
+  let system = DataStore::globals().get_object("system");
+  loop {
+    if !system.get_bool("running") { break; }
+
+    let mut lastopcode = 0;
+    let mut baos: Vec<u8> = Vec::new();
+
+    loop {
+      let mut buf = [0; 1];
+      let _ = stream.read_exact(&mut buf).unwrap();
+      let i = buf[0] as i64;
+      let fin = (pow7 & i) != 0;
+      let rsv1 = (base.pow(6) & i) != 0;
+      let rsv2 = (base.pow(5) & i) != 0;
+      let rsv3 = (base.pow(4) & i) != 0;
+
+      if rsv1 || rsv2 || rsv3 { panic!("Websocket failed - Unimplimented"); } 
+
+      let mut opcode = 0xf & i;
+
+      let _ = stream.read_exact(&mut buf).unwrap();
+      let i = buf[0] as i64;
+      let mask = (pow7 & i) != 0;
+      if !mask { panic!("Websocket failed - Mask required"); } 
+
+      let mut len = i - pow7;
+
+      if len == 126 {
+        let mut buf = [0; 2];
+        let _ = stream.read_exact(&mut buf).unwrap();
+        len = (buf[0] as i64 & 0x000000FF) << 8;
+        len += buf[1] as i64 & 0x000000FF;
+      }
+      else if len == 127 {
+        let mut buf = [0; 8];
+        let _ = stream.read_exact(&mut buf).unwrap();
+        len = (buf[0] as i64 & 0x000000FF) << 56;
+        len += (buf[1] as i64 & 0x000000FF) << 48;
+        len += (buf[2] as i64 & 0x000000FF) << 40;
+        len += (buf[3] as i64 & 0x000000FF) << 32;
+        len += (buf[4] as i64 & 0x000000FF) << 24;
+        len += (buf[5] as i64 & 0x000000FF) << 16;
+        len += (buf[6] as i64 & 0x000000FF) << 8;
+        len += buf[7] as i64 & 0x000000FF;
+      }
+
+      // FIXME - Should read larger messages in chunks
+      // if len > 4096 { panic!("Websocket message too long ({})", len); } 
+      let len = len as usize;
+
+      let mut maskkey = [0; 4];
+      let _ = stream.read_exact(&mut maskkey).unwrap();
+
+      let mut buf = vec![0; len as usize];
+      let _ = stream.read_exact(&mut buf).unwrap();
+      let mut i:usize = 0;
+      while i < len {
+        buf[i] = buf[i] ^ maskkey[i % 4];
+        i += 1;
+      }
+
+      baos.append(&mut buf);
+
+      if opcode == 0 {
+        println!("continuation frame");
+      }
+      else if opcode == 1 || opcode == 2 { lastopcode = opcode; }
+      else if opcode == 8 {  break; } // panic!("Websocket closed"); } 
+      else if opcode == 9 {
+        println!("ping");
+      }
+      else if opcode == 10 {
+        println!("pong");
+      }
+      else {
+        println!("UNEXPECTED OPCODE: {}", opcode);
+      }
+
+      if fin {
+        if opcode == 0 {
+          opcode = lastopcode;
+        }
+
+        if opcode == 1 {
+          // text frame
+          break;
+        }
+        else if opcode == 2 {
+          // binary frame
+          // FIXME - passing text anyway.
+          break;
+        }
+      }
+    }
+
+    let msg = std::str::from_utf8(&baos);
+    if msg.is_err() { break; }
+    
+    let msg = msg.unwrap().to_owned();        
+
+    let stream = stream.try_clone().unwrap();
+    let request = request.duplicate();
+    let sid = session_id.to_owned();
+    thread::spawn(move || {
+      if msg.starts_with("cmd ") {
+        let msg = &msg[4..];
+        let d = DataObject::from_string(msg);
+
+        let mut params = d.get_object("params");
+
+        for (k,v) in request.objects() {
+          if k != "params" {
+            params.set_property(&("nn_".to_string()+&k), v);
+          }
+        }
+
+        let o = handle_command(d, sid);
+        websock_message(stream, o.to_string());
+      }
+      else if msg.starts_with("sub ") {
+        let msg = &msg[4..];
+        let d = DataObject::from_string(msg);
+        let app = d.get_string("app");
+        let event = d.get_string("event");
+        let mut subs = DataObject::get(subref);
+        if !subs.has(&app) { subs.put_array(&app, DataArray::new()); }
+        subs.get_array(&app).push_str(&event);
+      }
+      else {
+        println!("Unknown websocket command: {}", msg);
+      }
+    });
+  }
+  true
+}
+
+pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
+  let system = DataStore::globals().get_object("system");
   let mut res = DataObject::new();
   
+  let path = hex_decode(request.get_string("path"));
   let mut p = "html".to_string() + &path;
   let mut b = false;
+  
+  let mut params = request.get_object("params");
   
   if Path::new(&p).exists() {
     let md = metadata(&p).unwrap();
@@ -562,168 +743,7 @@ fn handle_request(mut request: DataObject, mut stream: TcpStream) -> DataObject 
     res.put_object("headers", h);
   }
   else {
-    if headers.has("SEC-WEBSOCKET-KEY") {
-      b = true;
-      
-      let key = headers.get_string("SEC-WEBSOCKET-KEY");
-      let key = key.trim();
-      let key = key.to_string()+"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-      let mut checksum = SHA1::new();
-      let _hash = checksum.update(&key);
-      let hash = checksum.finish();
-      let key2: String = Base64::encode(hash).into_iter().collect();
-      let mut response = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n".to_string();
-      response += "Sec-WebSocket-Accept: ";
-      response += key2.trim();
-      response += "\r\n";
-      response += "Sec-WebSocket-Protocol: newbound\r\n\r\n";
-      stream.write(response.as_bytes()).unwrap();
-      
-      let subs = DataObject::new();
-      let subref = subs.data_ref;
-      let con = WebsockConnection{
-        stream: stream.try_clone().unwrap(),
-        sub: subs,
-      };
-      let sockref = WEBSOCKHEAP.get().write().unwrap().push(con);
-      request.put_i64("websocket_id", sockref as i64);
-      
-      fire_event("app", "WEBSOCK_BEGIN", request.duplicate());
-
-      let base:i64 = 2;
-      let pow7 = base.pow(7);
-      
-      loop {
-        if !system.get_bool("running") { break; }
-        
-        let mut lastopcode = 0;
-        let mut baos: Vec<u8> = Vec::new();
-
-        loop {
-          let mut buf = [0; 1];
-          let _ = stream.read_exact(&mut buf).unwrap();
-          let i = buf[0] as i64;
-          let fin = (pow7 & i) != 0;
-          let rsv1 = (base.pow(6) & i) != 0;
-          let rsv2 = (base.pow(5) & i) != 0;
-          let rsv3 = (base.pow(4) & i) != 0;
-
-          if rsv1 || rsv2 || rsv3 { panic!("Websocket failed - Unimplimented"); } 
-
-          let mut opcode = 0xf & i;
-
-          let _ = stream.read_exact(&mut buf).unwrap();
-          let i = buf[0] as i64;
-          let mask = (pow7 & i) != 0;
-          if !mask { panic!("Websocket failed - Mask required"); } 
-
-          let mut len = i - pow7;
-
-          if len == 126 {
-            let mut buf = [0; 2];
-            let _ = stream.read_exact(&mut buf).unwrap();
-            len = (buf[0] as i64 & 0x000000FF) << 8;
-            len += buf[1] as i64 & 0x000000FF;
-          }
-          else if len == 127 {
-            let mut buf = [0; 8];
-            let _ = stream.read_exact(&mut buf).unwrap();
-            len = (buf[0] as i64 & 0x000000FF) << 56;
-            len += (buf[1] as i64 & 0x000000FF) << 48;
-            len += (buf[2] as i64 & 0x000000FF) << 40;
-            len += (buf[3] as i64 & 0x000000FF) << 32;
-            len += (buf[4] as i64 & 0x000000FF) << 24;
-            len += (buf[5] as i64 & 0x000000FF) << 16;
-            len += (buf[6] as i64 & 0x000000FF) << 8;
-            len += buf[7] as i64 & 0x000000FF;
-          }
-
-          // FIXME - Should read larger messages in chunks
-          // if len > 4096 { panic!("Websocket message too long ({})", len); } 
-          let len = len as usize;
-
-          let mut maskkey = [0; 4];
-          let _ = stream.read_exact(&mut maskkey).unwrap();
-
-          let mut buf = vec![0; len as usize];
-          let _ = stream.read_exact(&mut buf).unwrap();
-          let mut i:usize = 0;
-          while i < len {
-            buf[i] = buf[i] ^ maskkey[i % 4];
-            i += 1;
-          }
-          
-          baos.append(&mut buf);
-
-          if opcode == 0 {
-            println!("continuation frame");
-          }
-          else if opcode == 1 || opcode == 2 { lastopcode = opcode; }
-          else if opcode == 8 {  return DataObject::new(); } // panic!("Websocket closed"); } 
-          else if opcode == 9 {
-            println!("ping");
-          }
-          else if opcode == 10 {
-            println!("pong");
-          }
-          else {
-            println!("UNEXPECTED OPCODE: {}", opcode);
-          }
-
-          if fin {
-            if opcode == 0 {
-              opcode = lastopcode;
-            }
-            
-            if opcode == 1 {
-              // text frame
-              break;
-            }
-            else if opcode == 2 {
-              // binary frame
-              // FIXME - passing text anyway.
-              break;
-            }
-          }
-        }
-
-        let msg = std::str::from_utf8(&baos).unwrap().to_owned();        
-        
-        let stream = stream.try_clone().unwrap();
-        let request = request.duplicate();
-        let sid = session_id.to_owned();
-        thread::spawn(move || {
-          if msg.starts_with("cmd ") {
-            let msg = &msg[4..];
-            let d = DataObject::from_string(msg);
-            
-            let mut params = d.get_object("params");
-            
-            for (k,v) in request.objects() {
-              if k != "params" {
-                params.set_property(&("nn_".to_string()+&k), v);
-              }
-            }
-            
-            let o = handle_command(d, sid);
-            websock_message(stream, o.to_string());
-          }
-          else if msg.starts_with("sub ") {
-            let msg = &msg[4..];
-            let d = DataObject::from_string(msg);
-            let app = d.get_string("app");
-            let event = d.get_string("event");
-            let mut subs = DataObject::get(subref);
-            if !subs.has(&app) { subs.put_array(&app, DataArray::new()); }
-            subs.get_array(&app).push_str(&event);
-          }
-          else {
-            println!("Unknown websocket command: {}", msg);
-          }
-        });
-      }
-    }
-    else {
+    {
       // Not a websocket, try app
       let mut sa = path.split("/");
       let appname = sa.nth(1).unwrap().to_string();

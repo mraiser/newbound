@@ -1,0 +1,1 @@
+{"data":{"attachmentkeynames":["rs"],"cmd":"remote","ctl":"peer","desc":"","import":"","lib":"peer","params":[{"name":"nn_path","type":"String"}],"returntype":"String","type":"rust"},"id":"txnvil183f6ffdf58w1d","readers":[],"time":1666296414763,"username":"system","writers":[]}

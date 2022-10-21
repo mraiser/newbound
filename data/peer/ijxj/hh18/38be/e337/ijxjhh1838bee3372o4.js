@@ -4,7 +4,9 @@ var ME = $('#'+me.UUID)[0];
 me.click = function(e) {
   var el = $('#headsupdisplay');
   el.width(0).css('display', 'block').animate({width:680}, 300);
-  installControl(el[0], 'peer', 'headsup', function(api){}, ME.DATA);
+  installControl(el[0], 'peer', 'headsup', function(api){
+    me.viewer.focus(me);
+  }, ME.DATA);
 };
 
 me.animate = function(model) {
