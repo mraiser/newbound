@@ -471,8 +471,19 @@ impl P2PConnection {
   }
   
   pub fn end_stream_write(&mut self, x:i64) {
-    let mut heap = STREAMWRITERS.get().write().unwrap();
-    heap.remove(&x);
+    let y;
+    {
+      let mut heap = STREAMWRITERS.get().write().unwrap();
+      y = heap.get(&x).unwrap().to_owned();
+      heap.remove(&x);
+    }
+    let mut bytes = "s_3 ".as_bytes().to_vec();
+    bytes.extend_from_slice(&y.to_be_bytes());
+    let buf = encrypt(&self.cipher, &bytes);
+    let len = buf.len() as i16;
+    let mut bytes = len.to_be_bytes().to_vec();
+    bytes.extend_from_slice(&buf);
+    let _x = self.stream.write(&bytes).unwrap();
   }
 
   pub fn end_stream_read(&mut self, y:i64) {
@@ -792,6 +803,13 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     let heap = STREAMREADERS.get().write().unwrap();
     let db = heap.get(&y).unwrap();
     db.write(bytes);
+  }
+  else if method == "s_3 " {
+    let buf: [u8; 8] = bytes[4..12].try_into().unwrap();
+    let y = i64::from_be_bytes(buf);
+    let heap = STREAMREADERS.get().write().unwrap();
+    let db = heap.get(&y).unwrap();
+    db.close_write();
   }
   else if method == "rcv " {
     let uuid2 = std::str::from_utf8(&bytes[4..40]).unwrap();
