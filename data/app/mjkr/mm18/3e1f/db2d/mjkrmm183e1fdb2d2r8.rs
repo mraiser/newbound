@@ -337,6 +337,13 @@ pub fn http_listen() {
           if isfile { body = response.get_string("file"); }
           else if response.has("body") && response.get_property("body").is_string() { body = response.get_string("body"); }
           else { body = "".to_owned(); }
+          
+          if isbytes {
+            let bytes = response.get_bytes("body");
+            if bytes.current_len() == 3 {
+              println!("bytes {:?}", bytes.get_data());
+            }
+          }
 
           if response.has("code") && response.get_property("code").is_int() { code = response.get_i64("code") as u16; }
           else { code = 200; }

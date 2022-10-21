@@ -15,6 +15,8 @@ o.put_object("request", d);
 
 let d = exec(uuid.to_string(), "peer".to_string(), "local".to_string(), o);
 let d = d.get_object("data");
-let id = d.get_i64("stream_id");
-
-con.join_stream(id)
+if d.has("stream_id") {
+	let id = d.get_i64("stream_id");
+	return con.join_stream(id);
+}
+DataBytes::from_bytes(&"404".as_bytes().to_vec())
