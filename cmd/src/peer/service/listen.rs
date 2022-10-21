@@ -823,19 +823,19 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
   session.put_i64("count", count);
 
   if method == "s_1 " {
-    let bytes: [u8; 8] = bytes[4..12].try_into().unwrap();
-    let x = i64::from_be_bytes(bytes);
-    let bytes: [u8; 8] = bytes[12..20].try_into().unwrap();
-    let y = i64::from_be_bytes(bytes);
+    let buf: [u8; 8] = bytes[4..12].try_into().unwrap();
+    let x = i64::from_be_bytes(buf);
+    let buf: [u8; 8] = bytes[12..20].try_into().unwrap();
+    let y = i64::from_be_bytes(buf);
     
     let mut heap = STREAMWRITERS.get().write().unwrap();
     heap.insert(x, y);
   }
   else if method == "s_2 " {
-    let bytes: [u8; 8] = bytes[4..12].try_into().unwrap();
-    let y = i64::from_be_bytes(bytes);
-    let bytes: [u8; 2] = bytes[12..14].try_into().unwrap();
-    let n = (14 + i16::from_be_bytes(bytes)) as usize;
+    let buf: [u8; 8] = bytes[4..12].try_into().unwrap();
+    let y = i64::from_be_bytes(buf);
+    let buf: [u8; 2] = bytes[12..14].try_into().unwrap();
+    let n = (14 + i16::from_be_bytes(buf)) as usize;
     let bytes = &bytes[14..n];
     
     let heap = STREAMREADERS.get().write().unwrap();
