@@ -47,7 +47,11 @@ o
 }
 
 pub fn listen(ipaddr:String, port:i64) -> i64 {
-  START.call_once(|| { P2PCONS.set(RwLock::new(HashMap::new())); });
+  START.call_once(|| { 
+    P2PCONS.set(RwLock::new(HashMap::new())); 
+    STREAMWRITERS.set(RwLock::new(HashMap::new())); 
+    STREAMREADERS.set(RwLock::new(HashMap::new())); 
+  });
   do_listen(ipaddr, port)
 }
 
