@@ -2,7 +2,7 @@ let session_id = prep_request(request.duplicate());
 let mut x = do_get(request, session_id);
 if x.has("file") {
   let user = nn_session.get_object("user");
-  let mut con = get_best(user).unwrap();
+  let mut con = get_best(user).unwrap().duplicate();
   let stream_id = con.begin_stream();
   
   let path = x.get_string("file");
