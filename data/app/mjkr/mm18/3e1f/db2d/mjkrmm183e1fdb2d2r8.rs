@@ -423,11 +423,18 @@ pub fn http_listen() {
             let bytes = response.get_bytes("body");
             let _x = stream.write(reshead.as_bytes());
             let chunk_size = 0x4000;
-            loop {
+            let beat = Duration::from_millis(100);
+            let mut timeout = 0;
+            while bytes.is_read_open() {
               let chunk = bytes.read(chunk_size);
               let x = stream.write(&chunk);
               if x.is_err() { break; }
-              if chunk.len() < chunk_size { break; }
+              if chunk.len() == 0 { 
+                thread::sleep(beat);
+                timeout += 1;
+                if timeout > 300 { println!("Unusually long wait for stream data... Abort"); break; }
+              }
+              else { timeout = 0; }
             }              
           }
           else {
