@@ -403,7 +403,7 @@ impl P2PConnection {
     let x:i64;
     loop {
       let y = rand::thread_rng().gen::<i64>();
-      if !heap.contains_key(&y) {
+      if y != -1 && !heap.contains_key(&y) {
         x = y;
         break;
       }
@@ -418,7 +418,7 @@ impl P2PConnection {
     let y:i64;
     loop {
       let z = rand::thread_rng().gen::<i64>();
-      if !heap.contains_key(&z) {
+      if z != -1 && !heap.contains_key(&z) {
         y = z;
         break;
       }
@@ -438,10 +438,18 @@ impl P2PConnection {
   }
   
   pub fn write_stream(&mut self, x:i64, data:&Vec<u8>) {
+    // ask for it in 30 seconds or it's gone forever
     let y;
-    {
+    let beat = Duration::from_millis(100);
+    let mut timeout = 0;
+    loop {
       let heap = STREAMWRITERS.get().write().unwrap();
-      y = heap.get(&x).unwrap().to_owned();
+      let z = heap.get(&x).unwrap().to_owned();
+      if z != -1 { y = z; break; }
+      
+      timeout += 1;
+      if timeout > 300 { println!("No request for stream data in 30 seconds... discarding stream."); return; }
+      thread::sleep(beat);
     }
     let mut bytes = "s_2 ".as_bytes().to_vec();
     bytes.extend_from_slice(&y.to_be_bytes());
