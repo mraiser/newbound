@@ -365,7 +365,7 @@ pub fn http_listen() {
           WEBSOCKHEAP.get().write().unwrap().decr(sockref as usize);
         }
         else {
-          let response = response.get_object("a").duplicate();
+          let mut response = response.get_object("a").duplicate();
 
           let body:String;
           let mimetype:String;
@@ -374,20 +374,28 @@ pub fn http_listen() {
           let msg:String;
           let mut headers:DataObject;
           
-          let isfile = response.has("file") && response.get_property("file").is_string();
-          let isbytes = response.has("body") && response.get_property("body").is_bytes();
+          let mut isfile = response.has("file") && response.get_property("file").is_string();
+          let mut isbytes = response.has("body") && response.get_property("body").is_bytes();
           
+          if isbytes {
+            let bytes = response.get_bytes("body");
+            if bytes.current_len() == 3 && bytes.get_data() == [52, 48, 52] {
+              let p = "html/404.html";
+              if Path::new(&p).exists() {
+                response.put_str("file", &p);
+                response.put_str("mimetype", "text/html");
+                isfile = true;
+              }
+              response.put_i64("code", 404);
+              response.put_str("msg", "NOT FOUND");
+              isbytes = false;
+            }
+          }
+
           if isfile { body = response.get_string("file"); }
           else if response.has("body") && response.get_property("body").is_string() { body = response.get_string("body"); }
           else { body = "".to_owned(); }
           
-          if isbytes {
-            let bytes = response.get_bytes("body");
-            if bytes.current_len() == 3 {
-              println!("bytes {:?}", bytes.get_data());
-            }
-          }
-
           if response.has("code") && response.get_property("code").is_int() { code = response.get_i64("code") as u16; }
           else { code = 200; }
 
