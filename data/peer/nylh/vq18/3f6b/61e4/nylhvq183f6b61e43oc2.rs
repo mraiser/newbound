@@ -1,11 +1,13 @@
 let session_id = prep_request(request.duplicate());
 let mut x = do_get(request, session_id);
 if x.has("file") {
+  let path = x.get_string("file");
   let user = nn_session.get_object("user");
   let mut con = get_best(user).unwrap();
+  // FIXME - set remote stream len
+//  let len = fs::metadata(&path).unwrap().len() as i64;
   let stream_id = con.begin_stream();
   
-  let path = x.get_string("file");
   thread::spawn(move || {
     let mut file = fs::File::open(&path).unwrap();
     let chunk_size = 0x4000;

@@ -365,7 +365,7 @@ pub fn http_listen() {
             let bytes = response.get_bytes("body");
             let x = bytes.stream_len();
             if x != 0 { len = x as i64; }
-            else { len = bytes.current_len() as i64; }
+            else { len = -1; }
           }
           else { len = body.len() as i64; }
 
