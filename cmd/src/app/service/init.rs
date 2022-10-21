@@ -744,7 +744,7 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
   let mut p = "html".to_string() + &path;
   let mut b = false;
   
-  let mut params = request.get_object("params");
+  let params = request.get_object("params");
   
   if Path::new(&p).exists() {
     let md = metadata(&p).unwrap();
@@ -852,7 +852,6 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
                 res.put_str("mimetype", &mime_type(p));
               }
               else if r == "InputStream" {
-                let s = d.to_string();
                 res.put_bytes("body", d.get_bytes("data"));
                 res.put_str("mimetype", &mime_type(p));
               }
