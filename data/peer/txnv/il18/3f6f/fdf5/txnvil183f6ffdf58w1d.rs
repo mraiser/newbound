@@ -19,6 +19,7 @@ if d.has("stream_id") {
   return con.join_stream(id);
 }
 if d.has("body") {
+  if d.has("mimetype") { println!("MIME {}", d.get_string("mimetype")); }
   let body = d.get_string("body");
   let s;
   if nn_params.has("callback") {
