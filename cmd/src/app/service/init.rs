@@ -128,13 +128,19 @@ pub fn http_listen() {
     }
   }
     
+  let max_keep_alive = Duration::from_millis(3000);
   for stream in listener.incoming() {
     let mut stream = stream.unwrap();
+    let _x = stream.set_read_timeout(Some(max_keep_alive));
     thread::spawn(move || {
       let remote_addr = stream.peer_addr().unwrap();
-      let mut line = read_line(&mut stream);
-      let count = line.len();
-      if count > 2 {
+      let mut keepalivecount = 0;
+      loop {
+        if keepalivecount > 0 { println!("keepalivecount {}", keepalivecount); }
+        let mut line = read_line(&mut stream);
+        let count = line.len();
+        println!("line len {}", count);
+        if count == 0 { break; }
         line = (&line[0..count-2]).to_string();
         let count = line.find(" ").unwrap();
         let method = (&line[0..count]).to_string();
@@ -144,7 +150,7 @@ pub fn http_listen() {
           println!("HTTP TCP unexpected request protocol: {}", line); 
           return; 
         }
-        
+
         let count = count.unwrap();
         let protocol = (&line[count+1..]).to_string();
         let path = (&line[0..count]).to_string();
@@ -242,12 +248,12 @@ pub fn http_listen() {
               value = hex_decode(value);
 
               params.put_str(&key, &value);
-              
+
               if b { break; }
             }
           }
         }
-        
+
         let cmd:String;
         if path.contains("?"){
           let i = path.find("?").unwrap();
@@ -309,7 +315,7 @@ pub fn http_listen() {
         request.put_str("querystring", &querystring);
         request.put_object("headers", headers.duplicate());
         request.put_object("params", params);
-        
+
         let now = time();
         request.put_i64("timestamp", now);
 
@@ -323,14 +329,15 @@ pub fn http_listen() {
           }
         }
 
-        
-        // FIXME - Implement keep-alive
-  //      let mut ka = "close".to_string();
-  //      if headers.has("CONNECTION") { ka = headers.get_string("CONNECTION"); }
+
+        let ka;
+        if headers.has("CONNECTION") { ka = headers.get_string("CONNECTION"); }
+        else { ka = "close".to_string(); }
+        println!("keepalive {}", ka);
 
         // FIXME - origin is never used, impliment CORS
-  //      let mut origin = "null".to_string();
-  //      if headers.has("ORIGIN") { origin = headers.get_string("ORIGIN"); }
+        //      let mut origin = "null".to_string();
+        //      if headers.has("ORIGIN") { origin = headers.get_string("ORIGIN"); }
 
         let mut response = DataObject::new();
         let dataref = response.data_ref;
@@ -340,16 +347,16 @@ pub fn http_listen() {
           let o = handle_request(request.duplicate(), stream.try_clone().unwrap());
           p.put_object("a", o);
         });
-        
+
         match result {
           Ok(_x) => (),
           Err(e) => {
-            
+
             let s = match e.downcast::<String>() {
               Ok(panic_msg) => format!("{}", panic_msg),
               Err(_) => "unknown error".to_string()
             };        
-            
+
             let mut o = DataObject::new();
             let s = format!("<html><head><title>500 - Server Error</title></head><body><h2>500</h2>Server Error: {}</body></html>", s);
             o.put_str("body", &s);
@@ -358,7 +365,7 @@ pub fn http_listen() {
             response.put_object("a", o);
           }
         }
-          
+
         if headers.has("SEC-WEBSOCKET-KEY") { 
           fire_event("app", "WEBSOCK_END", request.duplicate()); 
           let sockref = request.get_i64("websocket_id");
@@ -373,10 +380,10 @@ pub fn http_listen() {
           let code:u16;
           let msg:String;
           let mut headers:DataObject;
-          
+
           let mut isfile = response.has("file") && response.get_property("file").is_string();
           let mut isbytes = response.has("body") && response.get_property("body").is_bytes();
-          
+
           if isbytes {
             let bytes = response.get_bytes("body");
             if bytes.current_len() == 3 && bytes.get_data() == [52, 48, 52] {
@@ -395,7 +402,7 @@ pub fn http_listen() {
           if isfile { body = response.get_string("file"); }
           else if response.has("body") && response.get_property("body").is_string() { body = response.get_string("body"); }
           else { body = "".to_owned(); }
-          
+
           if response.has("code") && response.get_property("code").is_int() { code = response.get_i64("code") as u16; }
           else { code = 200; }
 
@@ -428,9 +435,9 @@ pub fn http_listen() {
           else { len = body.len() as i64; }
 
           //FIXME
-    //		int[] range = extractRange(len, h);
-    //		if (range[1] != -1) len = range[1] - range[0] + 1;
-    //		String res = range[0] == -1 ? "200 OK" : "206 Partial Content";
+          //		int[] range = extractRange(len, h);
+          //		if (range[1] != -1) len = range[1] - range[0] + 1;
+          //		String res = range[0] == -1 ? "200 OK" : "206 Partial Content";
 
           let date = RFC2822Date::new(now).to_string();
 
@@ -438,9 +445,9 @@ pub fn http_listen() {
           headers.put_str("Content-Type", &mimetype);
           if len != -1 { headers.put_str("Content-Length", &len.to_string()); }
           // FIXME
-    //      if (acceptRanges != null) h.put("Accept-Ranges", acceptRanges);
-    //      if (range != null && range[0] != -1) h.put("Content-Range","bytes "+range[0]+"-"+range[1]+"/"+range[2]);
-    //      if (expires != -1) h.put("Expires", toHTTPDate(new Date(expires)));
+          //      if (acceptRanges != null) h.put("Accept-Ranges", acceptRanges);
+          //      if (range != null && range[0] != -1) h.put("Content-Range","bytes "+range[0]+"-"+range[1]+"/"+range[2]);
+          //      if (expires != -1) h.put("Expires", toHTTPDate(new Date(expires)));
 
           let session_id = request.get_object("session").get_string("id");
           let later = now + 31536000000; // system.get_object("config").get_i64("sessiontimeoutmillis");
@@ -448,22 +455,22 @@ pub fn http_listen() {
           headers.put_str("Set-Cookie", &cookie);
 
           // FIXME
-    //		if (origin != null)
-    //		{
-    //			String cors = getCORS(name, origin);
-    //			if (cors != null)
-    //			{
-    //				h.put("Access-Control-Allow-Origin", cors);
-    //				if (!cors.equals("*")) h.put("Vary", "Origin");
-    //			}
-    //		}
+          //		if (origin != null)
+          //		{
+          //			String cors = getCORS(name, origin);
+          //			if (cors != null)
+          //			{
+          //				h.put("Access-Control-Allow-Origin", cors);
+          //				if (!cors.equals("*")) h.put("Vary", "Origin");
+          //			}
+          //		}
 
           let mut reshead = "HTTP/1.1 ".to_string()+&code.to_string()+" "+&msg+"\r\n";
           for (k,v) in headers.objects() {
             reshead = reshead +&k + ": "+&Data::as_string(v)+"\r\n";
           }
           reshead = reshead + "\r\n";
-          
+
           if isfile {
             let _x = stream.write(reshead.as_bytes());
             let mut file = fs::File::open(&body).unwrap();
@@ -499,14 +506,18 @@ pub fn http_listen() {
             let response = reshead + &body;
             let _x = stream.write(response.as_bytes());
           }
-    			
-    			fire_event("app", "HTTP_END", response);
-    			
+
+          fire_event("app", "HTTP_END", response);
+
           let _x = stream.flush();
         }
-      }
+        if ka == "keep-alive" { keepalivecount += 1; }
+        else { break; }
 
-      DataStore::gc();
+        DataStore::gc();
+        println!("end http request");
+      }
+      println!("close http connection");
     });
   }
 }
@@ -585,6 +596,8 @@ pub fn prep_request(mut request: DataObject) -> String {
 pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_id:String) -> bool {
   let headers = request.get_object("headers");
   if ! headers.has("SEC-WEBSOCKET-KEY") { return false; }
+  
+  stream.set_read_timeout(None).expect("set_read_timeout call failed");
 
   let key = headers.get_string("SEC-WEBSOCKET-KEY");
   let key = key.trim();
