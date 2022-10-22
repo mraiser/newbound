@@ -1,6 +1,7 @@
 let session_id = prep_request(request.duplicate());
 let mut x = do_get(request, session_id);
 if x.has("code") && x.get_i64("code") == 404 {
+  println!("GOT 404 {}", x.to_string());
   x.put_str("body", "404");
   x.put_str("status", "err");
   x.put_str("msg", "File not found");
