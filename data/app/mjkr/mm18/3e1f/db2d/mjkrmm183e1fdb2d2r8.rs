@@ -91,12 +91,12 @@ pub fn http_listen() {
     let _x = stream.set_read_timeout(Some(max_keep_alive));
     thread::spawn(move || {
       let remote_addr = stream.peer_addr().unwrap();
-      let mut keepalivecount = 0;
+//      let mut keepalivecount = 0;
       loop {
-        if keepalivecount > 0 { println!("keepalivecount {}", keepalivecount); }
+//        if keepalivecount > 0 { println!("keepalivecount {}", keepalivecount); }
         let mut line = read_line(&mut stream);
         let count = line.len();
-        println!("line len {}", count);
+//        println!("line len {}", count);
         if count == 0 { break; }
         line = (&line[0..count-2]).to_string();
         let count = line.find(" ").unwrap();
@@ -290,7 +290,6 @@ pub fn http_listen() {
         let ka;
         if headers.has("CONNECTION") { ka = headers.get_string("CONNECTION"); }
         else { ka = "close".to_string(); }
-        println!("keepalive {}", ka);
 
         // FIXME - origin is never used, impliment CORS
         //      let mut origin = "null".to_string();
@@ -300,8 +299,11 @@ pub fn http_listen() {
         let dataref = response.data_ref;
 
         let result = panic::catch_unwind(|| {
+          println!("begin handle_request");
           let mut p = DataObject::get(dataref);
+          println!("handle_request");
           let o = handle_request(request.duplicate(), stream.try_clone().unwrap());
+          println!("request handled");
           p.put_object("a", o);
         });
 
@@ -442,6 +444,7 @@ pub fn http_listen() {
             }
           }
           else if isbytes {
+            println!("begin send response");
             let bytes = response.get_bytes("body");
             let _x = stream.write(reshead.as_bytes());
             let chunk_size = 0x4000;
@@ -458,6 +461,7 @@ pub fn http_listen() {
               }
               else { timeout = 0; }
             }              
+            println!("response sent");
           }
           else {
             let response = reshead + &body;
@@ -468,13 +472,13 @@ pub fn http_listen() {
 
           let _x = stream.flush();
         }
-        if ka == "keep-alive" { keepalivecount += 1; }
-        else { break; }
+//        if ka.to_lowercase() == "keep-alive" { keepalivecount += 1; }
+        if ka.to_lowercase() != "keep-alive" { break; }
 
         DataStore::gc();
-        println!("end http request");
+//        println!("end http request");
       }
-      println!("close http connection");
+//      println!("close http connection");
     });
   }
 }
