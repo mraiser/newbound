@@ -10,15 +10,18 @@ use std::path::Path;
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_object("request");
 let a1 = o.get_object("nn_session");
-let ax = local(a0, a1);
+let a2 = o.get_string("nn_sessionid");
+let ax = local(a0, a1, a2);
 let mut o = DataObject::new();
 o.put_object("a", ax);
 o
 }
 
-pub fn local(request:DataObject, nn_session:DataObject) -> DataObject {
-println!("GOT P2P REQUEST {}", request.to_string());
+pub fn local(request:DataObject, nn_session:DataObject, nn_sessionid:String) -> DataObject {
+println!("GOT P2P REQUEST {}", nn_sessionid);
+request.duplicate().put_str("sessionid", &nn_sessionid);
 let session_id = prep_request(request.duplicate());
+println!("SAME? {}", session_id);
 let mut x = do_get(request, session_id);
 if x.has("code") && x.get_i64("code") == 404 {
   x.put_str("body", "404");

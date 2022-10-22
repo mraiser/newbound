@@ -1,5 +1,7 @@
-println!("GOT P2P REQUEST {}", request.to_string());
+println!("GOT P2P REQUEST {}", nn_sessionid);
+request.duplicate().put_str("sessionid", &nn_sessionid);
 let session_id = prep_request(request.duplicate());
+println!("SAME? {}", session_id);
 let mut x = do_get(request, session_id);
 if x.has("code") && x.get_i64("code") == 404 {
   x.put_str("body", "404");
