@@ -6,7 +6,7 @@ let mut con = get_best(user.duplicate()).unwrap();
 let mut d = DataObject::new();
 d.put_str("path", path);
 if (user.has("session_id")) { d.put_str("sessionid", &user.get_string("session_id")); }
-d.put_object("params", nn_params);
+d.put_object("params", nn_params.duplicate());
 d.put_object("headers", nn_headers);
 
 let mut o = DataObject::new();
@@ -19,6 +19,14 @@ if d.has("stream_id") {
   return con.join_stream(id);
 }
 if d.has("body") {
-  return DataBytes::from_bytes(&d.get_string("body").as_bytes().to_vec());
+  let body = d.get_string("body");
+  let s;
+  if nn_params.has("callback") {
+    s = nn_params.get_string("callback") + "(" + &body + ")";
+  }
+  else {
+    s = body;
+  }
+  return DataBytes::from_bytes(&s.as_bytes().to_vec());
 }
 DataBytes::from_bytes(&"404".as_bytes().to_vec())

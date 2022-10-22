@@ -342,11 +342,11 @@ pub fn http_listen() {
         let dataref = response.data_ref;
 
         let result = panic::catch_unwind(|| {
-          println!("begin handle_request");
+//          println!("begin handle_request");
           let mut p = DataObject::get(dataref);
-          println!("handle_request");
+//          println!("handle_request");
           let o = handle_request(request.duplicate(), stream.try_clone().unwrap());
-          println!("request handled");
+//          println!("request handled");
           p.put_object("a", o);
         });
 

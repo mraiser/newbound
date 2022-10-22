@@ -17,6 +17,7 @@ o
 }
 
 pub fn local(request:DataObject, nn_session:DataObject) -> DataObject {
+println!("GOT P2P REQUEST {}", request.to_string());
 let session_id = prep_request(request.duplicate());
 let mut x = do_get(request, session_id);
 if x.has("code") && x.get_i64("code") == 404 {
