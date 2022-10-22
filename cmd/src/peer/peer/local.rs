@@ -19,6 +19,7 @@ o
 pub fn local(request:DataObject, nn_session:DataObject) -> DataObject {
 let session_id = prep_request(request.duplicate());
 let mut x = do_get(request, session_id);
+println!("exec result {}", x.to_string());
 if x.has("file") {
   let path = x.get_string("file");
   if Path::new(&path).exists() {
