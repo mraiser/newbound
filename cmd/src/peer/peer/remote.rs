@@ -36,7 +36,6 @@ if d.has("stream_id") {
   return con.join_stream(id);
 }
 if d.has("body") {
-  if d.has("mimetype") { println!("MIME {}", d.get_string("mimetype")); }
   let body = d.get_string("body");
   let s;
   if nn_params.has("callback") {
@@ -45,7 +44,9 @@ if d.has("body") {
   else {
     s = body;
   }
-  return DataBytes::from_bytes(&s.as_bytes().to_vec());
+  let mut x = DataBytes::from_bytes(&s.as_bytes().to_vec());
+  if d.has("mimetype") { x.set_mime_type(Some(d.get_string("mimetype"))); }
+  return x;
 }
 DataBytes::from_bytes(&"404".as_bytes().to_vec())
 }

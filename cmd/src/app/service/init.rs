@@ -388,6 +388,8 @@ pub fn http_listen() {
 
           if isbytes {
             let bytes = response.get_bytes("body");
+            let mt = bytes.get_mime_type();
+            if mt.is_some() { response.put_str("mimetype", &mt.unwrap()); }
             if bytes.current_len() == 3 && bytes.get_data() == [52, 48, 52] {
               let p = "html/404.html";
               if Path::new(&p).exists() {
