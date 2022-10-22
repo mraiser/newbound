@@ -330,7 +330,7 @@ pub fn http_listen() {
         }
 
 
-        let ka;
+        let mut ka;
         if headers.has("CONNECTION") { ka = headers.get_string("CONNECTION"); }
         else { ka = "close".to_string(); }
 
@@ -445,7 +445,8 @@ pub fn http_listen() {
 
           headers.put_str("Date", &date);
           headers.put_str("Content-Type", &mimetype);
-          if len != -1 { headers.put_str("Content-Length", &len.to_string()); }
+          if len == -1 { ka = "close".to_string(); }
+          else { headers.put_str("Content-Length", &len.to_string()); }
           // FIXME
           //      if (acceptRanges != null) h.put("Accept-Ranges", acceptRanges);
           //      if (range != null && range[0] != -1) h.put("Content-Range","bytes "+range[0]+"-"+range[1]+"/"+range[2]);
