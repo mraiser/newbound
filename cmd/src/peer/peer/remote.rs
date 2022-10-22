@@ -30,7 +30,9 @@ d.put_object("headers", nn_headers);
 let mut o = DataObject::new();
 o.put_object("request", d);
 
+println!("initiating remote command");
 let d = exec(uuid.to_string(), "peer".to_string(), "local".to_string(), o);
+println!("received remote command result {}", d.to_string());
 let d = d.get_object("data");
 if d.has("stream_id") {
   let id = d.get_i64("stream_id");
