@@ -445,7 +445,7 @@ pub fn http_listen() {
             }
           }
           else if isbytes {
-            println!("begin send response");
+//            println!("begin send response");
             let bytes = response.get_bytes("body");
             let _x = stream.write(reshead.as_bytes());
             let chunk_size = 0x4000;
@@ -462,7 +462,7 @@ pub fn http_listen() {
               }
               else { timeout = 0; }
             }              
-            println!("response sent");
+//            println!("response sent");
           }
           else {
             let response = reshead + &body;
