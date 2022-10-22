@@ -22,7 +22,7 @@ let mut con = get_best(user.duplicate()).unwrap();
 
 let mut d = DataObject::new();
 d.put_str("path", path);
-if (user.has("session_id")) { d.put_str("sessionid", &user.get_string("session_id")); }
+if user.has("session_id") { d.put_str("sessionid", &user.get_string("session_id")); }
 d.put_object("params", nn_params.duplicate());
 d.put_object("headers", nn_headers);
 
@@ -44,7 +44,7 @@ if d.has("body") {
   else {
     s = body;
   }
-  let mut x = DataBytes::from_bytes(&s.as_bytes().to_vec());
+  let x = DataBytes::from_bytes(&s.as_bytes().to_vec());
   if d.has("mimetype") { x.set_mime_type(Some(d.get_string("mimetype"))); }
   return x;
 }
