@@ -69,6 +69,10 @@ me.ready = function(){
                   $(ME).find('.localpeerport').text("P2P Port: "+result.data.p2p_port);
                   $(ME).find('.localhttpport').text("HTTP Port: "+result.data.http_port);
                   
+                  json('../app/libs', null, function(result) {
+                    document.body.locallibraries = result.data;
+                  });
+                  
                   json('../security/groups', null, function(result){
                     if (result.status != 'ok') alert(result.msg);
                     else {

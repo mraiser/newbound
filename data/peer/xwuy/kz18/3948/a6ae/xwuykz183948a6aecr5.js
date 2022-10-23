@@ -5,6 +5,12 @@ me.ready = me.refresh = function(){
   me.check = $(ME).find('.rp-uuid')[0];
   me.update();
   document.body.api.ui.initNavbar(ME);
+  
+  var uuid = ME.DATA.id;
+  // FIXME
+  json('../peer/remote/'+uuid+'/app/libs', null, function(result){
+    debugger;
+  });
 };
 
 $(ME).find('.closehud').click(function(){

@@ -441,7 +441,7 @@ function json(cmd, vars, cb) {
 	  bot = cmd.substring(0,i);
 	  cmd = cmd.substring(i+1);
 	  
-	  if (bot == 'peerbot' && cmd.indexOf('remote/') == 0) {
+	  if (bot == 'peer' && cmd.indexOf('remote/') == 0) {
 	    cmd = cmd.substring(7);
 	    i = cmd.indexOf('/');
 	    wrap.peer = cmd.substring(0,i);
