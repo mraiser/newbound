@@ -133,6 +133,12 @@ for lib in libs {
     else { libversion = 0; }
     let libversion = libversion + 1;
     meta.put_i64("version", libversion);
+    
+    meta.put_str("author", &uuid);
+    meta.put_str("authorname", &metaidentity.get_string("displayname"));
+    meta.put_str("authororg", &metaidentity.get_string("organization"));
+    meta.put_str("authorkey", &public);
+    
     fs::write(propfile, &meta.to_string()).expect("Unable to write file");
     let propfile = datapath.join("version.txt");
     fs::write(propfile, &libversion.to_string()).expect("Unable to write file");
