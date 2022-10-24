@@ -27,7 +27,7 @@ let o = o.get_object("data");
 let v = o.get_string("version").parse::<i64>().unwrap();
 d.put_i64("version", v);
 let o = exec(uuid.to_owned(), "dev".to_string(), "lib_archive".to_string(), d);
-let stream_id = o.get_object("data").get_i64("stream_id");
+let stream_id = o.get_i64("stream_id");
 let user = get_user(&uuid).unwrap();
 let mut con = get_best(user.duplicate()).unwrap();
 let buf = con.join_stream(stream_id);
