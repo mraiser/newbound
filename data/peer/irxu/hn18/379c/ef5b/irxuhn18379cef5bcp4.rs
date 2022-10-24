@@ -931,7 +931,6 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       let mut o = handle_command(d, sessionid);
       
       if o.has("nn_return_type") && o.get_string("nn_return_type") == "File" {
-println!("{}",o.to_string());      
         // FIXME - combine with peer:peer:local
         let path = o.get_string("data");
         if Path::new(&path).exists() {
