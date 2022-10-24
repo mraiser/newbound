@@ -853,15 +853,21 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     let bytes = &bytes[14..n];
     
     let heap = STREAMREADERS.get().write().unwrap();
-    let db = heap.get(&y).unwrap();
-    db.write(bytes);
+    let db = heap.get(&y);
+    if db.is_some() {
+      let db = db.unwrap();
+      db.write(bytes);
+    }
   }
   else if method == "s_3 " {
     let buf: [u8; 8] = bytes[4..12].try_into().unwrap();
     let y = i64::from_be_bytes(buf);
     let heap = STREAMREADERS.get().write().unwrap();
-    let db = heap.get(&y).unwrap();
-    db.close_write();
+    let db = heap.get(&y);
+    if db.is_some(){
+      let db = db.unwrap();
+      db.close_write();
+    }
   }
   else if method == "rcv " {
     let uuid2 = std::str::from_utf8(&bytes[4..40]).unwrap();
