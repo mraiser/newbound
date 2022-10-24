@@ -971,6 +971,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     let sessionid = sessionid.to_owned();
     thread::spawn(move || {
       let o = handle_command(d, sessionid);
+      println!("XXX {}", o.to_string());
 
       let s = "res ".to_string() + &o.to_string();
       let buf = encrypt(&cipher, s.as_bytes());
