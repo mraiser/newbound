@@ -9,7 +9,21 @@ me.ready = me.refresh = function(){
   var uuid = ME.DATA.id;
   // FIXME
   json('../peer/remote/'+uuid+'/app/libs', null, function(result){
-    debugger;
+    if (result.data && document.body.locallibraries) {
+      for (var i in result.data) {
+        var theirlib = result.data[i];
+        var mylib = getByProperty(document.body.locallibraries, 'id', theirlib.id);
+        var author = mylib.author;
+        var authorkey = mylib.authorkey;
+        if (author && authorkey && theirlib.author == author && theirlib.authorkey == authorkey) {
+          if (mylib.version > theirlib.version) {
+            var newhtml = mylib.id + '<br>';
+            $(ME).find('.upgradelist').append(newhtml);
+            $(ME).find('.availableupgrades').css('display', 'block');
+          }
+        }
+      }
+    }
   });
 };
 

@@ -32,6 +32,7 @@ use flowlang::appserver::add_event_hook;
 use std::io::Write;
 use std::io::Read;
 use core::time::Duration;
+use crate::peer::service::exec::exec;
 
 pub fn execute(_o: DataObject) -> DataObject {
 let ax = init();
@@ -971,56 +972,61 @@ pub fn handle_command(d: DataObject, sid: String) -> DataObject {
   let pid = d.get_property("pid");
   let params = d.get_object("params");
   
-  let (b, ctldb, id) = lookup_command_id(app, cmd.to_owned());
-  
   let mut o;
-  if b {
-    let command = Command::new(&ctldb, &id);
-    if check_security(&command, &sid) {
-      command.cast_params(params.duplicate());
-      
-      let response = DataObject::new();
-      let dataref = response.data_ref;
-      let r = command.return_type.to_owned();
+  if d.has("peer") {
+    o = exec(d.get_string("peer"), app, cmd, params);
+  }
+  else {
+    let (b, ctldb, id) = lookup_command_id(app, cmd.to_owned());
 
-      let result = panic::catch_unwind(|| {
-        let mut p = DataObject::get(dataref);
-        let o = command.execute(params).unwrap();
-        p.put_object("a", o);
-      });
-      
-      match result {
-        Ok(_x) => {
-          let oo = response.get_object("a");
-          o = format_result(command, oo);
-          o.put_str("nn_return_type", &r);
-        },
-        Err(e) => {
-          let msg = match e.downcast::<String>() {
-            Ok(panic_msg) => format!("{}", panic_msg),
-            Err(x) => format!("Unknown Error {:?}", x)
-          };        
-          o = DataObject::new();
-          o.put_str("status", "err");
-          o.put_str("msg", &msg);
-          o.put_str("nn_return_type", "500");
-        },
+    if b {
+      let command = Command::new(&ctldb, &id);
+      if check_security(&command, &sid) {
+        command.cast_params(params.duplicate());
+
+        let response = DataObject::new();
+        let dataref = response.data_ref;
+        let r = command.return_type.to_owned();
+
+        let result = panic::catch_unwind(|| {
+          let mut p = DataObject::get(dataref);
+          let o = command.execute(params).unwrap();
+          p.put_object("a", o);
+        });
+
+        match result {
+          Ok(_x) => {
+            let oo = response.get_object("a");
+            o = format_result(command, oo);
+            o.put_str("nn_return_type", &r);
+          },
+          Err(e) => {
+            let msg = match e.downcast::<String>() {
+              Ok(panic_msg) => format!("{}", panic_msg),
+              Err(x) => format!("Unknown Error {:?}", x)
+            };        
+            o = DataObject::new();
+            o.put_str("status", "err");
+            o.put_str("msg", &msg);
+            o.put_str("nn_return_type", "500");
+          },
+        }
+      }
+      else {
+        o = DataObject::new();
+        o.put_str("status", "err");
+        let err = format!("UNAUTHORIZED: {}", &cmd);
+        o.put_str("msg", &err);
+        o.put_str("nn_return_type", "String");
       }
     }
     else {
       o = DataObject::new();
       o.put_str("status", "err");
-      let err = format!("UNAUTHORIZED: {}", &cmd);
+      let err = format!("Unknown command: {}", &cmd);
       o.put_str("msg", &err);
-      o.put_str("nn_return_type", "String");
+      o.put_str("nn_return_type", "404");
     }
-  }
-  else {
-    o = DataObject::new();
-    o.put_str("status", "err");
-    let err = format!("Unknown command: {}", &cmd);
-    o.put_str("msg", &err);
-    o.put_str("nn_return_type", "404");
   }
   
   if !o.has("status") { o.put_str("status", "ok"); }
