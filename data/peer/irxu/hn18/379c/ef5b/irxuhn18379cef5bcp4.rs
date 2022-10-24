@@ -441,7 +441,7 @@ impl P2PConnection {
     db
   }
   
-  pub fn write_stream(&mut self, x:i64, data:&Vec<u8>) {
+  pub fn write_stream(&mut self, x:i64, data:&Vec<u8>) -> bool{
     // ask for it in 30 seconds or it's gone forever
     let y;
     let beat = Duration::from_millis(100);
@@ -454,7 +454,7 @@ impl P2PConnection {
       }
       
       timeout += 1;
-      if timeout > 300 { println!("No request for stream data in 30 seconds... discarding stream."); return; }
+      if timeout > 300 { println!("No request for stream data in 30 seconds... discarding stream."); return false; }
       thread::sleep(beat);
     }
     let mut bytes = "s_2 ".as_bytes().to_vec();
@@ -468,6 +468,7 @@ impl P2PConnection {
     let mut bytes = len.to_be_bytes().to_vec();
     bytes.extend_from_slice(&buf);
     let _x = self.stream.write(&bytes).unwrap();
+    true
   }
   
   pub fn end_stream_write(&mut self, x:i64) {
@@ -923,9 +924,10 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     thread::spawn(move || {
       let mut o = handle_command(d, sessionid);
       
-      if o.has("return_type") && o.get_string("return_type") == "File" {
+      if o.has("nn_return_type") && o.get_string("nn_return_type") == "File" {
+println!("{}",o.to_string());      
         // FIXME - combine with peer:peer:local
-        let path = o.get_string("file");
+        let path = o.get_string("data");
         if Path::new(&path).exists() {
           let user = get_user(&uuid).unwrap();
           let mut con = get_best(user).unwrap();
@@ -940,9 +942,8 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
               let mut chunk = Vec::with_capacity(chunk_size);
               let n = std::io::Read::by_ref(&mut file).take(chunk_size as u64).read_to_end(&mut chunk).unwrap();
               if n == 0 { break; }
-              //let x = 
-              con.write_stream(stream_id, &chunk);
-              //if x.is_err() { break; }
+              let x = con.write_stream(stream_id, &chunk);
+              if !x { break; }
               if n < chunk_size { break; }
             }
             con.end_stream_write(stream_id);
