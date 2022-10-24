@@ -39,3 +39,18 @@
   margin-top:-6px;
   margin-left: 6px
 }
+
+.ispos {
+  position:relative;
+  display:inline-block;
+}
+
+.clickupdate{
+  display:inline-block;
+  width:calc(100% - 20px);
+  cursor:pointer;
+}
+
+.removeupdate {
+  margin-top:-2px;
+}
