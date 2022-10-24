@@ -32,11 +32,6 @@ me.ready = me.refresh = function(){
           }
         }
       }
-      el.find('.clickupdate').click(function(){
-        var lib = $(this).data("lib");
-        var v = $(this).data("version");
-        me.install(lib, v);
-      });
       el.find('.removeupdate').click(function(){
         $(this).closest('.chip').remove();
       });
@@ -44,14 +39,28 @@ me.ready = me.refresh = function(){
   });
 };
 
-me.install = function(lib, v) {
+me.install = function(lib, v, cb) {
   var myuuid = $('.localpeerid').text();
   var uuid = ME.DATA.id;
   var el = $(ME).find('#U_'+lib);
-  el.animate({'width':'100%','height':'60px'},300);
+  el.animate({'width':'100%','height':'60px'},300, function(){
+    el.append("<div class='progressbar myprogress'></div>");
+    document.body.api.ui.initProgress(ME);
+    el.find('.myprogress')[0].setProgress('indeterminate');
+  });
   var d = 'uuid='+myuuid+'&lib='+lib;
   json('../peer/remote/'+uuid+'/dev/install_lib', d, function(result){
-    alert(JSON.stringify(result));
+    if (result.data) {
+      el.find('.myprogress')[0].setProgress(100);
+      el.animate({'width':'0px','height':'0px'},300, function(){
+        el.remove();
+      });
+      if (cb) cb();
+    }
+    else {
+      el.find('.myprogress').remove();
+      el.append("<div class='progerr'><font color='red'>Error: "+result.msg+"</font></div>");
+    }
   });
 }
 
@@ -100,4 +109,31 @@ $(ME).find('.closeaddressbutton').click(function(){
 
 $(ME).find('.cancelupdateall').click(function(){
   $(ME).find('.availableupgrades').css('display', 'none');
+});
+
+function updateNext(){
+  if (ulist.length > 0) {
+    var el = ulist.shift();
+    var lib = el[0];
+    var v = el[1];
+    me.install(lib, v, updateNext);
+  }
+  else {
+    $(ME).find('.availableupgrades').animate({"opacity":0},300, function(){
+      $(this).css('display', 'none').css('opacity', '100%');
+    });
+  }
+}
+
+var ulist = [];
+$(ME).find('.updateall').click(function(){
+  $(ME).find('.updatebuttons').css('display', 'none');
+  ulist = [];
+  $(ME).find('.upgradelist').find('.chip').each(function(){
+    var el = $(this).find('.clickupdate');
+    var lib = el.data("lib");
+    var v = el.data("version");
+    ulist.push([lib,v]);
+  });
+  updateNext();
 });

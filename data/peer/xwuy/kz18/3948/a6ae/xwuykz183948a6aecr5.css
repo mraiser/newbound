@@ -48,9 +48,17 @@
 .clickupdate{
   display:inline-block;
   width:calc(100% - 20px);
-  cursor:pointer;
 }
 
 .removeupdate {
   margin-top:-2px;
 }
+
+.myprogress{
+  max-width:calc(100% - 20px);
+}
+
+.progerr{
+  margin-top:-10px;
+}
+
