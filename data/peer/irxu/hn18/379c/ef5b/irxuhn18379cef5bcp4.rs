@@ -921,8 +921,36 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     let cipher = cipher.to_owned();
     let sessionid = sessionid.to_owned();
     thread::spawn(move || {
-      let o = handle_command(d, sessionid);
-      println!("XXX {}", o.to_string());
+      let mut o = handle_command(d, sessionid);
+      
+      if o.has("return_type") && o.get_string("return_type") == "File" {
+        // FIXME - combine with peer:peer:local
+        let path = o.get_string("file");
+        if Path::new(&path).exists() {
+          let user = get_user(&uuid).unwrap();
+          let mut con = get_best(user).unwrap();
+          // FIXME - set remote stream len
+          // let len = fs::metadata(&path).unwrap().len() as i64;
+          let stream_id = con.begin_stream();
+
+          thread::spawn(move || {
+            let mut file = fs::File::open(&path).unwrap();
+            let chunk_size = 0x4000;
+            loop {
+              let mut chunk = Vec::with_capacity(chunk_size);
+              let n = std::io::Read::by_ref(&mut file).take(chunk_size as u64).read_to_end(&mut chunk).unwrap();
+              if n == 0 { break; }
+              //let x = 
+              con.write_stream(stream_id, &chunk);
+              //if x.is_err() { break; }
+              if n < chunk_size { break; }
+            }
+            con.end_stream_write(stream_id);
+          });
+
+          o.put_i64("stream_id", stream_id);
+        }
+      }
 
       let s = "res ".to_string() + &o.to_string();
       let buf = encrypt(&cipher, s.as_bytes());
