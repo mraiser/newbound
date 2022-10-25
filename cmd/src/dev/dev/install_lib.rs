@@ -24,8 +24,8 @@ pub fn install_lib(uuid:String, lib:String) -> bool {
 let mut d = DataObject::new();
 d.put_str("lib", &lib);
 let o = exec(uuid.to_owned(), "dev".to_string(), "lib_info".to_string(), d.duplicate());
-let o = o.get_object("data");
-let v = o.get_string("version").parse::<i64>().unwrap();
+let meta = o.get_object("data");
+let v = meta.get_string("version").parse::<i64>().unwrap();
 d.put_i64("version", v);
 let o = exec(uuid.to_owned(), "dev".to_string(), "lib_archive".to_string(), d);
 let stream_id = o.get_i64("stream_id");
@@ -59,11 +59,10 @@ let f = File::open(download).expect("Unable to open file");
 let mut zip = zip::ZipArchive::new(f).unwrap();
 let destdir = dir.join(dest);
 let _x = zip.extract(&destdir).unwrap();
-let h = hash(destdir.into_os_string().into_string().unwrap());
-
-
-
-println!("yay {:?}", h);
+let h = hash(destdir.to_owned().into_os_string().into_string().unwrap());
+if h == meta.get_string("hash") {
+  println!("yay {:?}", destdir);
+}
 
 true
 }
