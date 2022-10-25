@@ -11,10 +11,11 @@ let mut con = get_best(user.duplicate()).unwrap();
 let buf = con.join_stream(stream_id);
 
 let dir = temp_dir();
-let filename = unique_session_id();
-let path = dir.join(filename);
-println!("path {:?}", path);
-let mut f = File::create(path).expect("Unable to create file");
+let dest = unique_session_id();
+let filename = dest.to_owned()+".zip";
+let download = dir.join(filename);
+println!("download {:?}", download);
+let mut f = File::create(download).expect("Unable to create file");
 let beat = Duration::from_millis(100);
 let mut timeout = 0;
 while buf.is_read_open() {
@@ -29,6 +30,12 @@ while buf.is_read_open() {
 
 con.end_stream_read(stream_id);
 
-println!("yay");
+let mut zip = zip::ZipArchive::new(f).unwrap();
+let destdir = dir.join(dest);
+let x = zip.extract(destdir);
+
+
+
+println!("yay {:?}", x);
 
 true
