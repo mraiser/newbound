@@ -37,21 +37,24 @@ let dest = unique_session_id();
 let filename = dest.to_owned()+".zip";
 let download = dir.join(filename);
 println!("download {:?}", download);
-let mut f = File::create(download).expect("Unable to create file");
-let beat = Duration::from_millis(100);
-let mut timeout = 0;
-while buf.is_read_open() {
-  let bytes = buf.read(4096);
-  if bytes.len() > 0 { f.write(&bytes); }
-  else {
-    timeout += 1;
-    if timeout > 300 { println!("No library stream data in 30 seconds... abort."); return false; }
-    thread::sleep(beat);
+{
+  let mut f = File::create(download.to_owned()).expect("Unable to create file");
+  let beat = Duration::from_millis(100);
+  let mut timeout = 0;
+  while buf.is_read_open() {
+    let bytes = buf.read(4096);
+    if bytes.len() > 0 { f.write(&bytes); }
+    else {
+      timeout += 1;
+      if timeout > 300 { println!("No library stream data in 30 seconds... abort."); return false; }
+      thread::sleep(beat);
+    }
   }
 }
 
 con.end_stream_read(stream_id);
 
+let f = File::open(download).expect("Unable to open file");
 let mut zip = zip::ZipArchive::new(f).unwrap();
 let destdir = dir.join(dest);
 let x = zip.extract(destdir);
