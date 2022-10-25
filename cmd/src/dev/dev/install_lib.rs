@@ -9,6 +9,7 @@ use std::fs::File;
 use std::io::Write;
 use std::thread;
 use core::time::Duration;
+use crate::app::util::hash::hash;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("uuid");
@@ -57,11 +58,12 @@ con.end_stream_read(stream_id);
 let f = File::open(download).expect("Unable to open file");
 let mut zip = zip::ZipArchive::new(f).unwrap();
 let destdir = dir.join(dest);
-let x = zip.extract(destdir);
+let _x = zip.extract(&destdir).unwrap();
+let h = hash(destdir.into_os_string().into_string().unwrap());
 
 
 
-println!("yay {:?}", x);
+println!("yay {:?}", h);
 
 true
 }

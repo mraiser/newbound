@@ -35,10 +35,11 @@ con.end_stream_read(stream_id);
 let f = File::open(download).expect("Unable to open file");
 let mut zip = zip::ZipArchive::new(f).unwrap();
 let destdir = dir.join(dest);
-let x = zip.extract(destdir);
+let _x = zip.extract(&destdir).unwrap();
+let h = hash(destdir.into_os_string().into_string().unwrap());
 
 
 
-println!("yay {:?}", x);
+println!("yay {:?}", h);
 
 true
