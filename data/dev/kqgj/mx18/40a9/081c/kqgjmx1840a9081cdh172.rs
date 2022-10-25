@@ -51,7 +51,41 @@ if h == meta.get_string("hash") {
     if appsrc.is_dir() {
       let appdest = appruntime.join(appname);
       if appdest.join("botd.properties").exists() {
-        println!("UPDATE {:?}", appname);
+        copy_dir(appsrc.to_owned().into_os_string().into_string().unwrap(), appdest.to_owned().into_os_string().into_string().unwrap());
+        build_all();
+        
+        let mut ja = DataArray::new();
+        ja.push_str("cargo");
+        ja.push_str("build");
+        ja.push_str("-p");
+        ja.push_str("cmd");
+        let o = system_call(ja);
+        let e = o.get_string("err");
+        let lines = BufReader::new(e.as_bytes()).lines();
+        let mut b = false;
+        let mut c = false;
+        let mut s = "".to_string();
+        for line in lines {
+          let line = line.unwrap();
+          if c {
+            s += &line;
+            s += "\n";
+            c = line != "";
+          }
+          else if line.starts_with("error") {
+            s += &line;
+            s += "\n";
+            b = true;
+            c = true;
+          }
+        }
+
+        if b { panic!("{}",s); }
+        
+        
+        
+        
+        println!("UPDATED {:?}", appname);
       }    
     }
   }

@@ -14,6 +14,11 @@ use flowlang::datastore::DataStore;
 use flowlang::generated::flowlang::file::copy_dir::copy_dir;
 use std::fs::remove_dir_all;
 use std::fs;
+use flowlang::buildrust::build_all;
+use ndata::dataarray::DataArray;
+use flowlang::generated::flowlang::system::system_call::system_call;
+use std::io::BufReader;
+use std::io::BufRead;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("uuid");
@@ -78,7 +83,41 @@ if h == meta.get_string("hash") {
     if appsrc.is_dir() {
       let appdest = appruntime.join(appname);
       if appdest.join("botd.properties").exists() {
-        println!("UPDATE {:?}", appname);
+        copy_dir(appsrc.to_owned().into_os_string().into_string().unwrap(), appdest.to_owned().into_os_string().into_string().unwrap());
+        build_all();
+        
+        let mut ja = DataArray::new();
+        ja.push_str("cargo");
+        ja.push_str("build");
+        ja.push_str("-p");
+        ja.push_str("cmd");
+        let o = system_call(ja);
+        let e = o.get_string("err");
+        let lines = BufReader::new(e.as_bytes()).lines();
+        let mut b = false;
+        let mut c = false;
+        let mut s = "".to_string();
+        for line in lines {
+          let line = line.unwrap();
+          if c {
+            s += &line;
+            s += "\n";
+            c = line != "";
+          }
+          else if line.starts_with("error") {
+            s += &line;
+            s += "\n";
+            b = true;
+            c = true;
+          }
+        }
+
+        if b { panic!("{}",s); }
+        
+        
+        
+        
+        println!("UPDATED {:?}", appname);
       }    
     }
   }
