@@ -39,9 +39,9 @@ let _x = zip.extract(&destdir).unwrap();
 let h = hash(destdir.to_owned().into_os_string().into_string().unwrap());
 if h == meta.get_string("hash") {
   let datadir = DataStore::new().root.join(&lib);
-  if copy_dir(destdir.into_os_string().into_string().unwrap(), datadir.to_owned().into_os_string().into_string().unwrap()) {
-    println!("yay {:?}", datadir);
-  }
+  remove_dir_all(&datadir);
+  copy_dir(destdir.into_os_string().into_string().unwrap(), datadir.to_owned().into_os_string().into_string().unwrap());
+  println!("installed {:?}", datadir);
 }
 
 true
