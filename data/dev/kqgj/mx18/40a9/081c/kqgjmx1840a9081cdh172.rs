@@ -82,15 +82,10 @@ if h == meta.get_string("hash") {
 
         if b { panic!("{}",s); }
         
-        
-        
-        
-        println!("UPDATED {:?}", appname);
+        println!("UPDATED LIBRARY {:?}", appname);
       }    
     }
   }
-  
-  
 }
 
 true
