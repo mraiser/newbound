@@ -10,6 +10,8 @@ use std::io::Write;
 use std::thread;
 use core::time::Duration;
 use crate::app::util::hash::hash;
+use flowlang::datastore::DataStore;
+use flowlang::generated::flowlang::file::copy_dir::copy_dir;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("uuid");
@@ -61,7 +63,10 @@ let destdir = dir.join(dest);
 let _x = zip.extract(&destdir).unwrap();
 let h = hash(destdir.to_owned().into_os_string().into_string().unwrap());
 if h == meta.get_string("hash") {
-  println!("yay {:?}", destdir);
+  let datadir = DataStore::new().root.join(&lib);
+  if copy_dir(destdir.into_os_string().into_string().unwrap(), datadir.to_owned().into_os_string().into_string().unwrap()) {
+    println!("yay {:?}", datadir);
+  }
 }
 
 true
