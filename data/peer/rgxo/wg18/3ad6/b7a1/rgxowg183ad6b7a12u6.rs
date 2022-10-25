@@ -184,12 +184,23 @@ impl UdpStream {
   fn request_resend(&self, msgid:i64) {
     if self.data.get_bool("dead") { return; }
     
+    let mut inv = self.data.get_array("in");
+    let inlen = inv.len();
+    let mut last = msgid;
+    let mut x = 1;
+    while x < inlen {
+      if !inv.get_property(x).is_null() { break; }
+      last += 1;
+      x += 1;
+    }
+    
     let id = self.data.get_i64("id");
-    println!("request resend of {} from {}", msgid, id);
+    println!("request resend of {} to {} from {}", msgid, last, id);
     let mut bytes = Vec::new();
     bytes.push(RESEND);
     bytes.extend_from_slice(&id.to_be_bytes());
     bytes.extend_from_slice(&msgid.to_be_bytes());
+    bytes.extend_from_slice(&last.to_be_bytes());
     let heap = UDPCON.get().write().unwrap();
     let sock = heap.try_clone().unwrap();
     sock.send_to(&bytes, self.src).unwrap();
@@ -457,7 +468,6 @@ fn do_listen(){
               else {
                 while (inv.len() as i64) < i {
                   inv.push_property(Data::DNull);
-                  println!("INV EXPAND");
                 }
 
                 let db = DataBytes::from_bytes(&buf.to_vec());
@@ -528,6 +538,8 @@ fn do_listen(){
         let id = i64::from_be_bytes(id);
         let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
         let msg_id = i64::from_be_bytes(msg_id);
+        let last: [u8; 8] = buf[17..25].try_into().unwrap();
+        let last = i64::from_be_bytes(last);
 
         let mut con = P2PConnection::get(id);
         if let P2PStream::Udp(stream) = &mut con.stream {
@@ -538,13 +550,18 @@ fn do_listen(){
             let out_off = stream.data.get_i64("out_off");
             let out = stream.data.get_array("out");
 
-            let n = msg_id - out_off;
+            let mut n = msg_id - out_off;
             if n<0 {
               println!("Ignoring request for resend of msg {} on udp connection {}", msg_id, id);
             }
             else {
-              let bytes = out.get_bytes(n as usize);
-              sock.send_to(&bytes.get_data(), &src).unwrap();
+              let stop = last - out_off;
+              println!("Resending msg {} to {} on udp connection {}", msg_id, last, id);
+              while n <= stop {
+                let bytes = out.get_bytes(n as usize);
+                sock.send_to(&bytes.get_data(), &src).unwrap();
+                n += 1;
+              }
             }
           }
           else {
