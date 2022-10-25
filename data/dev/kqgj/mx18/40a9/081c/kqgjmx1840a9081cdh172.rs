@@ -52,7 +52,7 @@ if h == meta.get_string("hash") {
       let appdest = appruntime.join(appname);
       if appdest.join("botd.properties").exists() {
         copy_dir(appsrc.to_owned().into_os_string().into_string().unwrap(), appdest.to_owned().into_os_string().into_string().unwrap());
-        build_all();
+        build_lib(lib.to_owned());
         
         let mut ja = DataArray::new();
         ja.push_str("cargo");
