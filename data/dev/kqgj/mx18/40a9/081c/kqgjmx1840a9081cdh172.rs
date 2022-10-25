@@ -41,7 +41,18 @@ if h == meta.get_string("hash") {
   let datadir = DataStore::new().root.join(&lib);
   remove_dir_all(&datadir);
   copy_dir(destdir.into_os_string().into_string().unwrap(), datadir.to_owned().into_os_string().into_string().unwrap());
-  println!("installed {:?}", datadir);
+  
+  let appdata = datadir.join("_APPS");
+  for file in fs::read_dir(&appdata).unwrap() {
+    let path = file.unwrap().path();
+    let name = &path.display().to_string();
+    if path.is_dir() {
+      println!("app {:?}", name);
+      
+    }
+  }
+  
+  
 }
 
 true
