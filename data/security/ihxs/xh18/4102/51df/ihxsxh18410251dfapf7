@@ -1,0 +1,1 @@
+{"data":{"attachmentkeynames":["rs"],"cmd":"current_user","ctl":"security","desc":"","groups":"anonymous","import":"","lib":"security","params":[{"name":"nn_session","type":"JSONObject"}],"returntype":"JSONObject","type":"rust"},"id":"ihxsxh18410251dfapf7","readers":["anonymous"],"time":1666718605274,"username":"system","writers":[]}

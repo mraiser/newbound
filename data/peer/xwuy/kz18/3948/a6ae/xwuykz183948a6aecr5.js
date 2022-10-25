@@ -37,6 +37,49 @@ me.ready = me.refresh = function(){
       });
     }
   });
+  
+  json('../peer/remote/'+ME.DATA.id+'/security/current_user', null, function(result){
+    if (result.status == "ok") { 
+      $(ME).find('.rp-key').text(result.data.groups);
+      if (result.data.groups.indexOf('admin') != -1) $(ME).find('.adminonly').css('display', 'block');
+    }
+    else $(ME).find('.rp-key').text('n/a');
+  });
+
+  json('../security/users', null, function(result){
+    var u = result.data[ME.DATA.id];
+    var g = u.groups[0] ? u.groups : 'anonymous';
+    $(ME).find('.rp-lock').text(g);
+  });  
+  
+  json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=sharedcontrols", function(result){
+    if (result.status != 'ok'){
+      $(ME).find('.hudapps').html(result.msg);
+    }
+    else {
+      $('.navbar-tab2').click();
+      
+      var data = me.data = result.data;
+      var wrap = $(ME).find('.hudapps');
+      wrap.empty();
+      
+      for (var i in data.list){
+        var ctl = data.list[i];
+        var id = ctl.type;
+        var j = id.indexOf(':');
+        var db = j == -1 ? 'newboundpowerstrip' : id.substring(0,j);
+        id = j == -1 ? id : id.substring(j+1);
+        j = db.indexOf(':');
+        var d = j != -1 && db.substring(j+1,1) == '{' ? JSON.parse(db.substring(j+1)) : ctl;
+        db = j == -1 ? db : db.substring(0,j);
+        var claz = !ctl.big ? 'iconmode' : 'big';
+
+        var el = $('<div class="inline '+claz+'"></div>')[0];
+        wrap.append(el);
+        installControl(el, db, id, function(api){}, d);
+      }
+    }
+  });
 };
 
 me.install = function(lib, v, cb) {

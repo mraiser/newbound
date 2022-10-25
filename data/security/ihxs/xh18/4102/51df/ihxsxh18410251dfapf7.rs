@@ -1,0 +1,1 @@
+nn_session.get_object("user")

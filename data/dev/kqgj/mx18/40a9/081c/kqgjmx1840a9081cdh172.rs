@@ -32,16 +32,17 @@ println!("download {:?}", download);
 
 con.end_stream_read(stream_id);
 
-let f = File::open(download).expect("Unable to open file");
+let f = File::open(download.to_owned()).expect("Unable to open file");
 let mut zip = zip::ZipArchive::new(f).unwrap();
 let destdir = dir.join(dest);
 let _x = zip.extract(&destdir).unwrap();
 let h = hash(destdir.to_owned().into_os_string().into_string().unwrap());
+
+let store = DataStore::new();
 if h == meta.get_string("hash") {
-  let store = DataStore::new();
   let datadir = store.root.join(&lib);
   remove_dir_all(&datadir);
-  copy_dir(destdir.into_os_string().into_string().unwrap(), datadir.to_owned().into_os_string().into_string().unwrap());
+  copy_dir(destdir.to_owned().into_os_string().into_string().unwrap(), datadir.to_owned().into_os_string().into_string().unwrap());
   
   let appdata = datadir.join("_APPS");
   let appruntime = store.root.parent().unwrap().join("runtime");
@@ -86,6 +87,30 @@ if h == meta.get_string("hash") {
       }    
     }
   }
+
+  init_globals();
+
+  remove_dir_all(&destdir);
+  
+  let devroot = store.root.parent().unwrap().join("runtime").join("dev").join("libraries");
+  let _x = create_dir_all(&devroot);
+  let hashfile = devroot.join(&(lib.to_owned()+".hash"));
+  fs::write(hashfile, &h).expect("Unable to write file");
+
+  let mut x = v;
+  while x > 0 {
+    x -= 1;
+    let zipfile = devroot.join(&(lib.to_owned()+"_"+&x.to_string()+".zip"));
+    let _x = remove_file(zipfile);
+  }
+  let zipfile = devroot.join(&(lib.to_owned()+"_"+&v.to_string()+".zip"));
+  fs::copy(download, zipfile).expect("Unable to copy file");
+
+  let metafile = devroot.join(&(lib.to_owned()+".json"));
+  fs::write(metafile, &meta.to_string()).expect("Unable to write file");
+  
+  return true;
 }
 
-true
+
+false
