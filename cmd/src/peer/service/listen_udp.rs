@@ -143,7 +143,7 @@ impl UdpStream {
 
       let mut out = self.data.get_array("out");
       let mut msgid = self.data.get_i64("next");
-      let mut mtu = self.data.get_i64("mtu");
+      let mtu = self.data.get_i64("mtu");
       
       // FIXME - Support payloads up to 67K?
       let blocks: Vec<&[u8]> = buf.chunks((mtu as usize)-(PACKETHEADERSIZE as usize)).collect();
@@ -490,7 +490,7 @@ fn do_listen(){
             let id = i64::from_be_bytes(bytes);
             let con = P2PConnection::try_get(id);
             if con.is_some() {
-              let mut con = con.unwrap().duplicate();
+              let con = con.unwrap().duplicate();
               if let P2PStream::Udp(ref stream) = con.stream {
                 if stream.src == src {
                   let mut stream = stream.duplicate();
