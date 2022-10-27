@@ -21,7 +21,7 @@ println!("download {:?}", download);
   let mut timeout = 0;
   while buf.is_read_open() {
     let bytes = buf.read(4096);
-    if bytes.len() > 0 { f.write(&bytes); }
+    if bytes.len() > 0 { let _x = f.write(&bytes).unwrap(); }
     else {
       timeout += 1;
       if timeout > 300 { println!("No library stream data in 30 seconds... abort."); return false; }
@@ -41,7 +41,7 @@ let h = hash(destdir.to_owned().into_os_string().into_string().unwrap());
 let store = DataStore::new();
 if h == meta.get_string("hash") {
   let datadir = store.root.join(&lib);
-  remove_dir_all(&datadir);
+  let _x = remove_dir_all(&datadir).unwrap();
   copy_dir(destdir.to_owned().into_os_string().into_string().unwrap(), datadir.to_owned().into_os_string().into_string().unwrap());
   
   let appdata = datadir.join("_APPS");
@@ -90,7 +90,7 @@ if h == meta.get_string("hash") {
 
   init_globals();
 
-  remove_dir_all(&destdir);
+  let _x = remove_dir_all(&destdir).unwrap();
   
   let devroot = store.root.parent().unwrap().join("runtime").join("dev").join("libraries");
   let _x = create_dir_all(&devroot);

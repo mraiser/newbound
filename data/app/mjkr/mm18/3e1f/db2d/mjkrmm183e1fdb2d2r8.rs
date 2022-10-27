@@ -436,7 +436,7 @@ pub fn http_listen() {
           if isfile {
             let _x = stream.write(reshead.as_bytes());
             let mut file = fs::File::open(&body).unwrap();
-            let chunk_size = 0x4000;
+            let chunk_size = core::cmp::min(file.metadata().unwrap().len(), 65024) as usize;
             loop {
               let mut chunk = Vec::with_capacity(chunk_size);
               let n = std::io::Read::by_ref(&mut file).take(chunk_size as u64).read_to_end(&mut chunk).unwrap();
@@ -450,17 +450,17 @@ pub fn http_listen() {
 //            println!("begin send response");
             let bytes = response.get_bytes("body");
             let _x = stream.write(reshead.as_bytes());
-            let chunk_size = 0x4000;
-            let beat = Duration::from_millis(100);
             let mut timeout = 0;
             while bytes.is_read_open() {
+              let chunk_size = core::cmp::max(0x4000, bytes.current_len());
               let chunk = bytes.read(chunk_size);
               let x = stream.write(&chunk);
               if x.is_err() { break; }
               if chunk.len() == 0 { 
-                thread::sleep(beat);
                 timeout += 1;
-                if timeout > 300 { println!("Unusually long wait for stream data... Abort"); break; }
+                let beat = Duration::from_millis(timeout);
+                thread::sleep(beat);
+                if timeout > 246 { println!("Unusually long wait for stream data... Abort"); break; }
               }
               else { timeout = 0; }
             }              

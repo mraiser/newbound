@@ -56,12 +56,12 @@ let _x = stream.write(&bytes).unwrap();
 // FIXME - should timeout
 let pidstr = &pid.to_string();
 let mut timeout = 0;
-let beat = Duration::from_millis(100);
 while ! res.has(pidstr) {
   // TIGHTLOOP
-  thread::sleep(beat);
   timeout += 1;
-  if timeout > 1000 { println!("Unusually long wait in peer:service:exec [{}]", pid); timeout = 0; }
+  let beat = Duration::from_millis(timeout);
+  thread::sleep(beat);
+  if timeout > 450 { println!("Unusually long wait in peer:service:exec [{}]", pid); timeout = 0; }
   
   wait();
 }

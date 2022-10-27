@@ -154,12 +154,12 @@ impl P2PStream {
         let mut v = Vec::new();
         while i < len {
           let mut timeout = 0;
-          let beat = Duration::from_millis(100);
           while stream.buf.len() == 0 {
             // TIGHTLOOP
-            thread::sleep(beat);
             timeout += 1;
-            if timeout > 1000 { println!("Unusually long wait in peer:service:listen:p2p_stream:relay:read_exact [{}]", stream.data.get_i64("id")); timeout = 0; }
+            let beat = Duration::from_millis(timeout);
+            thread::sleep(beat);
+            if timeout > 450 { println!("Unusually long wait in peer:service:listen:p2p_stream:relay:read_exact [{}]", stream.data.get_i64("id")); timeout = 0; }
           }
           
           let bd = &mut stream.buf.get_bytes(0);
@@ -444,7 +444,6 @@ impl P2PConnection {
   pub fn write_stream(&mut self, x:i64, data:&Vec<u8>) -> bool{
     // ask for it in 30 seconds or it's gone forever
     let y;
-    let beat = Duration::from_millis(100);
     let mut timeout = 0;
     loop {
       {
@@ -454,7 +453,8 @@ impl P2PConnection {
       }
       
       timeout += 1;
-      if timeout > 300 { println!("No request for stream data in 30 seconds... discarding stream."); return false; }
+      if timeout > 246 { println!("No request for stream data in 30 seconds... discarding stream."); return false; }
+      let beat = Duration::from_millis(timeout);
       thread::sleep(beat);
     }
     let mut bytes = "s_2 ".as_bytes().to_vec();
@@ -488,8 +488,21 @@ impl P2PConnection {
   }
 
   pub fn end_stream_read(&mut self, y:i64) {
-    let mut heap = STREAMREADERS.get().write().unwrap();
-    heap.remove(&y);
+//    let x; {
+      let mut heap = STREAMREADERS.get().write().unwrap();
+//      x = heap.get(&y).unwrap().to_owned();
+      heap.remove(&y);
+//    }
+    // FIXME - Stop send
+/*
+    let mut bytes = "s_4 ".as_bytes().to_vec();
+    bytes.extend_from_slice(&x.to_be_bytes());
+    let buf = encrypt(&self.cipher, &bytes);
+    let len = buf.len() as i16;
+    let mut bytes = len.to_be_bytes().to_vec();
+    bytes.extend_from_slice(&buf);
+    let _x = self.stream.write(&bytes).unwrap();
+*/    
   }
 }
 

@@ -22,8 +22,12 @@ const RDY:u8 = 4;
 const CMD:u8 = 5;
 const ACK:u8 = 6;
 const RESEND:u8 = 7;
+const EXTEND_MTU:u8 = 8;
 
-const MAXPACKETBUFF:i64 = 1000;
+const MAXPACKETCOUNT:u16 = 1000;
+const MAXPACKETSIZE:usize = 65024;
+const PACKETHEADERSIZE:u16 = 17;
+const MTU_SIZES:[u16; 7] = [1016,2032,4064,8128,16256,32512,65024];
 
 #[derive(Debug)]
 pub struct UdpStream {
@@ -42,6 +46,7 @@ impl UdpStream {
     a.put_array("out", DataArray::new());
     a.put_bool("dead", false);
     a.put_i64("last_contact", time());
+    a.put_i64("mtu", 508);
     UdpStream{
       src: src,
       data: a,
@@ -95,9 +100,10 @@ impl UdpStream {
 
       let mut out = self.data.get_array("out");
       let mut msgid = self.data.get_i64("next");
+      let mut mtu = self.data.get_i64("mtu");
       
       // FIXME - Support payloads up to 67K?
-      let blocks: Vec<&[u8]> = buf.chunks(491).collect();
+      let blocks: Vec<&[u8]> = buf.chunks((mtu as usize)-(PACKETHEADERSIZE as usize)).collect();
       for buf in blocks {
         let mut bytes = Vec::new();
         bytes.push(CMD);
@@ -127,12 +133,12 @@ impl UdpStream {
     let mut in_off;
     {
       // There can be only one!
+      // FIXME - Is this really necessary?
       let _lock = READMUTEX.get().write().unwrap();
       in_off = self.data.get_i64("in_off");
     }
     //println!("start read {}", in_off);
     
-    let beat = Duration::from_millis(100);
     while i < len {
       // FIXME - should timeout?
       let mut timeout = 0;
@@ -140,9 +146,10 @@ impl UdpStream {
         if self.data.get_bool("dead") { return Err(Error::new(ErrorKind::ConnectionReset, "Connection closed")); }
         
         // TIGHTLOOP
-        thread::sleep(beat);
         timeout += 1;
-        if timeout > 1000 { println!("Unusually long wait in peer:service:listen_udp:read_exact 1 [{}]", self.data.get_i64("id")); timeout = 0; }
+        let beat = Duration::from_millis(timeout);
+        thread::sleep(beat);
+        if timeout > 450 { println!("Unusually long wait in peer:service:listen_udp:read_exact 1 [{}]", self.data.get_i64("id")); timeout = 0; }
       }
 
       let mut timeout = 0;
@@ -151,9 +158,10 @@ impl UdpStream {
         self.request_resend(in_off);
         
         // TIGHTLOOP
-        thread::sleep(beat);
         timeout += 1;
-        if timeout > 1000 { println!("Unusually long wait in peer:service:listen_udp:read_exact 2 [{}]", self.data.get_i64("id")); timeout = 0; }
+        let beat = Duration::from_millis(timeout);
+        thread::sleep(beat);
+        if timeout > 450 { println!("Unusually long wait in peer:service:listen_udp:read_exact 2 [{}]", self.data.get_i64("id")); timeout = 0; }
       }
       
       //println!("have data {}", in_off);
@@ -184,7 +192,7 @@ impl UdpStream {
   fn request_resend(&self, msgid:i64) {
     if self.data.get_bool("dead") { return; }
     
-    let mut inv = self.data.get_array("in");
+    let inv = self.data.get_array("in");
     let inlen = inv.len();
     let mut last = msgid;
     let mut x = 1;
@@ -209,6 +217,27 @@ impl UdpStream {
   pub fn last_contact(&self) -> i64 {
     self.data.get_i64("last_contact")
   }
+  
+  pub fn upgrade_mtu(&self) {
+    let id = self.data.get_i64("id");
+    let beat = Duration::from_millis(1000);
+    for size in MTU_SIZES {
+      let mut bytes = Vec::new();
+      bytes.push(EXTEND_MTU);
+      bytes.extend_from_slice(&id.to_be_bytes());
+      
+      let mut vec = Vec::new();
+      vec.resize((size - 9) as usize,0);
+      OsRng.fill_bytes(&mut vec);
+      bytes.extend_from_slice(&vec);
+      
+      let heap = UDPCON.get().write().unwrap();
+      let sock = heap.try_clone().unwrap();
+      sock.send_to(&bytes, self.src).unwrap();
+      
+      thread::sleep(beat);
+    }
+  }
 }
 
 fn do_listen(){
@@ -230,7 +259,7 @@ fn do_listen(){
   system.put_bytes("session_pubkey", buf);
   
   // FIXME - Support payloads up to 67K?
-  let mut buf = [0; 508]; 
+  let mut buf = [0; MAXPACKETSIZE]; 
   
   fn helo(cmd:u8, buf:&mut [u8], my_session_public:PublicKey, my_session_private:StaticSecret, my_uuid:String, my_public:String) -> (Aes256, Vec<u8>) {
     let remote_session_public: [u8; 32] = buf[1..33].try_into().unwrap();
@@ -303,6 +332,7 @@ fn do_listen(){
   while system.get_bool("running") {
     let sock = UDPCON.get().write().unwrap().try_clone().unwrap();
     let (amt, src) = sock.recv_from(&mut buf).unwrap();
+//    println!("GOT {}", amt);
     let buf = &mut buf[..amt];
     let cmd = buf[0];
     match cmd {
@@ -375,8 +405,9 @@ fn do_listen(){
             else {
               let bytes:[u8; 8] = buf[129..137].try_into().unwrap();
               let remote_id = i64::from_be_bytes(bytes);
-                            
-              let (conid, con) = P2PConnection::begin(uuid, P2PStream::Udp(UdpStream::new(src, remote_id)));
+                
+              let stream = UdpStream::new(src, remote_id);
+              let (conid, con) = P2PConnection::begin(uuid, P2PStream::Udp(stream.duplicate()));
 
               let mut buf = buf2;
               
@@ -389,8 +420,13 @@ fn do_listen(){
               //println!("SUP CON {} = {}", data_ref, conid);
               sock.send_to(&buf, &src).unwrap();
               
+              let con = con.duplicate();
               thread::spawn(move || {
                 handle_connection(conid, con);
+              });
+              
+              thread::spawn(move || {
+                stream.duplicate().upgrade_mtu();
               });
               
               let p2pport = src.port();
@@ -412,17 +448,24 @@ fn do_listen(){
             let con = P2PConnection::try_get(id);
             if con.is_some() {
               let mut con = con.unwrap().duplicate();
-              if let P2PStream::Udp(stream) = &mut con.stream {
+              if let P2PStream::Udp(ref stream) = con.stream {
                 if stream.src == src {
+                  let mut stream = stream.duplicate();
+                  
                   let bytes:[u8; 8] = buf[121..129].try_into().unwrap();
                   let remote_id = i64::from_be_bytes(bytes);
                   stream.set_id(remote_id);
                   //println!("RDY");
 
+                  let con = con.duplicate();
                   thread::spawn(move || {
                     handle_connection(id, con);
                   });
               
+                  thread::spawn(move || {
+                    stream.duplicate().upgrade_mtu();
+                  });
+
                   let p2pport = src.port();
                   let ipaddr = src.ip().to_string();
                   user.put_i64("port", p2pport as i64);
@@ -449,6 +492,8 @@ fn do_listen(){
           let mut con = con.unwrap();
           if let P2PStream::Udp(stream) = &mut con.stream {
             if stream.src == src {
+              let mut stream = stream.duplicate();
+                  
               let now = time();
               stream.data.put_i64("last_contact", now);
               system.get_object("sessions").get_object(&con.sessionid).put_i64("expire", now + sessiontimeoutmillis);
@@ -462,7 +507,7 @@ fn do_listen(){
               if i < 0 {
                 println!("Ignoring resend of msg {} on udp connection {}", msg_id, id);
               }
-              else if i > MAXPACKETBUFF {
+              else if i > MAXPACKETCOUNT as i64 {
                 println!("Too many packets... Ignoring msg {} on udp connection {}", msg_id, id);
               }
               else {
@@ -504,7 +549,7 @@ fn do_listen(){
           }
         }
       },
-      ACK => {
+      ACK => { // FIXME - Only process if size (amt) is correct 
         let id: [u8; 8] = buf[1..9].try_into().unwrap();
         let id = i64::from_be_bytes(id);
         let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
@@ -533,7 +578,7 @@ fn do_listen(){
           }
         }
       },
-      RESEND => {
+      RESEND => { // FIXME - Only process if size (amt) is correct 
         let id: [u8; 8] = buf[1..9].try_into().unwrap();
         let id = i64::from_be_bytes(id);
         let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
@@ -566,6 +611,20 @@ fn do_listen(){
           }
           else {
             println!("Received ACK from wrong source");
+          }
+        }
+      },
+      EXTEND_MTU => {
+        let id: [u8; 8] = buf[1..9].try_into().unwrap();
+        let id = i64::from_be_bytes(id);
+        let mut con = P2PConnection::get(id);
+        if let P2PStream::Udp(stream) = &mut con.stream {
+          if stream.src == src {
+            let mtu = stream.data.get_i64("mtu");
+            if mtu < amt as i64 {
+              stream.data.put_i64("mtu", amt as i64);
+              println!("Increased MTU for connection {} from {} to {}", id, mtu, amt);
+            }
           }
         }
       },
