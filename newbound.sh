@@ -1,6 +1,4 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd $DIR/src
-mkdir ../bin
-javac -d ../bin/ Startup.java
-cd ../
-java -cp bin Startup
+cd $DIR
+cargo run --release --features="serde_support,reload"
+
