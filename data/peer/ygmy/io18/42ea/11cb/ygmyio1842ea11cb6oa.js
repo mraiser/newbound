@@ -27,7 +27,7 @@ me.ready = function(){
         });
       }
     };
-    installControl(el[0], 'metabot', 'confirmdialog', function(result){}, data);
+    document.body.api.ui.confirm(data);
   });
 };
 
