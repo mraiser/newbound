@@ -17,9 +17,7 @@ if b {
 
 // FIXME - move threads to listen methods and pass returned port from tcp to udp
 let x = ipaddr.to_owned();
-thread::spawn(move || {
-  listen(x, port);
-});
+let port = listen(x, port);
 
 thread::spawn(move || {
   listen_udp(ipaddr, port);

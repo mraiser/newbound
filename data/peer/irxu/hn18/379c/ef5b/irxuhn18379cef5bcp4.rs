@@ -1,8 +1,4 @@
-  START.call_once(|| { 
-    P2PCONS.set(RwLock::new(HashMap::new())); 
-    STREAMWRITERS.set(RwLock::new(HashMap::new())); 
-    STREAMREADERS.set(RwLock::new(HashMap::new())); 
-  });
+  do_init();
   do_listen(ipaddr, port)
 }
 
@@ -10,6 +6,14 @@ static START: Once = Once::new();
 static P2PCONS:Storage<RwLock<HashMap<i64, P2PConnection>>> = Storage::new();
 static STREAMWRITERS:Storage<RwLock<HashMap<i64, i64>>> = Storage::new();
 static STREAMREADERS:Storage<RwLock<HashMap<i64, DataBytes>>> = Storage::new();
+
+fn do_init(){
+  START.call_once(|| { 
+    P2PCONS.set(RwLock::new(HashMap::new())); 
+    STREAMWRITERS.set(RwLock::new(HashMap::new())); 
+    STREAMREADERS.set(RwLock::new(HashMap::new())); 
+  });
+}
 
 #[derive(Debug)]
 pub struct RelayStream {
@@ -267,15 +271,18 @@ pub struct P2PConnection {
 
 impl P2PConnection {
   pub fn get(conid:i64) -> P2PConnection {
+    do_init();
     P2PCONS.get().write().unwrap().get(&conid).unwrap().duplicate()
   }
   
   pub fn try_get(conid:i64) -> Option<P2PConnection> {
+    do_init();
     let x = P2PCONS.get().write().unwrap().get(&conid)?.duplicate();
     Some(x)
   }
   
   pub fn list() -> Vec<i64> {
+    do_init();
     let mut v = Vec::new();
     for i in P2PCONS.get().write().unwrap().keys() {
       v.push(*i);
@@ -507,6 +514,7 @@ impl P2PConnection {
 }
 
 pub fn get_best(user:DataObject) -> Option<P2PConnection> {
+  do_init();
   let mut best = None;
   let heap = P2PCONS.get().write().unwrap();
   let cons = user.get_array("connections");
@@ -524,6 +532,7 @@ pub fn get_best(user:DataObject) -> Option<P2PConnection> {
 }
 
 pub fn get_tcp(user:DataObject) -> Option<P2PConnection> {
+  do_init();
   let heap = P2PCONS.get().write().unwrap();
   let cons = user.get_array("connections");
 //  println!("heap {:?} cons {}", heap, cons.to_string());
@@ -538,6 +547,7 @@ pub fn get_tcp(user:DataObject) -> Option<P2PConnection> {
 }
 
 pub fn get_udp(user:DataObject) -> Option<P2PConnection> {
+  do_init();
   let heap = P2PCONS.get().write().unwrap();
   let cons = user.get_array("connections");
 //  println!("heap {:?} cons {}", heap, cons.to_string());
@@ -552,6 +562,7 @@ pub fn get_udp(user:DataObject) -> Option<P2PConnection> {
 }
 
 pub fn get_relay(user:DataObject) -> Option<P2PConnection> {
+  do_init();
   let heap = P2PCONS.get().write().unwrap();
   let cons = user.get_array("connections");
 //  println!("heap {:?} cons {}", heap, cons.to_string());
@@ -739,22 +750,24 @@ fn do_listen(ipaddr:String, port:i64) -> i64 {
 
   println!("P2P TCP listening on port {}", port);
 
-  // FIXME - Interrupt and quit if !system.running
-  for stream in listener.incoming() {
-    let stream = stream.unwrap();
-    thread::spawn(move || {
-      let remote_addr = stream.peer_addr().unwrap();
-      println!("P2P TCP incoming request from {}", remote_addr);
-      
-      let mut stream = P2PStream::Tcp(stream);
-      
-      let con = handshake(&mut stream, None);
-      if con.is_some() {
-        let (conid, con) = con.unwrap();
-        handle_connection(conid, con);
-      }
-    });
-  }
+  thread::spawn(move || {
+    // FIXME - Interrupt and quit if !system.running
+    for stream in listener.incoming() {
+      let stream = stream.unwrap();
+      thread::spawn(move || {
+        let remote_addr = stream.peer_addr().unwrap();
+        println!("P2P TCP incoming request from {}", remote_addr);
+
+        let mut stream = P2PStream::Tcp(stream);
+
+        let con = handshake(&mut stream, None);
+        if con.is_some() {
+          let (conid, con) = con.unwrap();
+          handle_connection(conid, con);
+        }
+      });
+    }
+  });
   port.into()
 }
 
