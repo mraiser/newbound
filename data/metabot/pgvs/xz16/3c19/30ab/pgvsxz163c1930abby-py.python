@@ -1,4 +1,0 @@
-f = botmanager.getParentFile(botmanager.getParentFile(botmanager.root))
-f = os.path.join(os.path.join(f, 'data'), lib)
-shutil.rmtree(f)
-return 'OK'

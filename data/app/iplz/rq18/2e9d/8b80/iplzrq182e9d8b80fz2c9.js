@@ -13,6 +13,12 @@ $(document).click(function(event) {
   window.lastClick=event;
 });
 
+me.snackbarMsg = function(msg, width){
+  var d = { "message":msg };
+  if (width) d.width = width;
+  me.snackbar(d);
+};
+
 me.snackbar = function(data){
   if (me.snacking) {
     me.snacks.push(data);

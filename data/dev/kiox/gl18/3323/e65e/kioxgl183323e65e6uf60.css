@@ -10,30 +10,6 @@
   margin-right:-10px;
 }
 
-.libstable {
-  border: thin solid #0002;
-  border-collapse: collapse;
-  white-space: nowrap;
-  width:100%;
-}
-
-.libstable td, .libstable th {
-  border: thin solid #0002;
-  padding-left:24px;
-  padding-right:24px;
-  padding-top:12px;
-  padding-bottom:12px;
-  text-align:left;
-}
-
-.libstable td {
-  cursor:pointer;
-}
-
-.libstable td:hover {
-  background-color: #0002;
-}
-
 .scrollme {
   position:absolute;
   top:62px;

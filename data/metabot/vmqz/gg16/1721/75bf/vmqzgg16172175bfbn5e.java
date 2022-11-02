@@ -1,1 +1,0 @@
-return metabot.updateLibrary(peer, lib, guid, sessionid);

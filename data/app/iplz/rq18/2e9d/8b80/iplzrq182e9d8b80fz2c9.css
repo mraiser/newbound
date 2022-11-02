@@ -649,3 +649,27 @@ textarea::placeholder {
   color:white;
 }
 
+.tablelist {
+  border: thin solid #0002;
+  border-collapse: collapse;
+  white-space: nowrap;
+  width:100%;
+}
+
+.tablelist td, .tablelist th {
+  border: thin solid #0002;
+  padding-left:24px;
+  padding-right:24px;
+  padding-top:12px;
+  padding-bottom:12px;
+  text-align:left;
+}
+
+.tablelist td {
+  cursor:pointer;
+}
+
+.tablelist td:hover {
+  background-color: #0002;
+}
+

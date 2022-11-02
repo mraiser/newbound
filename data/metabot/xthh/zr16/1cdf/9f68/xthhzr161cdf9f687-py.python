@@ -1,1 +1,0 @@
-return metabot.buildJSAPI(lib, id);

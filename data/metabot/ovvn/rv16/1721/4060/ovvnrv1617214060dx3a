@@ -1,1 +1,0 @@
-{"data":{"import":"import org.json.*;\nimport com.newbound.robot.*;\n","returntype":"JSONObject","groups":"anonymous","type":"java","params":[{"name":"botmanager","type":"Bot"}],"attachmentkeynames":["java"],"desc":"List the apps installed on this device"},"readers":["anonymous"],"id":"ovvnrv1617214060dx3a","time":1643047230577,"addr":"/0:0:0:0:0:0:0:1:45484","username":"admin"}

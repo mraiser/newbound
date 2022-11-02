@@ -62,3 +62,17 @@
   margin-top:-10px;
 }
 
+.control-settings-popup {
+  position:absolute;
+  right:-20px;
+  top:6px;
+  width:300px;
+  color:black;
+  z-index:10;
+}
+
+.inline {
+  display:inline-block;
+  width:150px;
+  height:150px;
+}

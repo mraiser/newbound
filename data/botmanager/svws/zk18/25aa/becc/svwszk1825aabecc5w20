@@ -1,1 +1,0 @@
-{"data":{"import":"","lib":"botmanager","returntype":"FLAT","ctl":"botmanager","cmd":"execute","type":"flow","params":[{"name":"db","type":"String"},{"name":"id","type":"String"},{"name":"args","type":"JSONObject"}],"attachmentkeynames":["flow"],"desc":""},"id":"svwszk1825aabecc5w20","time":1661357267622,"addr":"/0:0:0:0:0:0:0:1:50938","username":"admin"}

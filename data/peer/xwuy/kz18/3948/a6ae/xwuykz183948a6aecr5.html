@@ -3,7 +3,15 @@
     <div class="connectionindicator"></div><div class="connectionindicator"></div><div class="connectionindicator"></div>
     <div class='connectionlatency'></div>
   </div>
-  <img src='../app/asset/app/more_icon-vert-white.png' class='roundbutton-small-white popupmenu morebutton' data-popup='{"selector":".rp-more","closeselector":".popupcard-close","popup":true}'>
+  <div class='card popupcard mini control-settings-popup'>
+    <table class="tablelist">
+      <tr><td class="refreshhud closeonclick">Refresh</td></tr>
+      <tr><td class="adminonly popupmenu closeonclick" data-popup='{"selector":".add-control-popup","closeselector":".add-control-popup-close","modal":true}'>Add Control</td></tr>
+      <tr><td class="adminonly closeonclick">Control Settings</td></tr>
+      <tr><td class="hudrestart adminonly closeonclick">Restart Services</td></tr>
+    </table>
+  </div>
+  <img src='../app/asset/app/more_icon-vert-white.png' class='roundbutton-small-white popupmenu morebutton' data-popup='{"selector":".control-settings-popup","closeselector":".control-settings-popup-close","popup":true}'>
 </div>
 <div class='padme'>
   <img src='../app/asset/app/close-white.png' class='closehud roundbutton-small-white marginme'>
@@ -25,9 +33,6 @@
     <img src="../app/asset/app/key_icon-white.png" class="icon-small-white">&nbsp;<span class='rp-key'><i>checking...</i></span>
     <img src="../app/asset/app/lock_icon-white.png" class="icon-small-white">&nbsp;<span class='rp-lock'><i>checking...</i></span>
     <br>
-    
-    
-    
     <label class="plaincheckbox">
       <input type='checkbox' id='keepalive'>
       <span>Stay connected</span>
@@ -46,5 +51,14 @@
   </div>
   <div class='padme tab-content tab2'>
     <div class='hudapps'></div>
+  </div>
+  <div class='add-control-popup card popup-card modal hideme'>
+    <div class='dialog-header padme'>
+      Add Control
+      <img src='../app/asset/app/close-white.png' class='upper-right add-control-popup-close roundbutton-small out10'>
+    </div>
+    <div class='card-text'>
+      <div class = 'add-control-available'></div>
+    </div>
   </div>
 </div>

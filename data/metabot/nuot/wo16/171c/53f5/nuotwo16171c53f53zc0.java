@@ -1,1 +1,0 @@
-return metabot.publishLibrary(lib);

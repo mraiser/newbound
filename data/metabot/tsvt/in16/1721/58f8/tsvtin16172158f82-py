@@ -1,1 +1,0 @@
-{"data":{"import":"import os","returntype":"JSONObject","type":"python","params":[{"name":"botmanager","type":"Bot"},{"name":"id","type":"String"}],"attachmentkeynames":["python"],"desc":"Deactivate the given app"},"id":"tsvtin16172158f82-py","time":1640450761097,"addr":"/0:0:0:0:0:0:0:1:51690","username":"admin"}

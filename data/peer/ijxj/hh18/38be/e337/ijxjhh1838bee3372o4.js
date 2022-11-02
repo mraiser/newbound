@@ -61,7 +61,8 @@ function textMesh(name){
 }
 
 me.render = function(){
-  me.sphere.rotation.y += 0.01;
+  var speed = me.sphere.rotation.speed ? me.sphere.rotation.speed : 0.01;
+  me.sphere.rotation.y += speed;
   
   var pos1 = me.model.position;
   count = 0;

@@ -1,4 +1,6 @@
 if check_auth(&lib, &id, &nn_sessionid, false) {
-  return DataStore::new().get_data(&lib, &id);
+  let store = DataStore::new();
+  if store.exists(&lib, &id) { return store.get_data(&lib, &id); }
+  else { return DataObject::from_string("{\"status\":\"err\",\"msg\":\"NOT FOUND\"}"); }
 }
 DataObject::from_string("{\"status\":\"err\",\"msg\":\"UNAUTHORIZED\"}")

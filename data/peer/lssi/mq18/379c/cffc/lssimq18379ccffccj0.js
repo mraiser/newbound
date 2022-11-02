@@ -43,6 +43,7 @@ me.ready = function(){
               spotLight.castShadow = true;
               spotLight.position.set (20, 35, 40);
               scene.add(spotLight);
+              scene.add( spotLight.target );
 
               camera.position.z = 5;
               camera.lookAt(scene.position);
@@ -246,6 +247,7 @@ me.render = function(){
   me.center.add(me.camv);
   me.camera.lookAt(me.center);
   me.spotLight.position.copy(me.camera.position);
+  me.spotLight.target.position.copy(me.center);
   me.renderer.render(me.scene, me.camera);
 }
 

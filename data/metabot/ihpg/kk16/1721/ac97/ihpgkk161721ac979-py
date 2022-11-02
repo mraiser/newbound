@@ -1,1 +1,0 @@
-{"data":{"import":"import os\nimport shutil","returntype":"String","type":"python","params":[{"name":"botmanager","type":"Bot"},{"name":"appid","type":"String"}],"attachmentkeynames":["python"],"desc":"Uninstall the given app"},"id":"ihpgkk161721ac979-py","time":1640450935825,"addr":"/0:0:0:0:0:0:0:1:51690","username":"admin"}

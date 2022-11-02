@@ -14,7 +14,7 @@ me.build = function(cb) {
     else {
       var libs = me.list = result.data;
       libs.sort((a, b) => (a.id > b.id) ? 1 : -1);
-      var newhtml = '<table class="libstable">';
+      var newhtml = '<table class="libstable tablelist">';
 //      newhtml += '<thead><tr><th>Library</th></tr></thead>';
       newhtml += '<tbody class="publish-liblist">';
       for (var i in libs){

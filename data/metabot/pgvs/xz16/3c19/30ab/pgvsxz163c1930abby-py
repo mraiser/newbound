@@ -1,1 +1,0 @@
-{"data":{"import":"import os\nimport shutil","returntype":"JSONObject","type":"python","params":[{"name":"lib","type":"String"},{"name":"botmanager","type":"Bot"}],"attachmentkeynames":["python"],"desc":""},"id":"pgvsxz163c1930abby-py","time":1640450951217,"addr":"/0:0:0:0:0:0:0:1:51690","username":"admin"}

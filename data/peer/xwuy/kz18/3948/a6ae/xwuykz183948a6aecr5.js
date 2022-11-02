@@ -1,13 +1,17 @@
 var me = this;
 var ME = $('#'+me.UUID)[0];
 
-me.ready = me.refresh = function(){
+me.refresh = function(){
+  installControl('#headsupdisplay', 'peer', 'headsup', function(api){}, ME.DATA);
+};
+
+me.ready = function(){
   me.check = $(ME).find('.rp-uuid')[0];
   me.update();
   document.body.api.ui.initNavbar(ME);
+  document.body.api.ui.initPopups(ME);
   
   var uuid = ME.DATA.id;
-  // FIXME
   json('../peer/remote/'+uuid+'/app/libs', null, function(result){
     if (result.data && document.body.locallibraries) {
       var el = $(ME).find('.upgradelist');
@@ -52,35 +56,68 @@ me.ready = me.refresh = function(){
     $(ME).find('.rp-lock').text(g);
   });  
   
-  json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=sharedcontrols", function(result){
+  json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_shared", function(result){
     if (result.status != 'ok'){
       $(ME).find('.hudapps').html(result.msg);
+      me.data = { "list": [] };
     }
     else {
-      $('.navbar-tab2').click();
-      
-      var data = me.data = result.data;
-      var wrap = $(ME).find('.hudapps');
-      wrap.empty();
-      
-      for (var i in data.list){
-        var ctl = data.list[i];
-        var id = ctl.type;
-        var j = id.indexOf(':');
-        var db = j == -1 ? 'newboundpowerstrip' : id.substring(0,j);
-        id = j == -1 ? id : id.substring(j+1);
-        j = db.indexOf(':');
-        var d = j != -1 && db.substring(j+1,1) == '{' ? JSON.parse(db.substring(j+1)) : ctl;
-        db = j == -1 ? db : db.substring(0,j);
-        var claz = !ctl.big ? 'iconmode' : 'big';
-
-        var el = $('<div class="inline '+claz+'"></div>')[0];
-        wrap.append(el);
-        installControl(el, db, id, function(api){}, d);
+      me.data = result.data;
+      buildControls();
+    }
+  });
+  json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_available", function(result){
+    var el = $(ME).find('.add-control-available');
+    if (result.status != 'ok'){
+      el.html(result.msg);
+    }
+    else {
+      me.available = result.data;
+      var newhtml = '';
+      for (i in result.data) {
+        var rdi = result.data[i];
+        if (rdi.title) {
+          newhtml += '<tr><td class="add-ctl-item" data-id="'+i+'">'+rdi.title+'</tr></td>';;
+        }
       }
+      if (newhtml == '') newhtml = '<i>there are no available controls to install on this device</i>';
+      else newhtml = '<table class="tablelist">' + newhtml + '</table>';
+      el.html(newhtml).find('.add-ctl-item').click(function(){
+        var d = me.available[$(this).data('id')];
+        me.data.list.push(d);
+        json('../peer/remote/'+ME.DATA.id+'/app/write', "lib=runtime&id=controls_shared&readers=[]&writers=[]&data="+encodeURIComponent(JSON.stringify(me.data)), function(result){
+          me.refresh();
+          $(ME).find('.add-control-popup-close').click();
+        });
+      });
     }
   });
 };
+
+function buildControls(){
+  $('.navbar-tab2').click();
+
+  var data = me.data;
+  var wrap = $(ME).find('.hudapps');
+  wrap.empty();
+
+  for (var i in data.list){
+    var ctl = data.list[i];
+    var id = ctl.type;
+    var j = id.indexOf(':');
+    var db = j == -1 ? 'newboundpowerstrip' : id.substring(0,j);
+    id = j == -1 ? id : id.substring(j+1);
+    j = db.indexOf(':');
+    var d = j != -1 && db.substring(j+1,1) == '{' ? JSON.parse(db.substring(j+1)) : ctl;
+    db = j == -1 ? db : db.substring(0,j);
+    var claz = !ctl.big ? 'iconmode' : 'big';
+
+    var el = $('<div class="inline '+claz+'"></div>')[0];
+    wrap.append(el);
+    d.peer = ME.DATA.id;
+    installControl(el, db, id, function(api){}, d);
+  }
+}
 
 me.install = function(lib, v, cb) {
   var myuuid = $('.localpeerid').text();
@@ -179,4 +216,14 @@ $(ME).find('.updateall').click(function(){
     ulist.push([lib,v]);
   });
   updateNext();
+});
+
+$(ME).find('.control-settings-popup').on("mouseleave", function(){
+  $(this).css('display', 'none');
+});
+
+$(ME).find('.refreshhud').on("click", me.refresh);
+
+$(ME).find('.closeonclick').on("click", function(){
+  $(ME).find('.control-settings-popup').css('display', 'none');
 });

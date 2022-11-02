@@ -1,1 +1,0 @@
-{"data":{"import":"import org.json.*;\nimport com.newbound.robot.*;\nimport java.io.*;\n","returntype":"String","type":"java","params":[{"name":"botmanager","type":"Bot"},{"name":"appid","type":"String"}],"attachmentkeynames":["java"],"desc":"Uninstall the given app"},"id":"ihpgkk161721ac979j84","time":1640452157349,"addr":"/0:0:0:0:0:0:0:1:51714","username":"admin"}
