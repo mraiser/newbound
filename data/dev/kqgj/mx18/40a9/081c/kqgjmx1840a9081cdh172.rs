@@ -41,7 +41,7 @@ let h = hash(destdir.to_owned().into_os_string().into_string().unwrap());
 let store = DataStore::new();
 if h == meta.get_string("hash") {
   let datadir = store.root.join(&lib);
-  let _x = remove_dir_all(&datadir).unwrap();
+  let _x = remove_dir_all(&datadir);
   copy_dir(destdir.to_owned().into_os_string().into_string().unwrap(), datadir.to_owned().into_os_string().into_string().unwrap());
   
   let appdata = datadir.join("_APPS");
