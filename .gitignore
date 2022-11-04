@@ -71,6 +71,7 @@ data/commerce
 data/raiser
 data/demo
 data/calcpose
+data/camera
 
 #non-core apps
 runtime/blog
@@ -95,6 +96,7 @@ runtime/footer
 runtime/raise
 runtime/commerce
 runtime/calcpose
+runtime/camera
 
 # Distribution / packaging
 .Python
