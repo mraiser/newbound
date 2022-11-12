@@ -15,9 +15,7 @@ use std::sync::Once;
 use state::Storage;
 use crate::peer::service::listen::decrypt;
 use ndata::databytes::DataBytes;
-use flowlang::appserver::get_user;
 use crate::peer::service::listen::to_hex;
-use flowlang::appserver::set_user;
 use crate::peer::service::listen::P2PConnection;
 use crate::peer::service::listen::P2PStream;
 use ndata::dataarray::DataArray;
@@ -30,6 +28,8 @@ use std::io::Error;
 use std::io::ErrorKind;
 use crate::peer::service::listen::handle_connection;
 use rand::RngCore;
+use crate::security::security::init::get_user;
+use crate::security::security::init::set_user;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("ipaddr");

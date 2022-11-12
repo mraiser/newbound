@@ -1,1 +1,1 @@
-{"data":{"rust":"ztizvj182ee99186cp2d2","name":"login","id":"ognnln182ee990f85s2d1","type":"rust"},"readers":["anonymous"],"id":"ognnln182ee990f85s2d1","time":1663000199493,"addr":"/0:0:0:0:0:0:0:1:44348","username":"admin"}
+{"data":{"id":"ognnln182ee990f85s2d1","name":"login","rust":"ztizvj182ee99186cp2d2","type":"rust"},"id":"ognnln182ee990f85s2d1","readers":["anonymous"],"time":1668277176416,"username":"system","writers":[]}

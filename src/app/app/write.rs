@@ -1,8 +1,8 @@
 use ndata::dataobject::*;
-use flowlang::appserver::check_auth;
 use flowlang::generated::flowlang::*;
 use ndata::dataarray::DataArray;
 use ndata::data::Data;
+use crate::security::security::init::check_auth;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("lib");

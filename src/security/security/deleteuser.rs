@@ -1,5 +1,5 @@
 use ndata::dataobject::*;
-use flowlang::appserver::*;
+use crate::security::security::init::delete_user;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("id");

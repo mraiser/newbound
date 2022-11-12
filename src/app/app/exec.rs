@@ -1,7 +1,7 @@
 use ndata::dataobject::*;
 use flowlang::command::Command;
-use flowlang::appserver::check_auth;
 use crate::app::service::init::format_result;
+use crate::security::security::init::check_auth;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("lib");

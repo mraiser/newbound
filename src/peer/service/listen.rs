@@ -10,8 +10,6 @@ use std::sync::RwLock;
 use std::net::TcpListener;
 use ndata::data::*;
 use flowlang::datastore::DataStore;
-use flowlang::appserver::get_user;
-use flowlang::appserver::set_user;
 use flowlang::generated::flowlang::system::unique_session_id::unique_session_id;
 use x25519_dalek::StaticSecret;
 use x25519_dalek::PublicKey;
@@ -38,6 +36,8 @@ use std::collections::HashMap;
 use rand::Rng;
 use std::path::Path;
 use std::fs;
+use crate::security::security::init::get_user;
+use crate::security::security::init::set_user;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("ipaddr");
