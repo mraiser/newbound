@@ -18,8 +18,8 @@ ndata="0.2.25"
 serde = { version = "1.0.143", features = ["derive"], optional = true }
 serde_json = { version = "1.0.83", optional = true }
 
-chrono = "0.4.22"
-image = "0.24.4"
-simple_moving_average = "0.1.2"
-state = "0.5.3"
+#chrono = "0.4.22"
+#image = "0.24.4"
+#simple_moving_average = "0.1.2"
+#state = "0.5.3"
 
