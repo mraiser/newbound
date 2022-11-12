@@ -1,9 +1,13 @@
-build(&lib, &ctl, &cmd);
+let store = DataStore::new();
+let root = store.get_lib_root(&lib);
+build(&lib, &ctl, &cmd, &root);
 let mut ja = DataArray::new();
 ja.push_str("cargo");
 ja.push_str("build");
-ja.push_str("-p");
-ja.push_str("cmd");
+if root == store.root.parent().unwrap().join("cmd") {
+  ja.push_str("-p");
+  ja.push_str("cmd");
+}
 
 #[cfg(not(debug_assertions))]
 ja.push_str("--release");
