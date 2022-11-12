@@ -257,3 +257,4 @@ dmypy.json
 /runtime/security/botd.properties
 /cmd/src/camera
 /runtime/dev/libraries/camera*
+/dev/libraries
