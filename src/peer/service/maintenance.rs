@@ -4,7 +4,7 @@ use ndata::data::Data;
 use crate::peer::service::tcp_connect::tcp_connect;
 use std::thread;
 use crate::peer::service::exec::exec;
-use flowlang::generated::flowlang::system::time::time;
+use flowlang::flowlang::system::time::time;
 use ndata::dataarray::DataArray;
 use flowlang::appserver::fire_event;
 use crate::peer::peer::peers::user_to_peer;
@@ -12,7 +12,7 @@ use flowlang::datastore::DataStore;
 use crate::peer::service::listen::relay;
 use crate::peer::service::listen::get_tcp;
 use blake2::{Blake2b, Digest, digest::consts::U10};
-use flowlang::generated::flowlang::system::unique_session_id::unique_session_id;
+use flowlang::flowlang::system::unique_session_id::unique_session_id;
 use crate::peer::service::listen::to_hex;
 use crate::peer::service::listen::P2PConnection;
 

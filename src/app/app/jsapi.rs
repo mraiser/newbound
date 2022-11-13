@@ -1,7 +1,7 @@
 use ndata::dataobject::*;
 use flowlang::datastore::DataStore;
 use ndata::dataarray::DataArray;
-use flowlang::generated::flowlang::http::hex_encode::hex_encode;
+use flowlang::flowlang::http::hex_encode::hex_encode;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("nn_path");

@@ -1,5 +1,5 @@
 use ndata::dataobject::*;
-use flowlang::generated::flowlang::*;
+use flowlang::flowlang::*;
 use ndata::dataarray::DataArray;
 use ndata::data::Data;
 use crate::security::security::init::check_auth;

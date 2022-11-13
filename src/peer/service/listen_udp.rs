@@ -23,7 +23,7 @@ use std::net::SocketAddr;
 use std::thread;
 use std::time::Duration;
 use ndata::data::Data;
-use flowlang::generated::flowlang::system::time::time;
+use flowlang::flowlang::system::time::time;
 use std::io::Error;
 use std::io::ErrorKind;
 use crate::peer::service::listen::handle_connection;

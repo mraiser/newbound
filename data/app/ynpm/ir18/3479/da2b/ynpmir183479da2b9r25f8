@@ -1,1 +1,1 @@
-{"data":{"import":"","lib":"app","returntype":"String","ctl":"app","cmd":"unique_session_id","type":"rust","params":[],"attachmentkeynames":["rs"],"desc":""},"id":"ynpmir183479da2b9r25f8","time":1663353980409,"addr":"/0:0:0:0:0:0:0:1:44518","username":"admin"}
+{"data":{"attachmentkeynames":["rs"],"cmd":"unique_session_id","ctl":"app","desc":"","import":"","lib":"app","params":[],"returntype":"String","type":"rust"},"id":"ynpmir183479da2b9r25f8","readers":[],"time":1668348600492,"username":"system","writers":[]}

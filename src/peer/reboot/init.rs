@@ -1,6 +1,6 @@
 use ndata::dataobject::*;
 use ndata::dataarray::*;
-use flowlang::generated::flowlang::data::write::write;
+use flowlang::flowlang::data::write::write;
 use flowlang::datastore::DataStore;
 
 pub fn execute(_o: DataObject) -> DataObject {

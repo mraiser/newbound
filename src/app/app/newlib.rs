@@ -3,7 +3,7 @@ use std::fs;
 use ndata::dataarray::*;
 use flowlang::datastore::*;
 use flowlang::appserver::load_library;
-use flowlang::generated::flowlang::*;
+use flowlang::flowlang::*;
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("lib");
 let a1 = o.get_array("readers");

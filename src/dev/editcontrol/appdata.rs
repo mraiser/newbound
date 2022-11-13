@@ -1,6 +1,6 @@
 use ndata::dataobject::*;
 use flowlang::datastore::*;
-use flowlang::generated::flowlang::file::read_properties::read_properties;
+use flowlang::flowlang::file::read_properties::read_properties;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_object("data");

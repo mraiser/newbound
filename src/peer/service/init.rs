@@ -2,7 +2,7 @@ use ndata::dataobject::*;
 use std::thread;
 use ndata::data::*;
 use flowlang::datastore::DataStore;
-use flowlang::generated::flowlang::file::write_properties::write_properties;
+use flowlang::flowlang::file::write_properties::write_properties;
 use crate::peer::service::listen::listen;
 use crate::peer::service::listen_udp::listen_udp;
 use crate::peer::service::discovery::discovery;

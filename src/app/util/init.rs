@@ -2,7 +2,7 @@ use ndata::dataobject::*;
 use flowlang::datastore::DataStore;
 use rand::rngs::OsRng;
 use x25519_dalek::{StaticSecret, PublicKey};
-use flowlang::generated::flowlang::file::write_properties::write_properties;
+use flowlang::flowlang::file::write_properties::write_properties;
 use uuid::Uuid;
 
 pub fn execute(_o: DataObject) -> DataObject {

@@ -1,7 +1,7 @@
 use ndata::dataobject::*;
 use flowlang::buildrust::*;
 use ndata::dataarray::*;
-use flowlang::generated::flowlang::system::system_call::system_call;
+use flowlang::flowlang::system::system_call::system_call;
 use std::io::{self, BufRead};
 use flowlang::datastore::DataStore;
 

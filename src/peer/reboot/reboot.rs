@@ -1,6 +1,6 @@
 use ndata::dataobject::*;
 use ndata::dataarray::DataArray;
-use flowlang::generated::flowlang::system::system_call::system_call;
+use flowlang::flowlang::system::system_call::system_call;
 
 pub fn execute(_o: DataObject) -> DataObject {
 let ax = reboot();

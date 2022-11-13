@@ -1,7 +1,7 @@
 use ndata::dataobject::*;
 use ndata::data::Data;
 use flowlang::datastore::DataStore;
-use flowlang::generated::flowlang::file::write_properties::write_properties;
+use flowlang::flowlang::file::write_properties::write_properties;
 use flowlang::appserver::init_globals;
 
 

@@ -3,7 +3,7 @@ use std::fs;
 use flowlang::datastore::*;
 use std::path::Path;
 use ndata::dataarray::DataArray;
-use flowlang::generated::flowlang::file::read_properties::read_properties;
+use flowlang::flowlang::file::read_properties::read_properties;
 
 pub fn execute(_o: DataObject) -> DataObject {
 let ax = apps();

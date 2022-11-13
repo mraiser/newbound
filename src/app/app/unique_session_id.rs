@@ -8,6 +8,6 @@ o
 }
 
 pub fn unique_session_id() -> String {
-flowlang::generated::flowlang::system::unique_session_id::unique_session_id()
+flowlang::flowlang::system::unique_session_id::unique_session_id()
 }
 
