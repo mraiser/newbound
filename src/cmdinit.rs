@@ -6,6 +6,7 @@ use flowlang::rustcmd::Transform;
 
 pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
     cmds.clear();
+    cmds.push(("yypums1847731c7fap5".to_string(), dev::dev::rebuild_lib::execute, "".to_string()));
     cmds.push(("suvlkp1846cfa2235q2c".to_string(), security::security::init::execute, "".to_string()));
     cmds.push(("jmhvzv1843439faa0i305".to_string(), peer::reboot::reboot::execute, "".to_string()));
     cmds.push(("hygrki1842eac55a9w2a".to_string(), peer::reboot::init::execute, "".to_string()));

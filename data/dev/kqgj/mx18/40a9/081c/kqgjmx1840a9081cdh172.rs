@@ -39,6 +39,7 @@ let _x = zip.extract(&destdir).unwrap();
 let h = hash(destdir.to_owned().into_os_string().into_string().unwrap());
 
 let store = DataStore::new();
+let mut rebuild = false;
 if h == meta.get_string("hash") {
   let datadir = store.root.join(&lib);
   let _x = remove_dir_all(&datadir);
@@ -54,38 +55,18 @@ if h == meta.get_string("hash") {
       if appdest.join("botd.properties").exists() {
         copy_dir(appsrc.to_owned().into_os_string().into_string().unwrap(), appdest.to_owned().into_os_string().into_string().unwrap());
       }
-      build_lib(lib.to_owned());
-
-      let mut ja = DataArray::new();
-      ja.push_str("cargo");
-      ja.push_str("build");
-      ja.push_str("-p");
-      ja.push_str("cmd");
-      let o = system_call(ja);
-      let e = o.get_string("err");
-      let lines = BufReader::new(e.as_bytes()).lines();
-      let mut b = false;
-      let mut c = false;
-      let mut s = "".to_string();
-      for line in lines {
-        let line = line.unwrap();
-        if c {
-          s += &line;
-          s += "\n";
-          c = line != "";
-        }
-        else if line.starts_with("error") {
-          s += &line;
-          s += "\n";
-          b = true;
-          c = true;
-        }
-      }
-
-      if b { panic!("{}",s); }
-
+      if build_lib(lib.to_owned()) { rebuild = true; }
       println!("UPDATED LIBRARY {:?}", appname);
     }
+  }
+  
+  if rebuild {
+    let root = store.get_lib_root(&lib);
+    let ja = build_compile_command(root);
+    println!("{}", ja.to_string());
+
+    let (b, s) = execute_compile_command(ja);
+    if b { panic!("{}",s); }
   }
 
   init_globals();
@@ -111,6 +92,5 @@ if h == meta.get_string("hash") {
   
   return true;
 }
-
 
 false

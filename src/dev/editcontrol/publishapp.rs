@@ -59,9 +59,10 @@ let appname = data.get_string("name");
 let applib = data.get_string("ctldb");
 let ctlid = data.get_string("ctlid");
 
-let approot = store.root.parent().unwrap().join("runtime").join(&appid);
+let pkgroot = store.root.parent().unwrap();
+let approot = pkgroot.join("runtime").join(&appid);
 let appsrc = approot.join("src");
-let devroot = store.root.parent().unwrap().join("runtime").join("dev").join("libraries");
+let devroot = pkgroot.join("runtime").join("dev").join("libraries");
 let _x = create_dir_all(&approot);
 let _x = create_dir_all(&devroot);
 
@@ -83,7 +84,7 @@ let htmlpath = appsrc.join("html").join(&appid);
 let destfile = htmlpath.join("index.html");
 if !destfile.exists() {
   let _x = create_dir_all(&htmlpath);
-  let templatepath = store.root.parent().unwrap()
+  let templatepath = pkgroot
         .join("runtime")
         .join("dev")
         .join("src")
@@ -109,6 +110,7 @@ if !destfile.exists() {
     fs::write(destfile, &html).expect("Unable to write file");
   }
 }
+
 copy_dir(appsrc.into_os_string().into_string().unwrap(), dest.into_os_string().into_string().unwrap());
 
 /* 2. build runtime/dev/libraries */
