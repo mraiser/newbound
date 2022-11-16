@@ -13,7 +13,7 @@ reload = ["flowlang/mirror","ndata/mirror"]
 
 [dependencies]
 
-flowlang = { version = "0.2.4" }
+flowlang = { version = "0.2.5" }
 #flowlang = { path = "../../../rust/flow" }
 ndata="0.2.25"
 #ndata = { path = "../../../rust/ndata" }
