@@ -9,5 +9,5 @@ for (_k, user) in users.objects(){
 }
 if !v.contains(&"anonymous".to_string()) { v.push("anonymous".to_string()); }
 let mut da = DataArray::new();
-for g in v { da.push_str(&g); }
+for g in v { da.push_string(&g); }
 da

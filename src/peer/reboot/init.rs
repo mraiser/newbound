@@ -23,7 +23,7 @@ if !d.has("peer:reboot") {
   b = true;
 }
 
-if b { write("runtime".to_string(), "controls_available".to_string(), d.duplicate(), DataArray::new(), DataArray::new()); }
+if b { write("runtime".to_string(), "controls_available".to_string(), d.clone(), DataArray::new(), DataArray::new()); }
   
 d
 }

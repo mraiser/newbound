@@ -30,13 +30,13 @@ pub fn init() -> DataObject {
     // Check sessions
     let dur = Duration::from_millis(5000);
     let mut sessions = system.get_object("sessions");
-    let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
+    let sessiontimeoutmillis = system.get_object("config").get_int("sessiontimeoutmillis");
 
-    while system.get_bool("running") {
+    while system.get_boolean("running") {
       let expired = time() - sessiontimeoutmillis; 
       for (k,v) in sessions.objects() {
         let v = v.object();
-        let expire = v.get_i64("expire");
+        let expire = v.get_int("expire");
         if expire < expired {
           println!("Session expired {} {} {}", k, v.get_string("username"), v.get_object("user").get_string("displayname"));
           sessions.remove_property(&k);
@@ -54,7 +54,7 @@ pub fn check_auth(lib:&str, id:&str, session_id:&str, write:bool) -> bool {
   let store = DataStore::new();
   let system = DataStore::globals().get_object("system");
   
-  if !system.get_object("config").get_bool("security") { 
+  if !system.get_object("config").get_boolean("security") { 
     return true; 
   }
   
@@ -67,7 +67,7 @@ pub fn check_auth(lib:&str, id:&str, session_id:&str, write:bool) -> bool {
   
   let ogroups;
   if !store.get_data_file(lib, id).exists() {
-    ogroups = libgroups.duplicate();
+    ogroups = libgroups.clone();
   }
   else {
     let data = store.get_data(lib, id);
@@ -112,7 +112,7 @@ pub fn check_security(command:&Command, session_id:&str) -> bool {
 //  println!("session id: {}", session_id);
   let system = DataStore::globals().get_object("system");
   
-  if !system.get_object("config").get_bool("security") { 
+  if !system.get_object("config").get_boolean("security") { 
     return true; 
   }
     
@@ -153,15 +153,15 @@ pub fn check_security(command:&Command, session_id:&str) -> bool {
 pub fn log_in(sessionid:&str, username:&str, password:&str) -> bool {
   let user = get_user(username);
   let mut e = DataObject::new();
-  e.put_str("user", username);
-  e.put_str("sessionid", sessionid);
+  e.put_string("user", username);
+  e.put_string("sessionid", sessionid);
   if user.is_some() {
     let user = user.unwrap();
     if user.get_string("password") == password {
       let system = DataStore::globals().get_object("system");
       let sessions = system.get_object("sessions");
       let mut session = sessions.get_object(sessionid);
-      session.put_str("username", username);
+      session.put_string("username", username);
       session.put_object("user", user);
       
       fire_event("security", "LOGIN", e);
@@ -177,7 +177,7 @@ pub fn log_in(sessionid:&str, username:&str, password:&str) -> bool {
 
 pub fn get_user(username:&str) -> Option<DataObject> {
   let system = DataStore::globals().get_object("system");
-  if system.get_object("config").get_bool("security") { 
+  if system.get_object("config").get_boolean("security") { 
     let users = system.get_object("users");
     if users.has(username) {
       return Some(users.get_object(username));
@@ -188,7 +188,7 @@ pub fn get_user(username:&str) -> Option<DataObject> {
 
 pub fn delete_user(username:&str) -> bool{
   let system = DataStore::globals().get_object("system");
-  if system.get_object("config").get_bool("security") { 
+  if system.get_object("config").get_boolean("security") { 
     let mut users = system.get_object("users");
     if users.has(&username) {
       users.remove_property(&username);
@@ -203,7 +203,7 @@ pub fn delete_user(username:&str) -> bool{
 
 pub fn set_user(username:&str, user:DataObject) {
   let system = DataStore::globals().get_object("system");
-  if system.get_object("config").get_bool("security") { 
+  if system.get_object("config").get_boolean("security") { 
     let mut users = system.get_object("users");
     if !users.has(&username) { users.put_object(username, user.deep_copy()); }
     
@@ -215,7 +215,7 @@ pub fn set_user(username:&str, user:DataObject) {
       if s != "" { s += ","; }
       s += &g
     }
-    user.put_str("groups", &s);
+    user.put_string("groups", &s);
     let root = DataStore::new().root.parent().unwrap().join("users");
     let propfile = root.join(&(username.to_owned()+".properties"));
     write_properties(propfile.into_os_string().into_string().unwrap(), user);
@@ -224,7 +224,7 @@ pub fn set_user(username:&str, user:DataObject) {
 
 pub fn load_users() {
   let mut system = DataStore::globals().get_object("system");
-  if system.get_object("config").get_bool("security") { 
+  if system.get_object("config").get_boolean("security") { 
     let mut users;
     let mut b = false;
     if system.has("users") { users = system.get_object("users"); }
@@ -238,9 +238,9 @@ pub fn load_users() {
     if !propfile.exists() {
       let _x = create_dir_all(&root);
       let mut admin = DataObject::new();
-      admin.put_str("displayname", "System Administrator");
-      admin.put_str("groups", "admin");
-      admin.put_str("password", &unique_session_id());
+      admin.put_string("displayname", "System Administrator");
+      admin.put_string("groups", "admin");
+      admin.put_string("password", &unique_session_id());
       write_properties(propfile.into_os_string().into_string().unwrap(), admin);
     }
     
@@ -252,10 +252,10 @@ pub fn load_users() {
         let id = &name[..name.len()-11];
         let groups = user.get_string("groups");
         let mut da = DataArray::new();
-        for group in groups.split(",") { da.push_str(group); }
+        for group in groups.split(",") { da.push_string(group); }
         user.put_array("groups", da);
         user.put_array("connections", DataArray::new());
-        user.put_str("id", &id);
+        user.put_string("id", &id);
         
         if user.has("addresses"){
           let s = user.get_string("addresses");
@@ -267,7 +267,7 @@ pub fn load_users() {
       }
     }
     
-    if b { system.put_object("users", users.duplicate()); }
+    if b { system.put_object("users", users.clone()); }
   }
 }
 

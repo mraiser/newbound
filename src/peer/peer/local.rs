@@ -18,13 +18,13 @@ o
 }
 
 pub fn local(request:DataObject, nn_session:DataObject, nn_sessionid:String) -> DataObject {
-request.get_object("params").put_str("session_id", &nn_sessionid);
-let session_id = prep_request(request.duplicate());
+request.get_object("params").put_string("session_id", &nn_sessionid);
+let session_id = prep_request(request.clone());
 let mut x = do_get(request, session_id);
-if x.has("code") && x.get_i64("code") == 404 {
-  x.put_str("body", "404");
-  x.put_str("status", "err");
-  x.put_str("msg", "File not found");
+if x.has("code") && x.get_int("code") == 404 {
+  x.put_string("body", "404");
+  x.put_string("status", "err");
+  x.put_string("msg", "File not found");
 }
 else if x.has("file") {
   let path = x.get_string("file");
@@ -50,11 +50,11 @@ else if x.has("file") {
       con.end_stream_write(stream_id);
     });
 
-    x.put_i64("stream_id", stream_id);
+    x.put_int("stream_id", stream_id);
   }
   else {
-    x.put_str("status", "err");
-    x.put_str("msg", "File not found");
+    x.put_string("status", "err");
+    x.put_string("msg", "File not found");
   }
 }
 

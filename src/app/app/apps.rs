@@ -25,7 +25,7 @@ for file in fs::read_dir(&p).unwrap() {
       
       let name:String = path.file_name().unwrap().to_str().unwrap().to_string();
       let b = DataStore::globals().get_object("system").get_object("apps").has(&name);
-      appdata.put_bool("active", b);
+      appdata.put_boolean("active", b);
       
       let ctldb = appdata.get_string("ctldb");
       let ctlid = appdata.get_string("ctlid");
@@ -52,7 +52,7 @@ for file in fs::read_dir(&p).unwrap() {
                 groups += &g.string();
               }
               c.put_array("include", r);
-              c.put_str("groups", &groups);
+              c.put_string("groups", &groups);
             }
 
 
@@ -63,7 +63,7 @@ for file in fs::read_dir(&p).unwrap() {
             let codename = &data.get_string(typ);
             if store.get_data_file(&ctldb, codename).exists(){
               let code = store.get_data(&ctldb, codename).get_object("data");
-              if code.has("desc") { c.put_str("desc", &code.get_string("desc")); }
+              if code.has("desc") { c.put_string("desc", &code.get_string("desc")); }
 
               let mut params = DataArray::new();
               if code.has("params") {
@@ -71,7 +71,7 @@ for file in fs::read_dir(&p).unwrap() {
                 for d in p.objects() {
                   let d = d.object();
                   let a = d.get_string("name");
-                  params.push_str(&a);
+                  params.push_string(&a);
                 }
               }
               c.put_array("parameters", params);

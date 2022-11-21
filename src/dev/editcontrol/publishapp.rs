@@ -50,9 +50,9 @@ let public = o.get_string("publickey");
 let uuid = o.get_string("uuid");
 let metaidentity = store.get_data("runtime", "metaidentity").get_object("data");
 
-let mut data = data.duplicate();
+let mut data = data.clone();
 let appversion = Data::as_string(data.get_property("version")).parse::<i64>().unwrap() + 1;
-data.put_i64("version", appversion);
+data.put_int("version", appversion);
 
 let appid = data.get_string("id");
 let appname = data.get_string("name");
@@ -70,9 +70,9 @@ let _x = create_dir_all(&devroot);
 let path = store.root.join(&applib).join("_APPS").join(&appid);
 let _x = create_dir_all(&path);
 let propfile = path.join("app.properties");
-write_properties(propfile.into_os_string().into_string().unwrap(), data.duplicate());
+write_properties(propfile.into_os_string().into_string().unwrap(), data.clone());
 let propfile = approot.join("app.properties");
-write_properties(propfile.into_os_string().into_string().unwrap(), data.duplicate());
+write_properties(propfile.into_os_string().into_string().unwrap(), data.clone());
 let propfile = approot.join("botd.properties");
 if !propfile.exists() {
   write_properties(propfile.into_os_string().into_string().unwrap(), DataObject::new());
@@ -127,19 +127,19 @@ for lib in libs {
     if h == oldhash { b = false; }
   }
   if b {
-    out.push_str(&lib);
+    out.push_string(&lib);
     let propfile = datapath.join("meta.json");
     let mut meta = DataObject::from_string(&read_all_string(propfile.to_owned().into_os_string().into_string().unwrap()));
     let libversion;
-    if meta.has("version") { libversion = meta.get_i64("version"); }
+    if meta.has("version") { libversion = meta.get_int("version"); }
     else { libversion = 0; }
     let libversion = libversion + 1;
-    meta.put_i64("version", libversion);
+    meta.put_int("version", libversion);
     
-    meta.put_str("author", &uuid);
-    meta.put_str("authorname", &metaidentity.get_string("displayname"));
-    meta.put_str("authororg", &metaidentity.get_string("organization"));
-    meta.put_str("authorkey", &public);
+    meta.put_string("author", &uuid);
+    meta.put_string("authorname", &metaidentity.get_string("displayname"));
+    meta.put_string("authororg", &metaidentity.get_string("organization"));
+    meta.put_string("authorkey", &public);
     
     fs::write(propfile, &meta.to_string()).expect("Unable to write file");
     let propfile = datapath.join("version.txt");
@@ -168,15 +168,15 @@ for lib in libs {
     let sig = to_hex(&buf);
     
     let mut meta = DataObject::new();
-    meta.put_str("signature", &sig);
-    meta.put_str("author", &uuid);
-    meta.put_str("authorname", &metaidentity.get_string("displayname"));
-    meta.put_str("authororg", &metaidentity.get_string("organization"));
-    meta.put_str("id", &lib);
-    meta.put_str("version", &libversion.to_string());
-    meta.put_str("hash", &h);
-    meta.put_str("key", &to_hex(&app_private.to_bytes()));
-    meta.put_str("authorkey", &public);
+    meta.put_string("signature", &sig);
+    meta.put_string("author", &uuid);
+    meta.put_string("authorname", &metaidentity.get_string("displayname"));
+    meta.put_string("authororg", &metaidentity.get_string("organization"));
+    meta.put_string("id", &lib);
+    meta.put_string("version", &libversion.to_string());
+    meta.put_string("hash", &h);
+    meta.put_string("key", &to_hex(&app_private.to_bytes()));
+    meta.put_string("authorkey", &public);
     let metafile = devroot.join(&(lib.to_owned()+".json"));
     fs::write(metafile, &meta.to_string()).expect("Unable to write file");
   }
@@ -189,7 +189,7 @@ let s = config.get_string("apps");
 let vec:Vec<&str> = s.split(",").collect();
 if !vec.contains(&appid.as_ref()) {
   let s = s + "," + &appid;
-  config.put_str("apps", &s);
+  config.put_string("apps", &s);
   write_properties(configfile.into_os_string().into_string().unwrap(), config);
 }
 

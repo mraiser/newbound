@@ -8,18 +8,18 @@ if p.exists() {
 else {
   let mut p = DataObject::new();
   let name = appid[0..1].to_uppercase()+&appid[1..];
-  p.put_str("name", &name);
-  p.put_str("id", &appid);
-//  p.put_str("botclass", "com.newbound.robot.published."+name);
-  p.put_str("img", "/app/asset/app/icon-square-app.png");
-  p.put_str("libraries", &data.get_string("db")); // FIXME - should be lib not db
-  p.put_str("price", "0");
-  p.put_str("forsale", "true");
-  p.put_str("desc", &("The ".to_string()+&name+" application"));
-  p.put_str("index", "index.html");
-  p.put_str("version", "0");
-  p.put_str("ctldb", &data.get_string("db")); // FIXME - should be lib not db
-  p.put_str("ctlid", &data.get_string("ctl"));
-//  p.put_str("generate", "html,java");
+  p.put_string("name", &name);
+  p.put_string("id", &appid);
+//  p.put_string("botclass", "com.newbound.robot.published."+name);
+  p.put_string("img", "/app/asset/app/icon-square-app.png");
+  p.put_string("libraries", &data.get_string("db")); // FIXME - should be lib not db
+  p.put_string("price", "0");
+  p.put_string("forsale", "true");
+  p.put_string("desc", &("The ".to_string()+&name+" application"));
+  p.put_string("index", "index.html");
+  p.put_string("version", "0");
+  p.put_string("ctldb", &data.get_string("db")); // FIXME - should be lib not db
+  p.put_string("ctlid", &data.get_string("ctl"));
+//  p.put_string("generate", "html,java");
   return p;
 }

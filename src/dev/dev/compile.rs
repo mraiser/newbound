@@ -56,17 +56,17 @@ pub fn execute_compile_command(ja:DataArray) -> (bool, String) {
 
 pub fn build_compile_command() -> DataArray {
   let mut ja = DataArray::new();
-  ja.push_str("cargo");
-  ja.push_str("build");
+  ja.push_string("cargo");
+  ja.push_string("build");
   
 //  let store = DataStore::new();
 //  if root == store.root.parent().unwrap().join("cmd") {
-//    ja.push_str("-p");
-//    ja.push_str("cmd");
+//    ja.push_string("-p");
+//    ja.push_string("cmd");
 //  }
 
   #[cfg(not(debug_assertions))]
-  ja.push_str("--release");
+  ja.push_string("--release");
 
   let mut features = "".to_string();
 
@@ -83,7 +83,7 @@ pub fn build_compile_command() -> DataArray {
   if features != "".to_string() {
     features = features[1..].to_string();
     features = "--features=".to_string() + &features;
-    ja.push_str(&features);
+    ja.push_string(&features);
   }
   ja
 }

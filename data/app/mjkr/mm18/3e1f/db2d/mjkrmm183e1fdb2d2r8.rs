@@ -8,7 +8,7 @@
     let mut sockheap = WEBSOCKHEAP.get().write().unwrap();
     for sockref in sockheap.keys(){
       let sock = sockheap.get(sockref);
-      let subs = sock.sub.duplicate();
+      let subs = sock.sub.clone();
       if subs.has(&app){
         let app = subs.get_array(&app);
         if app.index_of(de.clone()) != -1 {
@@ -44,8 +44,8 @@ pub fn http_listen() {
   let port = listener.local_addr().unwrap().port();
   println!("HTTP TCP listening on port {}", port);
 
-  config.put_i64("http_port", port as i64);
-  if b { save_config(config.duplicate()); }
+  config.put_int("http_port", port as i64);
+  if b { save_config(config.clone()); }
   
   if !config.has("headless") || !(Data::as_string(config.get_property("headless")) == "true".to_string()) {
     let user = get_user("admin");
@@ -56,15 +56,15 @@ pub fn http_listen() {
         // FIXME - Make session creation a function
         let session_id = unique_session_id();
         let mut session = DataObject::new();
-        session.put_i64("count", 0);
-        session.put_str("id", &session_id);
-        session.put_str("username", "admin");
-        session.put_object("user", user.duplicate());
-        let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
+        session.put_int("count", 0);
+        session.put_string("id", &session_id);
+        session.put_string("username", "admin");
+        session.put_object("user", user.clone());
+        let sessiontimeoutmillis = system.get_object("config").get_int("sessiontimeoutmillis");
         let expire = time() + sessiontimeoutmillis;
-        session.put_i64("expire", expire);
+        session.put_int("expire", expire);
         let mut sessions = system.get_object("sessions");
-        sessions.put_object(&session_id, session.duplicate());
+        sessions.put_object(&session_id, session.clone());
         
         let pass = user.get_string("password");
         if log_in(&session_id, "admin", &pass){
@@ -77,8 +77,8 @@ pub fn http_listen() {
           s += "/index.html?sessionid=";
           s += &session_id;
           let mut a = DataArray::new();
-          a.push_str("open");
-          a.push_str(&s);
+          a.push_string("open");
+          a.push_string(&s);
           system_call(a);
         }
       });
@@ -127,18 +127,18 @@ pub fn http_listen() {
             let mut val = (&line[count+1..]).to_string();
             val = val.trim().to_string();
             if !headers.has(&key) {
-              headers.put_str(&key, &val);
+              headers.put_string(&key, &val);
             }
             else {
               let d = headers.get_property(&key);
               if d.is_array() {
-                d.array().push_str(&val);
+                d.array().push_string(&val);
               }
               else {
                 let old = d.string();
                 let mut v = DataArray::new();
-                v.push_str(&old);
-                v.push_str(&val);
+                v.push_string(&old);
+                v.push_string(&val);
                 headers.put_array(&key, v);
               }
             }
@@ -152,12 +152,12 @@ pub fn http_listen() {
               let mut old = v.get_string(n);
               v.remove_property(n);
               old = old + "\r\n" + line.trim_end();
-              v.push_str(&old);
+              v.push_string(&old);
             }
             else {
               let mut old = d.string();
               old = old + "\r\n" + line.trim_end();
-              headers.put_str(&last, &old);
+              headers.put_string(&last, &old);
             }
           }
         }
@@ -204,7 +204,7 @@ pub fn http_listen() {
               key = hex_decode(key);
               value = hex_decode(value);
 
-              params.put_str(&key, &value);
+              params.put_string(&key, &value);
 
               if b { break; }
             }
@@ -233,7 +233,7 @@ pub fn http_listen() {
               let i = oneparam.find("=").unwrap();
               let key = hex_decode(oneparam[0..i].to_string());
               let value = hex_decode(oneparam[i+1..].to_string());
-              params.put_str(&key, &value);
+              params.put_string(&key, &value);
             }
           }
         }
@@ -241,42 +241,42 @@ pub fn http_listen() {
           cmd = path;
         }
         let loc = remote_addr.to_string();
-        headers.put_str("nn-userlocation", &loc);
+        headers.put_string("nn-userlocation", &loc);
         let mut request = DataObject::new();
 
         // FIXME - Is this necessary?
         if headers.has("ACCEPT-LANGUAGE"){ 
           let lang = headers.get_string("ACCEPT-LANGUAGE");
-          request.put_str("language", &lang);
+          request.put_string("language", &lang);
         }
         else {
-          request.put_str("language", "*");
+          request.put_string("language", "*");
         }
 
         // FIXME - Is this necessary?
         if headers.has("HOST"){ 
           let h = headers.get_string("HOST");
-          request.put_str("host", &h);
+          request.put_string("host", &h);
         }
 
         // FIXME - Is this necessary?
         if headers.has("REFERER"){ 
           let h = headers.get_string("REFERER");
-          request.put_str("referer", &h);
+          request.put_string("referer", &h);
         }
 
-        request.put_str("protocol", &protocol);
-        request.put_str("path", &cmd);
-        request.put_str("loc", &loc);
-        request.put_str("method", &method);
-        request.put_str("querystring", &querystring);
-        request.put_object("headers", headers.duplicate());
+        request.put_string("protocol", &protocol);
+        request.put_string("path", &cmd);
+        request.put_string("loc", &loc);
+        request.put_string("method", &method);
+        request.put_string("querystring", &querystring);
+        request.put_object("headers", headers.clone());
         request.put_object("params", params);
 
         let now = time();
-        request.put_i64("timestamp", now);
+        request.put_int("timestamp", now);
 
-        fire_event("app", "HTTP_BEGIN", request.duplicate());
+        fire_event("app", "HTTP_BEGIN", request.clone());
 
         // FIXME - implement or remove
         if headers.has("TRANSFER-ENCODING"){
@@ -302,7 +302,7 @@ pub fn http_listen() {
 //          println!("begin handle_request");
           let mut p = DataObject::get(dataref);
 //          println!("handle_request");
-          let o = handle_request(request.duplicate(), stream.try_clone().unwrap());
+          let o = handle_request(request.clone(), stream.try_clone().unwrap());
 //          println!("request handled");
           p.put_object("a", o);
         });
@@ -318,20 +318,20 @@ pub fn http_listen() {
 
             let mut o = DataObject::new();
             let s = format!("<html><head><title>500 - Server Error</title></head><body><h2>500</h2>Server Error: {}</body></html>", s);
-            o.put_str("body", &s);
-            o.put_i64("code", 500);
-            o.put_str("mimetype", "text/html");
+            o.put_string("body", &s);
+            o.put_int("code", 500);
+            o.put_string("mimetype", "text/html");
             response.put_object("a", o);
           }
         }
 
         if headers.has("SEC-WEBSOCKET-KEY") { 
-          fire_event("app", "WEBSOCK_END", request.duplicate()); 
-          let sockref = request.get_i64("websocket_id");
+          fire_event("app", "WEBSOCK_END", request.clone()); 
+          let sockref = request.get_int("websocket_id");
           WEBSOCKHEAP.get().write().unwrap().decr(sockref as usize);
         }
         else {
-          let mut response = response.get_object("a").duplicate();
+          let mut response = response.get_object("a").clone();
 
           let body:String;
           let mimetype:String;
@@ -346,16 +346,16 @@ pub fn http_listen() {
           if isbytes {
             let bytes = response.get_bytes("body");
             let mt = bytes.get_mime_type();
-            if mt.is_some() { response.put_str("mimetype", &mt.unwrap()); }
+            if mt.is_some() { response.put_string("mimetype", &mt.unwrap()); }
             if bytes.current_len() == 3 && bytes.get_data() == [52, 48, 52] {
               let p = "html/404.html";
               if Path::new(&p).exists() {
-                response.put_str("file", &p);
-                response.put_str("mimetype", "text/html");
+                response.put_string("file", &p);
+                response.put_string("mimetype", "text/html");
                 isfile = true;
               }
-              response.put_i64("code", 404);
-              response.put_str("msg", "NOT FOUND");
+              response.put_int("code", 404);
+              response.put_string("msg", "NOT FOUND");
               isbytes = false;
             }
           }
@@ -364,7 +364,7 @@ pub fn http_listen() {
           else if response.has("body") && response.get_property("body").is_string() { body = response.get_string("body"); }
           else { body = "".to_owned(); }
 
-          if response.has("code") && response.get_property("code").is_int() { code = response.get_i64("code") as u16; }
+          if response.has("code") && response.get_property("code").is_int() { code = response.get_int("code") as u16; }
           else { code = 200; }
 
           if response.has("msg") && response.get_property("msg").is_string() { msg = response.get_string("msg"); }
@@ -384,8 +384,8 @@ pub fn http_listen() {
           else if isfile { mimetype = mime_type(cmd); }
           else { mimetype = "text/plain".to_string(); }
 
-          if response.has("len") && response.get_property("len").is_int() { len = response.get_i64("len"); }
-          else if headers.has("Content-Length") { len = headers.get_i64("Content-Length"); }
+          if response.has("len") && response.get_property("len").is_int() { len = response.get_int("len"); }
+          else if headers.has("Content-Length") { len = headers.get_int("Content-Length"); }
           else if isfile { len = fs::metadata(&body).unwrap().len() as i64; }
           else if isbytes { 
             let bytes = response.get_bytes("body");
@@ -402,19 +402,19 @@ pub fn http_listen() {
 
           let date = RFC2822Date::new(now).to_string();
 
-          headers.put_str("Date", &date);
-          headers.put_str("Content-Type", &mimetype);
+          headers.put_string("Date", &date);
+          headers.put_string("Content-Type", &mimetype);
           if len == -1 { ka = "close".to_string(); }
-          else { headers.put_str("Content-Length", &len.to_string()); }
+          else { headers.put_string("Content-Length", &len.to_string()); }
           // FIXME
           //      if (acceptRanges != null) h.put("Accept-Ranges", acceptRanges);
           //      if (range != null && range[0] != -1) h.put("Content-Range","bytes "+range[0]+"-"+range[1]+"/"+range[2]);
           //      if (expires != -1) h.put("Expires", toHTTPDate(new Date(expires)));
 
           let session_id = request.get_object("session").get_string("id");
-          let later = now + 31536000000; // system.get_object("config").get_i64("sessiontimeoutmillis");
+          let later = now + 31536000000; // system.get_object("config").get_int("sessiontimeoutmillis");
           let cookie = "sessionid=".to_string()+&session_id+"; Path=/; Expires="+&RFC2822Date::new(later).to_string();
-          headers.put_str("Set-Cookie", &cookie);
+          headers.put_string("Set-Cookie", &cookie);
 
           // FIXME
           //		if (origin != null)
@@ -487,8 +487,8 @@ pub fn http_listen() {
 }
 
 pub fn handle_request(request: DataObject, stream: TcpStream) -> DataObject {
-  let session_id = prep_request(request.duplicate());
-  handle_websocket(request.duplicate(), stream, session_id.to_owned());
+  let session_id = prep_request(request.clone());
+  handle_websocket(request.clone(), stream, session_id.to_owned());
   do_get(request, session_id)
 }
 
@@ -519,40 +519,40 @@ pub fn prep_request(mut request: DataObject) -> String {
   let mut session;
   if !sessions.has(&session_id) {
     session = DataObject::new();
-    session.put_i64("count", 0);
-    session.put_str("id", &session_id);
+    session.put_int("count", 0);
+    session.put_string("id", &session_id);
 
     let mut user = DataObject::new();
-    user.put_str("displayname", "Anonymous");
+    user.put_string("displayname", "Anonymous");
     user.put_array("groups", DataArray::new());
-    user.put_str("username", "anonymous");
-    session.put_str("username", "anonymous");
+    user.put_string("username", "anonymous");
+    session.put_string("username", "anonymous");
     session.put_object("user", user);
     
-    sessions.put_object(&session_id, session.duplicate());
+    sessions.put_object(&session_id, session.clone());
   }
   else {
     session = sessions.get_object(&session_id);
   }
   
-  let expire = time() + system.get_object("config").get_i64("sessiontimeoutmillis");
-  session.put_i64("expire", expire);
+  let expire = time() + system.get_object("config").get_int("sessiontimeoutmillis");
+  session.put_int("expire", expire);
   
-  let count = session.get_i64("count") + 1;
-  session.put_i64("count", count);
+  let count = session.get_int("count") + 1;
+  session.put_int("count", count);
   
   if session.has("user") {
-    headers.put_str("nn-username", &session.get_string("username"));
+    headers.put_string("nn-username", &session.get_string("username"));
     let groups = session.get_object("user").get_array("groups");
     headers.put_array("nn-groups", groups);
   }
   else {
-    headers.put_str("nn-username", "anonymous");
-    headers.put_str("nn-groups", "anonymous");
+    headers.put_string("nn-username", "anonymous");
+    headers.put_string("nn-groups", "anonymous");
   }
   
   request.put_object("session", session);
-  request.put_str("sessionid", &session_id);
+  request.put_string("sessionid", &session_id);
   
   session_id
 }
@@ -584,16 +584,16 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
     sub: subs,
   };
   let sockref = WEBSOCKHEAP.get().write().unwrap().push(con);
-  request.put_i64("websocket_id", sockref as i64);
+  request.put_int("websocket_id", sockref as i64);
 
-  fire_event("app", "WEBSOCK_BEGIN", request.duplicate());
+  fire_event("app", "WEBSOCK_BEGIN", request.clone());
 
   let base:i64 = 2;
   let pow7 = base.pow(7);
 
   let system = DataStore::globals().get_object("system");
   loop {
-    if !system.get_bool("running") { break; }
+    if !system.get_boolean("running") { break; }
 
     let mut lastopcode = 0;
     let mut baos: Vec<u8> = Vec::new();
@@ -692,7 +692,7 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
     let msg = msg.unwrap().to_owned();        
 
     let stream = stream.try_clone().unwrap();
-    let request = request.duplicate();
+    let request = request.clone();
     let sid = session_id.to_owned();
     thread::spawn(move || {
       if msg.starts_with("cmd ") {
@@ -718,7 +718,7 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
         let event = d.get_string("event");
         let mut subs = DataObject::get(subref);
         if !subs.has(&app) { subs.put_array(&app, DataArray::new()); }
-        subs.get_array(&app).push_str(&event);
+        subs.get_array(&app).push_string(&event);
       }
       else {
         println!("Unknown websocket command: {}", msg);
@@ -749,16 +749,16 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
   }
   
   if b {
-    res.put_str("file", &p);
-    res.put_str("mimetype", &mime_type(p));
+    res.put_string("file", &p);
+    res.put_string("mimetype", &mime_type(p));
   }
   else if path == "/" {
     let default_app = system.get_string("default_app");
     let p = "/".to_owned()+&default_app+"/index.html";
-    res.put_i64("code", 302);
-    res.put_str("msg", "FOUND");
+    res.put_int("code", 302);
+    res.put_string("msg", "FOUND");
     let mut h = DataObject::new();
-    h.put_str("Location", &p);
+    h.put_string("Location", &p);
     res.put_object("headers", h);
   }
   else {
@@ -773,9 +773,9 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
         let mut a = DataArray::new();
         for mut s in sa {
           if s == "" { s = "index.html"; }
-          a.push_str(s);
+          a.push_string(s);
         }
-        if a.len() == 0 { a.push_str("index.html"); }
+        if a.len() == 0 { a.push_string("index.html"); }
         
         let cmd = a.get_string(0);
         let mut path = cmd.to_owned();
@@ -799,8 +799,8 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
         }
         
         if b {
-          res.put_str("file", &p);
-          res.put_str("mimetype", &mime_type(p));
+          res.put_string("file", &p);
+          res.put_string("mimetype", &mime_type(p));
         }
         else {
           // try app src dir
@@ -817,17 +817,17 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
           }
           
           if b {
-            res.put_str("file", &p);
-            res.put_str("mimetype", &mime_type(p));
+            res.put_string("file", &p);
+            res.put_string("mimetype", &mime_type(p));
           }
           else {
             // try app command
             let mut d = DataObject::new();
-            d.put_str("bot", &appname);
-            d.put_str("cmd", &cmd);
-            d.put_i64("pid", 0);
+            d.put_string("bot", &appname);
+            d.put_string("cmd", &cmd);
+            d.put_int("pid", 0);
             let mut params = params.deep_copy();
-            d.put_object("params", params.duplicate());
+            d.put_object("params", params.clone());
             
             for (k,v) in request.objects() {
 //              if k != "params" {
@@ -840,12 +840,12 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
             if r != "404" {
               b = true;
               if r == "File" {
-                res.put_str("file", &d.get_string("data"));
-                res.put_str("mimetype", &mime_type(p));
+                res.put_string("file", &d.get_string("data"));
+                res.put_string("mimetype", &mime_type(p));
               }
               else if r == "InputStream" {
                 res.put_bytes("body", d.get_bytes("data"));
-                res.put_str("mimetype", &mime_type(p));
+                res.put_string("mimetype", &mime_type(p));
               }
               else {
                 let s;
@@ -855,8 +855,8 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
                 else {
                   s = d.to_string();
                 }
-                res.put_str("body", &s);
-                res.put_str("mimetype", "application/json");
+                res.put_string("body", &s);
+                res.put_string("mimetype", "application/json");
               }
             }
           }
@@ -868,11 +868,11 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
       // 404
       let p = "html/404.html";
       if Path::new(&p).exists() {
-        res.put_str("file", &p);
-        res.put_str("mimetype", "text/html");
+        res.put_string("file", &p);
+        res.put_string("mimetype", "text/html");
       }
-      res.put_i64("code", 404);
-      res.put_str("msg", "NOT FOUND");
+      res.put_int("code", 404);
+      res.put_string("msg", "NOT FOUND");
     }
   }
 
@@ -919,9 +919,9 @@ pub fn handle_command(d: DataObject, sid: String) -> DataObject {
   //println!("session {}", session.to_string());
   let mut user = session.get_object("user");
   let last_contact = time();
-  let expire = last_contact + system.get_object("config").get_i64("sessiontimeoutmillis");
-  session.put_i64("expire", expire);
-  user.put_i64("last_contact", last_contact);
+  let expire = last_contact + system.get_object("config").get_int("sessiontimeoutmillis");
+  session.put_int("expire", expire);
+  user.put_int("last_contact", last_contact);
   
   let app = d.get_string("bot");
   let cmd = d.get_string("cmd");
@@ -938,7 +938,7 @@ pub fn handle_command(d: DataObject, sid: String) -> DataObject {
     if b {
       let command = Command::new(&ctldb, &id);
       if check_security(&command, &sid) {
-        command.cast_params(params.duplicate());
+        command.cast_params(params.clone());
 
         let response = DataObject::new();
         let dataref = response.data_ref;
@@ -954,7 +954,7 @@ pub fn handle_command(d: DataObject, sid: String) -> DataObject {
           Ok(_x) => {
             let oo = response.get_object("a");
             o = format_result(command, oo);
-            o.put_str("nn_return_type", &r);
+            o.put_string("nn_return_type", &r);
           },
           Err(e) => {
             let msg = match e.downcast::<String>() {
@@ -962,30 +962,30 @@ pub fn handle_command(d: DataObject, sid: String) -> DataObject {
               Err(x) => format!("Unknown Error {:?}", x)
             };        
             o = DataObject::new();
-            o.put_str("status", "err");
-            o.put_str("msg", &msg);
-            o.put_str("nn_return_type", "500");
+            o.put_string("status", "err");
+            o.put_string("msg", &msg);
+            o.put_string("nn_return_type", "500");
           },
         }
       }
       else {
         o = DataObject::new();
-        o.put_str("status", "err");
+        o.put_string("status", "err");
         let err = format!("UNAUTHORIZED: {}", &cmd);
-        o.put_str("msg", &err);
-        o.put_str("nn_return_type", "String");
+        o.put_string("msg", &err);
+        o.put_string("nn_return_type", "String");
       }
     }
     else {
       o = DataObject::new();
-      o.put_str("status", "err");
+      o.put_string("status", "err");
       let err = format!("Unknown command: {}", &cmd);
-      o.put_str("msg", &err);
-      o.put_str("nn_return_type", "404");
+      o.put_string("msg", &err);
+      o.put_string("nn_return_type", "404");
     }
   }
   
-  if !o.has("status") { o.put_str("status", "ok"); }
+  if !o.has("status") { o.put_string("status", "ok"); }
   o.set_property("pid", pid);
   o
 }
@@ -1030,7 +1030,7 @@ pub fn format_result(command:Command, o:DataObject) -> DataObject {
   let mut d;
                 
   if command.return_type == "FLAT" { 
-    if command.lang == "flow" && o.duplicate().keys().len() > 1 {
+    if command.lang == "flow" && o.clone().keys().len() > 1 {
       d = o; 
     }
     else {
@@ -1054,6 +1054,6 @@ pub fn format_result(command:Command, o:DataObject) -> DataObject {
     }
   }
   
-  if !d.has("status") { d.put_str("status", "ok"); }
+  if !d.has("status") { d.put_string("status", "ok"); }
   
   d

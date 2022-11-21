@@ -12,7 +12,7 @@ if file.exists() {
 else {
   p = DataObject::new();
 }
-p.put_str(&nn_sessionid, &user.get_string("username"));
+p.put_string(&nn_sessionid, &user.get_string("username"));
 
 let mut file = File::create(file).unwrap();
 for (k,v) in p.objects() {

@@ -73,7 +73,7 @@ if ctl.has("cmd") {
   }
 }
 
-o.put_str("js", &js);
+o.put_string("js", &js);
 o
 }
 
