@@ -26,7 +26,7 @@ pub struct RelayStream {
 impl RelayStream {
   pub fn new(from:String, to:String) -> RelayStream {
     let mut o = DataObject::new();
-    o.put_i64("last_contact", time());
+    o.put_int("last_contact", time());
     RelayStream{
       from:from,
       to:to,
@@ -39,13 +39,13 @@ impl RelayStream {
     RelayStream{
       from:self.from.to_owned(),
       to:self.to.to_owned(),
-      buf:self.buf.duplicate(),
-      data:self.data.duplicate(),
+      buf:self.buf.clone(),
+      data:self.data.clone(),
     }
   }
   
   pub fn last_contact(&self) -> i64 {
-    self.data.get_i64("last_contact")
+    self.data.get_int("last_contact")
   }
 }
 
@@ -163,7 +163,7 @@ impl P2PStream {
             timeout += 1;
             let beat = Duration::from_millis(timeout);
             thread::sleep(beat);
-            if timeout > 450 { println!("Unusually long wait in peer:service:listen:p2p_stream:relay:read_exact [{}]", stream.data.get_i64("id")); timeout = 0; }
+            if timeout > 450 { println!("Unusually long wait in peer:service:listen:p2p_stream:relay:read_exact [{}]", stream.data.get_int("id")); timeout = 0; }
           }
           
           let bd = &mut stream.buf.get_bytes(0);
@@ -223,7 +223,7 @@ impl P2PStream {
         Ok(())
       },
       P2PStream::Udp(stream) => {
-        stream.duplicate().data.put_bool("dead", true);
+        stream.duplicate().data.put_boolean("dead", true);
         Ok(())
       },
     }
@@ -296,8 +296,8 @@ impl P2PConnection {
       sessionid: self.sessionid.to_owned(),
       cipher: self.cipher.to_owned(),
       uuid: self.uuid.to_owned(),
-      res: self.res.duplicate(),
-      pending: self.pending.duplicate(),
+      res: self.res.clone(),
+      pending: self.pending.clone(),
     }
   }
     
@@ -331,19 +331,19 @@ impl P2PConnection {
       pending: DataArray::new(),
     };
     
-    let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
+    let sessiontimeoutmillis = system.get_object("config").get_int("sessiontimeoutmillis");
 
     // FIXME - Make session creation its own thing
     let mut session = DataObject::new();
-    session.put_i64("count", 0);
-    session.put_str("id", &sessionid);
-    session.put_str("username", &uuid);
-    session.put_object("user", user.duplicate());
+    session.put_int("count", 0);
+    session.put_string("id", &sessionid);
+    session.put_string("username", &uuid);
+    session.put_object("user", user.clone());
     let expire = time() + sessiontimeoutmillis;
-    session.put_i64("expire", expire);
+    session.put_int("expire", expire);
 
     let mut sessions = system.get_object("sessions");
-    sessions.put_object(&sessionid, session.duplicate());
+    sessions.put_object(&sessionid, session.clone());
     
     let conid;
     {
@@ -353,14 +353,14 @@ impl P2PConnection {
         if !heap.contains_key(&x) {
           conid = x;
           heap.insert(conid, con.duplicate());
-          cons.push_i64(conid);
+          cons.push_int(conid);
           break;
         }
       }
     }
     
-    fire_event("peer", "UPDATE", user_to_peer(user.duplicate(), uuid.to_string()));
-    fire_event("peer", "CONNECT", user_to_peer(user.duplicate(), uuid.to_string()));
+    fire_event("peer", "UPDATE", user_to_peer(user.clone(), uuid.to_string()));
+    fire_event("peer", "CONNECT", user_to_peer(user.clone(), uuid.to_string()));
     println!("P2P {} Connect {} / {} / {} / {}", con.stream.mode(), con.stream.describe(), sessionid, user.get_string("displayname"), uuid);
 
     (conid, con)
@@ -378,15 +378,15 @@ impl P2PConnection {
       heap.remove(&conid);
     }
     let x = self.stream.shutdown();
-    fire_event("peer", "UPDATE", user_to_peer(user.duplicate(), uuid.to_string()));
-    fire_event("peer", "DISCONNECT", user_to_peer(user.duplicate(), uuid.to_string()));
+    fire_event("peer", "UPDATE", user_to_peer(user.clone(), uuid.to_string()));
+    fire_event("peer", "DISCONNECT", user_to_peer(user.clone(), uuid.to_string()));
     
     let mut o = DataObject::new();
-    o.put_str("status", "err");
-    o.put_str("msg", "Connection closed");
+    o.put_string("status", "err");
+    o.put_string("msg", "Connection closed");
     for pid in con.pending.objects() {
       let pid = pid.int();
-      con.res.put_object(&pid.to_string(), o.duplicate());
+      con.res.put_object(&pid.to_string(), o.clone());
     }
     
     if self.stream.is_tcp(){
@@ -434,7 +434,7 @@ impl P2PConnection {
         break;
       }
     }
-    heap.insert(y, db.duplicate());
+    heap.insert(y, db.clone());
     
     let mut bytes = "s_1 ".as_bytes().to_vec();
     bytes.extend_from_slice(&x.to_be_bytes());
@@ -719,8 +719,8 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
       let (conid, con) = P2PConnection::begin(uuid.to_owned(), stream.try_clone().unwrap());
   
       if saveme {
-        user.put_str("publickey", &peer_public_string);
-        set_user(&uuid, user.duplicate());
+        user.put_string("publickey", &peer_public_string);
+        set_user(&uuid, user.clone());
       }
       
       return Some((conid, con));
@@ -737,7 +737,7 @@ fn do_listen(ipaddr:String, port:i64) -> i64 {
   let mut botd = system.get_object("apps").get_object("peer").get_object("runtime");
   let b = port == 0;
   let port = listener.local_addr().unwrap().port();
-  botd.put_i64("port", port as i64);
+  botd.put_int("port", port as i64);
   
   if b {
     let file = DataStore::new().root
@@ -774,7 +774,7 @@ fn do_listen(ipaddr:String, port:i64) -> i64 {
 pub fn handle_connection(conid:i64, con:P2PConnection) {
   // loop
   let system = DataStore::globals().get_object("system");
-  while system.get_bool("running") {
+  while system.get_boolean("running") {
     if !handle_next_message(con.duplicate()) { break; }
   }
   // end loop
@@ -806,10 +806,10 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
   let bytes = decrypt(&cipher, &bytes);
   let method = String::from_utf8(bytes[0..4].to_vec()).unwrap();
 
-  let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
-  session.put_i64("expire", time() + sessiontimeoutmillis);
-  let count = session.get_i64("count") + 1;
-  session.put_i64("count", count);
+  let sessiontimeoutmillis = system.get_object("config").get_int("sessiontimeoutmillis");
+  session.put_int("expire", time() + sessiontimeoutmillis);
+  let count = session.get_int("count") + 1;
+  session.put_int("count", count);
 
   if method == "s_1 " {
     let buf: [u8; 8] = bytes[4..12].try_into().unwrap();
@@ -855,7 +855,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     let con = relay(&uuid, &uuid2, true).unwrap();  
 	if let P2PStream::Relay(mut stream) = con.stream.try_clone().unwrap() {
       stream.buf.push_bytes(DataBytes::from_bytes(&buf.to_vec()));
-      stream.data.put_i64("last_contact", time());
+      stream.data.put_int("last_contact", time());
       handle_next_message(con);
     }
   }
@@ -929,13 +929,13 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       let s = String::from_utf8(bytes).unwrap();
       let s = s.trim_matches(char::from(0));
       let o = DataObject::from_string(&s[4..]);
-      let pid = o.get_i64("pid");
+      let pid = o.get_int("pid");
       let pid = &pid.to_string();
       let mut con = relay(&uuid, &uuid2, true).unwrap();
       
       let mut err = DataObject::new();
-      err.put_str("status", "err");
-      err.put_str("msg", "No route to host");
+      err.put_string("status", "err");
+      err.put_string("msg", "No route to host");
       con.res.put_object(&pid, err);
       
 //      println!("SUSPECT 2 {} -> {}", uuid,uuid2);
@@ -947,8 +947,8 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     let msg = msg.trim_matches(char::from(0));
     let d = DataObject::from_string(msg);
     let mut params = d.get_object("params");
-    params.put_str("nn_sessionid", &sessionid);
-    params.put_object("nn_session", session.duplicate());
+    params.put_string("nn_sessionid", &sessionid);
+    params.put_object("nn_session", session.clone());
 
     let mut stream = stream.try_clone().unwrap();
     let cipher = cipher.to_owned();
@@ -980,7 +980,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
             con.end_stream_write(stream_id);
           });
 
-          o.put_i64("stream_id", stream_id);
+          o.put_int("stream_id", stream_id);
         }
       }
 
@@ -998,7 +998,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     let msg = String::from_utf8(bytes[4..].to_vec()).unwrap();
     let msg = msg.trim_matches(char::from(0));
     let d = DataObject::from_string(msg);
-    let i = d.get_i64("pid");
+    let i = d.get_int("pid");
     res.put_object(&i.to_string(), d);
   }
   else {

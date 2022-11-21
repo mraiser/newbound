@@ -30,18 +30,18 @@ pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
   let mut o = o.deep_copy();
   o.remove_property("password");
   o.remove_property("publickkey");
-  o.put_str("id", &id);
-  o.put_str("name", &o.get_string("displayname"));
+  o.put_string("id", &id);
+  o.put_string("name", &o.get_string("displayname"));
   
   // FIXME - Each call gets the same lock
-  let tcp = get_tcp(o.duplicate()).is_some();
-  let udp = get_udp(o.duplicate()).is_some();
-  let relay = get_relay(o.duplicate()).is_some();
+  let tcp = get_tcp(o.clone()).is_some();
+  let udp = get_udp(o.clone()).is_some();
+  let relay = get_relay(o.clone()).is_some();
   let connected = tcp || udp || relay;
   
-  o.put_bool("tcp", tcp);  
-  o.put_bool("udp", udp);  
-  o.put_bool("relay", relay);  
-  o.put_bool("connected", connected);  
+  o.put_boolean("tcp", tcp);  
+  o.put_boolean("udp", udp);  
+  o.put_boolean("relay", relay);  
+  o.put_boolean("connected", connected);  
 
   o

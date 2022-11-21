@@ -11,7 +11,7 @@ let a1 = o.get_string("ctl");
 let a2 = o.get_string("cmd");
 let ax = compile(a0, a1, a2);
 let mut o = DataObject::new();
-o.put_str("a", &ax);
+o.put_string("a", &ax);
 o
 }
 

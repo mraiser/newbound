@@ -37,7 +37,7 @@ fn do_send() {
   
   let broad = "255.255.255.255:5770";
   let beat = Duration::from_millis(10000);
-  while system.get_bool("running") {
+  while system.get_boolean("running") {
     let sock;
     unsafe { sock = DISCOVERYCON.get().write().unwrap().try_clone().unwrap(); }
     sock.send_to(&buf, &broad).unwrap();
@@ -53,7 +53,7 @@ fn do_listen() {
   let runtime = system.get_object("apps").get_object("app").get_object("runtime");
   let my_uuid = runtime.get_string("uuid");
   let mut buf = [0; 508]; 
-  while system.get_bool("running") {
+  while system.get_boolean("running") {
     let sock;
     unsafe { sock = DISCOVERYCON.get().write().unwrap().try_clone().unwrap(); }
     let (amt, src) = sock.recv_from(&mut buf).unwrap();
@@ -68,12 +68,12 @@ fn do_listen() {
       let ipaddress = src.ip().to_string();
         
       let mut o = DataObject::new();
-      o.put_i64("p2pport", p2pport as i64);
-      o.put_i64("httpport", httpport as i64);
-      o.put_str("address", &ipaddress);
-      o.put_str("uuid", &s);
-      o.put_str("name", &displayname);
-      o.put_i64("time", time());
+      o.put_int("p2pport", p2pport as i64);
+      o.put_int("httpport", httpport as i64);
+      o.put_string("address", &ipaddress);
+      o.put_string("uuid", &s);
+      o.put_string("name", &displayname);
+      o.put_int("time", time());
       
       let src = ipaddress.to_owned()+":"+&p2pport.to_string();
       discovery.put_object(&src, o);
@@ -82,7 +82,7 @@ fn do_listen() {
       if user.is_some() {
         let user = user.unwrap();
         if user.has("keepalive") && Data::as_string(user.get_property("keepalive")) == "true" {
-          if get_udp(user.duplicate()).is_none() && get_tcp(user.duplicate()).is_none() {
+          if get_udp(user.clone()).is_none() && get_tcp(user.clone()).is_none() {
             let _x = udp_connect(ipaddress, p2pport as i64);
           }        
         }

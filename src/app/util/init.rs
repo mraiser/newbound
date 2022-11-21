@@ -8,7 +8,7 @@ use uuid::Uuid;
 pub fn execute(_o: DataObject) -> DataObject {
 let ax = init();
 let mut o = DataObject::new();
-o.put_str("a", &ax);
+o.put_string("a", &ax);
 o
 }
 

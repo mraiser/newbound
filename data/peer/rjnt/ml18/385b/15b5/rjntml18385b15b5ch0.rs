@@ -32,9 +32,9 @@ for (uuid, user) in users.objects(){
     hasher.update(uuid.as_bytes());
     let res = hasher.finalize();
     let hash = to_hex(&res);
-    ask.push_str(&hash);
+    ask.push_string(&hash);
     
-    if get_tcp(user.duplicate()).is_none() {
+    if get_tcp(user.clone()).is_none() {
       if user.has("keepalive") && Data::as_string(user.get_property("keepalive")) == "true" {
         if user.has("address") && user.has("port") {
           let ipaddr = user.get_string("address");
@@ -53,7 +53,7 @@ for (uuid, user) in users.objects(){
   if uuid.len() == 36 {
     let mut user = user.object();
     if user.get_array("connections").len() > 0 {
-      user.put_bool("connected", true);
+      user.put_boolean("connected", true);
       let salt = salt.to_owned();
       thread::spawn(move || {
         let system = DataStore::globals().get_object("system");
@@ -62,31 +62,31 @@ for (uuid, user) in users.objects(){
         let t1 = time();
         let mut d = DataObject::new();
         d.put_array("uuid", ask);
-        d.put_str("salt", &salt);
+        d.put_string("salt", &salt);
         let o = exec(user.get_string("id"), "peer".to_string(), "info".to_string(), d);
         if o.get_string("status") == "ok" {
           let o = o.get_object("data");
           let t2 = time();
           let l = t2 - t1;
-          user.put_i64("latency", l);
+          user.put_int("latency", l);
           if !user.has("addresses") { user.put_array("addresses", DataArray::new()); }
           let addrs = user.get_array("addresses");
           let v = o.get_array("addresses");
           for a in v.objects(){
             addrs.push_unique(a);
           }
-          user.put_str("displayname", &o.get_string("name"));
-          user.put_str("session_id", &o.get_string("session_id"));
-          user.put_i64("http_port", o.get_i64("http_port"));
-          user.put_i64("p2p_port", o.get_i64("p2p_port"));
+          user.put_string("displayname", &o.get_string("name"));
+          user.put_string("session_id", &o.get_string("session_id"));
+          user.put_int("http_port", o.get_int("http_port"));
+          user.put_int("p2p_port", o.get_int("p2p_port"));
           
           let cons = o.get_object("connections");
-          user.put_object("peers", cons.duplicate());
+          user.put_object("peers", cons.clone());
           
-          if get_tcp(user.duplicate()).is_some() {
+          if get_tcp(user.clone()).is_some() {
             let users = system.get_object("users");
             for (uuid2,u) in users.objects() {
-              if uuid2.len() == 36 && uuid != uuid2 && !u.object().get_bool("connected") {
+              if uuid2.len() == 36 && uuid != uuid2 && !u.object().get_boolean("connected") {
                 let b = cons.has(&uuid2) && cons.get_string(&uuid2).starts_with("tcp#");
                 if b { relay(&uuid, &uuid2, b); }
               }
@@ -98,7 +98,7 @@ for (uuid, user) in users.objects(){
       });
     }
     else {
-      user.put_bool("connected", false);
+      user.put_boolean("connected", false);
       // Fixme - notify if something changes (latency?)
       fire_event("peer", "UPDATE", user_to_peer(user, uuid));
     }

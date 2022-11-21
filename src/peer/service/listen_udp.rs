@@ -33,10 +33,10 @@ use crate::security::security::init::set_user;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("ipaddr");
-let a1 = o.get_i64("port");
+let a1 = o.get_int("port");
 let ax = listen_udp(a0, a1);
 let mut o = DataObject::new();
-o.put_i64("a", ax);
+o.put_int("a", ax);
 o
 }
 
@@ -81,15 +81,15 @@ pub struct UdpStream {
 impl UdpStream {
   pub fn new(src:SocketAddr, remote_id:i64) -> Self {
     let mut a = DataObject::new();
-    a.put_i64("id", remote_id);
-    a.put_i64("in_off", 0);
-    a.put_i64("out_off", 0);
-    a.put_i64("next", 0);
+    a.put_int("id", remote_id);
+    a.put_int("in_off", 0);
+    a.put_int("out_off", 0);
+    a.put_int("next", 0);
     a.put_array("in", DataArray::new());
     a.put_array("out", DataArray::new());
-    a.put_bool("dead", false);
-    a.put_i64("last_contact", time());
-    a.put_i64("mtu", 508);
+    a.put_boolean("dead", false);
+    a.put_int("last_contact", time());
+    a.put_int("mtu", 508);
     UdpStream{
       src: src,
       data: a,
@@ -103,7 +103,7 @@ impl UdpStream {
   pub fn duplicate(&self) -> UdpStream {
     UdpStream{
       src: self.src.to_owned(),
-      data: self.data.duplicate(),
+      data: self.data.clone(),
     }
   }
 
@@ -111,7 +111,7 @@ impl UdpStream {
     // There can be only one!
     let _lock = WRITEMUTEX.get().write().unwrap();
     
-    self.data.put_i64("id", id);
+    self.data.put_int("id", id);
 
     if self.data.has("hold") { 
       let hold = self.data.get_array("hold");
@@ -125,12 +125,12 @@ impl UdpStream {
   
   pub fn write(&mut self, buf: &[u8]) -> io::Result<usize>
   {
-    if self.data.get_bool("dead") { return Err(Error::new(ErrorKind::ConnectionReset, "Connection closed")); }
+    if self.data.get_boolean("dead") { return Err(Error::new(ErrorKind::ConnectionReset, "Connection closed")); }
     
     // There can be only one!
     let _lock = WRITEMUTEX.get().write().unwrap();
     
-    let id = self.data.get_i64("id");
+    let id = self.data.get_int("id");
     if id == -1 {
       if !self.data.has("hold") { self.data.put_array("hold", DataArray::new()); }
       let mut hold = self.data.get_array("hold");
@@ -142,8 +142,8 @@ impl UdpStream {
       let sock = heap.try_clone().unwrap();
 
       let mut out = self.data.get_array("out");
-      let mut msgid = self.data.get_i64("next");
-      let mtu = self.data.get_i64("mtu");
+      let mut msgid = self.data.get_int("next");
+      let mtu = self.data.get_int("mtu");
       
       // FIXME - Support payloads up to 67K?
       let blocks: Vec<&[u8]> = buf.chunks((mtu as usize)-(PACKETHEADERSIZE as usize)).collect();
@@ -159,13 +159,13 @@ impl UdpStream {
         msgid += 1;
       }
       
-      self.data.put_i64("next", msgid);
+      self.data.put_int("next", msgid);
     }
     Ok(buf.len())
   }
   
   pub fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
-    if self.data.get_bool("dead") { return Err(Error::new(ErrorKind::ConnectionReset, "Connection closed")); }
+    if self.data.get_boolean("dead") { return Err(Error::new(ErrorKind::ConnectionReset, "Connection closed")); }
     
     let mut inv = self.data.get_array("in");
     
@@ -178,7 +178,7 @@ impl UdpStream {
       // There can be only one!
       // FIXME - Is this really necessary?
       let _lock = READMUTEX.get().write().unwrap();
-      in_off = self.data.get_i64("in_off");
+      in_off = self.data.get_int("in_off");
     }
     //println!("start read {}", in_off);
     
@@ -186,25 +186,25 @@ impl UdpStream {
       // FIXME - should timeout?
       let mut timeout = 0;
       while inv.len() == 0 {
-        if self.data.get_bool("dead") { return Err(Error::new(ErrorKind::ConnectionReset, "Connection closed")); }
+        if self.data.get_boolean("dead") { return Err(Error::new(ErrorKind::ConnectionReset, "Connection closed")); }
         
         // TIGHTLOOP
         timeout += 1;
         let beat = Duration::from_millis(timeout);
         thread::sleep(beat);
-        if timeout > 450 { println!("Unusually long wait in peer:service:listen_udp:read_exact 1 [{}]", self.data.get_i64("id")); timeout = 0; }
+        if timeout > 450 { println!("Unusually long wait in peer:service:listen_udp:read_exact 1 [{}]", self.data.get_int("id")); timeout = 0; }
       }
 
       let mut timeout = 0;
       while inv.get_property(0).is_null() {
-        if self.data.get_bool("dead") { return Err(Error::new(ErrorKind::ConnectionReset, "Connection closed")); }
+        if self.data.get_boolean("dead") { return Err(Error::new(ErrorKind::ConnectionReset, "Connection closed")); }
         self.request_resend(in_off);
         
         // TIGHTLOOP
         timeout += 1;
         let beat = Duration::from_millis(timeout);
         thread::sleep(beat);
-        if timeout > 450 { println!("Unusually long wait in peer:service:listen_udp:read_exact 2 [{}]", self.data.get_i64("id")); timeout = 0; }
+        if timeout > 450 { println!("Unusually long wait in peer:service:listen_udp:read_exact 2 [{}]", self.data.get_int("id")); timeout = 0; }
       }
       
       //println!("have data {}", in_off);
@@ -223,7 +223,7 @@ impl UdpStream {
         in_off += 1;
         inv.remove_property(0); 
       }
-      self.data.put_i64("in_off", in_off);
+      self.data.put_int("in_off", in_off);
 
       i += n;
     }        
@@ -233,7 +233,7 @@ impl UdpStream {
   }
   
   fn request_resend(&self, msgid:i64) {
-    if self.data.get_bool("dead") { return; }
+    if self.data.get_boolean("dead") { return; }
     
     let inv = self.data.get_array("in");
     let inlen = inv.len();
@@ -245,7 +245,7 @@ impl UdpStream {
       x += 1;
     }
     
-    let id = self.data.get_i64("id");
+    let id = self.data.get_int("id");
     println!("request resend of {} to {} from {}", msgid, last, id);
     let mut bytes = Vec::new();
     bytes.push(RESEND);
@@ -258,11 +258,11 @@ impl UdpStream {
   }
   
   pub fn last_contact(&self) -> i64 {
-    self.data.get_i64("last_contact")
+    self.data.get_int("last_contact")
   }
   
   pub fn upgrade_mtu(&self) {
-    let id = self.data.get_i64("id");
+    let id = self.data.get_int("id");
     let beat = Duration::from_millis(1000);
     for size in MTU_SIZES {
       let mut bytes = Vec::new();
@@ -355,8 +355,8 @@ fn do_listen(){
         // Read remote public key
         peer_public = bytes.try_into().unwrap();
         let x = to_hex(&peer_public);
-        user.put_str("publickey", &x);
-        set_user(&uuid, user.duplicate());
+        user.put_string("publickey", &x);
+        set_user(&uuid, user.clone());
       }
       if ok {
         // Switch to permanent keypair
@@ -371,8 +371,8 @@ fn do_listen(){
     None
   }
   
-  let sessiontimeoutmillis = system.get_object("config").get_i64("sessiontimeoutmillis");
-  while system.get_bool("running") {
+  let sessiontimeoutmillis = system.get_object("config").get_int("sessiontimeoutmillis");
+  while system.get_boolean("running") {
     let sock = UDPCON.get().write().unwrap().try_clone().unwrap();
     let (amt, src) = sock.recv_from(&mut buf).unwrap();
 //    println!("GOT {}", amt);
@@ -474,9 +474,9 @@ fn do_listen(){
               
               let p2pport = src.port();
               let ipaddr = src.ip().to_string();
-              user.put_i64("port", p2pport as i64);
-              user.put_i64("p2pport", p2pport as i64);
-              user.put_str("address", &ipaddr);
+              user.put_int("port", p2pport as i64);
+              user.put_int("p2pport", p2pport as i64);
+              user.put_string("address", &ipaddr);
             }
           }
         }
@@ -511,9 +511,9 @@ fn do_listen(){
 
                   let p2pport = src.port();
                   let ipaddr = src.ip().to_string();
-                  user.put_i64("port", p2pport as i64);
-                  user.put_i64("p2pport", p2pport as i64);
-                  user.put_str("address", &ipaddr);
+                  user.put_int("port", p2pport as i64);
+                  user.put_int("p2pport", p2pport as i64);
+                  user.put_string("address", &ipaddr);
                 }
                 else {
                   println!("Received RDY from wrong source");
@@ -538,12 +538,12 @@ fn do_listen(){
               let mut stream = stream.duplicate();
                   
               let now = time();
-              stream.data.put_i64("last_contact", now);
-              system.get_object("sessions").get_object(&con.sessionid).put_i64("expire", now + sessiontimeoutmillis);
+              stream.data.put_int("last_contact", now);
+              system.get_object("sessions").get_object(&con.sessionid).put_int("expire", now + sessiontimeoutmillis);
 
               // There can be only one!
               let _lock = READMUTEX.get().write().unwrap();
-              let in_off = stream.data.get_i64("in_off");
+              let in_off = stream.data.get_int("in_off");
               let mut inv = stream.data.get_array("in");
 
               let i = msg_id - in_off;
@@ -576,7 +576,7 @@ fn do_listen(){
                   let i = (i as i64) + in_off - 1;
                   //println!("send ACK {}", i);
 
-                  let id = stream.data.get_i64("id");
+                  let id = stream.data.get_int("id");
 
                   let mut bytes = Vec::new();
                   bytes.push(ACK);
@@ -603,7 +603,7 @@ fn do_listen(){
           if stream.src == src {
             // There can be only one!
             let _lock = WRITEMUTEX.get().write().unwrap();
-            let mut out_off = stream.data.get_i64("out_off");
+            let mut out_off = stream.data.get_int("out_off");
             let mut out = stream.data.get_array("out");
 
             let n = msg_id - out_off;
@@ -614,7 +614,7 @@ fn do_listen(){
               out_off += 1;
               i += 1;
             }
-            stream.data.put_i64("out_off", out_off);
+            stream.data.put_int("out_off", out_off);
           }
           else {
             println!("Received ACK from wrong source");
@@ -635,7 +635,7 @@ fn do_listen(){
             // There can be only one!
             // FIXME - Is lock necessary? We're in the only thread that removes packets from out.
             let _lock = WRITEMUTEX.get().write().unwrap();
-            let out_off = stream.data.get_i64("out_off");
+            let out_off = stream.data.get_int("out_off");
             let out = stream.data.get_array("out");
 
             let mut n = msg_id - out_off;
@@ -663,9 +663,9 @@ fn do_listen(){
         let mut con = P2PConnection::get(id);
         if let P2PStream::Udp(stream) = &mut con.stream {
           if stream.src == src {
-            let mtu = stream.data.get_i64("mtu");
+            let mtu = stream.data.get_int("mtu");
             if mtu < amt as i64 {
-              stream.data.put_i64("mtu", amt as i64);
+              stream.data.put_int("mtu", amt as i64);
               println!("Increased MTU for connection {} from {} to {}", id, mtu, amt);
             }
           }

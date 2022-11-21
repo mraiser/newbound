@@ -12,9 +12,9 @@ let pid;
 unsafe { pid = NEXT_CMD.fetch_add(1, Ordering::SeqCst) as i64;}
 
 let mut d = DataObject::new();
-d.put_str("bot", &app);
-d.put_str("cmd", &cmd);
-d.put_i64("pid", pid);
+d.put_string("bot", &app);
+d.put_string("cmd", &cmd);
+d.put_int("pid", pid);
 d.put_object("params", params);
 
 let con = get_best(user).unwrap();
@@ -23,7 +23,7 @@ let mut stream = con.stream;
 let mut res = con.res;
 
 let mut pending = con.pending;
-pending.push_i64(pid);
+pending.push_int(pid);
 
 let s = "cmd ".to_string() + &d.to_string();
 let buf = encrypt(&cipher, s.as_bytes());

@@ -5,7 +5,7 @@ use crate::peer::service::listen_udp::UDPCON;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("ipaddr");
-let a1 = o.get_i64("port");
+let a1 = o.get_int("port");
 let ax = udp_connect(a0, a1);
 let mut o = DataObject::new();
 o.put_object("a", ax);

@@ -8,7 +8,7 @@ let a3 = o.get_string("cmdlib");
 let a4 = o.get_string("cmdid");
 let ax = eventon(a0, a1, a2, a3, a4);
 let mut o = DataObject::new();
-o.put_str("a", &ax);
+o.put_string("a", &ax);
 o
 }
 

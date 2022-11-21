@@ -7,10 +7,10 @@ use crate::peer::service::listen::P2PStream;
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("uuid");
 let a1 = o.get_string("ipaddr");
-let a2 = o.get_i64("port");
+let a2 = o.get_int("port");
 let ax = tcp_connect(a0, a1, a2);
 let mut o = DataObject::new();
-o.put_bool("a", ax);
+o.put_boolean("a", ax);
 o
 }
 
