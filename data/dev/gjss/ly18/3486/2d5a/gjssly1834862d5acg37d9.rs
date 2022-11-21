@@ -2,7 +2,7 @@ let store = DataStore::new();
 let root = store.get_lib_root(&lib);
 let b = build(&lib, &ctl, &cmd, &root);
 if b {
-  let ja = build_compile_command(root);
+  let ja = build_compile_command();
   println!("{}", ja.to_string());
 
   let (b, s) = execute_compile_command(ja);
@@ -36,16 +36,16 @@ pub fn execute_compile_command(ja:DataArray) -> (bool, String) {
   (b, s)
 }
 
-pub fn build_compile_command(root:PathBuf) -> DataArray {
+pub fn build_compile_command() -> DataArray {
   let mut ja = DataArray::new();
   ja.push_str("cargo");
   ja.push_str("build");
   
-  let store = DataStore::new();
-  if root == store.root.parent().unwrap().join("cmd") {
-    ja.push_str("-p");
-    ja.push_str("cmd");
-  }
+//  let store = DataStore::new();
+//  if root == store.root.parent().unwrap().join("cmd") {
+//    ja.push_str("-p");
+//    ja.push_str("cmd");
+//  }
 
   #[cfg(not(debug_assertions))]
   ja.push_str("--release");

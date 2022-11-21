@@ -91,8 +91,8 @@ if h == meta.get_string("hash") {
   }
   
   if rebuild {
-    let root = store.get_lib_root(&lib);
-    let ja = build_compile_command(root);
+    //let root = store.get_lib_root(&lib);
+    let ja = build_compile_command();
     println!("{}", ja.to_string());
 
     let (b, s) = execute_compile_command(ja);

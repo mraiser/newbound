@@ -1,6 +1,5 @@
 use ndata::dataobject::*;
 use flowlang::buildrust::build_lib;
-use flowlang::datastore::DataStore;
 use crate::dev::dev::compile::build_compile_command;
 use crate::dev::dev::compile::execute_compile_command;
 
@@ -14,9 +13,9 @@ o
 
 pub fn rebuild_lib(lib:String) -> String {
 if build_lib(lib.to_owned()) {
-  let store = DataStore::new();
-  let root = store.get_lib_root(&lib);
-  let ja = build_compile_command(root);
+//  let store = DataStore::new();
+//  let root = store.get_lib_root(&lib);
+  let ja = build_compile_command();
   println!("{}", ja.to_string());
 
   let (b, s) = execute_compile_command(ja);
