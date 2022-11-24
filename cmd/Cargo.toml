@@ -13,9 +13,9 @@ reload = ["flowlang/mirror","ndata/mirror"]
 
 [dependencies]
 
-flowlang = { version = "0.2.7" }
+flowlang = { version = "0.2.8" }
 #flowlang = { path = "../../../rust/flow" }
-ndata="0.3.0"
+ndata="0.3.3"
 #ndata = { path = "../../../rust/ndata" }
 serde = { version = "1.0.143", features = ["derive"], optional = true }
 serde_json = { version = "1.0.83", optional = true }
