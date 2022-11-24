@@ -29,8 +29,8 @@ state = "0.5.3"
 
 cmd = { path = "./cmd" }
 hot-lib-reloader = { version = "^0.6", optional = true }
-#flowlang = { version = "0.2.7" }
-flowlang = { path = "../../rust/flow" }
+flowlang = { version = "0.2.7" }
+#flowlang = { path = "../../rust/flow" }
 ndata="0.3.0"
 #ndata = { path = "../../rust/ndata" }
 serde = { version = "1.0.143", features = ["derive"], optional = true }
