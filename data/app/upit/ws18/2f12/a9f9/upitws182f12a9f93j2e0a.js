@@ -6,7 +6,7 @@ me.ready = function(){
   var img = data.img.replace("botmanager/asset/", "app/asset/");
   loadImg(img);
   $(ME).find(".card-title").text(data.name);
-  $(ME).find(".appcard").addClass(data.active ?"active" : "inactive").addClass("appcard-id-"+data.id);
+  $(ME).find(".appcard").addClass(data.active ? "active" : "inactive").addClass(data.remote ? "remote" : "local").addClass("appcard-id-"+data.id);
   me.updateFilters();
 };
 
@@ -19,13 +19,26 @@ function loadImg(img){
 }
 
 me.updateFilters = function(){
-  var x = 228;
-  var y = 16;
-  $(ME).find('.appcard.active').closest(".appcard-wrap").animate({width:x+'px',height:x+"px",margin:y+"px"},500);
-  var b = $("#appfilter-inactive").prop("checked");
-  var xx = b ? x : 0;
-  var yy = b ? y : 0;
-  $(ME).find('.appcard.inactive').closest(".appcard-wrap").animate({width:xx+'px',height:xx+"px",margin:yy+"px"},500);
+  var x = 0;
+  var y = 0;
+  
+  var b = false;
+  if (ME.DATA.active) b = true;
+  else {
+    if (ME.DATA.remote) {
+      if ($("#appfilter-available").prop("checked")) b = true;
+    }
+    else {
+      if ($("#appfilter-inactive").prop("checked")) b = true;
+    }
+  }
+  
+  if (b) {
+    x = 228;
+    y = 16;
+  }
+  
+  $(ME).animate({width:x+'px',height:x+"px",margin:y+"px"},500);
 }
 
 $(ME).find('.appcard').click(function(e){

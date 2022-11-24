@@ -256,5 +256,6 @@ dmypy.json
 /runtime/peer/botd.properties
 /runtime/security/botd.properties
 /cmd/src/camera
+/cmd/src/ds18b20
 /runtime/dev/libraries
 /src/flowlang

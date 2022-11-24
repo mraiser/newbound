@@ -41,6 +41,10 @@
   background: rgba(0, 0, 0, 0.533);
 }
 
+.remote .card-title{
+  background: rgba(132, 189, 0, 0.533);
+}
+
 .maximize-app-icon {
   position:absolute;
   top:3px;

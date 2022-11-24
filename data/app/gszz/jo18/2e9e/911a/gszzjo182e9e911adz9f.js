@@ -27,14 +27,45 @@ me.uiReady = function(ui){
         me.list.sort((a, b) => (a.name > b.name) ? 1 : -1)
         for (var i in me.list) {
           var o = me.list[i];
-          var el = $("<div class='appcard-wrap'/>");
+          var el = $("<div class='appcard-wrap appcard_"+o.id+"'/>");
           div.append(el);
           installControl(el[0], "app", "appcard", function(api){}, o);
         }
+        json('../peer/peers', null, function(result){
+          for (var i in result.data) {
+            var p = result.data[i];
+            if (p.connected) addRemoteApps(p);
+          }
+        });
       }
     });
   });
 };
+
+function addRemoteApps(p){
+  send_apps(function(result){
+    for (var j in result.data) {
+      var papp = result.data[j];
+      var el = $('.appcard_'+papp.id)[0];
+      if (!el) {
+        papp.active = false;
+        papp.remote = true;
+        papp.peers = [p.id];
+        me.list.push(papp);
+        me.list.sort((a, b) => (a.name > b.name) ? 1 : -1);
+        var n = me.list.indexOf(papp);
+        var el = $("<div class='appcard-wrap appcard_"+papp.id+"'/>");
+        var div = $(ME).find(".applist>div:nth-child("+n+")");
+        div.after(el);
+        installControl(el[0], "app", "appcard", function(api){}, papp);
+      }
+      else {
+        if (!el.DATA.peers) el.DATA.peers = [];
+        el.DATA.peers.push(p.id);
+      }
+    }
+  }, p.id);
+}
 
 function updateFilters() {
   let list = $(ME).find(".appcard-wrap");

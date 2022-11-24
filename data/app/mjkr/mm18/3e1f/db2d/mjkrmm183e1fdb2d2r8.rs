@@ -47,6 +47,7 @@ pub fn http_listen() {
   config.put_int("http_port", port as i64);
   if b { save_config(config.clone()); }
   
+  #[cfg(not(feature = "webview"))]
   if !config.has("headless") || !(Data::as_string(config.get_property("headless")) == "true".to_string()) {
     let user = get_user("admin");
     if user.is_some(){
@@ -76,6 +77,7 @@ pub fn http_listen() {
           s += &default_app;
           s += "/index.html?sessionid=";
           s += &session_id;
+          
           let mut a = DataArray::new();
           a.push_string("open");
           a.push_string(&s);

@@ -10,7 +10,6 @@ use ndata::data::Data;
 use flowlang::flowlang::system::unique_session_id::unique_session_id;
 use flowlang::flowlang::system::time::time;
 use ndata::dataarray::DataArray;
-use flowlang::flowlang::system::system_call::system_call;
 use flowlang::flowlang::http::hex_decode::hex_decode;
 use std::net::TcpStream;
 use std::sync::Once;
@@ -30,9 +29,14 @@ use std::io::Write;
 use std::io::Read;
 use core::time::Duration;
 use crate::peer::service::exec::exec;
-use crate::security::security::init::get_user;
-use crate::security::security::init::log_in;
 use crate::security::security::init::check_security;
+
+#[cfg(not(feature = "webview"))]
+use flowlang::flowlang::system::system_call::system_call;
+#[cfg(not(feature = "webview"))]
+use crate::security::security::init::get_user;
+#[cfg(not(feature = "webview"))]
+use crate::security::security::init::log_in;
 
 pub fn execute(_o: DataObject) -> DataObject {
 let ax = init();
@@ -91,6 +95,7 @@ pub fn http_listen() {
   config.put_int("http_port", port as i64);
   if b { save_config(config.clone()); }
   
+  #[cfg(not(feature = "webview"))]
   if !config.has("headless") || !(Data::as_string(config.get_property("headless")) == "true".to_string()) {
     let user = get_user("admin");
     if user.is_some(){
@@ -120,6 +125,7 @@ pub fn http_listen() {
           s += &default_app;
           s += "/index.html?sessionid=";
           s += &session_id;
+          
           let mut a = DataArray::new();
           a.push_string("open");
           a.push_string(&s);
