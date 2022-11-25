@@ -3,3 +3,7 @@
   margin-right:auto;
   margin-top: calc(50vh - 158px);
 }
+
+.loginmsg {
+  margin-top:-30px;
+}
