@@ -1,7 +1,8 @@
   load_users();
 
   thread::spawn(move || {
-    let system = DataStore::globals().get_object("system");
+    let mut system = DataStore::globals().get_object("system");
+    system.put_boolean("security_ready", true);
     
     // Check sessions
     let dur = Duration::from_millis(5000);

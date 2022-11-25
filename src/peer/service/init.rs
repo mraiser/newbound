@@ -6,6 +6,7 @@ use flowlang::flowlang::file::write_properties::write_properties;
 use crate::peer::service::listen::listen;
 use crate::peer::service::listen_udp::listen_udp;
 use crate::peer::service::discovery::discovery;
+use core::time::Duration;
 
 pub fn execute(_o: DataObject) -> DataObject {
 let ax = init();
@@ -15,6 +16,10 @@ o
 }
 
 pub fn init() -> DataObject {
+let beat = Duration::from_millis(10);
+let system = DataStore::globals().get_object("system");
+while !system.has("security_ready") { thread::sleep(beat); }
+
 let mut meta = DataStore::globals().get_object("system").get_object("apps").get_object("peer").get_object("runtime");
 let mut b = false;
 let ipaddr;

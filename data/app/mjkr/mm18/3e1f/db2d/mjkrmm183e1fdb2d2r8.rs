@@ -1,5 +1,9 @@
   START.call_once(|| { WEBSOCKHEAP.set(RwLock::new(Heap::new())); });  
 
+  let beat = Duration::from_millis(10);
+  let system = DataStore::globals().get_object("system");
+  while !system.has("security_ready") { thread::sleep(beat); }
+
   // Start HTTP
   thread::spawn(http_listen);
 
@@ -33,7 +37,7 @@ static START: Once = Once::new();
 pub static WEBSOCKHEAP:Storage<RwLock<Heap<WebsockConnection>>> = Storage::new();
 
 pub fn http_listen() {
-  let system = DataStore::globals().get_object("system");
+  let mut system = DataStore::globals().get_object("system");
   let mut config = system.get_object("config");
   let ipaddr = config.get_string("http_address");
   let port = config.get_string("http_port");
@@ -46,6 +50,8 @@ pub fn http_listen() {
 
   config.put_int("http_port", port as i64);
   if b { save_config(config.clone()); }
+  
+  system.put_boolean("http_ready", true);
   
   #[cfg(not(feature = "webview"))]
   if !config.has("headless") || !(Data::as_string(config.get_property("headless")) == "true".to_string()) {

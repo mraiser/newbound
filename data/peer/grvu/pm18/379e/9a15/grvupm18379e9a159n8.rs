@@ -1,3 +1,7 @@
+let beat = Duration::from_millis(10);
+let system = DataStore::globals().get_object("system");
+while !system.has("security_ready") { thread::sleep(beat); }
+
 let mut meta = DataStore::globals().get_object("system").get_object("apps").get_object("peer").get_object("runtime");
 let mut b = false;
 let ipaddr;

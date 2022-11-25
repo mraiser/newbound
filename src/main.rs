@@ -81,11 +81,13 @@ fn main() {
         run();
       });
 
-      let dur = Duration::from_millis(3000);
-      thread::sleep(dur);
+      let beat = Duration::from_millis(10);
+      let globals = DataStore::globals();
+      while !globals.has("system") { thread::sleep(beat); }
+      let system = globals.get_object("system");
+      while !system.has("http_ready") { thread::sleep(beat); }
           
       // FIXME - Make session creation a function
-      let system = DataStore::globals().get_object("system");
       let config = system.get_object("config");
       let user = get_user("admin").unwrap();
       let session_id = unique_session_id();
