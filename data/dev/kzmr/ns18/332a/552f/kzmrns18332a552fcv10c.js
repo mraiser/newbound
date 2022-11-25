@@ -7,7 +7,15 @@ me.ready = function(){
   buildGroups();
   buildControls();
   buildAssets();
+  document.body.api.ui.initTooltips(ME);
 };
+
+$(ME).find('.rebuildlib').click(function(e){
+  document.body.api.ui.snackbarMsg('Rebuilding library '+ME.DATA.id);
+  json('../dev/rebuild_lib', 'lib='+ME.DATA.id, function(result){
+    document.body.api.ui.snackbarMsg('Library '+ME.DATA.id+' rebuilt');
+  });
+});
 
 $(ME).find('.deletelibrarybutton').click(function(e){
   var data = {
