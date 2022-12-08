@@ -15,6 +15,7 @@ let bytes: [u8; 32] = decode_hex(&o.get_string("privatekey")).unwrap().try_into(
 let private = StaticSecret::from(bytes);
 let public = o.get_string("publickey");
 let uuid = o.get_string("uuid");
+//FIXME - don't panic if metaidentity does not exist
 let metaidentity = store.get_data("runtime", "metaidentity").get_object("data");
 
 let mut data = data.clone();

@@ -25,6 +25,7 @@ if b {
 
   let (b, s) = execute_compile_command(ja);
   if b { panic!("{}",s); }
+  println!("Compile OK");
 }
 
 "OK".to_string()
@@ -78,6 +79,21 @@ pub fn build_compile_command() -> DataArray {
   #[cfg(feature="reload")]
   {
     features += ",reload";
+  }
+
+  #[cfg(feature="python_runtime")]
+  {
+    features += ",python_runtime";
+  }
+
+  #[cfg(feature="javascript_runtime")]
+  {
+    features += ",javascript_runtime";
+  }
+
+  #[cfg(feature="java_runtime")]
+  {
+    features += ",java_runtime";
   }
 
   if features != "".to_string() {

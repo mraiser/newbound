@@ -57,7 +57,7 @@ $(ME).find('.app-install-button').click(function(){
           var uuid = ME.DATA.peers[i];
           var p = (i++*100)/n;
           $(ME).find('.installprogress')[0].setProgress(p);
-          $(ME).find('.prog-info-text').html('<i>Installing library '+lib+'v'+ME.DATA.version+'</i>');
+          $(ME).find('.prog-info-text').html('<i>Installing library '+lib+' v'+ME.DATA.version+'</i>');
           json('../dev/install_lib', 'lib='+lib+'&uuid='+uuid, function(result){
             popNext();
           });

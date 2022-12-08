@@ -18,21 +18,23 @@ me.ready = function(){
       for (var i in result.data) {
         var theirlib = result.data[i];
         var mylib = getByProperty(document.body.locallibraries, 'id', theirlib.id);
-        var author = mylib.author;
-        var authorkey = mylib.authorkey;
-        if (author && authorkey && theirlib.author == author && theirlib.authorkey == authorkey) {
-          if (mylib.version > theirlib.version) {
-            
-            var newhtml = '<span class="chip ispos" id="U_'+mylib.id+'"><span class="clickupdate" data-lib="'+mylib.id+'" data-version="'+mylib.version+'">'
-              + mylib.id 
-              + ' v' 
-              + theirlib.version 
-              + ' ➤ ' 
-              + mylib.version 
-              + '</span><img src="../app/asset/app/close-white.png" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
-            
-            $(ME).find('.availableupgrades').css('display', 'block');
-            el.append(newhtml);
+        if (mylib) {
+          var author = mylib.author;
+          var authorkey = mylib.authorkey;
+          if (author && authorkey && theirlib.author == author && theirlib.authorkey == authorkey) {
+            if (mylib.version > theirlib.version) {
+
+              var newhtml = '<span class="chip ispos" id="U_'+mylib.id+'"><span class="clickupdate" data-lib="'+mylib.id+'" data-version="'+mylib.version+'">'
+                + mylib.id 
+                + ' v' 
+                + theirlib.version 
+                + ' ➤ ' 
+                + mylib.version 
+                + '</span><img src="../app/asset/app/close-white.png" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
+
+              $(ME).find('.availableupgrades').css('display', 'block');
+              el.append(newhtml);
+            }
           }
         }
       }
