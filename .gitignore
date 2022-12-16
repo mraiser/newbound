@@ -2,6 +2,9 @@
 version.txt
 botd.properties
 /html
+/cmd
+/target
+/users
 
 /data/camera
 /data/chuckme
@@ -11,10 +14,15 @@ botd.properties
 /data/rfm96
 /data/runtime
 /data/truckbot
+/data/nebula
+/data/raspberry
 
+runtime/dev/libraries/
 /runtime/camera
-runtime/ds18b20
-runtime/positioning
-runtime/rfm96
-runtime/truckbot
+/runtime/ds18b20
+/runtime/positioning
+/runtime/rfm96
+/runtime/truckbot
+/runtime/nebula
+/runtime/raspberry
 
