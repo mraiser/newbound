@@ -5,6 +5,7 @@ botd.properties
 /cmd
 /target
 /users
+/config.properties
 
 /data/camera
 /data/chuckme
