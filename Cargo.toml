@@ -29,7 +29,7 @@ state = "0.5.3"
 
 cmd = { path = "./cmd" }
 hot-lib-reloader = { version = "^0.6", optional = true }
-flowlang = { version = "0.2.10" }
+flowlang = { version = "0.2.11" }
 #flowlang = { path = "../rust/flow" }
 ndata="0.3.3"
 #ndata = { path = "../../rust/ndata" }

@@ -156,7 +156,10 @@ me.popup = function(data, cb){
       if (cb) cb();
     });
   }
-  else el2.css('display', 'inline-block');
+  else {
+    el2.css('display', 'inline-block');
+    if (cb) cb();
+  }
   
   var selector = data.closeselector ? data.closeselector : '.popupcard-close';
   el2.find(selector).click(function(){
