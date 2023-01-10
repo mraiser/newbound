@@ -132,7 +132,8 @@ me.install = function(lib, v, cb) {
   });
   var d = 'uuid='+myuuid+'&lib='+lib;
   json('../peer/remote/'+uuid+'/dev/install_lib', d, function(result){
-    if (result.data) {
+    if (result.status == "ok") {
+      recompile = recompile || result.data;
       el.find('.myprogress')[0].setProgress(100);
       el.animate({'width':'0px','height':'0px'},300, function(){
         el.remove();
@@ -201,13 +202,24 @@ function updateNext(){
     me.install(lib, v, updateNext);
   }
   else {
-    $(ME).find('.availableupgrades').animate({"opacity":0},300, function(){
-      $(this).css('display', 'none').css('opacity', '100%');
-    });
+    if (recompile){
+      recompile = false;
+      var uuid = ME.DATA.id;
+      $(ME).find('.upgradelist').html("<i>Recompiling Rust...</i>");
+      json('../peer/remote/'+uuid+'/dev/compile_rust', null, function(result){
+        updateNext();
+      });
+    }
+    else{
+      $(ME).find('.availableupgrades').animate({"opacity":0},300, function(){
+        $(this).css('display', 'none').css('opacity', '100%');
+      });
+    }
   }
 }
 
 var ulist = [];
+var recompile = false;
 $(ME).find('.updateall').click(function(){
   $(ME).find('.updatebuttons').css('display', 'none');
   ulist = [];

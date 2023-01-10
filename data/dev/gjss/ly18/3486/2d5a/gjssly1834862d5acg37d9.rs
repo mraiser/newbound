@@ -2,12 +2,7 @@ let store = DataStore::new();
 let root = store.get_lib_root(&lib);
 let b = build(&lib, &ctl, &cmd, &root);
 if b {
-  let ja = build_compile_command();
-  println!("{}", ja.to_string());
-
-  let (b, s) = execute_compile_command(ja);
-  if b { panic!("{}",s); }
-  println!("Compile OK");
+  compile_rust();
 }
 
 "OK".to_string()

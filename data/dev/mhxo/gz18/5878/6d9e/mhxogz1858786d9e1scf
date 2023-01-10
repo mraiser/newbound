@@ -1,0 +1,1 @@
+{"data":{"attachmentkeynames":["rs"],"cmd":"compile_rust","ctl":"dev","desc":"","import":"use crate::dev::dev::compile::build_compile_command;\nuse crate::dev::dev::compile::execute_compile_command;\n","lib":"dev","params":[],"returntype":"String","type":"rust"},"id":"mhxogz1858786d9e1scf","readers":[],"time":1673016107098,"username":"system","writers":[]}

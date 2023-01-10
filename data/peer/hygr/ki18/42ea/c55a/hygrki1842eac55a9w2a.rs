@@ -5,7 +5,7 @@ else { d = DataObject::new(); }
 
 let mut b = false;
 if !d.has("peer:reboot") {
-  let o = DataObject::from_string("{\"title\":\"Reboot Device\",\"type\":\"peer:reboot\",\"big\":true,\"position\":\"inline\",\"groups\":[\"admin\"]}");
+  let o = DataObject::from_string("{\"title\":\"Reboot Device\",\"type\":\"peer:reboot\",\"big\":false,\"position\":\"inline\",\"groups\":[\"admin\"]}");
   d.put_object("peer:reboot", o);
   b = true;
 }

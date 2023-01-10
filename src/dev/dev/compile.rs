@@ -4,6 +4,7 @@ use ndata::dataarray::*;
 use flowlang::flowlang::system::system_call::system_call;
 use std::io::{self, BufRead};
 use flowlang::datastore::DataStore;
+use crate::dev::dev::compile_rust::compile_rust;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("lib");
@@ -20,12 +21,7 @@ let store = DataStore::new();
 let root = store.get_lib_root(&lib);
 let b = build(&lib, &ctl, &cmd, &root);
 if b {
-  let ja = build_compile_command();
-  println!("{}", ja.to_string());
-
-  let (b, s) = execute_compile_command(ja);
-  if b { panic!("{}",s); }
-  println!("Compile OK");
+  compile_rust();
 }
 
 "OK".to_string()

@@ -5,3 +5,4 @@ pub mod lib_info;
 pub mod install_lib;
 pub mod rebuild_lib;
 pub mod check;
+pub mod compile_rust;

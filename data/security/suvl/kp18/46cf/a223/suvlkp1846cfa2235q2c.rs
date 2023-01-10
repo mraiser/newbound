@@ -117,7 +117,7 @@ pub fn check_security(command:&Command, session_id:&str) -> bool {
   }
   
   for g in groups.objects() {
-    if index_of(libgroups.clone(), g.clone()) != -1 {
+    if index_of(libgroups.clone(), Data::DString("anonymous".to_string())) != -1 || index_of(libgroups.clone(), g.clone()) != -1 {
       if cmdgroups.iter().position(|r| r == &(g.string())).is_some() {
         return true;
       }

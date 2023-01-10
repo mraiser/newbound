@@ -17,6 +17,7 @@ botd.properties
 /data/truckbot
 /data/nebula
 /data/raspberry
+/data/growboxhill
 
 runtime/dev/libraries/
 /runtime/camera
@@ -26,4 +27,5 @@ runtime/dev/libraries/
 /runtime/truckbot
 /runtime/nebula
 /runtime/raspberry
+/runtime/growboxhill
 

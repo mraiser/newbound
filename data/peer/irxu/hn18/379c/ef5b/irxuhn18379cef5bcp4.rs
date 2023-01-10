@@ -620,7 +620,9 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
 
   // Read remote temp pubkey
   let mut bytes = vec![0u8; 32];
-  let _x = stream.read_exact(&mut bytes).unwrap();
+  let _x = stream.read_exact(&mut bytes);
+  if _x.is_err() { return None;}
+  //let _x = x.unwrap();
   let remote_session_public: [u8; 32] = bytes.try_into().expect("slice with incorrect length");
   let remote_session_public = PublicKey::from(remote_session_public);
 
@@ -756,7 +758,10 @@ fn do_listen(ipaddr:String, port:i64) -> i64 {
       let stream = stream.unwrap();
       thread::spawn(move || {
         let remote_addr = stream.peer_addr().unwrap();
-        println!("P2P TCP incoming request from {}", remote_addr);
+        let mut d = DataObject::new();
+        d.put_string("addr", &remote_addr.to_string());
+        fire_event("peer", "TCP_REQUEST_RECEIVED", d);
+        //println!("P2P TCP incoming request from {}", remote_addr);
 
         let mut stream = P2PStream::Tcp(stream);
 

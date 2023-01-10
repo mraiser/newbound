@@ -73,6 +73,14 @@
 
 .inline {
   display:inline-block;
+}
+
+.inline.big{
+  width:600px;
+  height:450px;
+}
+
+.inline.iconmode{
   width:150px;
   height:150px;
 }

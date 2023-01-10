@@ -923,13 +923,15 @@ fn websock_message(mut stream: TcpStream, msg:String){
 pub fn handle_command(d: DataObject, sid: String) -> DataObject {
   let system = DataStore::globals().get_object("system");
   let sessions = system.get_object("sessions");
-  let mut session = sessions.get_object(&sid);
-  //println!("session {}", session.to_string());
-  let mut user = session.get_object("user");
-  let last_contact = time();
-  let expire = last_contact + system.get_object("config").get_int("sessiontimeoutmillis");
-  session.put_int("expire", expire);
-  user.put_int("last_contact", last_contact);
+  if sessions.has(&sid){
+    let mut session = sessions.get_object(&sid);
+    //println!("session {}", session.to_string());
+    let mut user = session.get_object("user");
+    let last_contact = time();
+    let expire = last_contact + system.get_object("config").get_int("sessiontimeoutmillis");
+    session.put_int("expire", expire);
+    user.put_int("last_contact", last_contact);
+  }
   
   let app = d.get_string("bot");
   let cmd = d.get_string("cmd");

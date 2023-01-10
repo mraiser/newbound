@@ -30,6 +30,7 @@ use crate::peer::service::listen::handle_connection;
 use rand::RngCore;
 use crate::security::security::init::get_user;
 use crate::security::security::init::set_user;
+use flowlang::appserver::fire_event;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("ipaddr");
@@ -380,7 +381,11 @@ fn do_listen(){
     let cmd = buf[0];
     match cmd {
       HELO => {
-        println!("P2P UDP incoming request from {:?} len {}", src, amt);
+        let mut d = DataObject::new();
+        d.put_string("addr", &src.to_string());
+        d.put_int("len", amt as i64);
+        fire_event("peer", "UDP_REQUEST_RECEIVED", d);
+        //println!("P2P UDP incoming request from {:?} len {}", src, amt);
         if amt == 33 {
           // FIXME - If we have their pubkey, skip to YO
           let (_cipher, buf) = helo(WELCOME, buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned());
@@ -666,7 +671,7 @@ fn do_listen(){
             let mtu = stream.data.get_int("mtu");
             if mtu < amt as i64 {
               stream.data.put_int("mtu", amt as i64);
-              println!("Increased MTU for connection {} from {} to {}", id, mtu, amt);
+              //println!("Increased MTU for connection {} from {} to {}", id, mtu, amt);
             }
           }
         }
