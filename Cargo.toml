@@ -17,25 +17,25 @@ python_runtime = ["flowlang/python_runtime"]
 javascript_runtime = ["flowlang/javascript_runtime"]
 
 [dependencies]
-uuid = { version="1.1.2", features=["v4"] }
+uuid = { version="1.3.0", features=["v4"] }
 x25519-dalek = "1.2.0"
-zip = { version="0.6.2", features=["deflate-miniz"] }
-local-ip-address = "0.4.8"
-aes = "0.8.1"
+zip = { version="0.6.4", features=["deflate-miniz"] }
+local-ip-address = "0.5.1"
+aes = "0.8.2"
 walkdir = "2.3.2"
 rand = "0.7"
-blake2 = "0.10.4"
+blake2 = "0.10.6"
 state = "0.5.3"
 
 cmd = { path = "./cmd" }
 hot-lib-reloader = { version = "^0.6", optional = true }
-flowlang = { version = "0.2.12" }
-#flowlang = { path = "../rust/flow" }
+#flowlang = { path = "../../rust/flow" }
+flowlang = "0.2.13"
 ndata="0.3.5"
 #ndata = { path = "../../rust/ndata" }
-serde = { version = "1.0.143", features = ["derive"], optional = true }
-serde_json = { version = "1.0.83", optional = true }
-wry = { version="0.22.3", optional=true }
+serde = { version = "1.0.155", features = ["derive"], optional = true }
+serde_json = { version = "1.0.94", optional = true }
+wry = { version="0.27.0", optional=true }
 
 [[bin]]
 name = "newbound"
