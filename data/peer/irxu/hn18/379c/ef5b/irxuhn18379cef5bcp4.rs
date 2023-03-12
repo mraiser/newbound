@@ -474,8 +474,12 @@ impl P2PConnection {
     let len = buf.len() as i16;
     let mut bytes = len.to_be_bytes().to_vec();
     bytes.extend_from_slice(&buf);
-    let _x = self.stream.write(&bytes).unwrap();
-    true
+
+    // Seems to fix stream corruption issue on other side of connection
+    let _heap = STREAMWRITERS.get().write().unwrap();
+    
+    let x = self.stream.write(&bytes);
+    x.is_ok()
   }
   
   pub fn end_stream_write(&mut self, x:i64) {
@@ -538,9 +542,12 @@ pub fn get_tcp(user:DataObject) -> Option<P2PConnection> {
 //  println!("heap {:?} cons {}", heap, cons.to_string());
   for con in cons.objects(){
     let conid = con.int();
-    let con = heap.get(&conid).unwrap();
-    if con.stream.is_tcp() {
-      return Some(con.duplicate());
+    let con = heap.get(&conid);
+    if con.is_some(){
+      let con = con.unwrap();
+      if con.stream.is_tcp() {
+        return Some(con.duplicate());
+      }
     }
   }
   None
@@ -553,9 +560,12 @@ pub fn get_udp(user:DataObject) -> Option<P2PConnection> {
 //  println!("heap {:?} cons {}", heap, cons.to_string());
   for con in cons.objects(){
     let conid = con.int();
-    let con = heap.get(&conid).unwrap();
-    if con.stream.is_udp() {
-      return Some(con.duplicate());
+    let con = heap.get(&conid);
+    if con.is_some() {
+      let con = con.unwrap();
+      if con.stream.is_udp() {
+        return Some(con.duplicate());
+      }
     }
   }
   None
@@ -568,9 +578,12 @@ pub fn get_relay(user:DataObject) -> Option<P2PConnection> {
 //  println!("heap {:?} cons {}", heap, cons.to_string());
   for con in cons.objects(){
     let conid = con.int();
-    let con = heap.get(&conid).unwrap();
-    if con.stream.is_relay() {
-      return Some(con.duplicate());
+    let con = heap.get(&conid);
+    if con.is_some(){
+      let con = con.unwrap();
+      if con.stream.is_relay() {
+        return Some(con.duplicate());
+      }
     }
   }
   None
@@ -805,11 +818,27 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
 
   let bytes: [u8; 2] = bytes.try_into().unwrap();
   let len = i16::from_be_bytes(bytes) as usize; // FIXME - Should be u16
+  //println!("{}",len);
+  
+  // FIXME - Where does 16400 come from? Who is reading or writing data out of turn to cause this?
+  if len > 16400 { 
+    println!("Connection corrupted (1): {:?}", stream);
+    return false; 
+  }
+  
   let mut bytes:Vec<u8> = Vec::with_capacity(len);
   bytes.resize(len, 0);
   let _x = stream.read_exact(&mut bytes).unwrap();
   let bytes = decrypt(&cipher, &bytes);
-  let method = String::from_utf8(bytes[0..4].to_vec()).unwrap();
+  let method = String::from_utf8(bytes[0..4].to_vec());
+  
+  // FIXME - Most likely extension of [len > 16400] problem, where len happens to be less than 16400
+  if method.is_err() { 
+    println!("Connection corrupted (2): {:?}", stream);
+    return false; 
+  }
+  
+  let method = method.unwrap();
 
   let sessiontimeoutmillis = system.get_object("config").get_int("sessiontimeoutmillis");
   session.put_int("expire", time() + sessiontimeoutmillis);
@@ -836,7 +865,9 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     let db = heap.get(&y);
     if db.is_some() {
       let db = db.unwrap();
-      db.write(bytes);
+      if db.is_write_open() {
+        db.write(bytes);
+      }
     }
   }
   else if method == "s_3 " {
@@ -996,7 +1027,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       //        let _lock = P2PHEAP.get().write().unwrap();
       let mut bytes = len.to_be_bytes().to_vec();
       bytes.extend_from_slice(&buf);
-      let _x = stream.write(&bytes).unwrap();
+      let _x = stream.write(&bytes);
     });
   }
   else if method == "res ".to_string() {

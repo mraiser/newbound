@@ -103,6 +103,121 @@ me.ready = function(){
   });
 };
 
+$(ME).find('.updateallpeersbutton').click(function(){
+  //alert(JSON.stringify(document.body.locallibraries));
+  //alert(JSON.stringify(me.peers));
+  
+  var newhtml = '<table cellpadding="10px" class="updateablepeerstable"><thead><tr><th><label class="plaincheckbox"><input type="checkbox" class="toggleallupdates"><span></span></label></th><th style="text-align:left;">Peer</th><th style="text-align:left;">Available Updates</th></tr></thead><tbody>';
+  for (var i in me.peers) {
+    var p = me.peers[i];
+    if (p.connected) {
+      var uuid = p.id;
+      newhtml += '<tr class="uprow r_'+uuid+'" data-peer="'+uuid+'">'
+        + '<td><label class="plaincheckbox"><input type="checkbox" class="libupdate"><span></span></label></td>'
+        + '<td>'+p.name+'<br><div style="font-size:x-small;">'+uuid+'</div></td>'
+        + '<td class="rowstatus"><i>pending...</i></td>'
+        + '</tr>';
+      checkForUpdates(p);
+    }
+  }
+  newhtml += '</tbody></table>';;
+  
+  var el = $(ME).find('.peerupdatelist');
+  el.html(newhtml).find('.toggleallupdates').click(function(){
+    var b = $(this).prop("checked");
+    el.find('.libupdate').prop('checked', b);
+  });;
+});
+
+function checkForUpdates(peer) {
+  var uuid = peer.id;
+  json('../peer/remote/'+uuid+'/app/libs', null, function(result){
+    if (result.data && document.body.locallibraries) {
+      var newhtml = '';
+      for (var i in result.data) {
+        var theirlib = result.data[i];
+        var mylib = getByProperty(document.body.locallibraries, 'id', theirlib.id);
+        if (mylib) {
+          var author = mylib.author;
+          var authorkey = mylib.authorkey;
+          if (author && authorkey && theirlib.author == author && theirlib.authorkey == authorkey) {
+            if (mylib.version > theirlib.version) {
+              newhtml += '<span class="chip ispos" id="U_'+mylib.id+'"><span class="clickupdate" data-lib="'+mylib.id+'" data-version="'+mylib.version+'">'
+                + mylib.id 
+                + ' v' 
+                + theirlib.version 
+                + ' ➤ ' 
+                + mylib.version 
+                + '</span><img src="../app/asset/app/close-white.png" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
+            }
+          }
+        }
+      }
+      var el = $(ME).find('.r_'+uuid);
+      if (newhtml == '') el.remove();
+      else {
+        el.find('.rowstatus').html(newhtml);
+        el.find('.removeupdate').click(function(){
+          $(this).closest('.chip').remove();
+        });
+      }
+    }
+  });
+}
+
+$(ME).find('#updateallpeersnow').click(function(){
+  var myuuid = $('.localpeerid').text();
+  $(ME).find('.libupdate').each(function(i, el){
+    if ($(el).prop('checked')) {
+      var row = $(el.closest('.uprow'));
+      var peer = row.data('peer');
+      var libs = [];
+      row.find('.clickupdate').each(function(j, chip){
+        libs.push($(chip).data('lib'));
+      });
+      
+      if (libs.length > 0) {
+        
+        var recompile = false;
+
+        function fetchNext() {
+          if (libs.length > 0) {
+            var lib = libs.pop();
+            console.log(peer+"/"+lib);
+            var x = $(row.find('.removeupdate')[0]);
+            var chip = x.parent();
+            chip.css('color', 'rgba(0,0,0,0.5)');
+            x.remove();
+            
+            var d = 'uuid='+myuuid+'&lib='+lib;
+            json('../peer/remote/'+peer+'/dev/install_lib', d, function(result){
+              if (result.status == "ok") {
+                recompile = recompile || result.data;
+                chip.remove();
+                fetchNext();
+              }
+              else {
+                chip.css('color', 'rgba(255,0,0,0.5)');
+                chip.append('<br>Error: '+result.msg);
+              }
+            });
+          }
+          else {
+            if (recompile) {
+              row.find('.rowstatus').html("<i>Recompiling Rust...</i>");
+              json('../peer/remote/'+peer+'/dev/compile_rust', null, function(result){
+                row.remove();
+              });
+            }
+            else row.remove();
+          }
+        }
+        fetchNext();
+      }
+    }
+  });
+});
+
 $(ME).find('.addpeerbutton').click(function(){
   json('../peer/discovery', null, function(result){
     me.discovery = result.data;

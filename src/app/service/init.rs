@@ -65,6 +65,7 @@ pub fn init() -> String {
         let app = subs.get_array(&app);
         if app.index_of(de.clone()) != -1 {
           let stream = sock.stream.try_clone().unwrap();
+          // FIXME - Remove the dead ones
           websock_message(stream, data.to_string());
         }
       }
@@ -519,7 +520,8 @@ pub fn http_listen() {
                 if timeout > 246 { println!("Unusually long wait for stream data... Abort"); break; }
               }
               else { timeout = 0; }
-            }              
+            }
+            bytes.close_read();
 //            println!("response sent");
           }
           else {
@@ -765,6 +767,7 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
         d.put_object("params", params);
 
         let o = handle_command(d, sid);
+        // FIXME - Remove the dead ones
         websock_message(stream, o.to_string());
       }
       else if msg.starts_with("sub ") {
@@ -965,7 +968,9 @@ fn websock_message(mut stream: TcpStream, msg:String){
 
   reply.extend_from_slice(msg);
 
-  let _ = stream.write(&reply).unwrap();
+  let x = stream.write(&reply);
+  // FIXME - Remove the dead ones
+  if x.is_err() { println!("WEBSOCKET DIED"); }
 }
 
 pub fn handle_command(d: DataObject, sid: String) -> DataObject {

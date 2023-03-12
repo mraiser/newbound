@@ -29,9 +29,9 @@ state = "0.5.3"
 
 cmd = { path = "./cmd" }
 hot-lib-reloader = { version = "^0.6", optional = true }
-flowlang = { version = "0.2.11" }
+flowlang = { version = "0.2.12" }
 #flowlang = { path = "../rust/flow" }
-ndata="0.3.3"
+ndata="0.3.5"
 #ndata = { path = "../../rust/ndata" }
 serde = { version = "1.0.143", features = ["derive"], optional = true }
 serde_json = { version = "1.0.83", optional = true }
@@ -40,4 +40,6 @@ wry = { version="0.22.3", optional=true }
 [[bin]]
 name = "newbound"
 path = "src/main.rs"
+
+[lib]
 

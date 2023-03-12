@@ -73,6 +73,11 @@ pub fn build_compile_command() -> DataArray {
     features += ",java_runtime";
   }
 
+  #[cfg(feature="webview")]
+  {
+    features += ",webview";
+  }
+
   if features != "".to_string() {
     features = features[1..].to_string();
     features = "--features=".to_string() + &features;

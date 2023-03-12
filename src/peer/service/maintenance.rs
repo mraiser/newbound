@@ -113,7 +113,8 @@ for (uuid, user) in users.objects(){
           if get_tcp(user.clone()).is_some() {
             let users = system.get_object("users");
             for (uuid2,u) in users.objects() {
-              if uuid2.len() == 36 && uuid != uuid2 && !u.object().get_boolean("connected") {
+              let b = u.object().has("connected") && Data::as_string(u.object().get_property("connected")).parse::<bool>().unwrap();
+              if uuid2.len() == 36 && uuid != uuid2 && !b {
                 let b = cons.has(&uuid2) && cons.get_string(&uuid2).starts_with("tcp#");
                 if b { relay(&uuid, &uuid2, b); }
               }

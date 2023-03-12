@@ -46,9 +46,10 @@ if uuid.is_array() || (uuid.is_string() && uuid.string().starts_with("[")) {
     if u.is_some(){
       let u = u.unwrap();
       let uuid = u.get_string("id");
-      let p = user_to_peer(u.clone(), uuid.to_owned());
-      if p.has("p2p_port") && p.has("address") && p.get_boolean("tcp") { cons.put_string(&uuid, &("tcp#".to_string()+&p.get_string("address")+"#"+&p.get_int("p2p_port").to_string())); }
-      else if p.has("p2p_port") && p.has("address") && p.get_boolean("udp") { cons.put_string(&uuid, &("udp#".to_string()+&p.get_string("address")+"#"+&p.get_int("p2p_port").to_string())); }
+      let mut p = user_to_peer(u.clone(), uuid.to_owned());
+      if p.has("p2pport") && !p.has("p2p_port") { p.set_property("p2p_port", p.get_property("p2pport")); }
+      if p.has("p2p_port") && p.has("address") && p.get_boolean("tcp") { cons.put_string(&uuid, &("tcp#".to_string()+&p.get_string("address")+"#"+&Data::as_string(p.get_property("p2p_port")))); }
+      else if p.has("p2p_port") && p.has("address") && p.get_boolean("udp") { cons.put_string(&uuid, &("udp#".to_string()+&p.get_string("address")+"#"+&Data::as_string(p.get_property("p2p_port")))); }
       else if p.get_boolean("relay") { cons.put_string(&uuid, "relay#"); }
     }
   }

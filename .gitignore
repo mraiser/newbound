@@ -29,3 +29,16 @@ runtime/dev/libraries/
 /runtime/raspberry
 /runtime/growboxhill
 
+/data/microphone/
+/data/rplidar/
+/data/site/
+/data/tekforge/
+/data/threejs/
+/data/ui/
+/data/video/
+/runtime/chuckme/
+/runtime/microphone/
+/runtime/rplidar/
+/runtime/tekforge/
+/runtime/video/
+

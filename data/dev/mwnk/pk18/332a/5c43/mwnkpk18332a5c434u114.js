@@ -74,10 +74,16 @@ me.uiReady = function(ui){
       me.buildTimerList();
       me.buildEventList();
       me.buildPublish();
+      me.build3D();
     });
   });
   
   $(ME).find('.backbutton').click(function(){ window.location.href='../dev/index.html?lib='+lib; });
+};
+
+me.build3D = function(){
+  var el = $(ME).find('.three-main');
+  installControl(el[0], 'dev', 'edit3d', function(api){}, me.data);
 };
 
 function validateName(s){
@@ -277,8 +283,15 @@ me.buildCommandList = function(){
 };
 
 $(ME).find('.navbar-tab').click(function(){
-  var display = $(this).data("id") == "tab1" ? "inline-block" : "none";
+  var did = $(this).data("id");
+  var display = did == "tab1" ? "inline-block" : "none";
   $(ME).find('.previewbutton').css('display', display);
+  if (did == "tab2") {
+    $(ME).find('.three-main')[0].api.activate();
+  }
+  else {
+    $(ME).find('.three-main')[0].api.deactivate();
+  }
 });
 
 $(ME).find('.zoomer-pmin').click(function(){

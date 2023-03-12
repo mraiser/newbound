@@ -18,7 +18,20 @@
     <button class='addpeerbutton coloredbutton popupmenu' data-popup='{"selector":".addusercard","closeselector":".close-add-user","modal":true}'><img src='../app/asset/app/person_add_icon.png' class='mediumicon'></button>
     <!-- button class="accesscodebutton coloredbutton"><img src='../app/asset/app/shield_icon.png' class='mediumicon'></button>
     <button class="lanbutton mdl-button coloredbutton"><img src='../app/asset/app/wifi_icon.png' class='mediumicon'></button -->
-    <button class="updateallpeersbutton coloredbutton"><img src='../app/asset/app/upload_icon.png' class='mediumicon'></button>
+    <button class='updateallpeersbutton coloredbutton popupmenu' data-popup='{"selector":".updateallpeerscard","closeselector":".close-update-peers","modal":true}'><img src='../app/asset/app/upload_icon.png' class='mediumicon'></button>
+  </div>
+  
+  <div class='card hideme updateallpeerscard'>
+    <div class='dialog-header'>
+      <div class='padme'>
+        Update Peers
+        <img src='../app/asset/app/close-white.png' class='upper-right close-update-peers roundbutton-small out10'>
+      </div>
+    </div>
+    <div class='padme peerupdatelist'></div>
+    <div class="card-button-wrap">
+      <button id="updateallpeersnow"  class="clearbutton">Update Selected Peers</button>
+    </div>
   </div>
   
   <div class='card hideme addusercard'>
