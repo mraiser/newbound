@@ -18,8 +18,18 @@ botd.properties
 /data/nebula
 /data/raspberry
 /data/growboxhill
+/data/microphone/
+/data/rplidar/
+/data/site/
+/data/tekforge/
+/data/threejs/
+/data/ui/
+/data/video/
+/data/site/
+/data/blog/
+/data/blogdata/
 
-runtime/dev/libraries/
+/runtime/dev/libraries/
 /runtime/camera
 /runtime/ds18b20
 /runtime/positioning
@@ -28,17 +38,12 @@ runtime/dev/libraries/
 /runtime/nebula
 /runtime/raspberry
 /runtime/growboxhill
-
-/data/microphone/
-/data/rplidar/
-/data/site/
-/data/tekforge/
-/data/threejs/
-/data/ui/
-/data/video/
 /runtime/chuckme/
 /runtime/microphone/
 /runtime/rplidar/
 /runtime/tekforge/
 /runtime/video/
+/runtime/site
+/runtime/blog
+/runtime/blogdata
 

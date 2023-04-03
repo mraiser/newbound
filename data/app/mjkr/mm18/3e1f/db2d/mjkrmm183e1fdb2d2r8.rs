@@ -395,7 +395,16 @@ pub fn http_listen() {
 
           if response.has("len") && response.get_property("len").is_int() { len = response.get_int("len"); }
           else if headers.has("Content-Length") { len = headers.get_int("Content-Length"); }
-          else if isfile { len = fs::metadata(&body).unwrap().len() as i64; }
+          else if isfile { 
+            let lenx = fs::metadata(&body);
+            if lenx.is_ok() { len = lenx.unwrap().len() as i64; }
+            else { 
+              response.put_int("code", 404);
+              response.put_string("msg", "NOT FOUND");
+              isfile = false;
+              len = -1;
+            }
+          }
           else if isbytes { 
             let bytes = response.get_bytes("body");
             let x = bytes.stream_len();

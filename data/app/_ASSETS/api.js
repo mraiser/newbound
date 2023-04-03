@@ -54,7 +54,7 @@ function lookupID(lib, name, cb){
     else {
       x.fetching = true;
 	  json('../app/read', 'lib='+encodeURIComponent(lib)+'&id=controls', function(result){
-		if (result.status != 'ok') cb(null);
+		if (result.status != 'ok') cb(name);
 		else {
 		  x.when = now;
 		  x.fetching = false;

@@ -1,4 +1,4 @@
-var me = this; 
+var me = document.body.ui = this; 
 var ME = $('#'+me.UUID)[0];
 
 me.ready = function(){

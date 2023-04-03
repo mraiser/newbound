@@ -17,7 +17,7 @@ d.put_string("cmd", &cmd);
 d.put_int("pid", pid);
 d.put_object("params", params);
 
-let con = get_best(user).unwrap();
+let con = get_best(user.clone()).unwrap();
 let cipher = con.cipher;
 let mut stream = con.stream;
 let mut res = con.res;
@@ -34,13 +34,17 @@ let _x = stream.write(&bytes).unwrap();
 
 // FIXME - should timeout
 let pidstr = &pid.to_string();
+let name = match user.has("displayname") {
+  true => user.get_string("displayname"),
+  _ => uuid.to_string()
+};
 let mut timeout = 0;
 while ! res.has(pidstr) {
   // TIGHTLOOP
   timeout += 1;
   let beat = Duration::from_millis(timeout);
   thread::sleep(beat);
-  if timeout > 450 { println!("Unusually long wait in peer:service:exec [{}]", pid); timeout = 0; }
+  if timeout > 450 { println!("Unusually long wait in peer:service:exec [{}/{}/{}/{}]", &name, &app, &cmd, pid); timeout = 0; }
   
   wait();
 }

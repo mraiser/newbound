@@ -514,7 +514,7 @@ me.buildPublish = function(){
   var data = me.CTLDATA;
   send_appdata(data, function(result){
     console.log(result);
-    var d = me.properties = result.data;
+    var d = me.properties = result.data ? result.data : {};
     d.ctlid = data.ctl;
     d.ctldb = data.db; // FIXME - should be lib not db
     
