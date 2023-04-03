@@ -6,6 +6,7 @@ botd.properties
 /target
 /users
 /config.properties
+/Cargo.lock
 
 /data/camera
 /data/chuckme
