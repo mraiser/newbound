@@ -21,7 +21,3 @@ fn init_cmds(){
   for q in &v { RustCmd::add(q.0.to_owned(), q.1, q.2.to_owned()); }
 }
 
-
-pub mod nebula;
-pub mod raspberry;
-pub mod chuckme;
