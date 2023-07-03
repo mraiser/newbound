@@ -299,6 +299,9 @@ pub fn http_listen() {
         let mut ka;
         if headers.has("CONNECTION") { ka = headers.get_string("CONNECTION"); }
         else { ka = "close".to_string(); }
+        
+        let mut origin = None;
+        if headers.has("ORIGIN") { origin = Some(headers.get_string("ORIGIN")); }
 
         // FIXME - origin is never used, impliment CORS
         //      let mut origin = "null".to_string();
@@ -434,16 +437,14 @@ pub fn http_listen() {
           let cookie = "sessionid=".to_string()+&session_id+"; Path=/; Expires="+&RFC2822Date::new(later).to_string();
           headers.put_string("Set-Cookie", &cookie);
 
-          // FIXME
-          //		if (origin != null)
-          //		{
-          //			String cors = getCORS(name, origin);
+          //if origin.is_some() {
+          let cors = "*"; //getCORS(name, origin);
           //			if (cors != null)
           //			{
-          //				h.put("Access-Control-Allow-Origin", cors);
+          headers.put_string("Access-Control-Allow-Origin", cors);
           //				if (!cors.equals("*")) h.put("Vary", "Origin");
           //			}
-          //		}
+          //}
 
           let mut reshead = "HTTP/1.1 ".to_string()+&code.to_string()+" "+&msg+"\r\n";
           for (k,v) in headers.objects() {

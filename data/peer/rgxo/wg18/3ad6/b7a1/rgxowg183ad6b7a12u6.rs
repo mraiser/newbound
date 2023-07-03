@@ -559,26 +559,29 @@ fn do_listen(){
         let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
         let msg_id = i64::from_be_bytes(msg_id);
 
-        let mut con = P2PConnection::get(id);
-        if let P2PStream::Udp(stream) = &mut con.stream {
-          if stream.src == src {
-            // There can be only one!
-            let _lock = WRITEMUTEX.get().write().unwrap();
-            let mut out_off = stream.data.get_int("out_off");
-            let mut out = stream.data.get_array("out");
+        let mut con = P2PConnection::try_get(id);
+        if con.is_some() {
+          let mut con = con.unwrap();
+          if let P2PStream::Udp(stream) = &mut con.stream {
+            if stream.src == src {
+              // There can be only one!
+              let _lock = WRITEMUTEX.get().write().unwrap();
+              let mut out_off = stream.data.get_int("out_off");
+              let mut out = stream.data.get_array("out");
 
-            let n = msg_id - out_off;
-            let mut i = 0;
-            while i <= n {
-              //println!("removing packet {}", out_off);
-              out.remove_property(0);
-              out_off += 1;
-              i += 1;
+              let n = msg_id - out_off;
+              let mut i = 0;
+              while i <= n {
+                //println!("removing packet {}", out_off);
+                out.remove_property(0);
+                out_off += 1;
+                i += 1;
+              }
+              stream.data.put_int("out_off", out_off);
             }
-            stream.data.put_int("out_off", out_off);
-          }
-          else {
-            println!("Received ACK from wrong source");
+            else {
+              println!("Received ACK from wrong source");
+            }
           }
         }
       },
@@ -590,44 +593,50 @@ fn do_listen(){
         let last: [u8; 8] = buf[17..25].try_into().unwrap();
         let last = i64::from_be_bytes(last);
 
-        let mut con = P2PConnection::get(id);
-        if let P2PStream::Udp(stream) = &mut con.stream {
-          if stream.src == src {
-            // There can be only one!
-            // FIXME - Is lock necessary? We're in the only thread that removes packets from out.
-            let _lock = WRITEMUTEX.get().write().unwrap();
-            let out_off = stream.data.get_int("out_off");
-            let out = stream.data.get_array("out");
+        let mut con = P2PConnection::try_get(id);
+        if con.is_some() {
+          let mut con = con.unwrap();
+          if let P2PStream::Udp(stream) = &mut con.stream {
+            if stream.src == src {
+              // There can be only one!
+              // FIXME - Is lock necessary? We're in the only thread that removes packets from out.
+              let _lock = WRITEMUTEX.get().write().unwrap();
+              let out_off = stream.data.get_int("out_off");
+              let out = stream.data.get_array("out");
 
-            let mut n = msg_id - out_off;
-            if n<0 {
-              println!("Ignoring request for resend of msg {} on udp connection {}", msg_id, id);
-            }
-            else {
-              let stop = last - out_off;
-              println!("Resending msg {} to {} on udp connection {}", msg_id, last, id);
-              while n <= stop {
-                let bytes = out.get_bytes(n as usize);
-                sock.send_to(&bytes.get_data(), &src).unwrap();
-                n += 1;
+              let mut n = msg_id - out_off;
+              if n<0 {
+                println!("Ignoring request for resend of msg {} on udp connection {}", msg_id, id);
+              }
+              else {
+                let stop = last - out_off;
+                println!("Resending msg {} to {} on udp connection {}", msg_id, last, id);
+                while n <= stop {
+                  let bytes = out.get_bytes(n as usize);
+                  sock.send_to(&bytes.get_data(), &src).unwrap();
+                  n += 1;
+                }
               }
             }
-          }
-          else {
-            println!("Received ACK from wrong source");
+            else {
+              println!("Received ACK from wrong source");
+            }
           }
         }
       },
       EXTEND_MTU => {
         let id: [u8; 8] = buf[1..9].try_into().unwrap();
         let id = i64::from_be_bytes(id);
-        let mut con = P2PConnection::get(id);
-        if let P2PStream::Udp(stream) = &mut con.stream {
-          if stream.src == src {
-            let mtu = stream.data.get_int("mtu");
-            if mtu < amt as i64 {
-              stream.data.put_int("mtu", amt as i64);
-              //println!("Increased MTU for connection {} from {} to {}", id, mtu, amt);
+        let mut con = P2PConnection::try_get(id);
+        if con.is_some() {
+          let mut con = con.unwrap();
+          if let P2PStream::Udp(stream) = &mut con.stream {
+            if stream.src == src {
+              let mtu = stream.data.get_int("mtu");
+              if mtu < amt as i64 {
+                stream.data.put_int("mtu", amt as i64);
+                //println!("Increased MTU for connection {} from {} to {}", id, mtu, amt);
+              }
             }
           }
         }

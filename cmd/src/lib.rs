@@ -18,3 +18,7 @@ pub fn mirror(state: &mut Initializer) {
   cmdinit(&mut state.cmds);
 }
 
+
+pub mod nebula;
+pub mod raspberry;
+pub mod chuckme;

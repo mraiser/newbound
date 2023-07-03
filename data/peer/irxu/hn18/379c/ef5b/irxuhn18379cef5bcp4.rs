@@ -443,7 +443,7 @@ impl P2PConnection {
     let len = buf.len() as i16;
     let mut bytes = len.to_be_bytes().to_vec();
     bytes.extend_from_slice(&buf);
-    let _x = self.stream.write(&bytes).unwrap();
+    let _x = self.stream.write(&bytes); //.unwrap();
     
     db
   }
@@ -476,6 +476,7 @@ impl P2PConnection {
     bytes.extend_from_slice(&buf);
 
     // Seems to fix stream corruption issue on other side of connection
+    // FIXME - Does it, tho?
     let _heap = STREAMWRITERS.get().write().unwrap();
     
     let x = self.stream.write(&bytes);
@@ -495,7 +496,7 @@ impl P2PConnection {
     let len = buf.len() as i16;
     let mut bytes = len.to_be_bytes().to_vec();
     bytes.extend_from_slice(&buf);
-    let _x = self.stream.write(&bytes).unwrap();
+    let _x = self.stream.write(&bytes); //.unwrap();
   }
 
   pub fn end_stream_read(&mut self, y:i64) {
@@ -828,7 +829,11 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
   
   let mut bytes:Vec<u8> = Vec::with_capacity(len);
   bytes.resize(len, 0);
-  let _x = stream.read_exact(&mut bytes).unwrap();
+  let x = stream.read_exact(&mut bytes);
+  if x.is_err(){
+    println!("Connection dropped (1.5): {:?}", stream);
+    return false; 
+  }
   let bytes = decrypt(&cipher, &bytes);
   let method = String::from_utf8(bytes[0..4].to_vec());
   
