@@ -21,7 +21,7 @@ me.ready = function(){
         if (mylib) {
           var author = mylib.author;
           var authorkey = mylib.authorkey;
-          if (author && authorkey && theirlib.author == author && theirlib.authorkey == authorkey) {
+          if (true) { //(author && authorkey && theirlib.author == author && theirlib.authorkey == authorkey) {
             if (mylib.version > theirlib.version) {
 
               var newhtml = '<span class="chip ispos" id="U_'+mylib.id+'"><span class="clickupdate" data-lib="'+mylib.id+'" data-version="'+mylib.version+'">'

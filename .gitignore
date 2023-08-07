@@ -7,6 +7,8 @@ botd.properties
 /users
 /config.properties
 /Cargo.lock
+/venv
+/requirements.txt
 
 /data/camera
 /data/chuckme
@@ -19,16 +21,18 @@ botd.properties
 /data/nebula
 /data/raspberry
 /data/growboxhill
-/data/microphone/
-/data/rplidar/
-/data/site/
-/data/tekforge/
-/data/threejs/
-/data/ui/
-/data/video/
-/data/site/
-/data/blog/
-/data/blogdata/
+/data/microphone
+/data/rplidar
+/data/site
+/data/tekforge
+/data/threejs
+/data/ui
+/data/video
+/data/site
+/data/blog
+/data/blogdata
+/data/automatic1111
+/data/discord
 
 /runtime/dev/libraries/
 /runtime/camera
@@ -39,12 +43,14 @@ botd.properties
 /runtime/nebula
 /runtime/raspberry
 /runtime/growboxhill
-/runtime/chuckme/
-/runtime/microphone/
-/runtime/rplidar/
-/runtime/tekforge/
-/runtime/video/
+/runtime/chuckme
+/runtime/microphone
+/runtime/rplidar
+/runtime/tekforge
+/runtime/video
 /runtime/site
 /runtime/blog
 /runtime/blogdata
+/runtime/automatic1111
+/runtime/discord
 

@@ -168,12 +168,6 @@ function installControl(el, lib, id, cb, data) {
 	  }
 
 	  function handlectlmeta(lib, id, result){
-if (!result.data){
-  if (result.status == 'err' && result.msg.indexOf('UNAUTHORIZED') != -1 && el == document.body)
-    window.location.href = '../app/login.html'
-  console.log("NO DATA FOR "+lib+'/'+id);
-  console.log(JSON.stringify(result));
-}	  
 	    $(el)[0].meta = result.data;
 		if (!$(el)[0].id) $(el)[0].id = guid();
 
@@ -225,6 +219,15 @@ function buildFinish(el, newhtml, oldhtml, cb){
 function activateControl(el, cb){
   var c = $(el).data('control');
   if (c.lib){
+    if (c.require_groups) {
+      json('../security/current_user', null, function(result){
+        for (group in c.require_groups) {
+          if (result.data.groups.indexOf(c.require_groups[group]) == -1) {
+            window.location.href='../app/login.html';
+          }
+        }
+      });
+    }
 	installControl(el, c.lib, c.id, cb);
   }
   else {
