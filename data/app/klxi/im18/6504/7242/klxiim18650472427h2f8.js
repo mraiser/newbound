@@ -50,7 +50,7 @@ me.rebuild = function(cb){
           ME.DATA.click_edit(val, index);
         });
       }
-      if (ME.DATA.allowadd) {
+      if (ME.DATA.allowadd && !ME.DATA.disallowdelete) {
         var b2 = $('<span class="item_cell" data-index="'+i+'"><img src="../app/asset/app/delete_icon.png" class="roundbutton-small"></span>');
         el.append(b2);
         b2.click(me.click_delete);
@@ -72,8 +72,8 @@ me.delete_item = function(index){
 me.click_delete = function(){
   var i = $(this).data('index');
   var d = {
-    "title": "Delete Bot",
-    "text": "Are you sure you want to permanently delete this bot?",
+    "title": "Delete Item",
+    "text": "Are you sure you want to permanently delete this item?",
     "cb": function(){ me.delete_item(i); }
   };
   document.body.ui.confirm(d);

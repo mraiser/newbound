@@ -50,6 +50,10 @@ me.build = function(cb) {
   });
 };
 
+$(ME).find('.importlibrarybutton').click(function(e){
+  window.location.href='github.html';
+});
+
 $(ME).find('.addlibrarybutton').click(function(e){
   var data = {
     title:'New Library',

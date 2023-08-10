@@ -9,6 +9,7 @@ botd.properties
 /Cargo.lock
 /venv
 /requirements.txt
+/repositories
 
 /data/camera
 /data/chuckme
@@ -33,6 +34,7 @@ botd.properties
 /data/blogdata
 /data/automatic1111
 /data/discord
+/data/quickjourney
 
 /runtime/dev/libraries/
 /runtime/camera
@@ -53,4 +55,5 @@ botd.properties
 /runtime/blogdata
 /runtime/automatic1111
 /runtime/discord
+/runtime/quickjourney
 

@@ -86,7 +86,7 @@ pub fn http_listen() {
           s += &session_id;
           
           let mut a = DataArray::new();
-          a.push_string("open");
+          a.push_string("xdg-open");
           a.push_string(&s);
           system_call(a);
         }
