@@ -1,1 +1,0 @@
-DataObject::new()
