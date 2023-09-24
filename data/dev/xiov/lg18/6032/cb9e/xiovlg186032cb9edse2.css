@@ -9,6 +9,8 @@
 .ctllistwrap {
   width:320px;
   position:relative;
+  display:inline-block;
+  vertical-align:top;
 }
 
 .ctllistnavbar {
@@ -40,4 +42,70 @@
 
 .cltab .textinput {
   color:white;
+}
+
+.x3dctllist .list_header, .behaviorlist .list_header {
+  display:none;
+}
+
+.x3dctllist .list_body, .behaviorlist .list_body {
+  background-color:rgb(40, 43, 48);
+  width:300px;
+}
+
+.x3dctllist .roundbutton-small, .behaviorlist .roundbutton-small{
+  background-color:#aaaa;
+}
+
+.item_edit, .item_delete{
+  width:20px;
+}
+
+.x3dctl-detail, .x3dbehavior-editor{
+  border: thin solid white;
+  padding:0px;
+  margin-top:38px;
+  vertical-align:top;
+  display:none;
+  position:relative;
+  z-index:11;
+  color: white;
+  background-color:#000a;
+}
+
+.x3dctl-detail table {
+  color: white;
+}
+
+.x3dctl-detail input {
+  color: white;
+  border-bottom:thin #fffa solid;
+}
+
+.xtitle{
+  vertical-align:bottom;
+  padding-bottom:3px;
+}
+
+.bwrap{
+  padding-left:20px;
+  padding-right:20px;
+  min-width:400px;
+  position:relative;
+  height:400px;
+}
+
+.abp{
+  font-size:14px;
+  height:28px;
+  width:28px;
+  border-radius:14px;
+  margin-left:3px;
+  margin-right:3px;
+}
+
+.abn {
+  background-color:transparent;
+  color:white;
+  width:80px;
 }

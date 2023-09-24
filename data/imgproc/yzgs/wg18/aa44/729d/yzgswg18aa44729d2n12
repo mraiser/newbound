@@ -1,0 +1,1 @@
+{"data":{"attachmentkeynames":["rs"],"cmd":"append_bodies","ctl":"batch","desc":"","import":"use std::path::Path;\nuse flowlang::command::Command;\n","lib":"imgproc","params":[],"returntype":"JSONObject","type":"rust"},"id":"yzgswg18aa44729d2n12","readers":[],"time":1694978492345,"username":"system","writers":[]}

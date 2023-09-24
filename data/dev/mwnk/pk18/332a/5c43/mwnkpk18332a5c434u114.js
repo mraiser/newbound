@@ -615,6 +615,6 @@ function dirty() {
   $('.savebutton').removeClass('accentbutton').addClass('coloredbutton');
 }
 
-me.dirty = dirty;
+me.dirty = document.body.dirty = dirty;
 $(ME).find('#ov_groups').change(me.dirty);
 $(ME).find('#ov_desc').change(me.dirty);

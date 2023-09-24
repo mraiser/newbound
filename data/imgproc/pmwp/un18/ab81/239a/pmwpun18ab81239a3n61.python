@@ -1,0 +1,14 @@
+dest = os.path.join(dest, "raw")
+os.makedirs(dest)
+
+vidcap = cv2.VideoCapture(mp4)
+success,image = vidcap.read()
+count = 0
+while success:
+  f = os.path.join(dest, "frame"+str(count)+"d.jpg")
+  cv2.imwrite(f, image)     # save frame as JPEG file      
+  success,image = vidcap.read()
+  print('Read a new frame: ', success)
+  count += 1
+  
+return str(count)

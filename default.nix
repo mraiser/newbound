@@ -8,6 +8,8 @@ stdenv.mkDerivation {
     pkg-config
     ffmpeg-full
     sox
+    gcc
+    openblas
 
     # Python requirements (enough to get a virtualenv going).
     python310Full

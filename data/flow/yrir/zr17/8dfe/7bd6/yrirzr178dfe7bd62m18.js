@@ -2,7 +2,7 @@ var me = this;
 var ME = $('#'+me.UUID)[0];
 
 me.ready = function(api){
-  componentHandler.upgradeAllRegistered();
+  //componentHandler.upgradeAllRegistered();
 
   var el = $(ME).find('.flowcodeviewer');
   el.data('orbitcontrols', false);

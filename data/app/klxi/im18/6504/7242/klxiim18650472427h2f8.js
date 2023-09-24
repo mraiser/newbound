@@ -37,12 +37,13 @@ me.rebuild = function(cb){
       var d = {
         "item": li
       };
-      var el = $("<li></li>");
+      var id = li.id ? li.id : typeof li == "string" ? li : i;
+      var el = $("<li data-id='"+id+"'></li>");
       me.wrap.append(el);
       var text = $("<span class='item_cell' />");
       el.append(text);
       if (ME.DATA.click_edit) {
-        var b1 = $('<span class="item_cell" data-index="'+i+'"><img src="../app/asset/app/pencil_icon.png" class="roundbutton-small"></span>');
+        var b1 = $('<span class="item_cell item_edit" data-index="'+i+'"><img src="../app/asset/app/pencil_icon.png" class="roundbutton-small"></span>');
         el.append(b1);
         b1.click(function(){
           var index = $(this).data('index');
@@ -50,8 +51,8 @@ me.rebuild = function(cb){
           ME.DATA.click_edit(val, index);
         });
       }
-      if (ME.DATA.allowadd && !ME.DATA.disallowdelete) {
-        var b2 = $('<span class="item_cell" data-index="'+i+'"><img src="../app/asset/app/delete_icon.png" class="roundbutton-small"></span>');
+      if ((ME.DATA.allowadd || ME.DATA.allowdelete) && !ME.DATA.disallowdelete) {
+        var b2 = $('<span class="item_cell item_delete" data-index="'+i+'"><img src="../app/asset/app/delete_icon.png" class="roundbutton-small"></span>');
         el.append(b2);
         b2.click(me.click_delete);
       }
