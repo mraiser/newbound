@@ -1,3 +1,5 @@
+/Cargo (copy).toml
+/cmd/Cargo (copy).toml
 /generated/
 version.txt
 botd.properties
@@ -35,6 +37,8 @@ botd.properties
 /data/automatic1111
 /data/discord
 /data/quickjourney
+/data/imageproc
+/data/imageproc_X
 
 /runtime/dev/libraries/
 /runtime/camera
@@ -56,4 +60,4 @@ botd.properties
 /runtime/automatic1111
 /runtime/discord
 /runtime/quickjourney
-
+/runtime/imgrpoc

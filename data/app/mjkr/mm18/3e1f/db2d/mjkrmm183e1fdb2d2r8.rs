@@ -300,8 +300,8 @@ pub fn http_listen() {
         if headers.has("CONNECTION") { ka = headers.get_string("CONNECTION"); }
         else { ka = "close".to_string(); }
         
-        let mut origin = None;
-        if headers.has("ORIGIN") { origin = Some(headers.get_string("ORIGIN")); }
+        //let mut origin = None;
+        //if headers.has("ORIGIN") { origin = Some(headers.get_string("ORIGIN")); }
 
         // FIXME - origin is never used, impliment CORS
         //      let mut origin = "null".to_string();

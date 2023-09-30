@@ -10,6 +10,8 @@ stdenv.mkDerivation {
     sox
     gcc
     openblas
+    rustc
+    cargo
 
     # Python requirements (enough to get a virtualenv going).
     python310Full

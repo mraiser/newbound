@@ -603,7 +603,7 @@ fn do_listen(){
         let msg_id: [u8; 8] = buf[9..17].try_into().unwrap();
         let msg_id = i64::from_be_bytes(msg_id);
 
-        let mut con = P2PConnection::try_get(id);
+        let con = P2PConnection::try_get(id);
         if con.is_some() {
           let mut con = con.unwrap();
           if let P2PStream::Udp(stream) = &mut con.stream {
@@ -637,7 +637,7 @@ fn do_listen(){
         let last: [u8; 8] = buf[17..25].try_into().unwrap();
         let last = i64::from_be_bytes(last);
 
-        let mut con = P2PConnection::try_get(id);
+        let con = P2PConnection::try_get(id);
         if con.is_some() {
           let mut con = con.unwrap();
           if let P2PStream::Udp(stream) = &mut con.stream {
@@ -671,7 +671,7 @@ fn do_listen(){
       EXTEND_MTU => {
         let id: [u8; 8] = buf[1..9].try_into().unwrap();
         let id = i64::from_be_bytes(id);
-        let mut con = P2PConnection::try_get(id);
+        let con = P2PConnection::try_get(id);
         if con.is_some() {
           let mut con = con.unwrap();
           if let P2PStream::Udp(stream) = &mut con.stream {

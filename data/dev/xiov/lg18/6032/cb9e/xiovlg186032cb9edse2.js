@@ -28,6 +28,7 @@ me.ready = function(){
       body: "return 'ok';",
       params: []
     };
+    if (!me.data.three.behaviors) me.data.three.behaviors = [];
     me.data.three.behaviors.push(d);
     buildBehaviors();
   });
@@ -244,7 +245,7 @@ function buildViewer(cb){
               el.append( renderer.domElement );
               
               var controls = new THREE.OrbitControls( camera, renderer.domElement );
-              controls.addEventListener( 'change', me.render );
+              //controls.addEventListener( 'change', me.render );
               
               hemi = new THREE.HemisphereLight( 0x888888, 0x888888 );
               scene.add(hemi);

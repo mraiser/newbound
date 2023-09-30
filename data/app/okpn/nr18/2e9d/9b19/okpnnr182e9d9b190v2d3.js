@@ -9,6 +9,9 @@ me.uiReady = function(ui){
   ui.initProgress(ME);
   ui.initTooltips(ME);
   ui.initSliders(ME);
+  
+  var d = { ready: ready3D, orbit: true };
+  installControl('#my3d', 'app', 'scenegraph', function(api){}, d);
 };
 
 $(ME).find('#usercardgroupradio1').click(function(){ $(ME).find('.myprogress')[0].setProgress(0); });
@@ -29,3 +32,22 @@ $(ME).find('.snackbarbutton').click(function(){
   };
   me.ui.snackbar(d);
 });
+
+function ready3D(api){
+  me.scene = api;
+  var el = $('<div class="hideme"/>');
+  $(ME).append(el);
+  api.addControl(el[0],'app', 'shape', function(shape){ 
+    shape.model.rotation.x = 0.3;
+    shape.render = function(){
+      shape.model.rotation.y += 0.01;
+    };
+    var cindex = 1;
+    var colors = [ [131,188,0], [255,69,0], [65,105,225], [220,220,220] ];
+    shape.click = function(e){
+      var c = colors[cindex++];
+      if (cindex >= colors.length) cindex = 0;
+      shape.setColor(c[0]/255, c[1]/255, c[2]/255);
+    };
+  }, {});
+}

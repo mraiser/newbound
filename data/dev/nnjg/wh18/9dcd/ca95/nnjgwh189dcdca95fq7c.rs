@@ -1,7 +1,7 @@
 // FIXME - assumes Newbound folder is in working directory
 
-let mut repodirx = Path::new("repositories");
-if !repodirx.exists() { std::fs::create_dir_all(repodirx); }
+let repodirx = Path::new("repositories");
+if !repodirx.exists() { let _x = std::fs::create_dir_all(repodirx); }
 let tempdir = repodirx.join(unique_session_id());
 
 let mut a = DataArray::new();
@@ -20,17 +20,17 @@ for datadirx in std::fs::read_dir(&datadirxx).unwrap() {
   let libid = datadirx.file_name().into_string().unwrap();
   let runtimedirx = runtimedirxx.join(libid.clone());
   if runtimedirx.exists() {
-    let mut repodir = repodirx.join(libid.clone());
-    let mut datadir = Path::new("data").join(libid.clone());
-    let mut runtimedir = Path::new("runtime").join(libid.clone());
+    let repodir = repodirx.join(libid.clone());
+    let datadir = Path::new("data").join(libid.clone());
+    let runtimedir = Path::new("runtime").join(libid.clone());
     if repodir.exists() || datadir.exists() || runtimedir.exists() { 
-      std::fs::remove_dir_all(tempdir);
+      let _x = std::fs::remove_dir_all(tempdir);
       return "ERROR: There is already a Library named ".to_string()+&libid; 
     }
     else {
       let _x = std::fs::rename(tempdir.clone(), repodir.clone());
-      symlink(repodir.join("data").join(libid.clone()).canonicalize().unwrap(), datadir);
-      symlink(repodir.join("runtime").join(libid.clone()).canonicalize().unwrap(), runtimedir);
+      let _x = symlink(repodir.join("data").join(libid.clone()).canonicalize().unwrap(), datadir);
+      let _x = symlink(repodir.join("runtime").join(libid.clone()).canonicalize().unwrap(), runtimedir);
       
       load_library(&libid);
       let _x = rebuild_lib(libid.to_owned());

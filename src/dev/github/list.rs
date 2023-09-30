@@ -1,8 +1,5 @@
 use ndata::dataobject::*;
-use flowlang::flowlang::data::exists::exists;
-use flowlang::flowlang::data::read::read;
 use ndata::dataarray::DataArray;
-use flowlang::flowlang::data::write::write;
 use std::path::Path;
 
 pub fn execute(_o: DataObject) -> DataObject {
@@ -15,7 +12,7 @@ o
 pub fn list() -> DataObject {
 let mut a = DataArray::new();
 
-let mut repodir = Path::new("repositories");
+let repodir = Path::new("repositories");
 if repodir.exists() {
   for libdir in std::fs::read_dir(&repodir).unwrap() {
     let libdir = libdir.unwrap();

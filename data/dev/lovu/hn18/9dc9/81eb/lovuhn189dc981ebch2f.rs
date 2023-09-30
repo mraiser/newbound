@@ -1,6 +1,6 @@
 let mut a = DataArray::new();
 
-let mut repodir = Path::new("repositories");
+let repodir = Path::new("repositories");
 if repodir.exists() {
   for libdir in std::fs::read_dir(&repodir).unwrap() {
     let libdir = libdir.unwrap();
