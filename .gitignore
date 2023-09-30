@@ -1,5 +1,7 @@
 /Cargo (copy).toml
 /cmd/Cargo (copy).toml
+/cmd (copy)
+/src (copy)
 /generated/
 version.txt
 botd.properties
