@@ -49,5 +49,8 @@ function ready3D(api){
       if (cindex >= colors.length) cindex = 0;
       shape.setColor(c[0]/255, c[1]/255, c[2]/255);
     };
+    shape.dblclick = function(e){
+      console.log(e);
+    };
   }, {});
 }

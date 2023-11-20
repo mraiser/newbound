@@ -47,6 +47,11 @@ me.ready = function(){
                 if (model && model.click) return model.click(event);
               });
               
+              $(renderer.domElement).dblclick(function(event){
+                var model = me.findEvent(event, "dblclick");
+                if (model && model.dblclick) return model.dblclick(event);
+              });
+              
               var render = function(){
                 for (var i in me.children){
                   var kid = me.children[i];
@@ -109,6 +114,10 @@ me.addControl = function(el, lib, id, cb, data, parent){
 };
 
 me.findClick = function(event){
+  return me.findEvent(event, "click");
+};
+
+me.findEvent = function(event, typ){
   event.three = {};
   var clientX = event.clientX - $(ME).offset().left;
   var clientY = event.clientY - $(ME).offset().top;
@@ -132,8 +141,8 @@ me.findClick = function(event){
     while (!o.api && o.parent) o = o.parent;
     if (o.api) {
       o = o.api;
-      while (!o.click && o.owner) o = o.owner;
-      if (o.click) return o;
+      while (!o[typ] && o.owner) o = o.owner;
+      if (o[typ]) return o;
     }
   }
   return null;
