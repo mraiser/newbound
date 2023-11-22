@@ -4,6 +4,7 @@ let
     gcc
     cargo
     rustc
+    python311
   ];
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath LLP;
 in  
