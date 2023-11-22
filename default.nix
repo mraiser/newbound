@@ -1,33 +1,18 @@
 with (import <nixpkgs> {});
-stdenv.mkDerivation {
-  name = "pip-env";
-  buildInputs = [
-    # System requirements.
-    readline
-    openssl
-    pkg-config
-    ffmpeg-full
-    sox
+let
+  LLP = with pkgs; [
     gcc
-    openblas
-    rustc
     cargo
-
-    # Python requirements (enough to get a virtualenv going).
-    python310Full
-    python310Packages.virtualenv
-    python310Packages.pip
-    python310Packages.setuptools
-    python310Packages.numpy
-    python310Packages.face_recognition
-    (python310Packages.opencv4.override {enableGtk2 = true;})
+    rustc
   ];
+  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath LLP;
+in  
+stdenv.mkDerivation {
+  name = "udo-env";
+  buildInputs = LLP;
   src = null;
   shellHook = ''
-    # Allow the use of wheels.
     SOURCE_DATE_EPOCH=$(date +%s)
-
-    # Augment the dynamic linker path
-    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${R}/lib/R/lib:${readline}/lib
+    export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
   '';
 }
