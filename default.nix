@@ -5,11 +5,12 @@ let
     cargo
     rustc
     python311
+    git
   ];
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath LLP;
 in  
 stdenv.mkDerivation {
-  name = "udo-env";
+  name = "newbound-env";
   buildInputs = LLP;
   src = null;
   shellHook = ''
