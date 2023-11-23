@@ -63,7 +63,8 @@ fn do_send() {
   while system.get_boolean("running") {
     let sock;
     unsafe { sock = DISCOVERYCON.get().write().unwrap().try_clone().unwrap(); }
-    sock.send_to(&buf, &broad).unwrap();
+    let x = sock.send_to(&buf, &broad);
+    if x.is_err() { println!("DISCOVERY ERROR {:?}", x); } 
     
     thread::sleep(beat);
   }
