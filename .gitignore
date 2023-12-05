@@ -39,8 +39,8 @@ botd.properties
 /data/automatic1111
 /data/discord
 /data/quickjourney
-/data/imageproc
-/data/imageproc_X
+/data/imgproc
+/data/mp42lora
 
 /runtime/dev/libraries/
 /runtime/camera
@@ -62,4 +62,5 @@ botd.properties
 /runtime/automatic1111
 /runtime/discord
 /runtime/quickjourney
-/runtime/imgrpoc
+/runtime/imgproc
+

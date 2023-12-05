@@ -1,2 +1,7 @@
 pub mod appdata;
 pub mod publishapp;
+use flowlang::rustcmd::*;
+pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
+    cmds.push(("iwvgmq1835bb194ffo8".to_string(), publishapp::execute, "".to_string()));
+    cmds.push(("vsxqui18332a86185i159".to_string(), appdata::execute, "".to_string()));
+}

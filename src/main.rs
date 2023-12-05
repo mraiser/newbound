@@ -30,14 +30,12 @@ fn main() {
   env::set_var("RUST_BACKTRACE", "1");
   {
     let mut initializer = Initializer { data_ref: flowlang::init("data"), cmds: Vec::new() };
-    
     let mut v = Vec::new();
     cmdinit(&mut v);
     for q in &v { RustCmd::add(q.0.to_owned(), q.1, q.2.to_owned()); }
-    
     mirror(&mut initializer);
     for q in &initializer.cmds { RustCmd::add(q.0.to_owned(), q.1, q.2.to_owned()); }
-
+    
     #[cfg(feature = "reload")]
     {
       use std::thread;
@@ -49,6 +47,7 @@ fn main() {
           hot_lib::subscribe().wait_for_reload();
           println!("... library has been reloaded {} times", hot_lib::version());
           
+          initializer.cmds.clear();
           mirror(&mut initializer);
           // FIXME - remove deleted commands
           for q in &initializer.cmds { RustCmd::add(q.0.to_owned(), q.1, q.2.to_owned()); }
