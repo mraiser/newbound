@@ -802,6 +802,8 @@ dependencies = [
 [[package]]
 name = "flowlang"
 version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be0e616186490310e84ed00c0bee1be669e5c6622a2f959b7c9a7b2f0746d0d2"
 dependencies = [
  "deno_core",
  "jni 0.19.0",

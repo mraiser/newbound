@@ -29,7 +29,7 @@ state = "0.5.3"
 
 cmd = { path = "./cmd" }
 hot-lib-reloader = { version = "^0.6", optional = true }
-flowlang = "0.3.2"
+flowlang = "0.3.3"
 ndata = "0.3.7"
 serde = { version = "1.0.155", features = ["derive"], optional = true }
 serde_json = { version = "1.0.94", optional = true }
