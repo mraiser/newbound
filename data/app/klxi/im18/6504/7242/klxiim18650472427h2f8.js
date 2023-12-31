@@ -13,8 +13,8 @@ me.ready = function(){
   
   if (ME.DATA.click_add) me.click_add = ME.DATA.click_add;
   else {
-    me.click_add_title = ME.DATA.click_add_title ? ME.DATA.click_add_title : "Add";
-    me.click_add_prompt = ME.DATA.click_add_prompt ? ME.DATA.click_add_prompt : "Give the new item a name";
+    me.click_add_title = ME.DATA.click_add_title ? ME.DATA.click_add_title : "Add" + (ME.DATA.type ? " "+ME.DATA.type : "");
+    me.click_add_prompt = ME.DATA.click_add_prompt ? ME.DATA.click_add_prompt : "Give the new "+(ME.DATA.type ? ME.DATA.type.toLowerCase() : "item")+" a name";
     me.default_value = ME.DATA.default_value ? ME.DATA.default_value : "UNTITLED";
   }
   
@@ -74,7 +74,7 @@ me.click_delete = function(){
   var i = $(this).data('index');
   var d = {
     "title": "Delete Item",
-    "text": "Are you sure you want to permanently delete this item?",
+    "text": "Are you sure you want to permanently delete this "+(ME.DATA.type ? ME.DATA.type.toLowerCase() : "item")+"?",
     "cb": function(){ me.delete_item(i); }
   };
   document.body.ui.confirm(d);
@@ -97,7 +97,11 @@ me.click_add = function(){
     "text": "Name",
     "subtext": me.click_add_prompt,
     "cb": function(val){
-      debugger;
+      if (me.list.indexOf(val) == -1) {
+        me.list.push(val);
+        me.rebuild();
+      }
+      else document.body.ui.snackbarMsg("There is already an item with that name.");
     }
   };
   document.body.ui.prompt(d);

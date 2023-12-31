@@ -1,6 +1,8 @@
 var me = this; 
 var ME = $('#'+me.UUID)[0];
 
+me.data = ME.DATA;
+
 me.animate = function(model){
   me.data = ME.DATA;
   me.model = model;

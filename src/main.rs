@@ -7,6 +7,7 @@ mod cmdinit;
 use std::env;
 use flowlang::appserver::*;
 use flowlang::rustcmd::*;
+use flowlang::buildrust::build_all;
 
 #[cfg(feature = "reload")]
 use hot_lib::*;
@@ -53,6 +54,15 @@ fn main() {
           for q in &initializer.cmds { RustCmd::add(q.0.to_owned(), q.1, q.2.to_owned()); }
         }
       });
+    }
+    
+    let params: Vec<String> = env::args().collect();
+    if params.len() > 1{
+      let x = &params[1];
+      if x == "rebuild" {
+        println!("REBUILDING ALL");
+        build_all();
+      }
     }
     
     #[cfg(not(feature = "webview"))]

@@ -8,7 +8,7 @@ me.ready = function(api){
   el.data('orbitcontrols', false);
   el.data('showdatgui', false);
   
-  installControl(el[0], 'threejs', 'viewer', function(api){
+  installControl(el[0], 'app', 'scenegraph', function(api){
     me.viewer = api;
     api.waitReady(function(){
       
@@ -36,7 +36,7 @@ me.getData = function(){
 me.setData = function(ctl){
   var el = $('<div/>');
   $(ME).append(el);
-  me.viewer.add(el[0], "flow", "case", function(model){
+  me.viewer.add(el[0], "xoxo", "case", function(model){
     me.case = model.api;
     me.case.parent = me;
     me.case.target_z = 0;

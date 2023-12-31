@@ -22,7 +22,7 @@ pub mod timeron;
 pub mod deviceid;
 
 use flowlang::rustcmd::*;
-pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
+pub fn cmdinit(cmds: &mut Vec<(String, flowlang::rustcmd::Transform, String)>) {
     cmds.push(("nyzimq182eabf7339p7c5".to_string(), read::execute, "".to_string()));
     cmds.push(("yjjxqk18303e75f8atb5a".to_string(), write::execute, "".to_string()));
     cmds.push(("ynpmir183479da2b9r25f8".to_string(), unique_session_id::execute, "".to_string()));

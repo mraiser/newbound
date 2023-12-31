@@ -10,7 +10,7 @@ botd.properties
 /target
 /users
 /config.properties
-/Cargo.lock
+/Cargo.lockx
 /venv
 /requirements.txt
 /repositories
@@ -41,6 +41,8 @@ botd.properties
 /data/quickjourney
 /data/imgproc
 /data/mp42lora
+/data/testflow
+data/xoxo
 
 /runtime/dev/libraries/
 /runtime/camera
@@ -63,4 +65,5 @@ botd.properties
 /runtime/discord
 /runtime/quickjourney
 /runtime/imgproc
-
+/runtime/testflow
+/runtime/xoxo

@@ -1,6 +1,19 @@
 var me = this; 
 var ME = $('#'+me.UUID)[0];
 
+var done = false;
+var callbacks = [];
+me.waitReady = function(cb){
+  callbacks.push(cb);
+  checkIfDone();
+};
+
+function checkIfDone(){
+  if (done) {
+    while (callbacks.length>0) callbacks.shift()(me);
+  }
+}
+
 me.ready = function(){
   me.children = [];
   $.getScript( '../app/asset/app/threejs/three.min.js', function() { 
@@ -15,8 +28,9 @@ me.ready = function(){
 
               var el = $(ME).find('.matrixviewer');
               var scene = me.scene = new THREE.Scene();
-              var camera = me.camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
-              var renderer = me.renderer = new THREE.WebGLRenderer({ alpha: true });
+              scene.viewer = me;
+              var camera = me.scene.camera = me.camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
+              var renderer = me.scene.renderer = me.renderer = new THREE.WebGLRenderer({ alpha: true });
               
               var w = window.innerWidth;
               var h = window.innerHeight - 96;
@@ -52,11 +66,29 @@ me.ready = function(){
                 if (model && model.dblclick) return model.dblclick(event);
               });
               
-              var render = function(){
-                for (var i in me.children){
-                  var kid = me.children[i];
-                  if (kid.render) kid.render();
+              var renderKids = function(who){
+                for (var i in who.children){
+                  var kid = who.children[i];
+                  if (kid.render) kid.render(kid.model);
+                  if (kid.children) renderKids(kid);
+                  /*
+                  if (kid.rig) {
+                    if (typeof kid.rig.pos_x != 'undefined') kid.position.x = kid.rig.pos_x;
+                    if (typeof kid.rig.pos_y != 'undefined') kid.position.y = kid.rig.pos_y;
+                    if (typeof kid.rig.pos_z != 'undefined') kid.position.z = kid.rig.pos_z;
+                    if (typeof kid.rig.rot_x != 'undefined') kid.rotation.x = kid.rig.rot_x;
+                    if (typeof kid.rig.rot_y != 'undefined') kid.rotation.y = kid.rig.rot_y;
+                    if (typeof kid.rig.rot_z != 'undefined') kid.rotation.z = kid.rig.rot_z;
+                    if (typeof kid.rig.scale_x != 'undefined') kid.scale.x = kid.rig.scale_x;
+                    if (typeof kid.rig.scale_y != 'undefined') kid.scale.y = kid.rig.scale_y;
+                    if (typeof kid.rig.scale_z != 'undefined') kid.scale.z = kid.rig.scale_z;
+                  }
+                  */
                 }
+              };
+              
+              var render = function(){
+                renderKids(me);
                 me.renderer.render(me.scene, me.camera);
               };
 
@@ -65,6 +97,9 @@ me.ready = function(){
                 render();
               };
               animate();
+              
+              done = true;
+              checkIfDone();
             });
           });
         });
@@ -73,43 +108,88 @@ me.ready = function(){
   });
 };
 
-me.addControl = function(el, lib, id, cb, data, parent){
+function addFunction(obj, name, params, body){
+  function construct(args) {
+    function F() { return Function.apply(obj, args); }
+    F.prototype = Function.prototype;
+    return new F();
+  }
+  var args = params.slice();
+  args.push(body);
+  var f = construct(args);
+  obj[name] = function(){
+    return f.apply(obj, arguments);
+  }
+}
+
+me.add = function(el, lib, id, cb, data, parent){
   console.log("ADD CONTROL "+lib+":"+id);
   
+  if (typeof lib == 'undefined')
+    debugger;
+  
   installControl(el, lib, id, function(api){
+    api.data = data;
+    
+    var kidcount = 0;
+    function checkTheKids(){
+      if (kidcount == 0) {
+        console.log("I AM DONE");
+        if (api.animate) 
+          api.animate(group);
+        if (cb) cb(api.model);
+      }
+    }
+    
     var group = new THREE.Group();
     group.api = api;
+    group.rig = {};
+    group.scene = me.scene;
     api.model = group;
     api.viewer = me;
+    
     if (!api.children) api.children = [];
+    if (!api.rig) api.rig = group.rig;
     
     if (parent) {
       parent.model.add(group);
-      parent.children.push(api);
-      api.owner = parent;
     }
     else {
       me.scene.add(group);
-      me.children.push(api);
-      api.owner = me;
+      parent = me;
     }
     
+    api.owner = parent;
+    parent.children.push(group);
+        
     var meta = $(el)[0].meta;
     if (meta && meta.three) {
       var three = meta.three;
+      if (three.behaviors){
+        for (var i in three.behaviors) {
+          var b = three.behaviors[i];
+          var args = [];
+          for (j in b.params) args.push(b.params[j].name);
+          if (b.lang == 'flow') me.interpreter.addFunction(api, b.name, b);
+          else addFunction(api, b.name, args, b.body);
+        }
+      }
       if (three.controls){
         for (var i in three.controls){
           var ctl = three.controls[i];
+          if (!ctl.lib) { ctl.lib = ctl.db; }
           var el2 = $('<div id="'+ctl.uuid+'"/>');
           $(el).append(el2);
-          me.addControl(el2[0], ctl.lib, ctl.id, function(model){}, ctl, api);
+          kidcount++;
+          me.add(el2[0], ctl.lib, ctl.id, function(model){
+            kidcount--;
+            checkTheKids();
+          }, ctl, api);
         }
       }
     }
     
-    if (api.animate) api.animate(group);
-    if (cb) cb(api);
-//  }, data);
+    checkTheKids();
   }, data);
 };
 
