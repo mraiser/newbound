@@ -62,6 +62,7 @@ fn main() {
       if x == "rebuild" {
         println!("REBUILDING ALL");
         build_all();
+        return;
       }
     }
     
