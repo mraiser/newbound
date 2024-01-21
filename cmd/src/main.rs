@@ -1,10 +1,4 @@
 mod cmdinit;
-pub mod testflow;
-pub mod imgproc;
-pub mod chuckme;
-pub mod discord;
-pub mod nebula;
-pub mod raspberry;
 
 use std::env;
 use flowlang::appserver::*;
