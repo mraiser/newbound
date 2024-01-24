@@ -5,6 +5,9 @@ use flowlang::appserver::*;
 use flowlang::rustcmd::*;
 use crate::cmdinit::cmdinit;
 
+mod api;
+pub static API : crate::api::api = crate::api::new();
+
 fn main() {
   flowlang::init("data");
   init_cmds();

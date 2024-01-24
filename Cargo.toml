@@ -8,7 +8,6 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-
 reload = ["dep:hot-lib-reloader","cmd/reload"]
 serde_support = ["serde","serde_json","flowlang/serde_support","ndata/serde_support","cmd/serde_support"]
 webview = ["wry"]
@@ -20,19 +19,19 @@ javascript_runtime = ["flowlang/javascript_runtime"]
 uuid = { version="1.3.0", features=["v4"] }
 x25519-dalek = "1.2.0"
 zip = { version="0.6.4", features=["deflate-miniz"] }
-local-ip-address = "0.5.1"
-aes = "0.8.2"
+local-ip-address = "^0.5"
+aes = "^0.8"
 walkdir = "2.3.2"
-rand = "0.7"
-blake2 = "0.10.6"
+rand = "^0.7"
+blake2 = "^0.10"
 state = "0.5.3"
 
 cmd = { path = "./cmd" }
-hot-lib-reloader = { version = "^0.6", optional = true }
-flowlang = "0.3.3"
-ndata = "0.3.7"
-serde = { version = "1.0.155", features = ["derive"], optional = true }
-serde_json = { version = "1.0.94", optional = true }
+hot-lib-reloader = { version = "^0.7", optional = true }
+flowlang = "0.3.9"
+ndata = "0.3.10"
+serde = { version = "^1.0", features = ["derive"], optional = true }
+serde_json = { version = "^1.0", optional = true }
 wry = { version="0.27.0", optional=true }
 
 [[bin]]

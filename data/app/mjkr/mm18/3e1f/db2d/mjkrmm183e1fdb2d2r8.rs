@@ -1,4 +1,4 @@
-  START.call_once(|| { WEBSOCKHEAP.set(RwLock::new(Heap::new())); });  
+  START.call_once(|| { WEBSOCKHEAP.set(RwLock::new(Heap::new())); }); 
 
   let beat = Duration::from_millis(10);
   let system = DataStore::globals().get_object("system");

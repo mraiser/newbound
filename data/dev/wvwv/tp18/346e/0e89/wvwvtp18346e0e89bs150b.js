@@ -13,6 +13,9 @@ me.ready = function(api){
   $(ME).find('.editcommand'+lang+'iddisplay').text(ME.DATA.cmd[lang]);
   
   json('../app/read', 'lib='+ME.DATA.lib+'&id='+cid, function(result){ 
+    
+    if (!result.data) result.data = {};
+    
     me.cmddata = result.data;
     var code = lang == "rust" ? result.data["rs"] : result.data[lang];
     

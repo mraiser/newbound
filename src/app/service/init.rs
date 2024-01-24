@@ -46,7 +46,7 @@ o
 }
 
 pub fn init() -> String {
-  START.call_once(|| { WEBSOCKHEAP.set(RwLock::new(Heap::new())); });  
+  START.call_once(|| { WEBSOCKHEAP.set(RwLock::new(Heap::new())); }); 
 
   let beat = Duration::from_millis(10);
   let system = DataStore::globals().get_object("system");
@@ -1130,5 +1130,6 @@ pub fn format_result(command:Command, o:DataObject) -> DataObject {
   if !d.has("status") { d.put_string("status", "ok"); }
   
   d
+
 }
 

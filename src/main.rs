@@ -8,6 +8,7 @@ use std::env;
 use flowlang::appserver::*;
 use flowlang::rustcmd::*;
 use flowlang::buildrust::build_all;
+use flowlang::buildrust::rebuild_rust_api;
 
 #[cfg(feature = "reload")]
 use hot_lib::*;
@@ -33,7 +34,7 @@ fn main() {
     let mut initializer = Initializer { data_ref: flowlang::init("data"), cmds: Vec::new() };
     let mut v = Vec::new();
     cmdinit(&mut v);
-    for q in &v { RustCmd::add(q.0.to_owned(), q.1, q.2.to_owned()); }
+    initializer.cmds = v;
     mirror(&mut initializer);
     for q in &initializer.cmds { RustCmd::add(q.0.to_owned(), q.1, q.2.to_owned()); }
     
@@ -49,19 +50,22 @@ fn main() {
           println!("... library has been reloaded {} times", hot_lib::version());
           
           initializer.cmds.clear();
+          let mut v = Vec::new();
+          cmdinit(&mut v);
+          initializer.cmds = v;
           mirror(&mut initializer);
-          // FIXME - remove deleted commands
           for q in &initializer.cmds { RustCmd::add(q.0.to_owned(), q.1, q.2.to_owned()); }
         }
       });
     }
-    
+
     let params: Vec<String> = env::args().collect();
     if params.len() > 1{
       let x = &params[1];
       if x == "rebuild" {
         println!("REBUILDING ALL");
         build_all();
+        rebuild_rust_api();
         return;
       }
     }

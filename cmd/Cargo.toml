@@ -12,7 +12,7 @@ serde_support = ["serde","serde_json","flowlang/serde_support","ndata/serde_supp
 reload = []
 
 [dependencies]
-flowlang = "0.3.3"
-ndata = "0.3.7"
-serde = { version = "1.0.155", features = ["derive"], optional = true }
-serde_json = { version = "1.0.94", optional = true }
+flowlang = "0.3.9"
+ndata = "0.3.10"
+serde = { version = "^1.0", features = ["derive"], optional = true }
+serde_json = { version = "^1.0", optional = true }
