@@ -1,17 +1,22 @@
   let socket_address = "0.0.0.0:5770".to_string();
   START.call_once(|| { 
-    let sock = UdpSocket::bind(socket_address).unwrap();
-    sock.set_broadcast(true).unwrap();
-    unsafe { DISCOVERYCON.set(RwLock::new(sock)); }
-    println!("DISCOVERY UDP listening on port 5770");
-  });
+    let sock = UdpSocket::bind(socket_address);
+    if sock.is_ok() {
+      let sock = sock.unwrap();
+      sock.set_broadcast(true).unwrap();
+      unsafe { DISCOVERYCON.set(RwLock::new(sock)); }
+      println!("DISCOVERY UDP listening on port 5770");
+      thread::spawn(move || {
+        do_listen();
+      });
 
-  thread::spawn(move || {
-    do_listen();
-  });
-  
-  thread::spawn(move || {
-    do_send();
+      thread::spawn(move || {
+        do_send();
+      });
+    }
+    else {
+      println!("DISCOVERY COULD NOT START");
+    }
   });
   
   "OK".to_string()

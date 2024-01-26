@@ -1,3 +1,4 @@
+pub mod close_stream;
 pub mod stream_write;
 pub mod new_stream;
 pub mod listen;
@@ -12,6 +13,7 @@ pub mod discovery;
 pub mod get_stream;
 use flowlang::rustcmd::*;
 pub fn cmdinit(cmds: &mut Vec<(String, flowlang::rustcmd::Transform, String)>) {
+    cmds.push(("zqxtsm18d3d4ef2b3j101".to_string(), close_stream::execute, "".to_string()));
     cmds.push(("pmumpq18d39a2594cp3".to_string(), stream_write::execute, "".to_string()));
     cmds.push(("myuvuz18d36f76d2cg3".to_string(), new_stream::execute, "".to_string()));
     cmds.push(("hlmugl188ab38379arb5".to_string(), get_stream::execute, "".to_string()));
