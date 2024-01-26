@@ -18,7 +18,9 @@
         if app.index_of(de.clone()) != -1 {
           let stream = sock.stream.try_clone().unwrap();
           // FIXME - Remove the dead ones
-          websock_message(stream, data.to_string());
+          if !websock_message(stream, data.to_string()) {
+            sockheap.decr(sockref);
+          }
         }
       }
     }
@@ -902,7 +904,7 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
   res
 }
 
-fn websock_message(mut stream: TcpStream, msg:String){
+fn websock_message(mut stream: TcpStream, msg:String) -> bool {
   let msg = msg.as_bytes();
   
   let n = msg.len() as i64;
@@ -934,7 +936,7 @@ fn websock_message(mut stream: TcpStream, msg:String){
 
   let x = stream.write(&reply);
   // FIXME - Remove the dead ones
-  if x.is_err() { println!("WEBSOCKET DIED"); }
+  x.is_ok()
 }
 
 pub fn handle_command(d: DataObject, sid: String) -> DataObject {
