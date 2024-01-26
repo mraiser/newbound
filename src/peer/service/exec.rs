@@ -51,7 +51,7 @@ let buf = encrypt(&cipher, s.as_bytes());
 let len = buf.len() as i16;
 let mut bytes = len.to_be_bytes().to_vec();
 bytes.extend_from_slice(&buf);
-let _x = stream.write(&bytes).unwrap();
+let _x = stream.write(&bytes, con.sessionid).unwrap();
 
 // FIXME - should timeout
 let pidstr = &pid.to_string();

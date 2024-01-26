@@ -65,10 +65,13 @@ for (uuid, user) in users.objects(){
       if user.has("keepalive") && Data::as_string(user.get_property("keepalive")) == "true" {
         if user.has("address") && user.has("port") {
           let ipaddr = user.get_string("address");
-          let port = Data::as_string(user.get_property("port")).parse::<i64>().unwrap();
-          thread::spawn(move || {
-            tcp_connect(uuid, ipaddr, port);
-          });
+          let port = Data::as_string(user.get_property("port")).parse::<i64>();
+          if port.is_ok() {
+            let port = port.unwrap();
+            thread::spawn(move || {
+              tcp_connect(uuid, ipaddr, port);
+            });
+          }
         }
       }
     }

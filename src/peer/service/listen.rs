@@ -38,6 +38,9 @@ use std::path::Path;
 use std::fs;
 use crate::security::security::init::get_user;
 use crate::security::security::init::set_user;
+use core::sync::atomic::AtomicBool;
+use core::sync::atomic::Ordering;
+use core::hint::spin_loop;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("ipaddr");
@@ -50,7 +53,7 @@ o
 
 pub fn listen(ipaddr:String, port:i64) -> i64 {
   do_init();
-  do_listen(ipaddr, port)
+  do_listen(ipaddr, port) 
 }
 
 static START: Once = Once::new();
@@ -58,11 +61,15 @@ static P2PCONS:Storage<RwLock<HashMap<i64, P2PConnection>>> = Storage::new();
 static STREAMWRITERS:Storage<RwLock<HashMap<i64, i64>>> = Storage::new();
 static STREAMREADERS:Storage<RwLock<HashMap<i64, DataBytes>>> = Storage::new();
 
+static P2PCONLOCKS:Storage<RwLock<HashMap<String, AtomicBool>>> = Storage::new();
+
 fn do_init(){
   START.call_once(|| { 
     P2PCONS.set(RwLock::new(HashMap::new())); 
     STREAMWRITERS.set(RwLock::new(HashMap::new())); 
     STREAMREADERS.set(RwLock::new(HashMap::new())); 
+    
+    P2PCONLOCKS.set(RwLock::new(HashMap::new())); 
   });
 }
 
@@ -161,8 +168,28 @@ impl P2PStream {
     }
   }
   
-  pub fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-    match self {
+  fn try_lock(&self, sid:String) -> bool {
+    if &sid == "HANDSHAKE" { return false; }
+    
+    let mut lockheap = P2PCONLOCKS.get().write().unwrap();
+    let lock = lockheap.get(&sid).unwrap();
+    lock.swap(true, Ordering::AcqRel)
+  }
+  
+  fn release_lock(&self, sid:String) {
+    if &sid != "HANDSHAKE" {
+      let mut lockheap = P2PCONLOCKS.get().write().unwrap();
+      let lock = lockheap.get(&sid).unwrap();
+      lock.store(false, Ordering::Release);
+    }
+  }
+  
+  pub fn write(&mut self, buf: &[u8], sid:String) -> io::Result<usize> {
+    while self.try_lock(sid.clone()) {
+      spin_loop();
+    }
+
+    let q = match self {
       P2PStream::Tcp(stream) => {
         stream.write(buf)
       },
@@ -185,7 +212,7 @@ impl P2PStream {
             let len = buf.len() as i16;
             let mut bytes = len.to_be_bytes().to_vec();
             bytes.extend_from_slice(&buf);
-            let x = stream.write(&bytes)?;
+            let x = stream.write(&bytes, con.sessionid)?;
             return Ok(x);
           }
           panic!("No route to relay {}", from);
@@ -195,7 +222,11 @@ impl P2PStream {
       P2PStream::Udp(stream) => {
         stream.write(buf)
       },
-    }
+    };
+    
+    self.release_lock(sid.clone());
+    
+    q
   }
   
   pub fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
@@ -399,11 +430,13 @@ impl P2PConnection {
     let conid;
     {
       let mut heap = P2PCONS.get().write().unwrap();
+      let mut lockheap = P2PCONLOCKS.get().write().unwrap();
       loop {
         let x = rand::thread_rng().gen::<i64>();
         if !heap.contains_key(&x) {
           conid = x;
           heap.insert(conid, con.duplicate());
+          lockheap.insert(con.sessionid.clone(), AtomicBool::new(false));
           cons.push_int(conid);
           break;
         }
@@ -423,10 +456,13 @@ impl P2PConnection {
     let mut con;
     {
       let mut heap = P2PCONS.get().write().unwrap();
+      let mut lockheap = P2PCONLOCKS.get().write().unwrap();
       let x = heap.get(&conid);
       if x.is_none() { return Ok(()); }
       con = x.unwrap().duplicate();
       heap.remove(&conid);
+      let sid = con.sessionid.clone();
+      lockheap.remove(&sid);
     }
     let x = self.stream.shutdown();
     fire_event("peer", "UPDATE", user_to_peer(user.clone(), uuid.to_string()));
@@ -494,7 +530,7 @@ impl P2PConnection {
     let len = buf.len() as i16;
     let mut bytes = len.to_be_bytes().to_vec();
     bytes.extend_from_slice(&buf);
-    let _x = self.stream.write(&bytes); //.unwrap();
+    let _x = self.stream.write(&bytes, self.sessionid.clone()); //.unwrap();
     
     db
   }
@@ -530,7 +566,7 @@ impl P2PConnection {
     // FIXME - Does it, tho?
     let _heap = STREAMWRITERS.get().write().unwrap();
     
-    let x = self.stream.write(&bytes);
+    let x = self.stream.write(&bytes, self.sessionid.clone());
     x.is_ok()
   }
   
@@ -547,7 +583,7 @@ impl P2PConnection {
     let len = buf.len() as i16;
     let mut bytes = len.to_be_bytes().to_vec();
     bytes.extend_from_slice(&buf);
-    let _x = self.stream.write(&bytes); //.unwrap();
+    let _x = self.stream.write(&bytes, self.sessionid.clone()); //.unwrap();
   }
 
   pub fn end_stream_read(&mut self, y:i64) {
@@ -681,7 +717,7 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
 
   // Send temp pubkey if init
   let init = peer.is_some();
-  if init { let _x = stream.write(&my_session_public.to_bytes()).unwrap(); }
+  if init { let _x = stream.write(&my_session_public.to_bytes(), "HANDSHAKE".to_string()).unwrap(); }
 
   // Read remote temp pubkey
   let mut bytes = vec![0u8; 32];
@@ -692,7 +728,7 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
   let remote_session_public = PublicKey::from(remote_session_public);
 
   // Send temp pubkey if not init
-  if !init { let _x = stream.write(&my_session_public.to_bytes()).unwrap(); }
+  if !init { let _x = stream.write(&my_session_public.to_bytes(), "HANDSHAKE".to_string()).unwrap(); }
   
   // Temp cipher for initial exchange
   let shared_secret = my_session_private.diffie_hellman(&remote_session_public);
@@ -701,7 +737,7 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
 
   // Send my UUID
   let bytes = encrypt(&cipher, my_uuid.as_bytes());
-  let _x = stream.write(&bytes).unwrap();
+  let _x = stream.write(&bytes, "HANDSHAKE".to_string()).unwrap();
 
   // Get remote UUID
   let mut bytes = vec![0u8; 48];
@@ -719,7 +755,7 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
     // Send my_step: 0 = sendpubkey, 1 = continue
     let my_step;
     if havekey { my_step = 1; } else { my_step = 0; }
-    let _x = stream.write(&[my_step]).unwrap();
+    let _x = stream.write(&[my_step], "HANDSHAKE".to_string()).unwrap();
 
     //read remote_step
     let mut bytes = vec![0u8; 1];
@@ -731,7 +767,7 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
     // Remote step
     if remote_step == 0 {
       let bytes = encrypt(&cipher, &decode_hex(&my_public).unwrap());
-      let _x = stream.write(&bytes).unwrap();
+      let _x = stream.write(&bytes, "HANDSHAKE".to_string()).unwrap();
     }
     else if remote_step != 1 {
       return None;
@@ -765,13 +801,13 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
       if sig != "What's good, yo?" { isok = false; }
       else {
         let buf = encrypt(&cipher, "All is good now!".as_bytes());
-        let _x = stream.write(&buf).unwrap();
+        let _x = stream.write(&buf, "HANDSHAKE".to_string()).unwrap();
         isok = true;
       }
     }
     else {
       let buf = encrypt(&cipher, "What's good, yo?".as_bytes());
-      let _x = stream.write(&buf).unwrap();
+      let _x = stream.write(&buf, "HANDSHAKE".to_string()).unwrap();
 
       let mut bytes = vec![0u8; 16];
       let _x = stream.read_exact(&mut bytes).unwrap();
@@ -968,7 +1004,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       let len = buf.len() as i16;
       let mut bytes = len.to_be_bytes().to_vec();
       bytes.extend_from_slice(&buf);
-      let _x = stream.write(&bytes).unwrap();
+      let _x = stream.write(&bytes, con.sessionid).unwrap();
     }
     else {
       let s = "err fwd ".to_string() + &uuid2;
@@ -981,7 +1017,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       let len = buf.len() as i16;
       let mut bytes = len.to_be_bytes().to_vec();
       bytes.extend_from_slice(&buf);
-      let _x = stream.write(&bytes).unwrap();
+      let _x = stream.write(&bytes, sessionid).unwrap();
     }
   }
   else if method == "err ".to_string() {
@@ -1046,7 +1082,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
     let cipher = cipher.to_owned();
     let sessionid = sessionid.to_owned();
     thread::spawn(move || {
-      let mut o = handle_command(d, sessionid);
+      let mut o = handle_command(d, sessionid.clone());
       
       if o.has("nn_return_type") && o.get_string("nn_return_type") == "File" {
         // FIXME - combine with peer:peer:local
@@ -1083,7 +1119,7 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       //        let _lock = P2PHEAP.get().write().unwrap();
       let mut bytes = len.to_be_bytes().to_vec();
       bytes.extend_from_slice(&buf);
-      let _x = stream.write(&bytes);
+      let _x = stream.write(&bytes, sessionid);
     });
   }
   else if method == "res ".to_string() {
