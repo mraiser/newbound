@@ -131,8 +131,18 @@ impl P2PStream {
   }
   
   pub fn write(&mut self, buf: &[u8], sid:String) -> io::Result<usize> {
+    let mut timeout = 0;
     while self.try_lock(sid.clone()) {
-      spin_loop();
+      // TIGHTLOOP
+      //spin_loop();
+      timeout += 1;
+      let beat = Duration::from_millis(timeout);
+      thread::sleep(beat);
+      if timeout > 450 { 
+        let form = format!("Unusually long wait writing to stream, aborting [{}]", &sid);
+        println!("{}", form); 
+        return Err(io::Error::new(io::ErrorKind::BrokenPipe, form));
+      }
     }
 
     let q = match self {
@@ -493,7 +503,7 @@ impl P2PConnection {
       }
       
       timeout += 1;
-      if timeout > 246 { println!("No request for stream data in 30 seconds... discarding stream."); return false; }
+      if timeout > 500 { println!("No request for stream data... discarding stream."); return false; }
       let beat = Duration::from_millis(timeout);
       thread::sleep(beat);
     }
