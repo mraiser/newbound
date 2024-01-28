@@ -204,7 +204,7 @@ impl P2PStream {
         stream.write(buf)
       },
       P2PStream::Relay(stream) => {
-        let from = &stream.from;
+        let from = &stream.from.clone();
         let to = &stream.to;
         
         let user = get_user(&from);
@@ -223,10 +223,13 @@ impl P2PStream {
             let mut bytes = len.to_be_bytes().to_vec();
             bytes.extend_from_slice(&buf);
             let x = stream.write(&bytes, con.sessionid)?;
+		    self.release_lock(sid.clone());
             return Ok(x);
           }
+		  self.release_lock(sid.clone());
           panic!("No route to relay {}", from);
         }
+    	self.release_lock(sid.clone());
         panic!("No such relay {}", from);
       },
       P2PStream::Udp(stream) => {
