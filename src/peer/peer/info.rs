@@ -32,18 +32,18 @@ for (_name, ip) in network_interfaces.iter() {
     a.push_string(&s);
   }
 }
-
-let system = DataStore::globals().get_object("system");
-let name = system.get_object("config").get_string("machineid");
-let http_port = Data::as_string(system.get_object("config").get_property("http_port")).parse::<i64>().unwrap();
-let port = Data::as_string(system.get_object("apps").get_object("peer").get_object("runtime").get_property("port")).parse::<i64>().unwrap();
-let id = system.get_object("apps").get_object("app").get_object("runtime").get_string("uuid");
-o.put_string("name", &name);
-o.put_string("uuid", &id);
-o.put_string("session_id", &nn_sessionid);
-o.put_int("p2p_port", port);
-o.put_int("http_port", http_port);
-
+{
+  let system = DataStore::globals().get_object("system");
+  let name = system.get_object("config").get_string("machineid");
+  let http_port = Data::as_string(system.get_object("config").get_property("http_port")).parse::<i64>().unwrap();
+  let port = Data::as_string(system.get_object("apps").get_object("peer").get_object("runtime").get_property("port")).parse::<i64>().unwrap();
+  let id = system.get_object("apps").get_object("app").get_object("runtime").get_string("uuid");
+  o.put_string("name", &name);
+  o.put_string("uuid", &id);
+  o.put_string("session_id", &nn_sessionid);
+  o.put_int("p2p_port", port);
+  o.put_int("http_port", http_port);
+}
 let mut cons = DataObject::new();
 o.put_object("connections", cons.clone());
 
