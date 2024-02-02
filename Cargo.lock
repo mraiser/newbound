@@ -261,7 +261,7 @@ dependencies = [
 name = "cmd"
 version = "0.1.0"
 dependencies = [
- "flowlang",
+ "flowlang 0.2.17",
  "ndata",
  "serde",
  "serde_json",
@@ -671,9 +671,21 @@ dependencies = [
 
 [[package]]
 name = "flowlang"
-version = "0.3.12"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "191b25e6780634eb613464097f4ad78515e9a5030b2f7d6956c4313a93f15d8f"
+checksum = "b4f4f3d80c20e41a92780279c09ed0ec742291ee97a3184a7e728acf92b0da66"
+dependencies = [
+ "ndata",
+ "serde",
+ "serde_json",
+ "state",
+]
+
+[[package]]
+name = "flowlang"
+version = "0.3.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63df1b67aeadded45949d98fb6d76d253dd447e44e1f7f06722a758e503d75ce"
 dependencies = [
  "deno_core",
  "jni 0.21.1",
@@ -1661,7 +1673,7 @@ dependencies = [
  "aes",
  "blake2",
  "cmd",
- "flowlang",
+ "flowlang 0.3.13",
  "hot-lib-reloader",
  "local-ip-address",
  "ndata",
