@@ -42,6 +42,7 @@ let x = ipaddr.to_owned();
 let port = listen(x, port);
 
 thread::spawn(move || {
+  thread::sleep(Duration::from_millis(3000));
   listen_udp(ipaddr, port);
 });
 
