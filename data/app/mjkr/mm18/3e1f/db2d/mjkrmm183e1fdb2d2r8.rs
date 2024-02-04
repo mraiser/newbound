@@ -19,7 +19,8 @@
           let stream = sock.stream.try_clone().unwrap();
           // FIXME - Remove the dead ones
           if !websock_message(stream, data.to_string()) {
-            sockheap.decr(sockref);
+            //sockheap.decr(sockref);
+            println!("DEAD WEBSOCK {}", sockref);
           }
         }
       }
