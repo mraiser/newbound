@@ -85,10 +85,12 @@ for (uuid, user) in users.objects(){
     if user.get_array("connections").len() > 0 {
       user.put_boolean("connected", true);
       let salt = salt.to_owned();
+      ask.incr();
       thread::spawn(move || {
         let system = DataStore::globals().get_object("system");
         
         let ask = DataArray::get(adr);
+        ask.decr();
         let t1 = time();
         let mut d = DataObject::new();
         d.put_array("uuid", ask);
