@@ -29,7 +29,7 @@ let port;
 if meta.has("port") { port = Data::as_string(meta.get_property("port")).parse::<i64>().unwrap(); }
 else { 
   let mut config = system.get_object("config");
-  if config.has("p2p_port") { port = Data::as_string(meta.get_property("p2p_port")).parse::<i64>().unwrap(); }  
+  if config.has("p2p_port") { port = Data::as_string(config.get_property("p2p_port")).parse::<i64>().unwrap(); }  
   else { port = 0; } 
   meta.put_int("port", port); 
   b=true; 
