@@ -27,7 +27,13 @@ if meta.has("ip_address") { ipaddr = meta.get_string("ip_address"); }
 else { ipaddr = "0.0.0.0".to_string(); meta.put_string("ip_address", &ipaddr); b=true; }
 let port;
 if meta.has("port") { port = Data::as_string(meta.get_property("port")).parse::<i64>().unwrap(); }
-else { port = 0; meta.put_int("port", port); b=true; }
+else { 
+  let mut config = system.get_object("config");
+  if config.has("p2p_port") { port = Data::as_string(meta.get_property("p2p_port")).parse::<i64>().unwrap(); }  
+  else { port = 0; } 
+  meta.put_int("port", port); 
+  b=true; 
+}
 if b {
   let file = DataStore::new().root
                 .parent().unwrap()
