@@ -1074,11 +1074,13 @@ fn read_line(reader: &mut TcpStream) -> String {
   loop {
     let res = reader.read_exact(&mut buf);
     if res.is_err() { break; }
-    line = line + &std::str::from_utf8(&buf).unwrap();
+//    line = line + &std::str::from_utf8(&buf).unwrap();
+    line.push(buf[0] as char);
     if buf[0] == b'\r' {
       let res = reader.read_exact(&mut buf);
       if res.is_err() { break; }
-      line = line + std::str::from_utf8(&buf).unwrap();
+//      line = line + std::str::from_utf8(&buf).unwrap();
+      line.push(buf[0] as char);
       if buf[0] == b'\n' {
         break;
       }
