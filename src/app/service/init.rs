@@ -177,7 +177,7 @@ pub fn http_listen() {
         loop {
           let line = read_line(&mut stream);
           let mut count = line.len();
-          if count == 2 {
+          if count <= 2 {
             break;
           }
           if (&line[0..1]).to_string() != " ".to_string(){
