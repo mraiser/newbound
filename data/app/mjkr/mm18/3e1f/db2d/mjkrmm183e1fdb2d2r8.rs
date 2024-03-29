@@ -197,7 +197,7 @@ pub fn http_listen() {
               let mut buf = vec![];
               let n = read_until(&mut stream, b'=', &mut buf);
               max -= n as i64;
-              let mut key = std::str::from_utf8(&buf).unwrap().to_string();
+              let mut key = String::from_utf8_lossy(&buf).to_string();
               if key.ends_with("=") {
                 key = (&key[..n-1]).to_string();
               }
@@ -205,7 +205,7 @@ pub fn http_listen() {
               buf = vec![];
               let n = read_until(&mut stream, b'&', &mut buf);
               max -= n as i64;
-              let mut value = std::str::from_utf8(&buf).unwrap().to_string();
+              let mut value = String::from_utf8_lossy(&buf).to_string();
               if value.ends_with("&") {
                 value = (&value[..n-1]).to_string();
               }
@@ -613,6 +613,7 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
 
   let base:i64 = 2;
   let pow7 = base.pow(7);
+  let mut dead = false;
 
   let system = DataStore::globals().get_object("system");
   loop {
@@ -709,47 +710,52 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
           }
         }
       }
-    }
-
-    let msg = std::str::from_utf8(&baos);
-    if msg.is_err() { break; }
-    
-    let msg = msg.unwrap().to_owned();        
-
-    let stream = stream.try_clone().unwrap();
-    let request = request.clone();
-    let sid = session_id.to_owned();
-    thread::spawn(move || {
-      if msg.starts_with("cmd ") {
-        let msg = &msg[4..];
-        let mut d = DataObject::from_string(msg);
-
-        let mut params = d.get_object("params").deep_copy();
-
-        for (k,v) in request.objects() {
-//          if k != "params" {
-            params.set_property(&("nn_".to_string()+&k), v);
-//          }
-        }
-        d.put_object("params", params);
-
-        let o = handle_command(d, sid);
-        // FIXME - Remove the dead ones
-        websock_message(stream, o.to_string());
-      }
-      else if msg.starts_with("sub ") {
-        let msg = &msg[4..];
-        let d = DataObject::from_string(msg);
-        let app = d.get_string("app");
-        let event = d.get_string("event");
-        let mut subs = DataObject::get(subref);
-        if !subs.has(&app) { subs.put_array(&app, DataArray::new()); }
-        subs.get_array(&app).push_string(&event);
-      }
       else {
-        println!("Unknown websocket command: {}", msg);
+        println!("BAD WEBSOCK NO GOOD");
+        dead = true;
+        break;
       }
-    });
+    }
+    if dead { break; }
+
+    let msg = "".to_string() + &String::from_utf8_lossy(&baos);
+    if msg.starts_with("cmd ") || msg.starts_with("sub ") {
+
+      let stream = stream.try_clone().unwrap();
+      let request = request.clone();
+      let sid = session_id.to_owned();
+      thread::spawn(move || {
+        if msg.starts_with("cmd ") {
+          let msg = &msg[4..];
+          let mut d = DataObject::from_string(msg);
+
+          let mut params = d.get_object("params").deep_copy();
+
+          for (k,v) in request.objects() {
+  //          if k != "params" {
+              params.set_property(&("nn_".to_string()+&k), v);
+  //          }
+          }
+          d.put_object("params", params);
+
+          let o = handle_command(d, sid);
+          // FIXME - Remove the dead ones
+          websock_message(stream, o.to_string());
+        }
+        else if msg.starts_with("sub ") {
+          let msg = &msg[4..];
+          let d = DataObject::from_string(msg);
+          let app = d.get_string("app");
+          let event = d.get_string("event");
+          let mut subs = DataObject::get(subref);
+          if !subs.has(&app) { subs.put_array(&app, DataArray::new()); }
+          subs.get_array(&app).push_string(&event);
+        }
+        else {
+          println!("Unknown websocket command: {}", msg);
+        }
+      });
+    }
   }
   true
 }
@@ -791,46 +797,33 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
     {
       // Not a websocket, try app
       let mut sa = path.split("/");
-      let appname = sa.nth(1).unwrap().to_string();
-      let apps = system.get_object("apps");
-      if apps.has(&appname) {
-        let app = apps.get_object(&appname);
-        request.put_object("app", app);
-        let mut a = DataArray::new();
-        for mut s in sa {
-          if s == "" { s = "index.html"; }
-          a.push_string(s);
-        }
-        if a.len() == 0 { a.push_string("index.html"); }
-        
-        let cmd = a.get_string(0);
-        let mut path = cmd.to_owned();
-        a.remove_property(0);
-        for p in a.objects() {
-          path += "/";
-          path += &p.string();
-        }
-        
-        // try app html dir
-        let mut p = "runtime/".to_string()+&appname+"/html/"+&path;
-
-        if Path::new(&p).exists() {
-          let md = metadata(&p).unwrap();
-          if md.is_dir() {
-            if !p.ends_with("/") { p += "/"; }
-            p += "index.html";
-            if Path::new(&p).exists() { b = true; }
+      if sa.clone().count() < 2 {
+        println!("Unknown http request url {}", &path);
+        b = false;
+      }
+      else {
+        let appname = sa.nth(1).unwrap().to_string();
+        let apps = system.get_object("apps");
+        if apps.has(&appname) {
+          let app = apps.get_object(&appname);
+          request.put_object("app", app);
+          let mut a = DataArray::new();
+          for mut s in sa {
+            if s == "" { s = "index.html"; }
+            a.push_string(s);
           }
-          else { b = true; }
-        }
-        
-        if b {
-          res.put_string("file", &p);
-          res.put_string("mimetype", &mime_type(p));
-        }
-        else {
-          // try app src dir
-          let mut p = "runtime/".to_string()+&appname+"/src/html/"+&appname+"/"+&path;
+          if a.len() == 0 { a.push_string("index.html"); }
+
+          let cmd = a.get_string(0);
+          let mut path = cmd.to_owned();
+          a.remove_property(0);
+          for p in a.objects() {
+            path += "/";
+            path += &p.string();
+          }
+
+          // try app html dir
+          let mut p = "runtime/".to_string()+&appname+"/html/"+&path;
 
           if Path::new(&p).exists() {
             let md = metadata(&p).unwrap();
@@ -841,48 +834,67 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
             }
             else { b = true; }
           }
-          
+
           if b {
             res.put_string("file", &p);
             res.put_string("mimetype", &mime_type(p));
           }
           else {
-            // try app command
-            let mut d = DataObject::new();
-            d.put_string("bot", &appname);
-            d.put_string("cmd", &cmd);
-            d.put_int("pid", 0);
-            let mut params = params.deep_copy();
-            d.put_object("params", params.clone());
-            
-            for (k,v) in request.objects() {
-//              if k != "params" {
-                params.set_property(&("nn_".to_string()+&k), v);
-//              }
+            // try app src dir
+            let mut p = "runtime/".to_string()+&appname+"/src/html/"+&appname+"/"+&path;
+
+            if Path::new(&p).exists() {
+              let md = metadata(&p).unwrap();
+              if md.is_dir() {
+                if !p.ends_with("/") { p += "/"; }
+                p += "index.html";
+                if Path::new(&p).exists() { b = true; }
+              }
+              else { b = true; }
             }
-            
-            let d = handle_command(d, session_id.to_owned());
-            let r = d.get_string("nn_return_type");
-            if r != "404" {
-              b = true;
-              if r == "File" {
-                res.put_string("file", &d.get_string("data"));
-                res.put_string("mimetype", &mime_type(p));
+
+            if b {
+              res.put_string("file", &p);
+              res.put_string("mimetype", &mime_type(p));
+            }
+            else {
+              // try app command
+              let mut d = DataObject::new();
+              d.put_string("bot", &appname);
+              d.put_string("cmd", &cmd);
+              d.put_int("pid", 0);
+              let mut params = params.deep_copy();
+              d.put_object("params", params.clone());
+
+              for (k,v) in request.objects() {
+  //              if k != "params" {
+                  params.set_property(&("nn_".to_string()+&k), v);
+  //              }
               }
-              else if r == "InputStream" {
-                res.put_bytes("body", d.get_bytes("data"));
-                res.put_string("mimetype", &mime_type(p));
-              }
-              else {
-                let s;
-                if params.has("callback") {
-                  s = params.get_string("callback") + "(" + &d.to_string() + ")";
+
+              let d = handle_command(d, session_id.to_owned());
+              let r = d.get_string("nn_return_type");
+              if r != "404" {
+                b = true;
+                if r == "File" {
+                  res.put_string("file", &d.get_string("data"));
+                  res.put_string("mimetype", &mime_type(p));
+                }
+                else if r == "InputStream" {
+                  res.put_bytes("body", d.get_bytes("data"));
+                  res.put_string("mimetype", &mime_type(p));
                 }
                 else {
-                  s = d.to_string();
+                  let s;
+                  if params.has("callback") {
+                    s = params.get_string("callback") + "(" + &d.to_string() + ")";
+                  }
+                  else {
+                    s = d.to_string();
+                  }
+                  res.put_string("body", &s);
+                  res.put_string("mimetype", "application/json");
                 }
-                res.put_string("body", &s);
-                res.put_string("mimetype", "application/json");
               }
             }
           }

@@ -411,11 +411,13 @@ impl P2PConnection {
   
   pub fn shutdown(&self, uuid:&str, conid:i64) -> io::Result<()> {
     let user = get_user(uuid);
+    let mut uname = "??".to_string();
     if user.is_some(){
       let user = user.unwrap();
       user.get_array("connections").remove_data(Data::DInt(conid));
       fire_event("peer", "UPDATE", user_to_peer(user.clone(), uuid.to_string()));
       fire_event("peer", "DISCONNECT", user_to_peer(user.clone(), uuid.to_string()));
+      uname = user.get_string("displayname");
     }
     
     let mut con;
@@ -451,7 +453,7 @@ impl P2PConnection {
     let mut sessions = DataStore::globals().get_object("system").get_object("sessions");
     sessions.remove_property(&con.sessionid);
     
-    println!("P2P {} Disconnect {} / {} / {} / {}", con.stream.mode(), con.stream.describe(), self.sessionid, "??", uuid);
+    println!("P2P {} Disconnect {} / {} / {} / {}", con.stream.mode(), con.stream.describe(), self.sessionid, uname, uuid);
     x
   }
   

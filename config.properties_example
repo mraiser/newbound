@@ -1,6 +1,6 @@
 sessiontimeoutmillis=900000
 default_app=app
-http_port=5774
+http_port=8080
 http_address=0.0.0.0
-apps=app,lib
-machineid=NUC7i7DNB
+apps=app,dev,security,peer
+machineid=IAMNOTABOT
