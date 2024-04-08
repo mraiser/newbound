@@ -172,15 +172,22 @@ impl P2PStream {
     if &sid == "HANDSHAKE" { return false; }
     
     let mut lockheap = P2PCONLOCKS.get().write().unwrap();
-    let lock = lockheap.get(&sid).unwrap();
-    lock.swap(true, Ordering::AcqRel)
+    let lock = lockheap.get(&sid);
+    if lock.is_some() {
+      let lock = lock.unwrap();
+      return lock.swap(true, Ordering::AcqRel)
+    }
+    return false;
   }
   
   fn release_lock(&self, sid:String) {
     if &sid != "HANDSHAKE" {
       let mut lockheap = P2PCONLOCKS.get().write().unwrap();
-      let lock = lockheap.get(&sid).unwrap();
-      lock.store(false, Ordering::Release);
+      let lock = lockheap.get(&sid);
+      if lock.is_some() {
+        let lock = lock.unwrap();
+        lock.store(false, Ordering::Release);
+      }
     }
   }
   
@@ -561,8 +568,11 @@ impl P2PConnection {
     loop {
       {
         let heap = STREAMWRITERS.get().write().unwrap();
-        let z = heap.get(&x).unwrap().to_owned();
-        if z != -1 { y = z; break; }
+        let z = heap.get(&x);
+        if z.is_some() {
+          let z = z.unwrap().to_owned();
+          if z != -1 { y = z; break; }
+        }
       }
       
       timeout += 1;
