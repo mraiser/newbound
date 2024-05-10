@@ -228,7 +228,10 @@ pub fn http_listen() {
         if method == "POST" {
           // extractPOSTParams
           let clstr = headers.get_string("CONTENT-LENGTH");
-          let ctstr = headers.get_string("CONTENT-TYPE");
+          let ctstr = match headers.has("CONTENT-TYPE") {
+            true => headers.get_string("CONTENT-TYPE"),
+            false => "text/plain".to_string()
+          };
           let mut max = clstr.parse::<i64>().unwrap();
 
           let s = ctstr.to_lowercase();

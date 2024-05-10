@@ -513,11 +513,14 @@ impl P2PConnection {
     let mut timeout = 0;
     loop {
       {
-        let heap = STREAMWRITERS.get().write().unwrap();
-        let z = heap.get(&x);
-        if z.is_some() {
-          let z = z.unwrap().to_owned();
-          if z != -1 { y = z; break; }
+        let heap = STREAMWRITERS.get().write();
+        if heap.is_ok() {
+          let heap = heap.unwrap();
+          let z = heap.get(&x);
+          if z.is_some() {
+            let z = z.unwrap().to_owned();
+            if z != -1 { y = z; break; }
+          }
         }
       }
       
@@ -539,7 +542,7 @@ impl P2PConnection {
 
     // Seems to fix stream corruption issue on other side of connection
     // FIXME - Does it, tho?
-    let _heap = STREAMWRITERS.get().write().unwrap();
+    let _heap = STREAMWRITERS.get().write(); //.unwrap();
     
     let x = self.stream.write(&bytes, self.sessionid.clone());
     x.is_ok()
