@@ -9,6 +9,8 @@ use flowlang::appserver::*;
 use flowlang::rustcmd::*;
 use flowlang::buildrust::build_all;
 use flowlang::buildrust::rebuild_rust_api;
+use ndata::dataobject::DataObject;
+
 
 #[cfg(feature = "reload")]
 use hot_lib::*;
@@ -62,6 +64,17 @@ fn main() {
     let params: Vec<String> = env::args().collect();
     if params.len() > 1{
       let x = &params[1];
+      if x == "exec" {
+        let lib = &params[2];
+        let ctl = &params[3];
+        let cmd = &params[4];
+        let data = DataObject::from_string(&params[5]);
+        let o = flowlang::command::Command::lookup(lib, ctl, cmd).execute(data);
+//        println!("exec {}::{}::{} ->\n\n{}", lib, ctl, cmd, o.unwrap().to_string());
+        println!("\n{}", o.unwrap().to_string());
+        return;
+      }
+      
       if x == "rebuild" {
         println!("REBUILDING ALL");
         build_all();

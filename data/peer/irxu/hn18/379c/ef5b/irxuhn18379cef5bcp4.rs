@@ -797,10 +797,10 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
     }
     
     if isok {
+      user.put_string("publickey", &peer_public_string);
       let (conid, con) = P2PConnection::begin(uuid.to_owned(), stream.try_clone().unwrap());
   
       if saveme {
-        user.put_string("publickey", &peer_public_string);
         set_user(&uuid, user.clone());
       }
       

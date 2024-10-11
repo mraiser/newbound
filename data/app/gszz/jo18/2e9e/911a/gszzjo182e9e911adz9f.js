@@ -1,4 +1,4 @@
-var me = this; 
+var me = this;
 var ME = $('#'+me.UUID)[0];
 
 json('../app/newlib', 'lib=runtime&readers=[]&writers=[]', function(result){

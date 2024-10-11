@@ -1,3 +1,4 @@
+pub mod spawn;
 pub mod read;
 pub mod asset;
 pub mod exec;
@@ -23,6 +24,7 @@ pub mod deviceid;
 
 use flowlang::rustcmd::*;
 pub fn cmdinit(cmds: &mut Vec<(String, flowlang::rustcmd::Transform, String)>) {
+    cmds.push(("tvigvw19268109f0fg2a60".to_string(), spawn::execute, "".to_string()));
     cmds.push(("nyzimq182eabf7339p7c5".to_string(), read::execute, "".to_string()));
     cmds.push(("yjjxqk18303e75f8atb5a".to_string(), write::execute, "".to_string()));
     cmds.push(("ynpmir183479da2b9r25f8".to_string(), unique_session_id::execute, "".to_string()));
