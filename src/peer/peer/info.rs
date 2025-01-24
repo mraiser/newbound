@@ -8,7 +8,7 @@ use crate::security::security::users::users;
 use blake2::{Blake2b, Digest, digest::consts::U10};
 use crate::peer::service::listen::to_hex;
 use std::collections::HashMap;
-
+use flowlang::flowlang::system::time::time;
 type Blake2b80 = Blake2b<U10>;
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("nn_sessionid");
@@ -21,19 +21,36 @@ o
 }
 
 pub fn info(nn_sessionid:String, uuid:Data, salt:Data) -> DataObject {
+let mut g = DataStore::globals();
+
 let mut o = DataObject::new();
-let mut a = DataArray::new();
+
+let mut a = match g.has("network_interfaces") && time() - g.get_object("network_interfaces").get_int("timestamp") < 30000 {
+  true => g.get_object("network_interfaces").get_array("list"),
+  false => {
+    let mut a = DataArray::new();
+
+    let network_interfaces = list_afinet_netifas().unwrap();
+    for (_name, ip) in network_interfaces.iter() {
+      let s = ip.to_string();
+      if s != "127.0.0.1" && s != "::1" {
+        a.push_string(&s);
+      }
+    }
+    let mut wrap = DataObject::new();
+    wrap.put_array("list", a.clone());
+    wrap.put_int("timestamp", time());
+    g.put_object("network_interfaces", wrap);
+    a
+  }
+};
+
+//println!("ADDRESSES {}", a.to_string());
+
 o.put_array("addresses", a.clone());
 
-let network_interfaces = list_afinet_netifas().unwrap();
-for (_name, ip) in network_interfaces.iter() {
-  let s = ip.to_string();
-  if s != "127.0.0.1" && s != "::1" {
-    a.push_string(&s);
-  }
-}
 {
-  let system = DataStore::globals().get_object("system");
+  let system = g.get_object("system");
   let name = system.get_object("config").get_string("machineid");
   let http_port = Data::as_string(system.get_object("config").get_property("http_port")).parse::<i64>().unwrap();
   let port = Data::as_string(system.get_object("apps").get_object("peer").get_object("runtime").get_property("port")).parse::<i64>().unwrap();

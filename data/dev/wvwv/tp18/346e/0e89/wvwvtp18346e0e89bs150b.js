@@ -181,6 +181,7 @@ function buildParams(){
     buildParams();
     me.dirty();
   });
+  generateForm(list);
 }
 
 $(ME).find('#deletecommandbutton').click(function(e){ // FIXME - Does not delete code controls or attachments
@@ -276,3 +277,36 @@ me.dirty = function(){
 me.clean = function(){
   $('#savecommandbutton').removeClass('coloredbutton').addClass('accentbutton');
 };
+
+function generateForm(params) {
+  const form = document.getElementById("parameterForm");
+  form.innerHTML = '';
+
+  params.forEach(param => {
+    const formGroup = document.createElement("div");
+    formGroup.classList.add("form-group");
+
+    const label = document.createElement("label");
+    label.innerText = `${param.name} (${param.type})`;
+    label.setAttribute("for", param.name);
+    formGroup.appendChild(label);
+    
+    if (!param.desc) param.desc = "";
+
+    let input = document.createElement("input");
+    input.type = "text";
+    input.value = param.desc;
+    input.classList.add("stickright");
+    
+    $(input).data("param", param).change(function(){
+      var param = $(this).data('param');
+      param.desc = $(this).val();
+      me.dirty();
+    });
+
+    input.id = param.name;
+    input.name = param.name;
+    formGroup.appendChild(input);
+    form.appendChild(formGroup);
+  });
+}

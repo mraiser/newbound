@@ -71,3 +71,22 @@
   height:100%;
   width:100%;
 }
+
+.form-container { 
+  max-width: 600px; 
+  margin: 20px auto; 
+  padding: 20px; 
+  border: 1px solid #ddd; 
+  border-radius: 8px; 
+  color:black;
+  position:relative;
+}
+
+.stickright{
+  width:100%;
+}
+
+.downalittle{
+  margin-top:10px;
+  margin-bottom:-10px;
+}

@@ -15,14 +15,14 @@ o
 
 pub fn spawn(lib:String, ctl:String, cmd:String, args:DataObject) -> DataObject {
   let mut ja = DataArray::new();
-  ja.push_string("cargo");
-  ja.push_string("run");
+
+  #[cfg(debug_assertions)]
+  let bin = "target/debug/newbound";
 
   #[cfg(not(debug_assertions))]
-  ja.push_string("--release");
+  let bin = "target/release/newbound";
 
-  let features = "--features=".to_string() + &features();
-  ja.push_string(&features);
+  ja.push_string(&bin);
 
   ja.push_string("exec");
   ja.push_string(&lib);
@@ -70,5 +70,6 @@ pub fn features() -> String {
     features = features[1..].to_string();
   }
   features
+
 }
 
