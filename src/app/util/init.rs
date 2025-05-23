@@ -1,9 +1,11 @@
 use ndata::dataobject::*;
 use flowlang::datastore::DataStore;
-use rand::rngs::OsRng;
-use x25519_dalek::{StaticSecret, PublicKey};
+//use rand::rngs::OsRng;
+//use x25519_dalek::{StaticSecret, PublicKey};
 use flowlang::flowlang::file::write_properties::write_properties;
-use uuid::Uuid;
+//use uuid::Uuid;
+use flowlang::x25519::*;
+use flowlang::rand::uuid;
 
 pub fn execute(_o: DataObject) -> DataObject {
 let ax = init();
@@ -17,14 +19,21 @@ let system = DataStore::globals().get_object("system");
 let mut o = system.get_object("apps").get_object("app").get_object("runtime");
 let mut b = false;
 if !o.has("uuid"){
-  o.put_string("uuid", &Uuid::new_v4().to_string());
+  o.put_string("uuid", &uuid().unwrap());
   b = true;
 }
 if !o.has("privatekey"){
-  let secret = StaticSecret::new(OsRng);
-  let public = PublicKey::from(&secret);
-  o.put_string("privatekey", &to_hex(&secret.to_bytes()));
-  o.put_string("publickey", &to_hex(&public.to_bytes()));
+  //let secret = StaticSecret::new(OsRng);
+  //let public = PublicKey::from(&secret);
+  //o.put_string("privatekey", &to_hex(&secret.to_bytes()));
+  //o.put_string("publickey", &to_hex(&public.to_bytes()));
+  
+  
+  let (secret, public) = generate_x25519_keypair();  
+  o.put_string("privatekey", &to_hex(&secret));
+  o.put_string("publickey", &to_hex(&public));
+  
+  
   b = true;
 }
 

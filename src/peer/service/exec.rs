@@ -6,6 +6,7 @@ use std::thread;
 use ndata::data::Data;
 use crate::peer::service::listen::get_best;
 use crate::security::security::init::get_user;
+use flowlang::command::Command;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("uuid");
@@ -19,6 +20,34 @@ o
 }
 
 pub fn exec(uuid:String, app:String, cmd:String, params:DataObject) -> DataObject {
+if uuid == "local" {
+  let cmd = Command::lookup(&app.clone(), &app.clone(), &cmd.clone());
+  let o = cmd.execute(params);
+  if o.is_err(){
+    let mut res = DataObject::new();
+    res.put_string("status", "err");
+    let msg = format!("{:?}", o.err().unwrap());
+    res.put_string("msg", &msg);
+    return res;
+  }
+  else {
+    let mut o = o.unwrap();
+    if !o.has("status") { o.put_string("status", "ok"); }
+    if o.has("a") {
+      let a = o.get_property("a");
+      if a.is_string() {
+        o.set_property("msg", a);
+      }
+      else {
+        o.set_property("data", a);
+      }
+      //o.remove_property("a");
+    }
+    return o;
+  }
+}
+
+
 let user = get_user(&uuid);
 if user.is_none(){
   return DataObject::from_string("{\"status\":\"err\",\"msg\":\"No such peer\"}");
@@ -30,6 +59,7 @@ if cons.len() == 0 {
 }
 
 let pid;
+#[allow(static_mut_refs)]
 unsafe { pid = NEXT_CMD.fetch_add(1, Ordering::SeqCst) as i64;}
 
 let mut d = DataObject::new();

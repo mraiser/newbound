@@ -17,7 +17,7 @@ me.ready = function(api){
       
       camera.position.x = 0;
       camera.position.y = 0;
-      camera.position.z = 10;    
+      camera.position.z = 6;    
       camera.lookAt(scene.position);
 
       me.setData(ME.DATA);
@@ -36,8 +36,8 @@ me.getData = function(){
 me.setData = function(ctl){
   var el = $('<div/>');
   $(ME).append(el);
-  me.viewer.add(el[0], "xoxo", "case", function(model){
-    me.case = model.api;
+  me.viewer.add(el[0], "flow", "case", function(model){
+    me.case = model;
     me.case.parent = me;
     me.case.target_z = 0;
     me.cases = [];

@@ -12,7 +12,7 @@ let store = DataStore::new();
 let system = DataStore::globals().get_object("system");
 let o = system.get_object("apps").get_object("app").get_object("runtime");
 let bytes: [u8; 32] = decode_hex(&o.get_string("privatekey")).unwrap().try_into().unwrap();
-let private = StaticSecret::from(bytes);
+let private = bytes; //StaticSecret::from(bytes);
 let public = o.get_string("publickey");
 let uuid = o.get_string("uuid");
 //FIXME - don't panic if metaidentity does not exist
@@ -119,11 +119,20 @@ for lib in libs {
     let h = hash(dir.to_owned());
     fs::write(hashfile, &h).expect("Unable to write file");
     
-    let app_private = StaticSecret::new(OsRng);
-    let app_public = PublicKey::from(&app_private);
-    let shared_secret = private.diffie_hellman(&app_public);
-    let key = GenericArray::from(shared_secret.to_bytes());
+//    let app_private = StaticSecret::new(OsRng);
+//    let app_public = PublicKey::from(&app_private);
+//    let shared_secret = private.diffie_hellman(&app_public);
+//    let key = GenericArray::from(shared_secret.to_bytes());
+//    let cipher = Aes256::new(&key);
+    
+    
+    let (app_private, app_public) = generate_x25519_keypair();
+    let shared_secret = x25519(private, app_public);
+    let key = GenericArray::from(shared_secret);
     let cipher = Aes256::new(&key);
+    
+    
+    
     let buf = decode_hex(&h).unwrap();
     let blocks: Vec<&[u8]> = buf.chunks(16).collect();
     let mut buf = Vec::new();
@@ -143,7 +152,7 @@ for lib in libs {
     meta.put_string("id", &lib);
     meta.put_string("version", &libversion.to_string());
     meta.put_string("hash", &h);
-    meta.put_string("key", &to_hex(&app_private.to_bytes()));
+    meta.put_string("key", &to_hex(&app_private)); // (&app_private.to_bytes()));
     meta.put_string("authorkey", &public);
     let metafile = devroot.join(&(lib.to_owned()+".json"));
     fs::write(metafile, &meta.to_string()).expect("Unable to write file");

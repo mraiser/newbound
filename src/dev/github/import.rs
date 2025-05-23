@@ -3,13 +3,7 @@ use ndata::dataarray::DataArray;
 use flowlang::flowlang::system::system_call::system_call;
 use flowlang::flowlang::system::unique_session_id::unique_session_id;
 use std::path::Path;
-
-#[cfg(not(target_os = "windows"))]
 use std::os::unix::fs::symlink;
-
-#[cfg(target_os = "windows")]
-use std::os::windows::fs::symlink_dir;
-
 use crate::dev::dev::rebuild_lib::rebuild_lib;
 use flowlang::appserver::load_library;
 
@@ -53,16 +47,8 @@ for datadirx in std::fs::read_dir(&datadirxx).unwrap() {
     }
     else {
       let _x = std::fs::rename(tempdir.clone(), repodir.clone());
-
-      #[cfg(not(target_os = "windows"))]
       let _x = symlink(repodir.join("data").join(libid.clone()).canonicalize().unwrap(), datadir);
-      #[cfg(not(target_os = "windows"))]
       let _x = symlink(repodir.join("runtime").join(libid.clone()).canonicalize().unwrap(), runtimedir);
-
-      #[cfg(target_os = "windows")]
-      let _x = symlink_dir(repodir.join("data").join(libid.clone()).canonicalize().unwrap(), datadir);
-      #[cfg(target_os = "windows")]
-      let _x = symlink_dir(repodir.join("runtime").join(libid.clone()).canonicalize().unwrap(), runtimedir);
       
       load_library(&libid);
       let _x = rebuild_lib(libid.to_owned());

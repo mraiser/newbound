@@ -27,6 +27,7 @@ pub fn discovery() -> String {
     if sock.is_ok() {
       let sock = sock.unwrap();
       sock.set_broadcast(true).unwrap();
+      #[allow(static_mut_refs)]
       unsafe { DISCOVERYCON.set(RwLock::new(sock)); }
       println!("DISCOVERY UDP listening on port 5770");
       thread::spawn(move || {
@@ -67,6 +68,7 @@ fn do_send() {
   let beat = Duration::from_millis(10000);
   while system.get_boolean("running") {
     let sock;
+    #[allow(static_mut_refs)]
     unsafe { sock = DISCOVERYCON.get().write().unwrap().try_clone().unwrap(); }
     let x = sock.send_to(&buf, &broad);
     if x.is_err() { println!("DISCOVERY ERROR {:?}", x); } 
@@ -84,6 +86,7 @@ fn do_listen() {
   let mut buf = [0; 508]; 
   while system.get_boolean("running") {
     let sock;
+    #[allow(static_mut_refs)]
     unsafe { sock = DISCOVERYCON.get().write().unwrap().try_clone().unwrap(); }
     let (amt, src) = sock.recv_from(&mut buf).unwrap();
     let buf = &mut buf[..amt];

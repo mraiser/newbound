@@ -1,4 +1,4 @@
-  do_init();
+  do_init(); 
   do_listen(ipaddr, port) 
 }
 
@@ -356,6 +356,22 @@ impl P2PConnection {
     // FIXME - move cipher generation to its own function
     let system = DataStore::globals().get_object("system");
     let runtime = system.get_object("apps").get_object("app").get_object("runtime");
+    
+    let my_private_hex = runtime.get_string("privatekey");
+    let my_private = decode_hex(&my_private_hex).unwrap();
+    let my_private: [u8; 32] = my_private.try_into().expect("slice with incorrect length");
+
+    let peer_public_hex = user.get_string("publickey");
+    let peer_public = decode_hex(&peer_public_hex).unwrap();
+    let peer_public: [u8; 32] = peer_public.try_into().expect("slice with incorrect length");
+
+    let shared_secret = x25519(my_private, peer_public);
+
+    let key = GenericArray::from(shared_secret);
+    let cipher = Aes256::new(&key);
+    
+    
+/*    
     let my_private = runtime.get_string("privatekey");
     let my_private = decode_hex(&my_private).unwrap();
     let my_private: [u8; 32] = my_private.try_into().expect("slice with incorrect length");
@@ -368,6 +384,7 @@ impl P2PConnection {
     let shared_secret = my_private.diffie_hellman(&peer_public);
     let key = GenericArray::from(shared_secret.to_bytes());
     let cipher = Aes256::new(&key);
+*/
     
     let sessionid = unique_session_id();
     let con = P2PConnection{
@@ -398,7 +415,7 @@ impl P2PConnection {
       let mut heap = P2PCONS.get().write().unwrap();
       let mut lockheap = P2PCONLOCKS.get().write().unwrap();
       loop {
-        let x = rand::thread_rng().gen::<i64>();
+        let x = rand_i64();
         if !heap.contains_key(&x) {
           conid = x;
           heap.insert(conid, con.duplicate());
@@ -472,7 +489,7 @@ impl P2PConnection {
     let mut heap = STREAMWRITERS.get().write().unwrap();
     let x:i64;
     loop {
-      let y = rand::thread_rng().gen::<i64>();
+      let y = rand_i64();
       if y != -1 && !heap.contains_key(&y) {
         x = y;
         break;
@@ -487,7 +504,7 @@ impl P2PConnection {
     let mut heap = STREAMREADERS.get().write().unwrap();
     let y:i64;
     loop {
-      let z = rand::thread_rng().gen::<i64>();
+      let z = rand_i64();
       if z != -1 && !heap.contains_key(&z) {
         y = z;
         break;
@@ -684,18 +701,22 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
 
   // FIXME - move cipher generation to its own function
   let my_public = runtime.get_string("publickey");
-  let my_private = runtime.get_string("privatekey");
-  let my_private = decode_hex(&my_private).unwrap();
-  let my_private: [u8; 32] = my_private.try_into().expect("slice with incorrect length");
-  let my_private = StaticSecret::from(my_private);
+//  let my_private = runtime.get_string("privatekey");
+//  let my_private = decode_hex(&my_private).unwrap();
+//  let my_private: [u8; 32] = my_private.try_into().expect("slice with incorrect length");
+//  let my_private = StaticSecret::from(my_private);
+    let my_private_hex = runtime.get_string("privatekey");
+    let my_private = decode_hex(&my_private_hex).unwrap();
+    let my_private: [u8; 32] = my_private.try_into().expect("slice with incorrect length");
 
   // Temp key pair for initial exchange
-  let my_session_private = StaticSecret::new(OsRng);
-  let my_session_public = PublicKey::from(&my_session_private);
+  //let my_session_private = StaticSecret::new(OsRng);
+  //let my_session_public = PublicKey::from(&my_session_private);
+  let (my_session_private, my_session_public) = generate_x25519_keypair();
 
   // Send temp pubkey if init
   let init = peer.is_some();
-  if init { let _x = stream.write(&my_session_public.to_bytes(), "HANDSHAKE".to_string()).unwrap(); }
+  if init { let _x = stream.write(&my_session_public, "HANDSHAKE".to_string()).unwrap(); }
 
   // Read remote temp pubkey
   let mut bytes = vec![0u8; 32];
@@ -703,14 +724,17 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
   if _x.is_err() { return None;}
   //let _x = x.unwrap();
   let remote_session_public: [u8; 32] = bytes.try_into().expect("slice with incorrect length");
-  let remote_session_public = PublicKey::from(remote_session_public);
+  //let remote_session_public = PublicKey::from(remote_session_public);
 
   // Send temp pubkey if not init
-  if !init { let _x = stream.write(&my_session_public.to_bytes(), "HANDSHAKE".to_string()).unwrap(); }
+  if !init { let _x = stream.write(&my_session_public, "HANDSHAKE".to_string()).unwrap(); }
   
   // Temp cipher for initial exchange
-  let shared_secret = my_session_private.diffie_hellman(&remote_session_public);
-  let key = GenericArray::from(shared_secret.to_bytes());
+  //let shared_secret = my_session_private.diffie_hellman(&remote_session_public);
+  //let key = GenericArray::from(shared_secret.to_bytes());
+  //let cipher = Aes256::new(&key);
+  let shared_secret = x25519(my_session_private, remote_session_public);
+  let key = GenericArray::from(shared_secret);
   let cipher = Aes256::new(&key);
 
   // Send my UUID
@@ -764,9 +788,13 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
     
     let peer_public = decode_hex(&peer_public_string).unwrap();
     let peer_public: [u8; 32] = peer_public.try_into().expect("slice with incorrect length");
-    let peer_public = PublicKey::from(peer_public);
-    let shared_secret = my_private.diffie_hellman(&peer_public);
-    let key = GenericArray::from(shared_secret.to_bytes());
+    //let peer_public = PublicKey::from(peer_public);
+    //let shared_secret = my_private.diffie_hellman(&peer_public);
+    //let key = GenericArray::from(shared_secret.to_bytes());
+    //let cipher = Aes256::new(&key);
+
+    let shared_secret = x25519(my_private, peer_public);
+    let key = GenericArray::from(shared_secret);
     let cipher = Aes256::new(&key);
 
     let isok;
@@ -1021,14 +1049,18 @@ pub fn handle_next_message(con:P2PConnection) -> bool {
       let my_private = runtime.get_string("privatekey");
       let my_private = decode_hex(&my_private).unwrap();
       let my_private: [u8; 32] = my_private.try_into().expect("slice with incorrect length");
-      let my_private = StaticSecret::from(my_private);
+      //let my_private = StaticSecret::from(my_private);
 
       let peer_public = user.get_string("publickey");
       let peer_public = decode_hex(&peer_public).unwrap();
       let peer_public: [u8; 32] = peer_public.try_into().expect("slice with incorrect length");
-      let peer_public = PublicKey::from(peer_public);
-      let shared_secret = my_private.diffie_hellman(&peer_public);
-      let key = GenericArray::from(shared_secret.to_bytes());
+      //let peer_public = PublicKey::from(peer_public);
+      //let shared_secret = my_private.diffie_hellman(&peer_public);
+      //let key = GenericArray::from(shared_secret.to_bytes());
+      //let cipher = Aes256::new(&key);
+
+      let shared_secret = x25519(my_private, peer_public);
+      let key = GenericArray::from(shared_secret);
       let cipher = Aes256::new(&key);
       
       let bytes = decrypt(&cipher, &buf);

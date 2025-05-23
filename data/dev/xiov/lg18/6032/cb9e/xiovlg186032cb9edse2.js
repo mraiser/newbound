@@ -141,6 +141,30 @@ function buildBehaviors(){
   }, d);
 }
 
+function loadControl(ctl){
+  me.load(ctl, function(api){
+    var model = api.model;
+    if (ctl.pos){
+      model.position.x = ctl.pos.x;
+      model.position.y = ctl.pos.y;
+      model.position.z = ctl.pos.z;
+    }
+    else ctl.pos = { x:0,y:0,z:0 };
+    if (ctl.rot){
+      model.rotation.x = ctl.rot.x;
+      model.rotation.y = ctl.rot.y;
+      model.rotation.z = ctl.rot.z;
+    }
+    else ctl.rot = { x:0,y:0,z:0 };
+    if (ctl.scale){
+      model.scale.x = ctl.scale.x;
+      model.scale.y = ctl.scale.y;
+      model.scale.z = ctl.scale.z;
+    }
+    else ctl.scale = { x:1,y:1,z:1 };
+  });
+}
+
 function build3D(){
   for (var i in me.children) {
     var kid = me.children[i];
@@ -151,31 +175,7 @@ function build3D(){
   
   for (var i in me.data.three.controls) {
     var ctl = me.data.three.controls[i];
-    //if (!ctl.uuid) ctl.uuid = guid();
-    //var el = $('<div id="'+ctl.uuid+'"/>');
-    //$(ME).append(el);
-    //me.add(el[0], ctl.db, ctl.id, ctl, function(api){
-    me.load(ctl, function(api){
-      var model = api.model;
-      if (ctl.pos){
-        model.position.x = ctl.pos.x;
-        model.position.y = ctl.pos.y;
-        model.position.z = ctl.pos.z;
-      }
-      else ctl.pos = { x:0,y:0,z:0 };
-      if (ctl.rot){
-        model.rotation.x = ctl.rot.x;
-        model.rotation.y = ctl.rot.y;
-        model.rotation.z = ctl.rot.z;
-      }
-      else ctl.rot = { x:0,y:0,z:0 };
-      if (ctl.scale){
-        model.scale.x = ctl.scale.x;
-        model.scale.y = ctl.scale.y;
-        model.scale.z = ctl.scale.z;
-      }
-      else ctl.scale = { x:1,y:1,z:1 };
-    });
+    loadControl(ctl);
   }
 }
 
@@ -281,6 +281,7 @@ me.animate = function () {
 };
 
 me.load = function(ctl, cb, parent){
+  console.log("doing the load "+ctl);
   if (!ctl.uuid) ctl.uuid = guid();
   var el = $('<div id="'+ctl.uuid+'" class="hideme x3dctl"/>');
   $(ME).find('.x3dctl-editor').append(el);

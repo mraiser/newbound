@@ -228,7 +228,7 @@ impl UdpStream {
       
       let mut vec = Vec::new();
       vec.resize((size - 9) as usize,0);
-      OsRng.fill_bytes(&mut vec);
+      fill_bytes(&mut vec);
       bytes.extend_from_slice(&vec);
       
       let heap = UDPCON.get().write().unwrap();
@@ -250,20 +250,22 @@ fn do_listen(){
   let my_private = runtime.get_string("privatekey");
   let my_private = decode_hex(&my_private).unwrap();
   let my_private: [u8; 32] = my_private.try_into().expect("slice with incorrect length");
-  let my_private = StaticSecret::from(my_private);
+  //let my_private = StaticSecret::from(my_private);
 
   // Temp key pair for initial exchange
-  let my_session_private = StaticSecret::new(OsRng);
-  let my_session_public = PublicKey::from(&my_session_private);
-  let buf = DataBytes::from_bytes(&my_session_public.to_bytes().to_vec());
+  //let my_session_private = StaticSecret::new(OsRng);
+  //let my_session_public = PublicKey::from(&my_session_private);
+  //let buf = DataBytes::from_bytes(&my_session_public.to_bytes().to_vec());
+  let (my_session_private, my_session_public) = generate_x25519_keypair();
+  let buf = DataBytes::from_bytes(&my_session_public.to_vec());
   system.put_bytes("session_pubkey", buf);
   
   // FIXME - Support payloads up to 67K?
   let mut buf = [0; MAXPACKETSIZE]; 
   
-  fn helo(cmd:u8, buf:&mut [u8], my_session_public:PublicKey, my_session_private:StaticSecret, my_uuid:String, my_public:String) -> (Aes256, Vec<u8>) {
+  fn helo(cmd:u8, buf:&mut [u8], my_session_public:[u8; 32], my_session_private:[u8; 32], my_uuid:String, my_public:String) -> (Aes256, Vec<u8>) {
     let remote_session_public: [u8; 32] = buf[1..33].try_into().unwrap();
-    let remote_session_public = PublicKey::from(remote_session_public);
+    //let remote_session_public = PublicKey::from(remote_session_public);
 
     let mut buf = Vec::new();
 
@@ -271,10 +273,13 @@ fn do_listen(){
     buf.push(cmd);
 
     // Send session public key
-    buf.extend_from_slice(my_session_public.as_bytes());
+    buf.extend_from_slice(&my_session_public);
 
-    let shared_secret = my_session_private.diffie_hellman(&remote_session_public);
-    let key = GenericArray::from(shared_secret.to_bytes());
+    //let shared_secret = my_session_private.diffie_hellman(&remote_session_public);
+    //let key = GenericArray::from(shared_secret.to_bytes());
+    //let cipher = Aes256::new(&key);
+    let shared_secret = x25519(my_session_private, remote_session_public);
+    let key = GenericArray::from(shared_secret);
     let cipher = Aes256::new(&key);
 
     // Send my UUID
@@ -288,7 +293,7 @@ fn do_listen(){
     (cipher, buf)
   }
   
-  fn welcome(cmd:u8, buf:&mut [u8], my_session_public:PublicKey, my_session_private:StaticSecret, my_uuid:String, my_public:String, my_private:StaticSecret) -> Option<(String, DataObject, Aes256, Vec<u8>)> {
+  fn welcome(cmd:u8, buf:&mut [u8], my_session_public:[u8; 32], my_session_private:[u8; 32], my_uuid:String, my_public:String, my_private:[u8; 32]) -> Option<(String, DataObject, Aes256, Vec<u8>)> {
     let (cipher, bytes2) = helo(cmd, buf, my_session_public, my_session_private, my_uuid, my_public);
     
     // Read remote UUID
@@ -317,10 +322,14 @@ fn do_listen(){
       }
       if ok {
         // Switch to permanent keypair
-        let peer_public = PublicKey::from(peer_public);
-        let shared_secret = my_private.diffie_hellman(&peer_public);
-        let key = GenericArray::from(shared_secret.to_bytes());
+        //let peer_public = PublicKey::from(peer_public);
+        //let shared_secret = my_private.diffie_hellman(&peer_public);
+        //let key = GenericArray::from(shared_secret.to_bytes());
+        //let cipher = Aes256::new(&key);
+        let shared_secret = x25519(my_private, peer_public);
+        let key = GenericArray::from(shared_secret);
         let cipher = Aes256::new(&key);
+        
         return Some((uuid, user, cipher, bytes2));
       }
       else { println!("BAD PUB KEY GIVEN {} / {}", to_hex(&peer_public), to_hex(&buf[81..113])); }

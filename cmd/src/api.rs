@@ -3,6 +3,20 @@ use ndata::dataarray::DataArray;
 use ndata::databytes::DataBytes;
 use ndata::data::Data;
 use flowlang::rustcmd::RustCmd;
+pub struct flow_case {}
+pub struct flow_checkicon {}
+pub struct flow_conditionalicon {}
+pub struct flow_editor {}
+pub struct flow_failicon {}
+pub struct flow_inputbar {}
+pub struct flow_listicon {}
+pub struct flow_loopicon {}
+pub struct flow_node {}
+pub struct flow_node_editor {}
+pub struct flow_operation {}
+pub struct flow_operation_editor {}
+pub struct flow_xicon {}
+pub struct flow_interpreter {}
 pub struct app_api {}
 pub struct app_app {}
 pub struct app_appcard {}
@@ -35,6 +49,22 @@ pub struct peer_peer_model {}
 pub struct peer_reboot {}
 pub struct peer_service {}
 pub struct peer_peer_select {}
+pub struct flow {
+  pub case: flow_case,
+  pub checkicon: flow_checkicon,
+  pub conditionalicon: flow_conditionalicon,
+  pub editor: flow_editor,
+  pub failicon: flow_failicon,
+  pub inputbar: flow_inputbar,
+  pub listicon: flow_listicon,
+  pub loopicon: flow_loopicon,
+  pub node: flow_node,
+  pub node_editor: flow_node_editor,
+  pub operation: flow_operation,
+  pub operation_editor: flow_operation_editor,
+  pub xicon: flow_xicon,
+  pub interpreter: flow_interpreter,
+}
 pub struct app {
   pub api: app_api,
   pub app: app_app,
@@ -76,12 +106,29 @@ pub struct peer {
   pub peer_select: peer_peer_select,
 }
 pub struct api {
+  pub flow: flow,
   pub app: app,
   pub security: security,
   pub dev: dev,
   pub peer: peer,
 }pub const fn new() -> api {
   api {
+    flow: flow {
+      case: flow_case {},
+      checkicon: flow_checkicon {},
+      conditionalicon: flow_conditionalicon {},
+      editor: flow_editor {},
+      failicon: flow_failicon {},
+      inputbar: flow_inputbar {},
+      listicon: flow_listicon {},
+      loopicon: flow_loopicon {},
+      node: flow_node {},
+      node_editor: flow_node_editor {},
+      operation: flow_operation {},
+      operation_editor: flow_operation_editor {},
+      xicon: flow_xicon {},
+      interpreter: flow_interpreter {},
+    },
     app: app {
       api: app_api {},
       app: app_app {},
@@ -251,6 +298,14 @@ impl app_app {
     d.set_property("writers", writers);
     d.put_string("nn_sessionid", &nn_sessionid);
     RustCmd::new("yjjxqk18303e75f8atb5a").execute(d).unwrap().get_object("a")
+  }
+  pub fn spawn(&self, lib:String, ctl:String, cmd:String, args:DataObject) -> DataObject {
+    let mut d = DataObject::new();
+    d.put_string("lib", &lib);
+    d.put_string("ctl", &ctl);
+    d.put_string("cmd", &cmd);
+    d.put_object("args", args);
+    RustCmd::new("tvigvw19268109f0fg2a60").execute(d).unwrap().get_object("a")
   }
 }
 impl app_service {
