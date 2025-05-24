@@ -4,7 +4,6 @@ pub mod groups;
 pub mod setuser;
 pub mod deleteuser;
 pub mod current_user;
-use flowlang::rustcmd::*;
 pub fn cmdinit(cmds: &mut Vec<(String, flowlang::rustcmd::Transform, String)>) {
     cmds.push(("ysnihn1836b0814aen5".to_string(), users::execute, "".to_string()));
     cmds.push(("soqxoo1836bb51d5dy2".to_string(), setuser::execute, "".to_string()));

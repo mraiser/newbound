@@ -117,7 +117,7 @@ impl P2PStream {
   fn try_lock(&self, sid:String) -> bool {
     if &sid == "HANDSHAKE" { return false; }
     
-    let mut lockheap = P2PCONLOCKS.get().write().unwrap();
+    let lockheap = P2PCONLOCKS.get().write().unwrap();
     let lock = lockheap.get(&sid);
     if lock.is_some() {
       let lock = lock.unwrap();
@@ -128,7 +128,7 @@ impl P2PStream {
   
   fn release_lock(&self, sid:String) {
     if &sid != "HANDSHAKE" {
-      let mut lockheap = P2PCONLOCKS.get().write().unwrap();
+      let lockheap = P2PCONLOCKS.get().write().unwrap();
       let lock = lockheap.get(&sid);
       if lock.is_some() {
         let lock = lock.unwrap();

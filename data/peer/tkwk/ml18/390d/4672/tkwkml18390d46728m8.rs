@@ -2,7 +2,7 @@ let mut g = DataStore::globals();
 
 let mut o = DataObject::new();
 
-let mut a = match g.has("network_interfaces") && time() - g.get_object("network_interfaces").get_int("timestamp") < 30000 {
+let a = match g.has("network_interfaces") && time() - g.get_object("network_interfaces").get_int("timestamp") < 30000 {
   true => g.get_object("network_interfaces").get_array("list"),
   false => {
     let mut a = DataArray::new();

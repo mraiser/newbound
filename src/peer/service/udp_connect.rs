@@ -1,8 +1,6 @@
 use ndata::dataobject::*;
 use flowlang::datastore::DataStore;
-//use x25519_dalek::PublicKey;
 use crate::peer::service::listen_udp::UDPCON;
-use flowlang::rand::fill_bytes;
 
 pub fn execute(o: DataObject) -> DataObject {
 let a0 = o.get_string("ipaddr");

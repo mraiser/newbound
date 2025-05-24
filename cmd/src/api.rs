@@ -1,3 +1,4 @@
+#![allow(unused_mut)]
 use ndata::dataobject::DataObject;
 use ndata::dataarray::DataArray;
 use ndata::databytes::DataBytes;

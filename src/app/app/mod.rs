@@ -22,7 +22,6 @@ pub mod timeroff;
 pub mod timeron;
 pub mod deviceid;
 
-use flowlang::rustcmd::*;
 pub fn cmdinit(cmds: &mut Vec<(String, flowlang::rustcmd::Transform, String)>) {
     cmds.push(("tvigvw19268109f0fg2a60".to_string(), spawn::execute, "".to_string()));
     cmds.push(("nyzimq182eabf7339p7c5".to_string(), read::execute, "".to_string()));

@@ -1,4 +1,4 @@
-let user = get_user(&uuid);
+let user = get_user(&uuid); 
 if user.is_some(){
   let user = user.unwrap();
   let con = get_best(user.clone());

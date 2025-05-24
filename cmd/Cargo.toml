@@ -6,8 +6,10 @@ edition = "2021"
 [lib]
 crate-type = ["rlib", "dylib"]
 
-[features]
+[lints.rust]
+non_camel_case_types = "allow"
 
+[features]
 serde_support = ["serde","serde_json","flowlang/serde_support","ndata/serde_support"]
 reload = []
 
