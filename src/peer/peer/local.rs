@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use crate::app::service::init::prep_request;
 use crate::app::service::init::do_get;
 use crate::peer::service::listen::get_best;
@@ -8,16 +8,16 @@ use std::thread;
 use std::path::Path;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_object("request");
-let a1 = o.get_object("nn_session");
-let a2 = o.get_string("nn_sessionid");
-let ax = local(a0, a1, a2);
-let mut o = DataObject::new();
-o.put_object("a", ax);
-o
+  let arg_0: DataObject = o.get_object("request");
+  let arg_1: DataObject = o.get_object("nn_session");
+  let arg_2: String = o.get_string("nn_sessionid");
+  let ax = local(arg_0, arg_1, arg_2);
+  let mut result_obj = DataObject::new();
+  result_obj.put_object("a", ax);
+  result_obj
 }
 
-pub fn local(request:DataObject, nn_session:DataObject, nn_sessionid:String) -> DataObject {
+pub fn local(request: DataObject, nn_session: DataObject, nn_sessionid: String) -> DataObject {
 request.get_object("params").put_string("session_id", &nn_sessionid);
 let session_id = prep_request(request.clone());
 let mut x = do_get(request, session_id);
@@ -60,4 +60,3 @@ else if x.has("file") {
 
 x
 }
-

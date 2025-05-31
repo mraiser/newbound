@@ -1,12 +1,12 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use crate::dev::dev::compile::build_compile_command;
 use crate::dev::dev::compile::execute_compile_command;
 
-pub fn execute(_o: DataObject) -> DataObject {
-let ax = compile_rust();
-let mut o = DataObject::new();
-o.put_string("a", &ax);
-o
+pub fn execute(_: DataObject) -> DataObject {
+  let ax = compile_rust();
+  let mut result_obj = DataObject::new();
+  result_obj.put_string("a", &ax);
+  result_obj
 }
 
 pub fn compile_rust() -> String {
@@ -17,4 +17,3 @@ if b { panic!("{}",s); }
 println!("Compile OK");
 "OK".to_string()
 }
-

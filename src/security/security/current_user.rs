@@ -1,14 +1,13 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_object("nn_session");
-let ax = current_user(a0);
-let mut o = DataObject::new();
-o.put_object("a", ax);
-o
+  let arg_0: DataObject = o.get_object("nn_session");
+  let ax = current_user(arg_0);
+  let mut result_obj = DataObject::new();
+  result_obj.put_object("a", ax);
+  result_obj
 }
 
-pub fn current_user(nn_session:DataObject) -> DataObject {
+pub fn current_user(nn_session: DataObject) -> DataObject {
 nn_session.get_object("user")
 }
-

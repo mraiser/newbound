@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use crate::peer::service::exec::exec;
 use crate::peer::service::listen::get_best;
 use std::env::temp_dir;
@@ -19,15 +19,15 @@ use crate::security::security::init::get_user;
 use flowlang::appserver::init_globals;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("uuid");
-let a1 = o.get_string("lib");
-let ax = install_lib(a0, a1);
-let mut o = DataObject::new();
-o.put_boolean("a", ax);
-o
+  let arg_0: String = o.get_string("uuid");
+  let arg_1: String = o.get_string("lib");
+  let ax = install_lib(arg_0, arg_1);
+  let mut result_obj = DataObject::new();
+  result_obj.put_boolean("a", ax);
+  result_obj
 }
 
-pub fn install_lib(uuid:String, lib:String) -> bool {
+pub fn install_lib(uuid: String, lib: String) -> bool {
 let mut d = DataObject::new();
 d.put_string("lib", &lib);
 let o = exec(uuid.to_owned(), "dev".to_string(), "lib_info".to_string(), d.clone());
@@ -122,4 +122,3 @@ fs::write(metafile, &meta.to_string()).expect("Unable to write file");
 return rebuild;
 
 }
-

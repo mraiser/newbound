@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use ndata::dataarray::DataArray;
 use flowlang::flowlang::system::system_call::system_call;
 use flowlang::flowlang::system::unique_session_id::unique_session_id;
@@ -8,14 +8,14 @@ use crate::dev::dev::rebuild_lib::rebuild_lib;
 use flowlang::appserver::load_library;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("url");
-let ax = import(a0);
-let mut o = DataObject::new();
-o.put_string("a", &ax);
-o
+  let arg_0: String = o.get_string("url");
+  let ax = import(arg_0);
+  let mut result_obj = DataObject::new();
+  result_obj.put_string("a", &ax);
+  result_obj
 }
 
-pub fn import(url:String) -> String {
+pub fn import(url: String) -> String {
 // FIXME - assumes Newbound folder is in working directory
 
 let repodirx = Path::new("repositories");
@@ -60,4 +60,3 @@ for datadirx in std::fs::read_dir(&datadirxx).unwrap() {
 }
 "ERROR: No Newbound Library found".to_string()
 }
-

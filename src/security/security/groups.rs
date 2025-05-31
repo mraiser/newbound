@@ -1,12 +1,12 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use ndata::dataarray::DataArray;
 use flowlang::datastore::DataStore;
 
-pub fn execute(_o: DataObject) -> DataObject {
-let ax = groups();
-let mut o = DataObject::new();
-o.put_array("a", ax);
-o
+pub fn execute(_: DataObject) -> DataObject {
+  let ax = groups();
+  let mut result_obj = DataObject::new();
+  result_obj.put_array("a", ax);
+  result_obj
 }
 
 pub fn groups() -> DataArray {
@@ -24,4 +24,3 @@ let mut da = DataArray::new();
 for g in v { da.push_string(&g); }
 da
 }
-

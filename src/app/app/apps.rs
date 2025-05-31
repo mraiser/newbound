@@ -1,15 +1,15 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use std::fs;
 use flowlang::datastore::*;
 use std::path::Path;
 use ndata::dataarray::DataArray;
 use flowlang::flowlang::file::read_properties::read_properties;
 
-pub fn execute(_o: DataObject) -> DataObject {
-let ax = apps();
-let mut o = DataObject::new();
-o.put_array("a", ax);
-o
+pub fn execute(_: DataObject) -> DataObject {
+  let ax = apps();
+  let mut result_obj = DataObject::new();
+  result_obj.put_array("a", ax);
+  result_obj
 }
 
 pub fn apps() -> DataArray {
@@ -90,4 +90,3 @@ for file in fs::read_dir(&p).unwrap() {
 }
 ja
 }
-

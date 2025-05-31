@@ -110,6 +110,55 @@ The official (though currently being updated) documentation for Newbound can be 
 
 *Please note that while comprehensive, the documentation is in the process of being fully updated from the original Java version to accurately reflect the current Rust-based architecture and its newest features. Your understanding and patience are appreciated as this transition completes.*
 
+## LLM Prompts
+
+The following is a pretty good prompt preface for creating web interfaces with Newbound using an LLM:
+
+    You are writing a front-end Control in the Newbound development environment, which consists of discrete component sections (one each of) HTML, CSS, and Javascript. Back-end functions can be written in any of Rust, Javascript, Python, Java, or Flow (but we prefer Rust). When a function is added to the backend, it becomes available to the front-end by way of an auto-generated Javascript function. For example, if a back-end function named, "foo" with parameters "bar" and "bat" is written, you can call it like this:
+
+    ``` command_example.js
+    // Please note that we prefer this notation for callbacks
+    send_foo(bar, bat, callbackFunction(result){
+    if (result.status != "ok") { /* ERROR */ }
+    else {
+        var some_data = result.data; // Unless the result data is a String, in which case some_data = result.msg
+        /* CODE GOES HERE */
+    }
+    });
+    ```
+
+    Make sure to always keep the different types of code in their separate respective sections (HTML/CSS/JS/RUST).
+
+    In Javascript, there are some things you should be aware of:
+    - In the DOM, your Javascript section is attached to the HTML div that contains this Control. For example, if the control is added directly into the body, the javascript will be found at document.body.api
+    - If the div this Control is added into does not have an id specified, Newbound will generate one at runtime
+    - The div id will be attached to the javascript as a member attribute named UUID. You can access it at the top level of your Javascript with `this.UUID`
+    - If you define a "ready" function as a member of the javascript section, it will be called on startup when your control is ready
+    - JQuery 3.6.1 is loaded and available for you to use
+    - It is good practice to start your Javascript section like so:
+
+    ``` control_example.js
+    var me = this;
+    var ME = $('#'+me.UUID)[0];
+
+    me.ready = function(){
+    /* YOUR CODE HERE */
+    };
+    ```
+
+    If your control is being called with data, the data will be available at ME.DATA (if you have defined "ME" as specified above).
+
+    Your control can load additional controls in a number of ways:
+
+    ``` load_control_html_example.html
+    <div class='data-control' data-control='mylib:myctl:{"some_param": "some_value"}'></div>
+    ```
+
+    ``` load_control_js_example.js
+    var d = { "some_param": "some_value" };
+    installControl($(ME).find('.some_class')[0], 'mylib', 'myctl', function(api){}, d);
+    ```
+
 ## Community, Support & Contribution Opportunities
 
 * Join the Discussion on Discord: The Newbound Discord server (see link in repository details or visit the Newbound website) is the primary channel for real-time community interaction, asking questions, and getting support directly from the authors and other users.

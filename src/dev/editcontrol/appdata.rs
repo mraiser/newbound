@@ -1,16 +1,16 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use flowlang::datastore::*;
 use flowlang::flowlang::file::read_properties::read_properties;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_object("data");
-let ax = appdata(a0);
-let mut o = DataObject::new();
-o.put_object("a", ax);
-o
+  let arg_0: DataObject = o.get_object("data");
+  let ax = appdata(arg_0);
+  let mut result_obj = DataObject::new();
+  result_obj.put_object("a", ax);
+  result_obj
 }
 
-pub fn appdata(data:DataObject) -> DataObject {
+pub fn appdata(data: DataObject) -> DataObject {
 let appid = data.get_string("name");
 
 let store = DataStore::new();
@@ -37,4 +37,3 @@ else {
   return p;
 }
 }
-

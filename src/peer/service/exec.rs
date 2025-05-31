@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use crate::peer::service::listen::encrypt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
@@ -9,17 +9,17 @@ use crate::security::security::init::get_user;
 use flowlang::command::Command;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("uuid");
-let a1 = o.get_string("app");
-let a2 = o.get_string("cmd");
-let a3 = o.get_object("params");
-let ax = exec(a0, a1, a2, a3);
-let mut o = DataObject::new();
-o.put_object("a", ax);
-o
+  let arg_0: String = o.get_string("uuid");
+  let arg_1: String = o.get_string("app");
+  let arg_2: String = o.get_string("cmd");
+  let arg_3: DataObject = o.get_object("params");
+  let ax = exec(arg_0, arg_1, arg_2, arg_3);
+  let mut result_obj = DataObject::new();
+  result_obj.put_object("a", ax);
+  result_obj
 }
 
-pub fn exec(uuid:String, app:String, cmd:String, params:DataObject) -> DataObject {
+pub fn exec(uuid: String, app: String, cmd: String, params: DataObject) -> DataObject {
 if uuid == "local" {
   let cmd = Command::lookup(&app.clone(), &app.clone(), &cmd.clone());
   let o = cmd.execute(params);
@@ -113,4 +113,3 @@ fn wait(){
 //  spin_loop();
 //  yield_now();
 }
-

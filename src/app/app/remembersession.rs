@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use std::fs::File;
 use std::io::prelude::*;
 use ndata::data::Data;
@@ -6,14 +6,14 @@ use flowlang::datastore::DataStore;
 use flowlang::flowlang::file::read_properties::read_properties;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_object("nn_session");
-let ax = remembersession(a0);
-let mut o = DataObject::new();
-o.put_string("a", &ax);
-o
+  let arg_0: DataObject = o.get_object("nn_session");
+  let ax = remembersession(arg_0);
+  let mut result_obj = DataObject::new();
+  result_obj.put_string("a", &ax);
+  result_obj
 }
 
-pub fn remembersession(nn_session:DataObject) -> String {
+pub fn remembersession(nn_session: DataObject) -> String {
 let user = nn_session.get_object("user");
 let nn_sessionid = nn_session.get_string("id");
 let file = DataStore::new().root
@@ -38,4 +38,3 @@ for (k,v) in p.objects() {
 
 format!("You are now logged in\", \"sessionid\": \"{}", nn_sessionid)
 }
-

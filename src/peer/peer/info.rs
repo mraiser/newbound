@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use local_ip_address::list_afinet_netifas;
 use ndata::dataarray::DataArray;
 use flowlang::datastore::DataStore;
@@ -11,16 +11,16 @@ use std::collections::HashMap;
 use flowlang::flowlang::system::time::time;
 type Blake2b80 = Blake2b<U10>;
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("nn_sessionid");
-let a1 = o.get_property("uuid");
-let a2 = o.get_property("salt");
-let ax = info(a0, a1, a2);
-let mut o = DataObject::new();
-o.put_object("a", ax);
-o
+  let arg_0: String = o.get_string("nn_sessionid");
+  let arg_1: Data = o.get_property("uuid");
+  let arg_2: Data = o.get_property("salt");
+  let ax = info(arg_0, arg_1, arg_2);
+  let mut result_obj = DataObject::new();
+  result_obj.put_object("a", ax);
+  result_obj
 }
 
-pub fn info(nn_sessionid:String, uuid:Data, salt:Data) -> DataObject {
+pub fn info(nn_sessionid: String, uuid: Data, salt: Data) -> DataObject {
 let mut g = DataStore::globals();
 
 let mut o = DataObject::new();
@@ -97,4 +97,3 @@ if uuid.is_array() || (uuid.is_string() && uuid.string().starts_with("[")) {
 
 o
 }
-

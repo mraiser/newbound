@@ -1,15 +1,15 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use ndata::dataarray::*;
 use flowlang::datastore::*;
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("app");
-let ax = events(a0);
-let mut o = DataObject::new();
-o.put_array("a", ax);
-o
+  let arg_0: String = o.get_string("app");
+  let ax = events(arg_0);
+  let mut result_obj = DataObject::new();
+  result_obj.put_array("a", ax);
+  result_obj
 }
 
-pub fn events(app:String) -> DataArray {
+pub fn events(app: String) -> DataArray {
 let mut a = DataArray::new();
 
 let system = DataStore::globals().get_object("system");
@@ -23,4 +23,3 @@ if events.has(&app) {
 
 a
 }
-

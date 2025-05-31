@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use flowlang::datastore::DataStore;
 //use rand::rngs::OsRng;
 //use x25519_dalek::{StaticSecret, PublicKey};
@@ -7,11 +7,11 @@ use flowlang::flowlang::file::write_properties::write_properties;
 use flowlang::x25519::*;
 use flowlang::rand::uuid;
 
-pub fn execute(_o: DataObject) -> DataObject {
-let ax = init();
-let mut o = DataObject::new();
-o.put_string("a", &ax);
-o
+pub fn execute(_: DataObject) -> DataObject {
+  let ax = init();
+  let mut result_obj = DataObject::new();
+  result_obj.put_string("a", &ax);
+  result_obj
 }
 
 pub fn init() -> String {
@@ -52,4 +52,3 @@ fn to_hex(ba:&[u8]) -> String {
   }
   s
 }
-

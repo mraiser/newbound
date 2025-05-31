@@ -1,0 +1,125 @@
+/* Library Settings Control Styles */
+.library-settings-control {
+    font-family: sans-serif;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    margin-bottom: 15px;
+}
+
+.control-toggle-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #e7e7e7;
+    color: #333;
+    text-decoration: none;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.control-toggle-link:hover {
+    background-color: #ddd;
+}
+
+.control-toggle-link .toggle-icon {
+    transition: transform 0.3s ease-in-out;
+}
+
+.control-toggle-link[aria-expanded="true"] .toggle-icon {
+    transform: rotate(90deg);
+}
+
+.settings-editor {
+    margin-top: 10px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    background-color: #fff;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #555;
+}
+
+.form-input,
+.form-textarea {
+    width: calc(100% - 20px); /* Account for padding */
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    box-sizing: border-box;
+    font-size: 14px;
+}
+
+.form-textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.checkbox-group div {
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+}
+
+.checkbox-group input[type="checkbox"] {
+    margin-right: 8px;
+    accent-color: #007bff; /* Modern way to color checkboxes */
+}
+
+.checkbox-group label {
+    font-weight: normal; /* Override bold from .form-group label */
+    margin-bottom: 0; /* Override default from .form-group label */
+}
+
+.form-actions {
+    margin-top: 20px;
+    text-align: right;
+}
+
+.button {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-left: 10px;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.save-button {
+    background-color: #007bff;
+    color: white;
+}
+
+.save-button:hover {
+    background-color: #0056b3;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.cancel-button {
+    background-color: #6c757d;
+    color: white;
+}
+
+.cancel-button:hover {
+    background-color: #545b62;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}

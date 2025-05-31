@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use std::fs;
 use std::fs::*;
 use ndata::data::Data;
@@ -24,14 +24,14 @@ use aes::cipher::{
 use flowlang::x25519::*;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_object("data");
-let ax = publishapp(a0);
-let mut o = DataObject::new();
-o.put_array("a", ax);
-o
+  let arg_0: DataObject = o.get_object("data");
+  let ax = publishapp(arg_0);
+  let mut result_obj = DataObject::new();
+  result_obj.put_array("a", ax);
+  result_obj
 }
 
-pub fn publishapp(data:DataObject) -> DataArray {
+pub fn publishapp(data: DataObject) -> DataArray {
 /*
 
 1. build _APPS/[APPNAME]
@@ -223,4 +223,3 @@ pub fn decode_hex(s: &str) -> Result<Vec<u8>, ParseIntError> {
         .collect()
 
 }
-

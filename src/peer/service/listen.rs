@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use std::num::ParseIntError;
 use std::net::TcpStream;
 use std::io::Read;
@@ -45,15 +45,15 @@ use core::sync::atomic::Ordering;
 use flowlang::x25519::*;
 use flowlang::rand::*;
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("ipaddr");
-let a1 = o.get_int("port");
-let ax = listen(a0, a1);
-let mut o = DataObject::new();
-o.put_int("a", ax);
-o
+  let arg_0: String = o.get_string("ipaddr");
+  let arg_1: i64 = o.get_int("port");
+  let ax = listen(arg_0, arg_1);
+  let mut result_obj = DataObject::new();
+  result_obj.put_int("a", ax);
+  result_obj
 }
 
-pub fn listen(ipaddr:String, port:i64) -> i64 {
+pub fn listen(ipaddr: String, port: i64) -> i64 {
   do_init(); 
   do_listen(ipaddr, port) 
 }
@@ -1244,4 +1244,3 @@ pub fn decode_hex(s: &str) -> Result<Vec<u8>, ParseIntError> {
         .collect()
 
 }
-

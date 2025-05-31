@@ -1,12 +1,12 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use ndata::dataarray::DataArray;
 use flowlang::flowlang::system::system_call::system_call;
 
-pub fn execute(_o: DataObject) -> DataObject {
-let ax = reboot();
-let mut o = DataObject::new();
-o.put_object("a", ax);
-o
+pub fn execute(_: DataObject) -> DataObject {
+  let ax = reboot();
+  let mut result_obj = DataObject::new();
+  result_obj.put_object("a", ax);
+  result_obj
 }
 
 pub fn reboot() -> DataObject {
@@ -16,4 +16,3 @@ ja.push_string("reboot");
 let o = system_call(ja);
 o
 }
-

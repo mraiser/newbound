@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use std::io::prelude::*;
 use std::io::{Seek, Write};
 use std::iter::Iterator;
@@ -10,15 +10,15 @@ use std::path::Path;
 use walkdir::{DirEntry, WalkDir};
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("srcdir");
-let a1 = o.get_string("destfile");
-let ax = zip(a0, a1);
-let mut o = DataObject::new();
-o.put_boolean("a", ax);
-o
+  let arg_0: String = o.get_string("srcdir");
+  let arg_1: String = o.get_string("destfile");
+  let ax = zip(arg_0, arg_1);
+  let mut result_obj = DataObject::new();
+  result_obj.put_boolean("a", ax);
+  result_obj
 }
 
-pub fn zip(srcdir:String, destfile:String) -> bool {
+pub fn zip(srcdir: String, destfile: String) -> bool {
   let method = zip::CompressionMethod::Deflated;
   let x = doit(&srcdir, &destfile, method);
   if x.is_err() { return false; }
@@ -86,4 +86,3 @@ fn doit(
 
     Ok(())
 }
-

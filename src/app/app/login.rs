@@ -1,18 +1,17 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use crate::security::security::init::log_in;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("user");
-let a1 = o.get_string("pass");
-let a2 = o.get_string("nn_sessionid");
-let ax = login(a0, a1, a2);
-let mut o = DataObject::new();
-o.put_string("a", &ax);
-o
+  let arg_0: String = o.get_string("user");
+  let arg_1: String = o.get_string("pass");
+  let arg_2: String = o.get_string("nn_sessionid");
+  let ax = login(arg_0, arg_1, arg_2);
+  let mut result_obj = DataObject::new();
+  result_obj.put_string("a", &ax);
+  result_obj
 }
 
-pub fn login(user:String, pass:String, nn_sessionid:String) -> String {
+pub fn login(user: String, pass: String, nn_sessionid: String) -> String {
 if !log_in(&nn_sessionid, &user, &pass) { panic!("UNAUTHORIZED: {}", user); }
 format!("You are now logged in\", \"sessionid\": \"{}", nn_sessionid)
 }
-

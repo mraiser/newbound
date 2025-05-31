@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use crate::security::security::users::users;
 use ndata::data::Data;
 use crate::peer::service::tcp_connect::tcp_connect;
@@ -17,11 +17,11 @@ use crate::peer::service::listen::to_hex;
 use crate::peer::service::listen::P2PConnection;
 
 type Blake2b80 = Blake2b<U10>;
-pub fn execute(_o: DataObject) -> DataObject {
-let ax = maintenance();
-let mut o = DataObject::new();
-o.put_string("a", &ax);
-o
+pub fn execute(_: DataObject) -> DataObject {
+  let ax = maintenance();
+  let mut result_obj = DataObject::new();
+  result_obj.put_string("a", &ax);
+  result_obj
 }
 
 pub fn maintenance() -> String {
@@ -140,4 +140,3 @@ for (uuid, user) in users.objects(){
 
 "OK".to_string()
 }
-

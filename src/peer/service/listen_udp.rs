@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use std::io;
 use std::net::UdpSocket;
 use flowlang::datastore::DataStore;
@@ -36,15 +36,15 @@ use flowlang::x25519::*;
 use flowlang::rand::fill_bytes;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("ipaddr");
-let a1 = o.get_int("port");
-let ax = listen_udp(a0, a1);
-let mut o = DataObject::new();
-o.put_int("a", ax);
-o
+  let arg_0: String = o.get_string("ipaddr");
+  let arg_1: i64 = o.get_int("port");
+  let ax = listen_udp(arg_0, arg_1);
+  let mut result_obj = DataObject::new();
+  result_obj.put_int("a", ax);
+  result_obj
 }
 
-pub fn listen_udp(ipaddr:String, port:i64) -> i64 {
+pub fn listen_udp(ipaddr: String, port: i64) -> i64 {
   let socket_address = ipaddr+":"+&port.to_string();
   START.call_once(|| { 
     UDPCON.set(RwLock::new(UdpSocket::bind(socket_address).unwrap())); 
@@ -706,4 +706,3 @@ fn do_listen(){
 
   }
 }
-

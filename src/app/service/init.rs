@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use std::thread;
 use std::panic;
 use std::fs;
@@ -6,10 +6,8 @@ use flowlang::datastore::*;
 use std::net::TcpListener;
 use flowlang::appserver::save_config;
 use flowlang::appserver::fire_event;
-use ndata::data::Data;
 use flowlang::flowlang::system::unique_session_id::unique_session_id;
 use flowlang::flowlang::system::time::time;
-use ndata::dataarray::DataArray;
 use flowlang::flowlang::http::hex_decode::hex_decode;
 use std::net::TcpStream;
 use std::sync::Once;
@@ -30,6 +28,8 @@ use std::io::Read;
 use core::time::Duration;
 use crate::peer::service::exec::exec;
 use crate::security::security::init::check_security;
+use ndata::Data;
+use ndata::dataarray::DataArray;
 
 #[cfg(not(feature = "webview"))]
 use flowlang::flowlang::system::system_call::system_call;
@@ -38,15 +38,15 @@ use crate::security::security::init::get_user;
 #[cfg(not(feature = "webview"))]
 use crate::security::security::init::log_in;
 
-pub fn execute(_o: DataObject) -> DataObject {
-let ax = init();
-let mut o = DataObject::new();
-o.put_string("a", &ax);
-o
+pub fn execute(_: DataObject) -> DataObject {
+  let ax = init();
+  let mut result_obj = DataObject::new();
+  result_obj.put_string("a", &ax);
+  result_obj
 }
 
 pub fn init() -> String {
-  START.call_once(|| { WEBSOCKHEAP.set(RwLock::new(Heap::new())); }); 
+  START.call_once(|| { WEBSOCKHEAP.set(RwLock::new(Heap::new())); });
 
   let beat = Duration::from_millis(10);
   let system = DataStore::globals().get_object("system");
@@ -1100,7 +1100,7 @@ fn read_line(reader: &mut TcpStream) -> String {
         break;
       }
     }
-    if line.len() >= 4096 { break; } // FIXME - What is an appropriate max HTTP request line length?
+    //if line.len() >= 4096 { break; } // FIXME - What is an appropriate max HTTP request line length?
   }
   line
 }
@@ -1116,7 +1116,7 @@ fn read_until(reader: &mut TcpStream, c: u8, bufout: &mut Vec<u8>) -> usize {
     if buf[0] == c {
       break;
     }
-    if i >= 4096 { break; } // FIXME - What is an appropriate max HTTP request line length?
+    //if i >= 4096 { break; } // FIXME - What is an appropriate max HTTP request line length?
   }
   i
 }
@@ -1154,4 +1154,3 @@ pub fn format_result(command:Command, o:DataObject) -> DataObject {
   d
 
 }
-

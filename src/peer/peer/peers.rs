@@ -1,15 +1,15 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use flowlang::datastore::DataStore;
 use ndata::dataarray::DataArray;
 use crate::peer::service::listen::get_tcp;
 use crate::peer::service::listen::get_relay;
 use crate::peer::service::listen::get_udp;
 
-pub fn execute(_o: DataObject) -> DataObject {
-let ax = peers();
-let mut o = DataObject::new();
-o.put_array("a", ax);
-o
+pub fn execute(_: DataObject) -> DataObject {
+  let ax = peers();
+  let mut result_obj = DataObject::new();
+  result_obj.put_array("a", ax);
+  result_obj
 }
 
 pub fn peers() -> DataArray {
@@ -61,4 +61,3 @@ pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
 
   o
 }
-

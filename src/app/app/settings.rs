@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use ndata::data::Data;
 use flowlang::datastore::DataStore;
 use flowlang::flowlang::file::write_properties::write_properties;
@@ -6,14 +6,14 @@ use flowlang::appserver::init_globals;
 
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_property("settings");
-let ax = settings(a0);
-let mut o = DataObject::new();
-o.put_object("a", ax);
-o
+  let arg_0: Data = o.get_property("settings");
+  let ax = settings(arg_0);
+  let mut result_obj = DataObject::new();
+  result_obj.put_object("a", ax);
+  result_obj
 }
 
-pub fn settings(settings:Data) -> DataObject {
+pub fn settings(settings: Data) -> DataObject {
 let system = DataStore::globals().get_object("system");
 let mut o = system.get_object("config");
 let mut b = false;
@@ -36,4 +36,3 @@ if b {
 
 o
 }
-

@@ -1,17 +1,17 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use flowlang::datastore::DataStore;
 use ndata::dataarray::DataArray;
 use flowlang::flowlang::http::hex_encode::hex_encode;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("nn_path");
-let ax = jsapi(a0);
-let mut o = DataObject::new();
-o.put_object("a", ax);
-o
+  let arg_0: String = o.get_string("nn_path");
+  let ax = jsapi(arg_0);
+  let mut result_obj = DataObject::new();
+  result_obj.put_object("a", ax);
+  result_obj
 }
 
-pub fn jsapi(nn_path:String) -> DataObject {
+pub fn jsapi(nn_path: String) -> DataObject {
 let mut o = DataObject::new();
 let mut js = "".to_string();
 
@@ -78,4 +78,3 @@ if store.exists(lib, id) {
 o.put_string("js", &js);
 o
 }
-

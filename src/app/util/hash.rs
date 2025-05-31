@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use blake2::Blake2b512;
 use blake2::Digest;
 use std::path::Path;
@@ -7,14 +7,14 @@ use std::io::prelude::*;
 use std::fs::File;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("file");
-let ax = hash(a0);
-let mut o = DataObject::new();
-o.put_string("a", &ax);
-o
+  let arg_0: String = o.get_string("file");
+  let ax = hash(arg_0);
+  let mut result_obj = DataObject::new();
+  result_obj.put_string("a", &ax);
+  result_obj
 }
 
-pub fn hash(file:String) -> String {
+pub fn hash(file: String) -> String {
   let path = Path::new(&file);
   let mut hasher = Blake2b512::new();
   hash_path(&path, &mut hasher);
@@ -56,4 +56,3 @@ pub fn hash_dir(path:&Path, hasher:&mut Blake2b512) {
     hash_path(&path, hasher);
   }
 }
-

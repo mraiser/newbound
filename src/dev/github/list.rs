@@ -1,12 +1,12 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use ndata::dataarray::DataArray;
 use std::path::Path;
 
-pub fn execute(_o: DataObject) -> DataObject {
-let ax = list();
-let mut o = DataObject::new();
-o.put_object("a", ax);
-o
+pub fn execute(_: DataObject) -> DataObject {
+  let ax = list();
+  let mut result_obj = DataObject::new();
+  result_obj.put_object("a", ax);
+  result_obj
 }
 
 pub fn list() -> DataObject {
@@ -27,4 +27,3 @@ let mut d = DataObject::new();
 d.put_array("list", a);
 d
 }
-

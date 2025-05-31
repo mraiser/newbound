@@ -1,4 +1,4 @@
-  START.call_once(|| { WEBSOCKHEAP.set(RwLock::new(Heap::new())); }); 
+  START.call_once(|| { WEBSOCKHEAP.set(RwLock::new(Heap::new())); });
 
   let beat = Duration::from_millis(10);
   let system = DataStore::globals().get_object("system");
@@ -1052,7 +1052,7 @@ fn read_line(reader: &mut TcpStream) -> String {
         break;
       }
     }
-    if line.len() >= 4096 { break; } // FIXME - What is an appropriate max HTTP request line length?
+    //if line.len() >= 4096 { break; } // FIXME - What is an appropriate max HTTP request line length?
   }
   line
 }
@@ -1068,7 +1068,7 @@ fn read_until(reader: &mut TcpStream, c: u8, bufout: &mut Vec<u8>) -> usize {
     if buf[0] == c {
       break;
     }
-    if i >= 4096 { break; } // FIXME - What is an appropriate max HTTP request line length?
+    //if i >= 4096 { break; } // FIXME - What is an appropriate max HTTP request line length?
   }
   i
 }

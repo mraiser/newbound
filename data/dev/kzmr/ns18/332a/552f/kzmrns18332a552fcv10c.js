@@ -8,6 +8,8 @@ me.ready = function(){
   buildControls();
   buildAssets();
   document.body.api.ui.initTooltips(ME);
+  var el = $(ME).find('.libsettingswrap')[0];
+  installControl(el, 'dev', 'libsettings', function(result){}, ME.DATA);
 };
 
 $(ME).find('.rebuildlib').click(function(e){

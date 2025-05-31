@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use flowlang::buildrust::*;
 use ndata::dataarray::*;
 use flowlang::flowlang::system::system_call::system_call;
@@ -7,16 +7,16 @@ use flowlang::datastore::DataStore;
 use crate::dev::dev::compile_rust::compile_rust;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("lib");
-let a1 = o.get_string("ctl");
-let a2 = o.get_string("cmd");
-let ax = compile(a0, a1, a2);
-let mut o = DataObject::new();
-o.put_string("a", &ax);
-o
+  let arg_0: String = o.get_string("lib");
+  let arg_1: String = o.get_string("ctl");
+  let arg_2: String = o.get_string("cmd");
+  let ax = compile(arg_0, arg_1, arg_2);
+  let mut result_obj = DataObject::new();
+  result_obj.put_string("a", &ax);
+  result_obj
 }
 
-pub fn compile(lib:String, ctl:String, cmd:String) -> String {
+pub fn compile(lib: String, ctl: String, cmd: String) -> String {
 let store = DataStore::new();
 let root = store.get_lib_root(&lib);
 let b = build(&lib, &ctl, &cmd, &root);
@@ -104,4 +104,3 @@ pub fn build_compile_command() -> DataArray {
   }
   ja
 }
-

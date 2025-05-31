@@ -1,21 +1,21 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use flowlang::command::Command;
 use crate::app::service::init::format_result;
 use crate::security::security::init::check_auth;
 use std::panic;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("lib");
-let a1 = o.get_string("id");
-let a2 = o.get_object("args");
-let a3 = o.get_string("nn_sessionid");
-let ax = exec(a0, a1, a2, a3);
-let mut o = DataObject::new();
-o.put_object("a", ax);
-o
+  let arg_0: String = o.get_string("lib");
+  let arg_1: String = o.get_string("id");
+  let arg_2: DataObject = o.get_object("args");
+  let arg_3: String = o.get_string("nn_sessionid");
+  let ax = exec(arg_0, arg_1, arg_2, arg_3);
+  let mut result_obj = DataObject::new();
+  result_obj.put_object("a", ax);
+  result_obj
 }
 
-pub fn exec(lib:String, id:String, args:DataObject, nn_sessionid:String) -> DataObject {
+pub fn exec(lib: String, id: String, args: DataObject, nn_sessionid: String) -> DataObject {
 if check_auth(&lib, &id, &nn_sessionid, false) {
   let mut args = args.clone();
   args.put_string("nn_sessionid", &nn_sessionid);
@@ -48,4 +48,3 @@ if check_auth(&lib, &id, &nn_sessionid, false) {
 }
 DataObject::from_string("{\"status\":\"err\",\"msg\":\"UNAUTHORIZED\"}")
 }
-

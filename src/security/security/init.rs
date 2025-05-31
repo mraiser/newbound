@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use std::thread;
 use std::fs;
 use core::time::Duration;
@@ -14,11 +14,11 @@ use std::fs::create_dir_all;
 use flowlang::flowlang::system::unique_session_id::unique_session_id;
 use flowlang::flowlang::file::read_properties::read_properties;
 
-pub fn execute(_o: DataObject) -> DataObject {
-let ax = init();
-let mut o = DataObject::new();
-o.put_object("a", ax);
-o
+pub fn execute(_: DataObject) -> DataObject {
+  let ax = init();
+  let mut result_obj = DataObject::new();
+  result_obj.put_object("a", ax);
+  result_obj
 }
 
 pub fn init() -> DataObject {
@@ -271,4 +271,3 @@ pub fn load_users() {
     if b { system.put_object("users", users.clone()); }
   }
 }
-

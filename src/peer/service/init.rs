@@ -1,4 +1,4 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use std::thread;
 use ndata::data::*;
 use flowlang::datastore::DataStore;
@@ -8,11 +8,11 @@ use crate::peer::service::listen_udp::listen_udp;
 use crate::peer::service::discovery::discovery;
 use core::time::Duration;
 
-pub fn execute(_o: DataObject) -> DataObject {
-let ax = init();
-let mut o = DataObject::new();
-o.put_object("a", ax);
-o
+pub fn execute(_: DataObject) -> DataObject {
+  let ax = init();
+  let mut result_obj = DataObject::new();
+  result_obj.put_object("a", ax);
+  result_obj
 }
 
 pub fn init() -> DataObject {
@@ -56,4 +56,3 @@ discovery();
   
 meta
 }
-

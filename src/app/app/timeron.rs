@@ -1,17 +1,16 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use flowlang::appserver::*;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("id");
-let a1 = o.get_object("data");
-let ax = timeron(a0, a1);
-let mut o = DataObject::new();
-o.put_string("a", &ax);
-o
+  let arg_0: String = o.get_string("id");
+  let arg_1: DataObject = o.get_object("data");
+  let ax = timeron(arg_0, arg_1);
+  let mut result_obj = DataObject::new();
+  result_obj.put_string("a", &ax);
+  result_obj
 }
 
-pub fn timeron(id:String, data:DataObject) -> String {
+pub fn timeron(id: String, data: DataObject) -> String {
 add_timer(&id, data);
 "OK".to_string()
 }
-

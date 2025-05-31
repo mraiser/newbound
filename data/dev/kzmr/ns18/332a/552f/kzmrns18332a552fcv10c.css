@@ -58,3 +58,7 @@
   top:8px;
   right:20px;
 }
+
+.libsettingswrap, .groupchips{
+  display:inline-block;
+}

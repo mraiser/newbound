@@ -1,19 +1,19 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use ndata::dataarray::DataArray;
 use flowlang::flowlang::system::system_call::system_call;
 
 pub fn execute(o: DataObject) -> DataObject {
-let a0 = o.get_string("lib");
-let a1 = o.get_string("ctl");
-let a2 = o.get_string("cmd");
-let a3 = o.get_object("args");
-let ax = spawn(a0, a1, a2, a3);
-let mut o = DataObject::new();
-o.put_object("a", ax);
-o
+  let arg_0: String = o.get_string("lib");
+  let arg_1: String = o.get_string("ctl");
+  let arg_2: String = o.get_string("cmd");
+  let arg_3: DataObject = o.get_object("args");
+  let ax = spawn(arg_0, arg_1, arg_2, arg_3);
+  let mut result_obj = DataObject::new();
+  result_obj.put_object("a", ax);
+  result_obj
 }
 
-pub fn spawn(lib:String, ctl:String, cmd:String, args:DataObject) -> DataObject {
+pub fn spawn(lib: String, ctl: String, cmd: String, args: DataObject) -> DataObject {
 let mut ja = DataArray::new();
 
 #[cfg(debug_assertions)]
@@ -32,4 +32,3 @@ ja.push_string(&args.to_string());
 
 system_call(ja)
 }
-

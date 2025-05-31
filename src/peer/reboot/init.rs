@@ -1,13 +1,13 @@
-use ndata::dataobject::*;
+use ndata::dataobject::DataObject;
 use ndata::dataarray::*;
 use flowlang::flowlang::data::write::write;
 use flowlang::datastore::DataStore;
 
-pub fn execute(_o: DataObject) -> DataObject {
-let ax = init();
-let mut o = DataObject::new();
-o.put_object("a", ax);
-o
+pub fn execute(_: DataObject) -> DataObject {
+  let ax = init();
+  let mut result_obj = DataObject::new();
+  result_obj.put_object("a", ax);
+  result_obj
 }
 
 pub fn init() -> DataObject {
@@ -27,4 +27,3 @@ if b { write("runtime".to_string(), "controls_available".to_string(), d.clone(),
   
 d
 }
-
