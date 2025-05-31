@@ -81,6 +81,10 @@ fn main() {
         rebuild_rust_api();
         return;
       }
+
+      if x == "mcp" {
+        flowlang::mcp::mcp::mcp::run();
+      }
     }
     
     #[cfg(not(feature = "webview"))]
