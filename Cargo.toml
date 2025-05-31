@@ -18,7 +18,7 @@ javascript_runtime = ["flowlang/javascript_runtime"]
 [dependencies]
 cmd = { path = "./cmd" }
 
-flowlang = { version="0.3.19" }
+flowlang = { version="0.3.20" }
 ndata = { version="0.3.13" }
 
 hot-lib-reloader = { version = "^0.7", optional = true }

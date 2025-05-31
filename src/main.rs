@@ -83,6 +83,7 @@ fn main() {
       }
 
       if x == "mcp" {
+        init_globals();
         flowlang::mcp::mcp::mcp::run();
       }
     }
