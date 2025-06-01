@@ -7,7 +7,7 @@
       "dependencies":{
          "aes":"\"^0.8\"",
          "blake2":"\"^0.10\"",
-         "flowlang":"{ version=\"0.3.18\" }",
+         "flowlang":"{ version=\"0.3.21\" }",
          "hot-lib-reloader":"{ version = \"^0.7\", optional = true }",
          "local-ip-address":"\"^0.5\"",
          "ndata":"{ version=\"0.3.13\" }",
