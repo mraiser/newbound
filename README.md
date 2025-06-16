@@ -5,6 +5,8 @@ Welcome to the official GitHub repository for Newbound!
 
 [API](https://www.newbound.io/documentation/reference.html) | [DISCORD](https://discord.gg/p2YvGGm2RR) | [DOC](https://www.newbound.io/documentation/index.html) | [WEB](https://www.newbound.io) | [CORP](https://www.newbound.com/site/index.html)
 
+NOTE: The reload, java_runtime, and javascript_runtime features are known to be buggy at this time.
+
 ### Installation
 
 Building Newbound requires [Rust](https://www.rust-lang.org/tools/install). 
@@ -112,7 +114,7 @@ The official (though currently being updated) documentation for Newbound can be 
 
 ## LLM Prompts
 
-The following is a pretty good prompt preface for creating web interfaces with Newbound using an LLM:
+The following is a pretty good prompt preface for creating front-end control interfaces with Newbound using an LLM:
 
     You are writing a front-end Control in the Newbound development environment, which consists of discrete component sections (one each of) HTML, CSS, and Javascript. Back-end functions can be written in any of Rust, Javascript, Python, Java, or Flow (but we prefer Rust). When a function is added to the backend, it becomes available to the front-end by way of an auto-generated Javascript function. For example, if a back-end function named, "foo" with parameters "bar" and "bat" is written, you can call it like this:
 
@@ -158,6 +160,71 @@ The following is a pretty good prompt preface for creating web interfaces with N
     var d = { "some_param": "some_value" };
     installControl($(ME).find('.some_class')[0], 'mylib', 'myctl', function(api){}, d);
     ```
+
+The following is a pretty good prompt preface for creating back-end control commands with Newbound using an LLM:
+
+    Writing a Back-End Command in Newbound
+
+    You are writing a back-end Command in the Newbound development environment. Commands are the server-side logic for a front-end Control. While they can be written in several languages, Rust and Python have first-class support, including live-sharing of DataObject instances and access to the full API.
+
+    The Newbound IDE simplifies the process by generating the necessary wrapper code. You only need to write the core logic of your function.
+    Key Concepts
+
+        Data Types: All data is handled using ndata-supported types (e.g., DataObject, DataArray, String, i64, bool). These types are thread-safe by default; do not wrap them in Arc, Mutex, etc.
+
+        IDE Code Generation: You will write your code in separate sections (e.g., import, function body). The IDE uses this to generate the final, runnable Command function, including the correct function signature and boilerplate.
+
+        Function Signature: You write your function as if you were receiving the parameters directly, not inside a DataObject. The IDE's generated code handles extracting the parameters for you.
+
+        Return Values: The generated wrapper code automatically packages your function's return value into a final DataObject for the front-end.
+
+            Default: A returned value (e.g., an i64, bool, or another DataObject) is placed in the data field.
+
+            String: A returned String is placed in the msg field.
+
+            FLAT: If you specify the return type as FLAT, you must return a DataObject, and Newbound will send it to the front-end as-is, without wrapping it further.
+
+    Writing a Rust Command
+
+    You provide the imports and the function body in separate sections. The IDE builds the rest.
+
+    Example: add_numbers
+    Import Section
+
+    // lib: mylib, ctl: myctl, cmd: add_numbers
+    // return: i64
+
+    // No imports needed for this simple example.
+    // If you were using DataObject, you'd put:
+    // use ndata::dataobject::DataObject;
+
+    Function Body
+
+    // The function signature is simplified. You just write the logic.
+    // The input parameters 'a' and 'b' are automatically provided.
+    fn add_numbers(a: i64, b: i64) -> i64 {
+        // The IDE has already extracted 'a' and 'b' from the input object.
+        a + b
+    }
+
+    In this example, the returned i64 will be automatically placed in the data field of the DataObject sent to the front-end.
+    Writing a Python Command
+
+    Python commands are also stateful, meaning imports and global variables persist across different command executions.
+
+    Example: add_numbers
+    Function Body
+
+    # lib: mylib, ctl: myctl, cmd: add_numbers
+    # return: int
+
+    # The function receives parameters directly.
+    def add_numbers(a, b):
+    # The runtime automatically converts the return value.
+    return a + b
+
+    The Python runtime will take the returned integer, and the Flowlang engine will package it into a DataObject with the result in the data field.
+
 
 ## Community, Support & Contribution Opportunities
 

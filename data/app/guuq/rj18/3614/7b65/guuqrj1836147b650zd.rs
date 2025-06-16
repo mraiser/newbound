@@ -1,3 +1,37 @@
+let src_path = Path::new(&srcdir);
+
+if !src_path.is_dir() {
+  return false;
+}
+
+let dest_file_path = Path::new(&destfile);
+let abs_dest_file_path_str: String = if dest_file_path.is_absolute() {
+  destfile.to_string()
+} else {
+  match env::current_dir() {
+    Ok(cwd) => cwd.join(dest_file_path).to_string_lossy().into_owned(),
+    Err(_) => {
+      return false;
+    }
+  }
+};
+
+let command_string = format!(
+  "cd '{}' && zip -qr '{}' .",
+  srcdir, // Path to cd into
+  abs_dest_file_path_str  // Absolute path for the output zip file
+);
+
+let mut cmd_array = DataArray::new();
+cmd_array.push_string("bash");
+cmd_array.push_string("-c");
+cmd_array.push_string(&command_string);
+
+let result_array = system_call(cmd_array);
+
+result_array.get_string("status")  == "ok"
+
+/*
   let method = zip::CompressionMethod::Deflated;
   let x = doit(&srcdir, &destfile, method);
   if x.is_err() { return false; }
@@ -64,3 +98,4 @@ fn doit(
     zip_dir(&mut it.filter_map(|e| e.ok()), src_dir, file, method)?;
 
     Ok(())
+*/

@@ -1,65 +1,16 @@
-pub mod peer;
-pub mod security;
-pub mod dev;
-pub mod app;
-mod cmdinit;
+mod generated_initializer;
 
 use std::env;
 use flowlang::appserver::*;
-use flowlang::rustcmd::*;
 use flowlang::buildrust::build_all;
 use flowlang::buildrust::rebuild_rust_api;
 use ndata::dataobject::DataObject;
 
-
-#[cfg(feature = "reload")]
-use hot_lib::*;
-#[cfg(not(feature = "reload"))]
-use cmd::*;
-
-use crate::cmdinit::cmdinit;
-
-#[cfg(feature = "reload")]
-#[hot_lib_reloader::hot_module(dylib = "cmd")]
-mod hot_lib {
-    pub use cmd::Initializer;
-    hot_functions_from_file!("cmd/src/lib.rs");
-    #[lib_change_subscription]
-    pub fn subscribe() -> hot_lib_reloader::LibReloadObserver {}
-    #[lib_version]
-    pub fn version() -> usize {}
-}
-
 fn main() {
   env::set_var("RUST_BACKTRACE", "1");
   {
-    let mut initializer = Initializer { data_ref: flowlang::init("data"), cmds: Vec::new() };
-    let mut v = Vec::new();
-    cmdinit(&mut v);
-    initializer.cmds = v;
-    mirror(&mut initializer);
-    for q in &initializer.cmds { RustCmd::add(q.0.to_owned(), q.1, q.2.to_owned()); }
-    
-    #[cfg(feature = "reload")]
-    {
-      use std::thread;
-      thread::spawn(move || {
-        loop {
-          println!("waiting for library change...");
-          let token = hot_lib::subscribe().wait_for_about_to_reload();
-          drop(token);
-          hot_lib::subscribe().wait_for_reload();
-          println!("... library has been reloaded {} times", hot_lib::version());
-          
-          initializer.cmds.clear();
-          let mut v = Vec::new();
-          cmdinit(&mut v);
-          initializer.cmds = v;
-          mirror(&mut initializer);
-          for q in &initializer.cmds { RustCmd::add(q.0.to_owned(), q.1, q.2.to_owned()); }
-        }
-      });
-    }
+    let _data_ref = flowlang::init("data");
+    generated_initializer::initialize_all_commands();
 
     let params: Vec<String> = env::args().collect();
     if params.len() > 1{
@@ -74,7 +25,7 @@ fn main() {
         println!("\n{}", o.unwrap().to_string());
         return;
       }
-      
+
       if x == "rebuild" {
         println!("REBUILDING ALL");
         build_all();
@@ -88,10 +39,10 @@ fn main() {
         return;
       }
     }
-    
+
     #[cfg(not(feature = "webview"))]
     run();
-    
+
     #[cfg(feature = "webview")]
     {
       use crate::security::security::init::get_user;
@@ -119,7 +70,7 @@ fn main() {
       while !globals.has("system") { thread::sleep(beat); }
       let system = globals.get_object("system");
       while !system.has("http_ready") { thread::sleep(beat); }
-          
+
       // FIXME - Make session creation a function
       let config = system.get_object("config");
       let user = get_user("admin").unwrap();
@@ -132,12 +83,12 @@ fn main() {
       session.put_int("expire", i64::MAX);
       let mut sessions = system.get_object("sessions");
       sessions.put_object(&session_id, session.clone());
-      
+
       let pass = user.get_string("password");
       if log_in(&session_id, "admin", &pass){
         let port = config.get_int("http_port");
         let default_app = system.get_string("default_app");
-              
+
         let mut s = "http://localhost:".to_string();
         s += &port.to_string();
         s += "/";

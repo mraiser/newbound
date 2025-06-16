@@ -310,3 +310,36 @@ function generateForm(params) {
     form.appendChild(formGroup);
   });
 }
+
+function getCommandData() {
+  const lang = me.lang;
+  let code = "";
+  let imports = "";
+  let returntype = me.cmddata.returntype;
+  const params = me.cmddata.params || [];
+
+  // Get code based on the selected language
+  if (lang === "java") {
+    code = $("#commandcodejava").val();
+  } else if (lang === "python") {
+    code = $("#commandcodepython").val();
+  } else if (lang === "rust") {
+    code = $("#commandcoderust").val();
+  } else if (lang === "js") {
+    code = $("#commandcodejs").val();
+  } else if (lang === "flow") {
+    code = me.floweditor ? me.floweditor.getData() : "";
+  }
+
+  // Get imports based on the selected language
+  if (lang === "java") {
+    imports = $("#ecmd_imports").val();
+  } else if (lang === "python") {
+    imports = $("#ecmdpy_imports").val();
+  } else if (lang === "rust") {
+    imports = $("#ecmdrust_imports").val();
+  }
+
+  return { code, imports, returntype, lang, params };
+}
+me.getCommandData = getCommandData;

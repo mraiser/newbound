@@ -618,3 +618,14 @@ function dirty() {
 me.dirty = document.body.dirty = dirty;
 $(ME).find('#ov_groups').change(me.dirty);
 $(ME).find('#ov_desc').change(me.dirty);
+
+me.isCommandEditorActive = function() {
+  // Check if the API tab is selected
+  const activeTab = $(".navbar-tab.selected").data("id");
+  const isApiTabActive = activeTab === "tab3";
+
+  // Check if the command editor section is visible
+  const isCommandEditorVisible = $(".api-editcommand").is(":visible");
+
+  return isApiTabActive && isCommandEditorVisible;
+};

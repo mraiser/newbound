@@ -75,7 +75,7 @@ for (uuid, user) in users.objects(){
           let l = t2 - t1;
           user.put_int("latency", l);
           if !user.has("addresses") { user.put_array("addresses", DataArray::new()); }
-          let addrs = user.get_array("addresses");
+          let mut addrs = user.get_array("addresses");
           let v = o.get_array("addresses");
           for a in v.objects(){
             addrs.push_unique(a);

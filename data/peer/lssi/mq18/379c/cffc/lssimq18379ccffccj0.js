@@ -17,7 +17,77 @@ me.ready = function(){
     else addPeer(data);
   });
   
-  $.getScript( '../app/asset/peer/three.min.js', function() { 
+  if (true){
+    
+    
+    let d = {
+      "orbit": true
+    };
+    var el = $(ME).find('.viewer');
+    installControl(el[0], "app", "scenegraph", function(api){
+      api.waitReady(function(){
+        me.viewer = ME.viewer = api;
+        var scene = me.scene = api.scene;
+        var camera = me.camera = api.camera;
+        var renderer = me.renderer = api.renderer;
+        
+        me.camv = new THREE.Vector3();
+        me.recenter = new THREE.Vector3();
+        me.center = new THREE.Vector3();
+        me.center.copy(scene.position);
+
+        me.distance = 10;
+        me.redistance = 10;
+        me.olddistance = 10;
+        
+        me.viewer.wrangler = me;
+        me.viewer.renderhooks.push(me.render);
+
+        
+        
+        
+        send_peers(function(result){
+          me.peers = result.data;
+          for (var i in result.data) {
+            var p = result.data[i];
+            addPeer(p);
+          }
+          send_info(null, null, null, function(result){
+            me.info = result.data;
+            $(ME).find('.localpeername').text(result.data.name);
+            $(ME).find('.localpeerid').text(result.data.uuid);
+            $(ME).find('.localpeerport').text("P2P Port: "+result.data.p2p_port);
+            $(ME).find('.localhttpport').text("HTTP Port: "+result.data.http_port);
+
+            json('../app/libs', null, function(result) {
+              document.body.locallibraries = result.data;
+            });
+
+            json('../security/groups', null, function(result){
+              if (result.status != 'ok') alert(result.msg);
+              else {
+                me.groups = result.data;
+                result.data.sort();
+                var newhtml = '';
+                for (var i in result.data) {
+                  newhtml += '<option>'+result.data[i]+'</option>';
+                }
+                $(ME).find('.groupselect').html(newhtml).val('anonymous');
+              }
+            });
+          });
+        });
+        
+        
+        
+        
+      });
+    }, d);
+    
+    
+    
+  }
+  else $.getScript( '../app/asset/peer/three.min.js', function() { 
     $.getScript( '../app/asset/peer/GLTFLoader.js', function() { 
       $.getScript( '../app/asset/peer/FontLoader.js', function() { 
         $.getScript( '../app/asset/peer/TextGeometry.js', function() { 
@@ -296,6 +366,7 @@ function addPeer(p) {
   var el = $('<div id="peer_'+p.id+'"/>');
   $(ME).append(el);
   me.add(el[0], 'peer', 'peer_model', p, function(api) {
+debugger;    
     var num = p.id.hashCode();
     var count = 100000;
     var n = (num/count)*Math.PI*2;
@@ -311,7 +382,8 @@ function addPeer(p) {
 }
 
 me.add = function(el, lib, ctl, data, cb){
-  installControl(el, lib, ctl, function(api){
+  if (true) me.viewer.add(el, lib, ctl, function(api){cb(api);}, data);
+  else installControl(el, lib, ctl, function(api){
     var group = new THREE.Group();
     group.api = api;
     me.scene.add(group);
@@ -358,12 +430,17 @@ me.render = function(){
     }
   }
   
-  me.camv.copy(me.recenter).sub(me.center).multiplyScalar(0.1);
-  me.center.add(me.camv);
-  me.camera.lookAt(me.center);
-  me.spotLight.position.copy(me.camera.position);
-  me.spotLight.target.position.copy(me.center);
-  me.renderer.render(me.scene, me.camera);
+  if (me.viewer){
+    me.camv.copy(me.recenter).sub(me.center).multiplyScalar(0.1);
+    me.center.add(me.camv);
+    me.camera.lookAt(me.center);
+    me.viewer.spotLight.position.copy(me.camera.position);
+    me.viewer.spotLight.target.position.copy(me.center);
+    //me.renderer.render(me.scene, me.camera);
+  }
+  else {
+    console.log("NO CAMV");
+  }
 }
 
 me.animate = function () {

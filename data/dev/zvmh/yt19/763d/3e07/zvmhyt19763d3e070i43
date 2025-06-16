@@ -1,0 +1,1 @@
+{"id":"zvmhyt19763d3e070i43","data":{"attachmentkeynames":["rs"],"cmd":"list_plugins","desc":"","ctl":"plugins","type":"rust","import":"use flowlang::datastore::DataStore;\n","lib":"dev","params":[],"returntype":"JSONObject"},"username":"system","time":1749726701466,"readers":[],"writers":[]}

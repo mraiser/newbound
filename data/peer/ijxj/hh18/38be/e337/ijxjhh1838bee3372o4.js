@@ -5,7 +5,7 @@ me.click = function(e) {
   var el = $('#headsupdisplay');
   el.width(0).css('display', 'block').animate({width:680}, 300);
   installControl(el[0], 'peer', 'headsup', function(api){
-    me.viewer.focus(me);
+    me.viewer.wrangler.focus(me);
   }, ME.DATA);
 };
 
@@ -63,7 +63,6 @@ function textMesh(name){
 me.render = function(){
   var speed = me.sphere.rotation.speed ? me.sphere.rotation.speed : 0.01;
   me.sphere.rotation.y += speed;
-  
   var pos1 = me.model.position;
   count = 0;
   dv.set(0,0,0);
@@ -75,7 +74,7 @@ me.render = function(){
   }
 
   for (var i in me.viewer.children) {
-    var p = me.viewer.children[i];
+    var p = me.viewer.children[i].api;
     if (p.model && p != me) {
       var pos2 = p.model.position;
       d = pos2.distanceTo(pos1);
