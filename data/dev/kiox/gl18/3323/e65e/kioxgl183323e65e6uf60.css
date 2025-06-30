@@ -1,62 +1,89 @@
-.libinfo-header{
-  background-color:#7c7f86;
-  color:white;
-  position:sticky;
-  top:0px;
+.sidebar-header {
+  background-color: var(--accent-color);
+  color: white;
+  position: sticky;
+  top: 0px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  z-index: 2;
+  transition: background-color 0.3s ease;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+body.dark .sidebar-header {
+    background-color: var(--surface-color);
+    color: var(--text-color);
+    border-bottom: 1px solid var(--border-color);
+}
+.sidebar-header-actions {
+    display: flex;
+    gap: 8px;
+}
+.sidebar-header .roundbutton {
+    background-color: transparent;
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    padding: 6px;
+    cursor: pointer;
+    transition: background-color .2s ease;
+}
+.sidebar-header .roundbutton:hover {
+    background-color: rgba(0,0,0,0.1);
+}
+body.dark .sidebar-header .roundbutton:hover {
+    background-color: rgba(255,255,255,0.1);
 }
 
-.out10 {
-  margin-top:-10px;
-  margin-right:-10px;
-}
 
+.libinfo-header {
+  background-color: var(--accent-color);
+  color: white;
+  position: sticky;
+  top: 0px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 .scrollme {
-  position:absolute;
-  top:62px;
-  left:0px;
-  bottom:0px;
-  overflow-y:scroll;
-  width:300px;
+  position: absolute;
+  top: 61px;
+  left: 0px;
+  bottom: 0px;
+  overflow-y: scroll;
+  width: 300px;
+  border-right: 1px solid var(--border-color);
+  background-color: var(--background-color);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
-
 .scrollme2 {
-  position:absolute;
-  top:62px;
-  left:320px;
-  bottom:0px;
-  right:0px;
-  overflow-y:auto;
+  position: absolute;
+  top: 61px;
+  left: 301px;
+  bottom: 0px;
+  right: 0px;
+  overflow-y: auto;
 }
-
-.wrap { 
-  position:absolute;
-  width:100%;
-  height:100%;
+.wrap {
+  position: absolute;
+  width: 100%;
+  height: 100%;
 }
-
-.deletelibrarybutton{
-  float:right;
-  margin:20px;
+.deletelibrarybutton {
+  float: right;
+  margin: 20px;
 }
-
 .card.library-settings {
-  white-space:nowrap;
-  overflow:hidden;
+  white-space: nowrap;
+  overflow: hidden;
 }
-
-#editidentityuuid{
-  font-size:0.9rem;
-  font-weight:900;
-}
-
-.addlibrarybutton{
-  position:absolute;
-  top:8px;
-  right:16px;
-}
-
-.importlibrarybutton{
-  position:absolute;
-  top:8px;
-  right:64px;
+#editidentityuuid {
+  font-size: 0.9rem;
+  font-weight: 900;
+  color: var(--text-color-light);
+  word-break: break-all;
+  white-space: normal;
 }

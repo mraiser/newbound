@@ -1,27 +1,50 @@
-<button class="regularbutton deletelibrarybutton">
-  delete
-</button>
-<h1><img src='../app/asset/dev/rebuild-icon.png' class='rebuildlib roundbutton tooltip' data-tooltip='{"message":"Rebuild Library"}'><span class='titlelibname'></span></h1>
-<div class='groupchips'></div>
-<div class='libsettingswrap'></div>
-<br>
-<div class='ctl-table-wrapper'>
-  <div class='padme dialog-header'>
-    Controls
-    <img src='../app/asset/app/add_icon-white.png' class='tablewhite-add addcontrolbutton roundbutton'>
-  </div>
-  <table class="card ctlstable">
-    <tbody class='controlsbody'>
-    </tbody>
-  </table>
-</div>  
-<div class='asset-table-wrapper'>
-  <div class='padme dialog-header'>
-    Assets
-    <img src='../app/asset/app/add_icon-white.png' class='tablewhite-add addassetbutton roundbutton'>
-  </div>
-  <table class="card assetstable">
-    <tbody class='assetsbody'>
-    </tbody>
-  </table>
-</div>  
+<div class="libinfo-container">
+    <div class="libinfo-main-header">
+        <h1>
+            <button class='roundbutton rebuildlib tooltip' data-tooltip='{"message":"Rebuild Library"}'>
+                <svg fill="currentColor" width="24" height="24" viewBox="0 0 24 24"><path d="M17.65,6.35C16.2,4.9,14.21,4,12,4c-4.42,0-7.99,3.58-7.99,8s3.57,8,7.99,8c3.73,0,6.84-2.55,7.73-6h-2.08 c-0.82,2.33-3.04,4-5.65,4-3.31,0-6-2.69-6-6s2.69-6,6-6c1.66,0,3.14,0.69,4.22,1.78L13,11h7V4L17.65,6.35z"></path></svg>
+            </button>
+            <span class='titlelibname'></span>
+        </h1>
+        <button class="regularbutton deletelibrarybutton">
+          Delete Library
+        </button>
+    </div>
+
+    <div class="libinfo-settings-section">
+        <div class='groupchips'></div>
+        <div class='libsettingswrap'></div>
+    </div>
+    
+    <div class="libinfo-tables-container">
+        <div class='ctl-table-wrapper'>
+            <div class='sidebar-header'>
+                <span>Controls</span>
+                <button class='roundbutton addcontrolbutton'>
+                    <svg fill="white" width="24" height="24" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
+                </button>
+            </div>
+            <table class="tablelist ctlstable">
+                <tbody class='controlsbody'>
+                </tbody>
+            </table>
+        </div>
+        <div class='asset-table-wrapper'>
+            <div class='sidebar-header'>
+                <span>Assets</span>
+                 <button class='roundbutton addassetbutton'>
+                    <svg fill="white" width="24" height="24" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
+                </button>
+            </div>
+            <table class="tablelist assetstable">
+                <tbody class='assetsbody'>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Hidden popup menu for adding groups -->
+    <div class="card popupcard groupmenupopup">
+        <div class="group-menu-items"></div>
+    </div>
+</div>

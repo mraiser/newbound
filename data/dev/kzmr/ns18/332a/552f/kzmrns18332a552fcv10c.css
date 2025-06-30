@@ -1,64 +1,117 @@
-.groupmenupopup{
-  position:absolute;
-  z-index:1;
-  padding:0px;
+.libinfo-container {
+    padding: 24px;
+}
+.libinfo-main-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+.libinfo-main-header h1 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    font-size: 1.8rem;
+    font-weight: 500;
+}
+.libinfo-main-header .roundbutton {
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--text-color);
+    transition: all .2s ease;
+}
+.libinfo-main-header .roundbutton:hover {
+    background-color: var(--border-color-light);
+    color: var(--primary-color);
 }
 
-#groupmenu, .editctlicon, .deleteasseticon{
-  vertical-align:middle;
-  width:24px;
-  height:24px;
+
+.groupmenupopup {
+  padding: 8px 0;
+  width: 200px;
+}
+.group-menu-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.group-menu-item:hover {
+    background-color: var(--border-color-light);
 }
 
-#groupmenu:hover, .editctlicon:hover, .deleteasseticon:hover{
-  background-color:#ddd;
-  border-radius:16px;
-  border:4px solid #ddd;
-  margin:-4px;
+.editctlicon, .deleteasseticon {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    color: var(--text-color-light);
+}
+.editctlicon:hover, .deleteasseticon:hover {
+    background-color: var(--border-color-light);
+    color: var(--text-color);
 }
 
-.ctl-table-wrapper, .asset-table-wrapper{
-  position:relative;
-  display:inline-block;
-  vertical-align:top;
-  margin-right:20px;
-  margin-top:20px;
-  min-width:180px;
+
+.libinfo-tables-container {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    flex-wrap: wrap;
 }
 
-.ctlstable, .assetstable {
-  border: thin solid #0002;
-  border-collapse: collapse;
-  white-space: nowrap;
-  width:100%;
-}
-
-.ctlstable td, .ctlstable th, .assetstable td, .assetstable th {
-  padding-left:24px;
-  padding-right:24px;
-  padding-top:12px;
-  padding-bottom:12px;
-  text-align:left;
+.ctl-table-wrapper, .asset-table-wrapper {
+  margin-top: 20px;
+  min-width: 250px;
+  flex: 1;
 }
 
 .ctlstable td, .assetstable td {
-  cursor:pointer;
-}
-
-.ctlstable tr:hover, .assetstable tr:hover {
-  background-color: #0002;
+    padding-top: 8px;
+    padding-bottom: 8px;
 }
 
 .previewctl, .previewasset {
-  text-decoration:none;
+  text-decoration: none;
+  color: var(--text-color);
+  font-weight: 500;
+}
+a.previewctl:hover, a.previewasset:hover {
+    text-decoration: underline;
+    color: var(--primary-color);
 }
 
-.tablewhite-add {
-  position:absolute;
-  top:8px;
-  right:20px;
+.libsettingswrap, .groupchips {
+  display: inline-block;
+  vertical-align: top;
+  margin-right: 16px;
 }
-
-.libsettingswrap, .groupchips{
-  display:inline-block;
+.groupchips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+#groupmenu {
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    border-radius: 50%;
+    padding: 4px;
+    background-color: var(--border-color-light);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    transition: all .2s ease;
+}
+#groupmenu:hover {
+    background-color: var(--border-color);
+    color: var(--primary-color);
 }

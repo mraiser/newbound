@@ -1,247 +1,291 @@
-.CodeMirror {
-  height:auto;
+/* Override default CodeMirror height to fill the container */
+.editor .CodeMirror {
+  height: 100%;
+  background: transparent;
+  color: var(--text-color);
 }
 
-.CodeMirror-scroll{
-  height:100%;
+.CodeMirror-scroll {
+  height: 100%;
+}
+body.dark .CodeMirror {
+  color: var(--text-color);
 }
 
-.wrap-dark{
-  background-color: #282b30;
-  background-color: #282b30;
-  color:white;
-  position:absolute !important;
-  top:0px;
-  left:0px;
-  bottom:0px;
-  right:0px;
+.wrap {
+  position: absolute !important;
+  top: 0px;
+  left: 0px;
+  bottom: 0px;
+  right: 0px;
 }
 
-.dark-title{
-  height:60px;
-  border:1px solid #282b30;
+/* Overriding some titlebar styles for this specific page */
+.titlebar .backbutton {
+    margin: 0 16px 0 0;
 }
 
-.section-title{
-  font-size:x-large;
-  font-weight:900;
+.inline {
+  display: inline-block;
+  vertical-align: middle;
 }
-
-.backbutton{
-  margin:16px;
-  width: 28px;
-  height:28px;
-  cursor:pointer;
+.ctltitle {
+  margin-top: 0px;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.2;
+  margin-right: auto; /* Pushes actions to the right */
 }
-
-.inline{
-  display:inline-block;
-  vertical-align:top;
+.ctltitle .ctl-lib, .ctltitle .ctl-name {
+    font-weight: 500;
 }
-
-.ctltitle{
-  margin-top:12px;
-}
-
-.toprighthugger{
-  position:absolute;
-  top:8px;
-  right:8px;
-}
-
-.navbar-dark .navbar-tab {
-  padding-top:0px;
+.titlebar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .html5editor {
-  position:fixed;
-  top:94px;
-  bottom:0px;
-  left:0px;
-  right:0px;
+  position: absolute;
+  top: 0;
+  bottom: 0px;
+  left: 0px;
+  right: 0px;
+}
+.html5editor table {
+    height: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+/* Give editor rows an initial height so JS can calculate them */
+.html5editor table > tbody > tr:first-child {
+    height: 100%;
+}
+#previewrow {
+    height: 0;
 }
 
-.api, .publish, .info, .three{
-  display:none;
-  background-color:#282b30;
-  color:white;
-  width:100%;
-  height:100%;
-  overflow-y:auto;
+
+.grabby-v {
+  background-color: var(--accent-color);
+  color: white;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--accent-color);
+  width: 100%;
+  height: 20px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.preview-title-text {
+  padding-left: 20px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  line-height: 20px;
 }
 
-.CodeMirror-scroll{
-  height:100%;
+.editor {
+  width: 100%;
+  height: 100%;
+  background-color: var(--surface-color);
+  color: var(--text-color);
+  overflow: hidden;
+  position: relative;
+  padding: 0px;
 }
 
-.grabby-v{
-  background-color:#505359;
-  color:white;
-  border-top:thin solid #7c7f86;
-  border-bottom:thin solid #282b30;
-  width:100%;  
-  height:20px;
-  position:relative;
+.editor-header {
+    height: 26px; /* Increased from 24px for more vertical space */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-left: 8px;
+    background-color: var(--accent-color);
+    color: white;
+    border-bottom: 1px solid var(--border-color);
+}
+.editor-title {
+  font-weight: 500;
+  font-size: 0.8rem;
 }
 
-.preview-title{
-  padding-left:20px;
+.editor-actions {
+    display: flex;
+}
+.zoomer {
+    background: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 2px;
+    width: 24px;
+    height: 24px;
+}
+.zoomer:hover {
+    background-color: rgba(255,255,255,0.1);
 }
 
-.zoomer{
-  color:white;
-  position:absolute;
-  cursor:pointer;
-  width:20px;
-  height:20px;
+.unzoom-button {
+    display: none; /* Hidden by default */
 }
 
-.zoomer-min, .zoomer-pmin{
-  right:21px;
-  top:0px;
+/* When a pane is maximized... */
+td.is-maximized .zoomer-min,
+td.is-maximized .zoomer-max {
+    display: none; /* ...hide the min/max buttons. */
 }
 
-.zoomer-max, .zoomer-pmax{
-  top:0px;
-  right:0px;
+td.is-maximized .unzoom-button {
+    display: inline-flex; /* ...show the unzoom button. */
 }
 
-.editor{
-  width:100%;
-  height:100%;
-  background-color:#282b30;
-  color:white;
-  overflow:hidden;
-  position:relative;
-  padding:0px;
+.editor-code {
+  position: absolute;
+  top: 26px; /* Increased from 24px to match new header height */
+  left: 0px;
+  right: 0px;
+  bottom: 0px;
 }
 
-.editor-title{
-  position:absolute;
-  display:inline-block;
-  vertical-align:top;
-  font-family: "Lato", "Lucida Grande", "Lucida Sans Unicode", Tahoma, Sans-Serif;
-  font-weight: bold;
-  width:80px;
+.editor-code-textarea {
+  width: 100%;
+  height: 100%;
+  background-color: var(--surface-color);
+  color: var(--text-color);
+  border: none;
+  resize: none;
 }
-
-.editor-code{
-  position:absolute;
-  top:25px;
-  left:20px;
-  right:0px;
-  bottom:0px;
-}
-
-.editor-code-textarea{
-  width:100%;
-  height:100%;
-  background-color:#282b30;
-  color:white;
-  border:none;
-}
-
-.vbar, .grabbybar{
-  width:20px;
-  height:100%;
-  display:inline-block;
-  vertical-align:top;
-  background-color:#505359;
-  border-left:thin solid #7c7f86;
-  border-right:thin solid #282b30;
-}
-
-.grabbybar{
+.grabbybar {
+  position: absolute;
+  top: 0;
+  left: -1px; /* Overlap border slightly */
+  width: 2px; /* Make it a thin line */
+  height: 100%;
   cursor: ew-resize;
+  z-index: 5;
+  background-color: var(--border-color);
 }
-
-.grabby-v{
+.grabby-v {
   cursor: ns-resize;
 }
+/* This is the visible separator line */
+.editor-css, .editor-js, .editor-data {
+    border-left: 1px solid var(--border-color);
+}
 
-iframe.width-changed {
-    width: 100%;
-    display: block;
-    border: 0;
-    height: 0;
+
+#previewcol {
+  background-color: white;
+  color: black;
+  border-top: 1px solid var(--border-color);
+}
+
+.ctlinfo {
+  display: inline-block;
+  vertical-align: top;
+  margin: 0 20px 20px 0;
+  min-width: 300px;
+  position: relative;
+}
+
+.ctlinfo .sidebar-header {
+    font-size: 1rem;
+    background-color: var(--surface-color);
+    color: var(--text-color);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 8px 0 16px;
+    height: 48px;
+}
+.ctlinfo .sidebar-header .roundbutton {
+    width: 36px;
+    height: 36px;
+    padding: 6px;
+    cursor: pointer;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    fill: var(--text-color);
+    transition: background-color .2s ease;
+}
+.ctlinfo .sidebar-header .roundbutton:hover {
+    background-color: var(--border-color-light);
+}
+
+.edit-icon-button {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    color: var(--text-color-light);
+}
+.edit-icon-button:hover {
+    background-color: var(--border-color-light);
+    color: var(--text-color);
+}
+
+
+.publish-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+.publishfield {
     margin: 0;
 }
 
-#previewcol{
-  background-color:white;
-  color:black;
+.main {
+  position: absolute;
+  top: 126px; /* Titlebar (61px) + Navbar (~45px) */
+  bottom: 0px;
+  left: 0px;
+  right: 0px;
+  padding: 0 !important;
+}
+.main > .tab-content.selected {
+    height: 100%;
+}
+.scrollme {
+  position: absolute;
+  overflow-y: auto;
+  top: 0;
+  bottom: 0px;
+  left: 0px;
+  right: 0px;
+  padding: 20px;
+}
+.api-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding-top:20px;
+}
+.api-editcommand {
+  display: none;
+  height: 100%;
+}
+.ctlinfo .textinput {
+  min-width: 300px;
+  max-width: 600px;
+}
+.publishing {
+  color: var(--text-color);
 }
 
-.ctlinfo{
-  display:inline-block;
-  vertical-align:top;
-  margin-right:20px;
-  margin-bottom:20px;
-  min-width:180px;
-  position:relative;
-}
-
-.tablewhite {
-  border-collapse: collapse;
-  white-space: nowrap;
-  width:100%;
-}
-
-.tablewhite td {
-  padding-left:24px;
-  padding-right:24px;
-  padding-top:12px;
-  padding-bottom:12px;
-  text-align:left;
-}
-
-.tablewhite td {
+.add3dctlbutton, .add3dbehaviorbutton{
+  width:42px;
   cursor:pointer;
 }
 
-.tablewhite tr:hover {
-  background-color: #0002;
-}
-
-.tablewhite-add {
-  position:absolute;
-  top:8px;
-  right:20px;
-}
-
-.publishfield {
-  width:300px;
-  margin-right:20px;
-  margin-bottom: 20px;
-}
-
-.publishoptions {
-  max-width:645px;
-}
-
-.main{
-  position:relative;
-}
-
-.scrollme {
-  position:fixed;
+.tab3 {
+  padding:0px;
   overflow-y:auto;
-  top:96px;
-  bottom:0px;
-  left:0px;
-  right:0px;
-  padding:20px;
 }
 
-.api-editcommand {
-  display:none;
-}
 
-.ctlinfo .textinput {
-  min-width:300px;
-  max-width:600px;
-}
-
-.publishing {
-  color:black;
-}

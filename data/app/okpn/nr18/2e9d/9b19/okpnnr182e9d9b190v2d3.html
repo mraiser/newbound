@@ -1,100 +1,183 @@
 <div class='data-control' data-control='app:ui:{}'></div>
 <div class='background'></div>
 <div class='wrap' style='display:none;'>
+
+  <!-- Titlebar with SVG Icons -->
   <div class='titlebar'>
-    <a href='../app/index.html'><img src='../app/asset/app/menu_icon.png' class='menuicon'></a>
-    Application Name
+    <a href='../app/index.html' style="line-height: 0;">
+      <svg class="menuicon" fill="white" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"></path></svg>
+    </a>
+    <span>Application Name</span>
     <div class='upper-right'>
-      <div class='card popupcard left-sided mini mypopupname1 padme'>
-        POPUP MENU
-        <img src='../app/asset/app/close.png' class='popupcard-close roundbutton-small'>
-        <img src='../app/asset/app/corner-left.png' class='popupcard-pointer'>
+       <div class="dark-mode-toggle-container">
+          <label for="dark-mode-switch" class="dark-mode-icon-label">
+            <svg class="dark-mode-moon-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9.37 5.51A7.35 7.35 0 0 0 9 6c0 4.42 3.58 8 8 8 .36 0 .72-.03 1.08-.1-.48.94-1.15 1.76-1.97 2.46A8.98 8.98 0 0 1 12.01 21c-4.97 0-9-4.03-9-9 0-3.9 2.51-7.25 6-8.49.49.25.93.57 1.36.98z"/></svg>
+            <svg class="dark-mode-sun-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.31 23.31 12 20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69zM12 18V6c3.31 0 6 2.69 6 6s-2.69 6-6 6z"/></svg>
+          </label>
+          <div class="switch">
+            <input id="dark-mode-switch" type="checkbox" class="switch-input" />
+            <label for="dark-mode-switch" class="switch-label"></label>
+          </div>
+       </div>
+      <div class='card popupcard left-sided mini mypopupname1 pad16' style="width: 200px;">
+        <p class="card-text" style="padding:0;">Your popup menu content goes here.</p>
       </div>
-      <img src='../app/asset/app/more_icon.png' class='roundbutton-small popupmenu' data-popup='{"selector":".mypopupname1","closeselector":".popupcard-close","modal":false}'>
+      <button class='roundbutton-small-white popupmenu' data-popup='{"selector":".mypopupname1","modal":false}'>
+         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path></svg>
+      </button>
     </div>
   </div>
+
+  <!-- Navbar -->
   <div class='navbar'>
-    <div class='navbar-tab selected' data-id='tab1'>Tab1</div>
-    <div class='navbar-tab' data-id='tab2'>Tab2</div>
-    <div class='navbar-tab' data-id='tab3'>Tab3</div>
-    <div class='navbar-tab' data-id='tab4'>Tab4</div>
+    <div class='navbar-tab selected' data-id='tab1'>Components</div>
+    <div class='navbar-tab' data-id='tab2'>3D Scene</div>
+    <div class='navbar-tab' data-id='tab3'>Table</div>
+    <div class='navbar-tab' data-id='tab4'>Empty</div>
   </div>
+
   <div class='main'>
+    <!-- Tab 1: Components -->
     <div class='tab-content tab1 selected'>
-      TAB 1
-      <br><br>
-      <span class='chip'>Chip<img src="../app/asset/app/close-white.png" class="roundbutton-small groupdelete mdl-chip__action chipbutton"></span>
+      <h3 style="font-weight: 400; color: var(--text-color-light);">Interactive Elements</h3>
+      <br>
+      <span class='chip'>Editable Chip
+        <button class="chipbutton">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="white" stroke-width="3" stroke="white" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </span>
+      <span class='chip'>Read-only Chip</span>
       <br><br>
       <label class="plaincheckbox">
-        <input type='checkbox' id='usercardgroupcheckbox1'>
+        <input type='checkbox' id='usercardgroupcheckbox1' checked>
         <span>Checkbox</span>
       </label>
       <br><br>
-      <label>
+      <label style="display:inline-flex; align-items:center; gap: 8px;">
         <div class="switch">
           <input id="appfilter-switch-1" type="checkbox" class="switch-input" />
-          <span class="switch-label">Switch</span>
+          <label for="appfilter-switch-1" class="switch-label"></label>
         </div>
-        Switch
+        <span>Toggle Switch</span>
       </label>
       <br><br>
+      
+      <h3 style="font-weight: 400; color: var(--text-color-light); margin-top:20px;">Progress Bar</h3>
       <div class='progressbar myprogress'></div>
-      <label class="plainradio">
-        <input type='radio' id='usercardgroupradio1' name='usercardgroupradio' checked>
-        <span>No Progress</span>
-      </label>
-      <label class="plainradio">
-        <input type='radio' id='usercardgroupradio2' name='usercardgroupradio'>
-        <span>25%</span>
-      </label>
-      <label class="plainradio">
-        <input type='radio' id='usercardgroupradio3' name='usercardgroupradio'>
-        <span>100%</span>
-      </label>
-      <label class="plainradio">
-        <input type='radio' id='usercardgroupradio4' name='usercardgroupradio'>
-        <span>Indeterminate</span>
-      </label>
+      <div style="margin-top: 8px;">
+        <label class="plainradio">
+          <input type='radio' id='usercardgroupradio1' name='usercardgroupradio' checked>
+          <span>None</span>
+        </label>
+        <label class="plainradio">
+          <input type='radio' id='usercardgroupradio2' name='usercardgroupradio'>
+          <span>25%</span>
+        </label>
+        <label class="plainradio">
+          <input type='radio' id='usercardgroupradio3' name='usercardgroupradio'>
+          <span>100%</span>
+        </label>
+        <label class="plainradio">
+          <input type='radio' id='usercardgroupradio4' name='usercardgroupradio'>
+          <span>Indeterminate</span>
+        </label>
+      </div>
       <br><br>
+
+      <h3 style="font-weight: 400; color: var(--text-color-light); margin-top:20px;">Buttons & Modals</h3>
       <button class='regularbutton snackbarbutton'>Snackbar</button>
-      <button class='accentbutton popupmenu' data-popup='{"selector":".mydialog","closeselector":".mydialog-close","modal":true}'>dialog</button>
+      <button class='accentbutton popupmenu' data-popup='{"selector":".mydialog", "closeselector":".mydialog-close", "modal":true}'>Dialog</button>
+      <button class='coloredbutton promptbutton'>Prompt</button>
+      <button class='regularbutton confirmbutton'>Confirm</button>
       <button class='coloredbutton tooltip' data-tooltip='{"message":"This is a tooltip!"}'>Tooltip</button>
-      <img src='../app/asset/app/more_icon.png' class='roundbutton popupmenu' data-popup='{"selector":".mypopupname2","closeselector":".popupcard-close","popup":true}'>
-      <div class='card popupcard right-sided mypopupname2 padme'>
-        POPUP MENU
-        <img src='../app/asset/app/close.png' class='popupcard-close roundbutton-small'>
-        <img src='../app/asset/app/corner.png' class='popupcard-pointer'>
-      </div>
+      
+      <!-- Static Dialog in DOM -->
       <div class='card modal mydialog'>
-        <div class="pad16 card-header dialog-header">Title</div>
-        <div class='pad16'>
-          <label class="textinputlabel" for="sample3">Text...</label>
-          <input class="textinput" type="text" id="sample3">
+        <div class="pad16 card-header dialog-header">
+            <span>Static Dialog</span>
+            <button class="popupcard-close mydialog-close">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
         </div>
-        <div class="card-description pad16">Card description goes here.</div>
+        <div class="card-description pad16">This is a modal dialog that was pre-defined in the HTML, triggered by the 'Dialog' button.</div>
         <div class="card-button-wrap">
-          <a class="clearbutton card-button-right">continue</a>
-          <a class="clearbutton mydialog-close">cancel</a>
+          <a class="regularbutton mydialog-close">Cancel</a>
+          <a class="coloredbutton mydialog-close">Continue</a>
         </div>
       </div>
       <br><br>
-      <div class='textinputlabel'>Text Field</div>
-      <input type='text' class='textinput' placeholder='Placeholder Text'>
-      <br><br>
-      <div class='textinputlabel'>Select</div>
-      <select name='defaultbot' class='textinput' id='defaultbot'>
-        <option>Apples</option>
-        <option>Oranges</option>
-        <option>Bananas</option>
-      </select> 
-      <br><br>
-      <div class='textinputlabel'>Slider</div>
-      <input class="myslider plainslider" min="0" max="60" type="range" value="30" />
+
+      <h3 style="font-weight: 400; color: var(--text-color-light); margin-top:20px;">Form Fields</h3>
+      <div style="max-width:300px;">
+        <label class='textinputlabel' for="text-field-1">Text Field</label>
+        <input type='text' class='textinput' id="text-field-1" placeholder='Placeholder Text'>
+      </div>
+      <br>
+      <div style="max-width:300px;">
+        <label class='textinputlabel' for="defaultbot">Select</label>
+        <select name='defaultbot' class='textinput' id='defaultbot'>
+          <option>Apples</option>
+          <option>Oranges</option>
+          <option>Bananas</option>
+        </select>
+      </div>
+      <br>
+       <div style="max-width:300px;">
+        <label class='textinputlabel' for="slider-1">Slider</label>
+        <input class="myslider plainslider" id="slider-1" min="0" max="60" type="range" value="30" />
+       </div>
+
     </div>
+
+    <!-- Tab 2: 3D Scene -->
     <div class='tab-content tab2'>
-      <div id='my3d' style='position: absolute; top: 107px; left: 0px; right: 0px; bottom: 0px; height: calc(100vh - 107px);background-color:black;'></div>
+      <div id='my3d' style='position: absolute; top: 115px; left: 0px; right: 0px; bottom: 0px; height: calc(100vh - 115px);background-color:black;'></div>
     </div>
-    <div class='tab-content tab3'>TAB 3</div>
-    <div class='tab-content tab4'>TAB 4</div>
+    
+    <!-- Tab 3: Table -->
+    <div class='tab-content tab3 pad16'>
+        <table class="tablelist">
+            <thead>
+                <tr>
+                    <th>Dessert (100g serving)</th>
+                    <th>Calories</th>
+                    <th>Fat (g)</th>
+                    <th>Carbs (g)</th>
+                    <th>Protein (g)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Frozen Yogurt</td>
+                    <td>159</td>
+                    <td>6.0</td>
+                    <td>24</td>
+                    <td>4.0</td>
+                </tr>
+                <tr>
+                    <td>Ice cream sandwich</td>
+                    <td>237</td>
+                    <td>9.0</td>
+                    <td>37</td>
+                    <td>4.3</td>
+                </tr>
+                <tr>
+                    <td>Eclair</td>
+                    <td>262</td>
+                    <td>16.0</td>
+                    <td>24</td>
+                    <td>6.0</td>
+                </tr>
+                 <tr>
+                    <td>Cupcake</td>
+                    <td>305</td>
+                    <td>3.7</td>
+                    <td>67</td>
+                    <td>4.3</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class='tab-content tab4 pad16'>TAB 4</div>
   </div>
 </div>

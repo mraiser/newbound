@@ -1,68 +1,88 @@
-<div class='data-control' data-control='app:ui:{}'></div> 
+<div class='data-control' data-control='app:ui:{}'></div>
 <div class='wrap' style='display:none;'>
   <div class='titlebar'>
-    <a href='../app/index.html'><img src='../app/asset/app/menu_icon.png' class='menuicon'></a>
-    Applications
+    <a href='../app/index.html' style="line-height: 0;">
+      <svg class="menuicon" fill="white" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"></path></svg>
+    </a>
+    <span>Applications</span>
     <div class='upper-right'>
-      <div class='card modal system-settings'>
-        <div class='appinfo-header padme'>
-          Settings
-          <img src='../app/asset/app/close-white.png' class='upper-right close-system-settings roundbutton-small out10'>
-        </div>
-        <div class='padme'>
-          <div class='textinputlabel'>Device Name</div>
-          <input type='text' class='textinput' placeholder='Name of this device' id='devicename'>
-          <br><br>
-          <div class='textinputlabel'>IP Address</div>
-          <input type='text' class='textinput' placeholder='IP Address for HTTP' id='ipaddr'>
-          <br><br>
-          <div class='textinputlabel'>Port Number</div>
-          <input type='number' class='textinput' placeholder='Port for HTTP' id='portnum'>
-          <br><br>
-          <div class='textinputlabel'>Default App</div>
-          <select name='defaultbot' class='textinput' id='defaultbot'></select> 
-          <br><br>
-          <i style='color:#0008;'>Changes require restart</i>
-        </div>
-        <div class="card-button-wrap">
-          <a class="clearbutton button-text-green save-system-settings close-system-settings">save</a>
-          <a class="clearbutton card-button-right save-and-restart">save and restart</a>
-        </div>
-      </div>
-      <img src='../app/asset/app/more_icon.png' class='open-system-settings roundbutton-small popupmenu' data-popup='{"selector":".system-settings", "closeselector":".close-system-settings", "modal":true}'>
+       <div class="dark-mode-toggle-container">
+          <label for="dark-mode-switch-app" class="dark-mode-icon-label">
+            <svg class="dark-mode-moon-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9.37 5.51A7.35 7.35 0 0 0 9 6c0 4.42 3.58 8 8 8 .36 0 .72-.03 1.08-.1-.48.94-1.15 1.76-1.97 2.46A8.98 8.98 0 0 1 12.01 21c-4.97 0-9-4.03-9-9 0-3.9 2.51-7.25 6-8.49.49.25.93.57 1.36.98z"/></svg>
+            <svg class="dark-mode-sun-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.31 23.31 12 20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69zM12 18V6c3.31 0 6 2.69 6 6s-2.69 6-6 6z"/></svg>
+          </label>
+          <div class="switch">
+            <input id="dark-mode-switch-app" type="checkbox" class="switch-input" />
+            <label for="dark-mode-switch-app" class="switch-label"></label>
+          </div>
+       </div>
+      <button class='roundbutton-small-white open-system-settings popupmenu' data-popup='{"selector":".system-settings", "closeselector":".close-system-settings", "modal":true}'>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.69-1.62-0.92L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.44,0.17-0.48,0.41L9.2,5.77C8.61,5.99,8.08,6.3,7.58,6.68L5.19,5.72C4.97,5.64,4.72,5.71,4.6,5.92L2.68,9.24 c-0.11,0.2-0.06,0.47,0.12,0.61l2.03,1.58C4.78,11.66,4.76,11.97,4.76,12.3c0,0.32,0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.69,1.62,0.92l0.44,2.96 c0.04,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.48-0.41l0.44-2.96c0.59-0.23,1.12-0.54,1.62-0.92l2.39,0.96 c0.22,0.08,0.47,0.01,0.59-0.22l1.92-3.32c0.11-0.2,0.06-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"></path></svg>
+      </button>
     </div>
   </div>
   <div class='padme'>
     <table class='applist-filters'>
       <tr>
         <td>
-          <form action="#">
+          <label style="display:inline-flex; align-items:center; gap: 8px;">
             <div class="switch">
               <input id="appfilter-inactive" type="checkbox" class="switch-input" />
-              <label for="appfilter-inactive" class="switch-label">Inactive</label>
+              <label for="appfilter-inactive" class="switch-label"></label>
             </div>
-            Inactive
-          </form>
+            <span>Inactive</span>
+          </label>
         </td>
         <td width="100px"></td>
         <td>
-          <form action="#">
+          <label style="display:inline-flex; align-items:center; gap: 8px;">
             <div class="switch">
               <input id="appfilter-available" type="checkbox" class="switch-input" />
-              <label for="appfilter-available" class="switch-label">Available</label>
+              <label for="appfilter-available" class="switch-label"></label>
             </div>
-            Available
-          </form>
+            <span>Available</span>
+           </label>
         </td>
       </tr>
     </table>
     <div class='applist'></div>
   </div>
+  <!-- System Settings Modal - Moved out of the transformed parent -->
+  <div class='card modal system-settings'>
+    <div class='appinfo-header pad16'>
+      <span>Settings</span>
+       <button class="popupcard-close close-system-settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+       </button>
+    </div>
+    <div class='pad16'>
+      <label class='textinputlabel' for='devicename'>Device Name</label>
+      <input type='text' class='textinput' placeholder='Name of this device' id='devicename'>
+      <br><br>
+      <label class='textinputlabel' for='ipaddr'>IP Address</label>
+      <input type='text' class='textinput' placeholder='IP Address for HTTP' id='ipaddr'>
+      <br><br>
+      <label class='textinputlabel' for='portnum'>Port Number</label>
+      <input type='number' class='textinput' placeholder='Port for HTTP' id='portnum'>
+      <br><br>
+      <label class='textinputlabel' for='defaultbot'>Default App</label>
+      <select name='defaultbot' class='textinput' id='defaultbot'></select>
+      <br><br>
+      <i style='color:var(--text-color-light);'>Changes require restart</i>
+    </div>
+    <div class="card-button-wrap">
+      <a class="regularbutton close-system-settings">Cancel</a>
+      <a class="clearbutton save-system-settings close-system-settings">Save</a>
+      <a class="coloredbutton save-and-restart">Save and Restart</a>
+    </div>
+  </div>
   <div class='card hideme app-settings dialog-wide' id='app-settings'>
-    <div class='appinfo-header padme'>
+    <div class='appinfo-header pad16'>
       <span class='appname'>Application Name</span>
-      <img src='../app/asset/app/close-white.png' class='upper-right close-app-settings roundbutton-small out10'>
+      <button class="popupcard-close close-app-settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
     </div>
     <div class='padme appinfo'></div>
-  </div>  
+  </div>
 </div>

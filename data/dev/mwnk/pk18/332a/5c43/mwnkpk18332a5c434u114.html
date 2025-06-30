@@ -1,19 +1,20 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/darcula.min.css">
 <div class='data-control' data-control='app:ui:{}'></div>
-<div class='wrap wrap-dark' style='display:none;'>
-  <div class='dark-title'>
-    <img src="../app/asset/app/arrow-left-white.png" class="backbutton">
+<div class='wrap' style='display:none;'>
+  <div class='titlebar'>
+     <button class="roundbutton-small-white backbutton">
+        <svg fill="currentColor" width="24" height="24" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
+     </button>
     <div class='inline ctltitle'>
-      Control Editor<br>
-      <span class='ctl-lib'></span>:<span class='ctl-name'></span>
+      Control Editor: <span class='ctl-lib'></span>:<span class='ctl-name'></span>
     </div>
-    <div class='toprighthugger'>
-      <span id='pluginholder'></span>
-      <button class='regularbutton accentbutton previewbutton'>Preview</button>
-      &nbsp;
-      <button class='regularbutton accentbutton savebutton'>Save</button>
+    <div class="titlebar-actions">
+      <button class='regularbutton previewbutton'>Preview</button>
+      <button class='regularbutton savebutton'>Save</button>
     </div>
   </div>
-  <div class='navbar navbar-dark'>
+  <div class='navbar'>
     <div class='navbar-tab selected' data-id='tab1'>HTML5</div>
     <div class='navbar-tab' data-id='tab2'>3D</div>
     <div class='navbar-tab' data-id='tab3'>API</div>
@@ -22,16 +23,18 @@
   <div class='main'>
     <div class='tab-content tab1 selected'>
       <div class='html5editor'>
-        <table border='0' cellpadding='0' cellspacing='0' width='100%' height='100%'>
+        <table border='0' cellpadding='0' cellspacing='0' width='100%'>
           <tr>
             <td width='25%'>
               <div class='editor editor-html'>
-                <div class='vbar'></div>
-                <div class='editor-title'>
-                  HTML
+                <div class='editor-header'>
+                    <div class='editor-title'>HTML</div>
+                    <div class="editor-actions">
+                        <button class="zoomer zoomer-min" title="Minimize Pane"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 14h12v2H6z"></path></svg></button>
+                        <button class="zoomer zoomer-max" title="Maximize Pane"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H5v-2h14v2z"></path><path d="M13 5h-2v14h2V5z"></path></svg></button>
+                        <button class="zoomer unzoom-button" title="Restore Layout"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"></path></svg></button>
+                    </div>
                 </div>
-                <img class="zoomer zoomer-min" src="../app/asset/app/minimize_icon-white.png">
-                <img class="zoomer zoomer-max" src="../app/asset/app/maximize_icon-white.png">
                 <div class='editor-code'>
                   <textarea class='editor-code-textarea html-textarea'></textarea>
                 </div>
@@ -40,9 +43,14 @@
             <td width='25%'>
               <div class='editor editor-css'>
                 <div class='grabbybar'></div>
-                <div class='editor-title'>CSS</div>
-                <img class="zoomer zoomer-min" src="../app/asset/app/minimize_icon-white.png">
-                <img class="zoomer zoomer-max" src="../app/asset/app/maximize_icon-white.png">
+                <div class='editor-header'>
+                    <div class='editor-title'>CSS</div>
+                    <div class="editor-actions">
+                        <button class="zoomer zoomer-min" title="Minimize Pane"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 14h12v2H6z"></path></svg></button>
+                        <button class="zoomer zoomer-max" title="Maximize Pane"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H5v-2h14v2z"></path><path d="M13 5h-2v14h2V5z"></path></svg></button>
+                        <button class="zoomer unzoom-button" title="Restore Layout"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"></path></svg></button>
+                    </div>
+                </div>
                 <div class='editor-code'>
                   <textarea class='editor-code-textarea css-textarea'></textarea>
                 </div>
@@ -51,9 +59,14 @@
             <td width='25%'>
               <div class='editor editor-js'>
                 <div class='grabbybar'></div>
-                <div class='editor-title'>JS</div>
-                <img class="zoomer zoomer-min" src="../app/asset/app/minimize_icon-white.png">
-                <img class="zoomer zoomer-max" src="../app/asset/app/maximize_icon-white.png">
+                <div class='editor-header'>
+                    <div class='editor-title'>JS</div>
+                     <div class="editor-actions">
+                        <button class="zoomer zoomer-min" title="Minimize Pane"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 14h12v2H6z"></path></svg></button>
+                        <button class="zoomer zoomer-max" title="Maximize Pane"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H5v-2h14v2z"></path><path d="M13 5h-2v14h2V5z"></path></svg></button>
+                        <button class="zoomer unzoom-button" title="Restore Layout"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"></path></svg></button>
+                    </div>
+                </div>
                 <div class='editor-code'>
                   <textarea class='editor-code-textarea js-textarea'></textarea>
                 </div>
@@ -62,9 +75,14 @@
             <td>
               <div class='editor editor-data'>
                 <div class='grabbybar'></div>
-                <div class='editor-title'>DATA</div>
-                <img class="zoomer zoomer-min" src="../app/asset/app/minimize_icon-white.png">
-                <img class="zoomer zoomer-max" src="../app/asset/app/maximize_icon-white.png">
+                <div class='editor-header'>
+                    <div class='editor-title'>DATA</div>
+                    <div class="editor-actions">
+                        <button class="zoomer zoomer-min" title="Minimize Pane"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 14h12v2H6z"></path></svg></button>
+                        <button class="zoomer zoomer-max" title="Maximize Pane"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H5v-2h14v2z"></path><path d="M13 5h-2v14h2V5z"></path></svg></button>
+                        <button class="zoomer unzoom-button" title="Restore Layout"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"></path></svg></button>
+                    </div>
+                </div>
                 <div class='editor-code'>
                   <textarea class='editor-code-textarea data-textarea'></textarea>
                 </div>
@@ -74,11 +92,12 @@
           <tr height='20px'>
             <td colspan='4'>
               <div class='grabby-v'>
-                <div class='editor-title preview-title'>
-                  PREVIEW
+                <div class='preview-title-text'>PREVIEW</div>
+                <div class="editor-actions">
+                    <button class="zoomer reset-layout-button" title="Reset Layout"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3zm0 10h8v8H3zM13 3h8v8h-8zm0 10h8v8h-8z"/></svg></button>
+                    <button class="zoomer zoomer-pmin" title="Collapse Preview"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="m12 15.4-6-6L7.4 8l4.6 4.6L16.6 8 18 9.4z"></path></svg></button>
+                    <button class="zoomer zoomer-pmax" title="Expand Preview"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="m12 8.6-6 6L7.4 16l4.6-4.6L16.6 16 18 14.6z"></path></svg></button>
                 </div>
-                <img class="zoomer zoomer-pmin" src="../app/asset/app/minimize_icon-white.png">
-                <img class="zoomer zoomer-pmax" src="../app/asset/app/maximize_icon-white.png">
               </div>
             </td>
           </tr>
@@ -91,46 +110,50 @@
     <div class='tab-content tab2 scrollme'>
       <div class='three-main'></div>
     </div>
-    <div class='tab-content tab3 scrollme'>
+    <div class='tab-content tab3'>
       <div class='api-main'>
         <div class='card ctlinfo'>
-          <div class='padme dialog-header'>
-            Overview
-          </div>
-          <div class='padme'>
+          <div class='sidebar-header'>Overview</div>
+          <div class='pad16'>
             <label class="textinputlabel" for="ov_groups">Groups</label>
             <input class="textinput" type="text" id="ov_groups" placeholder="Comma separated no spaces">
             <br><br>
-            <label class="textinputlabel" for="devorg">Description</label>
-            <textarea class="textinput" id="ov_desc" placeholder="Enter a description for this control"></textarea>
-          </div> 
+            <label class="textinputlabel" for="ov_desc">Description</label>
+            <textarea class="textinput" id="ov_desc" placeholder="Enter a description for this control" rows="3"></textarea>
+          </div>
         </div>
         <div class='card ctlinfo'>
-          <div class='padme dialog-header'>
-            Commands
-            <img src='../app/asset/app/add_icon-white.png' class='tablewhite-add addcmdbutton roundbutton'>
+          <div class='sidebar-header'>
+            <span>Commands</span>
+            <button class='roundbutton addcmdbutton'>
+                <svg fill="white" width="24" height="24" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
+            </button>
           </div>
-          <table class="tablewhite cmdstable">
+          <table class="tablelist cmdstable">
             <tbody class='commandlist-inner'>
             </tbody>
           </table>
         </div>
         <div class='card ctlinfo'>
-          <div class='padme dialog-header'>
-            Events
-            <img src='../app/asset/app/add_icon-white.png' class='tablewhite-add addeventbutton roundbutton'>
+          <div class='sidebar-header'>
+             <span>Events</span>
+             <button class='roundbutton addeventbutton'>
+                <svg fill="white" width="24" height="24" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
+            </button>
           </div>
-          <table class="tablewhite eventstable">
+          <table class="tablelist eventstable">
             <tbody class='eventlist-inner'>
             </tbody>
           </table>
         </div>
         <div class='card ctlinfo'>
-          <div class='padme dialog-header'>
-            Timers
-            <img src='../app/asset/app/add_icon-white.png' class='tablewhite-add addtimerbutton roundbutton'>
+          <div class='sidebar-header'>
+            <span>Timers</span>
+            <button class='roundbutton addtimerbutton'>
+                <svg fill="white" width="24" height="24" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
+            </button>
           </div>
-          <table class="tablewhite timerstable">
+          <table class="tablelist timerstable">
             <tbody class='timerlist-inner'>
             </tbody>
           </table>
@@ -141,53 +164,57 @@
       <div class='api-edittimer'></div>
     </div>
     <div class='tab-content tab4 scrollme'>
-      <div class='card ctlinfo'>
-        <div class='padme dialog-header'>
+      <div class='card ctlinfo' style="max-width: 645px;">
+        <div class='sidebar-header'>
           <div id='publishappname'>Publish [APPNAME] ([CTLID])</div>
         </div>
-        <div class='padme card-text publishoptions'>
-          <div class='inline publishfield'>
-            <label class="textinputlabel" for="pa_name">Name</label>
-            <input class="textinput" type="text" id="pa_name" placeholder="The name of this app">
-          </div>
-          <div class='inline publishfield'>
-            <label class="textinputlabel" for="pa_libraries">Libraries</label>
-            <input class="textinput" type="text" id="pa_libraries" placeholder="Comma delimited, no spaces">
-          </div>
-          <div class='inline publishfield'>
-            <label class="textinputlabel" for="pa_subtitle">Subtitle</label>
-            <input class="textinput" type="text" id="pa_subtitle" placeholder="One short sentence">
-          </div>
-          <div class='inline publishfield'>
-            <label class="textinputlabel" for="pa_desc">Description</label>
-            <input class="textinput" type="text" id="pa_desc" placeholder="Describe this app">
-          </div>
-          <div class='inline publishfield'>
-            <label class="textinputlabel" for="pa_img">Icon</label>
-            <input class="textinput" type="text" id="pa_img" placeholder="An image url">
-          </div>
-          <div class='inline publishfield'>
-            <label class="textinputlabel" for="pa_video">Video</label>
-            <input class="textinput" type="text" id="pa_video" placeholder="Embed HTML">
-          </div>
-          <div class='inline publishfield'>
-            <label class="textinputlabel" for="pa_detail">Detail</label>
-            <input class="textinput" type="text" id="pa_detail" placeholder="LIB:CTL:{DATA}">
-          </div>
-          <div class='inline publishfield'>
-            <label class="plaincheckbox">
-              <input type='checkbox' id='pa_forsale'>
-              <span>Make Public</span>
-            </label>
-          </div>
+        <div class='pad16 card-text publishoptions'>
+            <div class='publish-grid'>
+              <div class='publishfield'>
+                <label class="textinputlabel" for="pa_name">Name</label>
+                <input class="textinput" type="text" id="pa_name" placeholder="The name of this app">
+              </div>
+              <div class='publishfield'>
+                <label class="textinputlabel" for="pa_libraries">Libraries</label>
+                <input class="textinput" type="text" id="pa_libraries" placeholder="Comma delimited, no spaces">
+              </div>
+              <div class='publishfield'>
+                <label class="textinputlabel" for="pa_subtitle">Subtitle</label>
+                <input class="textinput" type="text" id="pa_subtitle" placeholder="One short sentence">
+              </div>
+              <div class='publishfield'>
+                <label class="textinputlabel" for="pa_desc">Description</label>
+                <input class="textinput" type="text" id="pa_desc" placeholder="Describe this app">
+              </div>
+              <div class='publishfield'>
+                <label class="textinputlabel" for="pa_img">Icon</label>
+                <input class="textinput" type="text" id="pa_img" placeholder="An image url">
+              </div>
+              <div class='publishfield'>
+                <label class="textinputlabel" for="pa_video">Video</label>
+                <input class="textinput" type="text" id="pa_video" placeholder="Embed HTML">
+              </div>
+              <div class='publishfield'>
+                <label class="textinputlabel" for="pa_detail">Detail</label>
+                <input class="textinput" type="text" id="pa_detail" placeholder="LIB:CTL:{DATA}">
+              </div>
+              <div class='publishfield' style="align-self: center;">
+                <label class="plaincheckbox">
+                  <input type='checkbox' id='pa_forsale'>
+                  <span>Make Public</span>
+                </label>
+              </div>
+            </div>
         </div>
         <div class="card-button-wrap publishoptions">
-          <a class="clearbutton button-text-green publishbutton" id="publishbutton">Publish</a>
-          <a class="clearbutton card-button-right deletecontrolbutton">Delete this control</a>
+          <a class="regularbutton deletecontrolbutton">Delete this control</a>
+          <a class="coloredbutton publishbutton" id="publishbutton">Publish</a>
         </div>
-        <div class='publishing padme hideme'></div>
+        <div class='publishing pad16 hideme'></div>
       </div>
     </div>
   </div>
 </div>
 <div class='data-control' data-control='dev:plugins:{}'></div>
+<div id='pluginholder'></div>
+

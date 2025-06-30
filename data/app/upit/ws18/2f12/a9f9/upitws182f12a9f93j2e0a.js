@@ -13,7 +13,7 @@ me.ready = function(){
 function loadImg(img){
   var el = $("<img src='"+img+"' style='display:none;'>");
   el.on('load', function(){
-    $(ME).find(".appcard").css("background-image", "url("+img+")").css("background-size", "cover");
+    $(ME).find(".appcard").css("background-image", "url("+img+")");
   });
   $(ME).append(el);
 }
