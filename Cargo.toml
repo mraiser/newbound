@@ -17,8 +17,8 @@ javascript_runtime = ["flowlang/javascript_runtime"]
 [dependencies]
 newbound_core = { path = "./newbound_core" }
 
-flowlang = { version="0.3.26" }
-ndata = "0.3.14"
+flowlang = { version="0.3.27" }
+ndata = "0.3.15"
 
 serde = { version = "^1.0", features = ["derive"], optional = true }
 serde_json = { version = "^1.0", optional = true }

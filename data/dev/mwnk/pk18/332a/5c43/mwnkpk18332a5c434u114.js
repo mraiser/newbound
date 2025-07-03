@@ -46,8 +46,8 @@ me.uiReady = function(ui){
     var ecss = $(ME).find('.editor-css');
     var ejs = $(ME).find('.editor-js');
     var ed = $(ME).find('.editor-data');
-    
-    
+
+
     // Build a list of editors that have content
     if (data.html && data.html.trim().length > 0) editors.push(ehtm);
     if (data.css && data.css.trim().length > 0) editors.push(ecss);
@@ -523,7 +523,7 @@ me.buildPublish = function(){
   send_appdata(data, function(result){
     var d = me.properties = result.data ? result.data : {};
     d.ctlid = data.ctl;
-    d.ctldb = data.db; 
+    d.ctldb = data.db;
 
     $('#publishappname').text('Publish '+d.name+' ('+d.ctlid+')');
     $('#pa_name').val(d.name).change(function(){ d.name = $(this).val(); });
@@ -548,7 +548,7 @@ function publishApp() {
   + "<div class='padme'>";
   var libs = d.libraries.split(',');
   for (var i in libs) {
-    newhtml +=  "<img src='../app/asset/app/loading.gif' class='roundbutton-small pleasewait'>&nbsp;"
+    newhtml += "<img src='../app/asset/app/loading.gif' class='roundbutton-small pleasewait'>&nbsp;"
       + libs[i]
       + "<br>";
   }
