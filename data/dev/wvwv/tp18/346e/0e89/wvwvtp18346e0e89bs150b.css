@@ -211,6 +211,6 @@ body.dark .javaerror-toggle:hover {
   background-color: var(--primary-color);
 }
 
-.edit-command-actions.dark {
+body.dark .edit-command-actions {
   background-color: var(--surface-color);
 }
