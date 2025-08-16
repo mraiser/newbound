@@ -678,7 +678,7 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
         }
       }
       else {
-        println!("BAD WEBSOCK NO GOOD");
+        //println!("BAD WEBSOCK NO GOOD");
         dead = true;
         break;
       }
