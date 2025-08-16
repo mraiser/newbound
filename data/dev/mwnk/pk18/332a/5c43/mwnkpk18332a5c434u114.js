@@ -548,7 +548,7 @@ function publishApp() {
   + "<div class='padme'>";
   var libs = d.libraries.split(',');
   for (var i in libs) {
-    newhtml += "<img src='../app/asset/app/loading.gif' class='roundbutton-small pleasewait'>&nbsp;"
+    newhtml += "<img src='../app/asset/app/loading.gif' class='roundbutton-small-white pleasewait'>&nbsp;"
       + libs[i]
       + "<br>";
   }

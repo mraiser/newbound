@@ -208,5 +208,9 @@ body.dark .javaerror-toggle:hover {
   right: 20px;
   z-index: 20;
   width:360px;
+  background-color: var(--primary-color);
+}
+
+.edit-command-actions.dark {
   background-color: var(--surface-color);
 }
