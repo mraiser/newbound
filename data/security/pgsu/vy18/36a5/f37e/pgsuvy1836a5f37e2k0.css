@@ -13,8 +13,13 @@
   margin-left:20px;
 }
 
+.wrap{
+  height:100%;
+}
+
 .main {
   position:relative;
+  height:calc(100% - 100px);
 }
 
 .whenon{
@@ -55,10 +60,24 @@
   width:205px;
 }
 
+.roundbutton{
+  width:40px;
+  cursor:pointer;
+}
+
 .roundbutton.addgroupbutton{
   margin-top:-20px;
 }
 
 .nowrap{
   white-space:nowrap;
+}
+
+.userlist {
+  position: absolute; /* Position the list relative to its parent `.main` */
+  top: 110px; /* Adjust top to start below the title and other controls */
+  bottom: 20px; /* Extend to 20px from the bottom of the parent */
+  left: 20px; /* Align with other content on the left */
+  right: 20px; /* Align with other content on the right */
+  overflow-y: auto; /* Enable vertical scrolling if content overflows */
 }

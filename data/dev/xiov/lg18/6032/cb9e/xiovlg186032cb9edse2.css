@@ -1,111 +1,280 @@
-.viewer{
-  position:absolute;
-  top:0px;
-  left:0px;
-  width:100%;
-  height:100%;
+/* Main Layout */
+.edit3d-container {
+    display: flex;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--background-color);
+    color: var(--text-color);
 }
 
+.edit3d-sidebar {
+    width: 450px;
+    min-width: 450px;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--surface-color);
+    border-right: 1px solid var(--border-color);
+    position: relative;
+    overflow: hidden; /* To contain the inspector */
+    z-index: 1;
+}
+
+.edit3d-main {
+    flex-grow: 1;
+    position: relative; /* For viewer positioning */
+}
+
+.viewer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* Sidebar components */
 .ctllistwrap {
-  width:320px;
-  position:relative;
-  display:inline-block;
-  vertical-align:top;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Fix for flexbox scrolling */
 }
 
 .ctllistnavbar {
-  font-size:small;
-}
-
-.ctllisttype {
-  font-size:x-small;
-}
-
-.cltabtable {
-  color:white;
-  width:100%;
-}
-
-.cltabtable .clickmerow:hover {
-  background-color:#fff2;
-  cursor:pointer;
-}
-
-.cltabtable .clickmecell {
-  padding:6px;
+    flex-shrink: 0; /* Prevents navbar from shrinking */
+    top: 0px;
 }
 
 .cltab {
-  padding:10px;
-  color:white;
-}
-
-.cltab .textinput {
-  color:white;
-}
-
-.x3dctllist .list_header, .behaviorlist .list_header {
-  display:none;
+    padding: 16px;
+    overflow-y: auto;
+    flex-grow: 1;
 }
 
 .x3dctllist .list_body, .behaviorlist .list_body {
-  background-color:rgb(40, 43, 48);
-  width:300px;
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    width: auto;
+}
+.x3dctllist .list_header, .behaviorlist .list_header {
+    display: none;
+}
+.x3dctllist .roundbutton-small, .behaviorlist .roundbutton-small {
+    background-color: var(--border-color);
+}
+.item_edit, .item_delete {
+    width: 20px;
 }
 
-.x3dctllist .roundbutton-small, .behaviorlist .roundbutton-small{
-  background-color:#aaaa;
+/* Add Buttons */
+.add-controls-area, .add-behavior-area {
+    padding-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.add-behavior-area {
+    margin-bottom: 42px;
+}
+.add3dctlbutton, .add3dbehaviorbutton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
 }
 
-.item_edit, .item_delete{
-  width:20px;
+/* Inspector Panel */
+.inspector-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--surface-color);
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+    transition: all 0.25s ease-in-out;
+    transform: translateX(100%);
+}
+.inspector-container:not(.hideme) {
+    transform: translateX(0);
+}
+.inspector-container.is-maximized {
+    position: fixed;
+    top: 126px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: auto;
+    z-index: 20;
+    transform: translateX(0) !important;
 }
 
-.x3dctl-detail, .x3dbehavior-editor{
-  border: thin solid white;
-  padding:0px;
-  margin-top:38px;
-  vertical-align:top;
-  display:none;
-  position:relative;
-  z-index:11;
-  color: white;
-  background-color:#000a;
+
+.inspector-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 8px 0 16px;
+    height: 45px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
 }
 
-.x3dctl-detail table {
-  color: white;
+.inspector-actions {
+    display: flex;
+    gap: 4px;
 }
 
-.x3dctl-detail input {
-  color: white;
-  border-bottom:thin #fffa solid;
+.maximize-inspector-btn {
+    display: none; /* Hidden by default, shown by JS for behaviors */
+}
+.maximize-inspector-btn .restore-icon {
+    display: none;
+}
+.is-maximized .maximize-inspector-btn .maximize-icon {
+    display: none;
+}
+.is-maximized .maximize-inspector-btn .restore-icon {
+    display: block;
 }
 
-.xtitle{
-  vertical-align:bottom;
-  padding-bottom:3px;
+
+.inspector-title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 500;
 }
 
-.bwrap{
-  padding-left:20px;
-  padding-right:20px;
-  min-width:400px;
-  position:relative;
-  height:400px;
+.inspector-content {
+    padding: 16px;
+    overflow-y: auto;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
 }
 
-.abp{
-  font-size:14px;
-  height:28px;
-  width:28px;
-  border-radius:14px;
-  margin-left:3px;
-  margin-right:3px;
+/* Control Detail Styling */
+.x3dctl-detail {
+    display: none;
 }
 
-.abn {
-  background-color:transparent;
-  color:white;
-  width:80px;
+.x3dbehavior-editor {
+    display: none;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.detail-section {
+    margin-bottom: 20px;
+}
+.transform-grid {
+    display: grid;
+    grid-template-columns: 70px 1fr 1fr 1fr;
+    gap: 8px;
+    align-items: center;
+}
+.transform-grid label {
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+.transform-row-header {
+    display: contents;
+}
+.transform-row-header span {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-color-light);
+    font-weight: 500;
+}
+.transform-row {
+    display: contents; /* Makes children part of the grid */
+}
+.transform-grid .textinput {
+    text-align: right;
+    padding: 8px;
+}
+
+
+/* Behavior Editor Styling */
+.x3dbehavior-editor .x3db-name {
+    margin-bottom: 16px;
+    padding: 8px;
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    flex-shrink: 0;
+}
+.x3dbehavior-editor .bwrap {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    position: relative;
+    flex-grow: 1;
+    min-height: 0;
+}
+
+.x3dbehavior-editor .bwrap .x3dbehavior-src-js {
+    height: 100%;
+}
+
+.x3dbehavior-editor .bwrap .CodeMirror {
+     height: 100%;
+     border-radius: var(--border-radius-md);
+}
+
+.x3dbehavior-editor .bwrap-footer {
+    padding: 8px 8px 8px 16px;
+    font-family: monospace;
+    color: var(--text-color-light);
+    flex-shrink: 0;
+    margin-bottom: 26px;
+}
+.x3dbehavior-editor .abp {
+    height: 24px;
+    width: 24px;
+    min-width: 24px;
+    border-radius: 50%;
+    margin: 0 4px;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+    border: 1px solid var(--border-color);
+    background-color: var(--surface-color);
+    color: var(--text-color);
+    cursor: pointer;
+}
+.x3dbehavior-editor .abp:hover {
+    background-color: var(--border-color-light);
+    border-color: var(--text-color-light);
+}
+.x3dbehavior-editor .abdel {
+    background-color: #d32f2f20;
+    color: var(--error-color);
+    border-color: #d32f2f40;
+}
+.x3dbehavior-editor .abdel:hover {
+     background-color: #d32f2f40;
+}
+
+.x3dbehavior-editor .abn {
+    background-color: transparent;
+    border: none;
+    border-bottom: 1px dashed var(--text-color-light);
+    color: var(--text-color);
+    font-weight: 500;
+    width: 100px;
+    text-align: center;
+}
+.x3dbehavior-editor .abn:focus {
+    outline: none;
+    border-bottom-style: solid;
+    border-bottom-color: var(--primary-color);
 }

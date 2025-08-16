@@ -230,6 +230,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cmd"
+version = "0.1.0"
+dependencies = [
+ "flowlang",
+ "ndata",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "cocoa"
 version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1505,6 +1515,7 @@ version = "0.1.0"
 dependencies = [
  "aes",
  "blake2",
+ "cmd",
  "flowlang",
  "hot-lib-reloader",
  "ndata",

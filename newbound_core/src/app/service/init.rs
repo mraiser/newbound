@@ -318,16 +318,18 @@ pub fn http_listen() {
           request.put_string("language", "*");
         }
 
-        if headers.has("HOST"){
-          let h = headers.get_string("HOST");
-          request.put_string("host", &h);
-        }
+        //if headers.has("HOST"){
+        //  let h = headers.get_string("HOST");
+        //  request.put_string("host", &h);
+        //}
+        request.put_string("host", &headers.try_get_string("HOST").unwrap_or("".to_string()));
 
-        if headers.has("REFERER"){
-          let h = headers.get_string("REFERER");
-          request.put_string("referer", &h);
-        }
-
+        //if headers.has("REFERER"){
+        //  let h = headers.get_string("REFERER");
+        //  request.put_string("referer", &h);
+        //}
+        request.put_string("referer", &headers.try_get_string("REFERER").unwrap_or("".to_string()));
+        
         request.put_string("protocol", &protocol);
         request.put_string("path", &cmd_path);
         request.put_string("loc", &loc);

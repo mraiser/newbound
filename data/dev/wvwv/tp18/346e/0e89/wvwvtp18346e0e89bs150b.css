@@ -124,7 +124,7 @@
 .id-display {
     margin-top: 10px;
     padding-top: 10px;
-    border-top: 1px solid var(--border-color);
+    display: inline;
 }
 .id-display span {
     display: inline;

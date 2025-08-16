@@ -6,31 +6,55 @@ me.ready = function() {
     me.children = [];
     me.state = 'cltab1';
     me.data = ME.DATA;
+    me.current_behavior_cm = null;
     if (!me.data) me.data = {};
     if (!me.data.three) me.data.three = { "controls": [] };
     if (!me.data.three.assets) me.data.three.assets = [];
 
+    // When switching main tabs, hide the inspector and reset maximized state
     $(ME).find('.navbar-tab').click(function() {
         me.state = $(this).data("id");
-        $(ME).find('.x3dctl-detail').css('display', 'none');
-        $(ME).find('.x3dbehavior-editor').css('display', 'none');
+        $(ME).find('.inspector-container').addClass('hideme').removeClass('is-maximized');
+    });
+    
+    // Close inspector button
+    $(ME).find('.close-inspector-btn').click(function() {
+        $(ME).find('.inspector-container').addClass('hideme').removeClass('is-maximized');
+    });
+
+    // Maximize/Restore inspector button
+    $(ME).find('.maximize-inspector-btn').click(function() {
+        $(ME).find('.inspector-container').toggleClass('is-maximized');
+        // After the CSS transition, refresh CodeMirror to fix its layout
+        setTimeout(function() {
+            if (me.current_behavior_cm) {
+                me.current_behavior_cm.refresh();
+            }
+        }, 300);
     });
 
     buildViewer(buildControlList);
     buildBehaviors();
 
     $(ME).find('.add3dbehaviorbutton').click(function() {
-        var nuname = prompt("Behavior Name");
-        if (!nuname) return;
-        var d = {
-            id: guid(),
-            name: nuname,
-            body: "return 'ok';",
-            params: []
-        };
-        if (!me.data.three.behaviors) me.data.three.behaviors = [];
-        me.data.three.behaviors.push(d);
-        buildBehaviors();
+        document.body.api.ui.prompt({
+            title: "New Behavior",
+            text: "Name",
+            subtext: "Enter a unique name for the new behavior.",
+            cb: function(nuname) {
+                 if (!nuname) return;
+                var d = {
+                    id: guid(),
+                    name: nuname,
+                    body: "return 'ok';",
+                    params: []
+                };
+                if (!me.data.three.behaviors) me.data.three.behaviors = [];
+                me.data.three.behaviors.push(d);
+                buildBehaviors();
+                document.body.dirty();
+            }
+        });
     });
 };
 
@@ -66,16 +90,22 @@ function buildBehaviors() {
         allowdelete: true,
         on_delete: function() {
             document.body.dirty();
+            $(ME).find('.inspector-container').addClass('hideme').removeClass('is-maximized');
         },
         click_edit: function(ctl, index) {
-            var el = $(ME).find('.x3dbehavior-editor');
+            var inspector = $(ME).find('.inspector-container');
+            inspector.removeClass('hideme');
+            inspector.find('.inspector-title').text('Behavior: ' + ctl.name);
+            inspector.find('.inspector-content > div').hide();
+            inspector.find('.maximize-inspector-btn').show();
+            
+            var el = inspector.find('.x3dbehavior-editor').show();
             var bwrap = el.find('.bwrap');
             var ta = $("<textarea class='x3dbehavior-src-js'></textarea>");
             bwrap.empty();
             bwrap.append(ta);
             ta.val(ctl.body);
-            el.css('display', 'inline-block');
-
+            
             var row = $($('.behaviorlist').find('li')[index]).find('span').find('span');
 
             var rebuildParams = function() {
@@ -94,11 +124,15 @@ function buildBehaviors() {
                 var plus = el.find('.abplus');
                 var del = el.find('.abdel');
                 plus.click(function() {
-                    var q = prompt("Parameter Name");
-                    if (!q) return;
-                    var d = { name: q, type: "object" };
-                    ctl.params.push(d);
-                    rebuildParams();
+                     document.body.api.ui.prompt({
+                         title: "New Parameter", text: "Name",
+                         cb: function(q) {
+                            if (!q) return;
+                            var d = { name: q, type: "object" };
+                            ctl.params.push(d);
+                            rebuildParams();
+                         }
+                     });
                 });
                 del.click(function() {
                     var q = $(this).data('index');
@@ -108,6 +142,7 @@ function buildBehaviors() {
                 abn.change(ub).keyup(function() {
                     ctl.name = abn.val();
                     row.text(ctl.name);
+                    inspector.find('.inspector-title').text('Behavior: ' + ctl.name);
                 });
             };
             rebuildParams();
@@ -115,13 +150,15 @@ function buildBehaviors() {
             var c = ta[0];
             var conf = {
                 mode: 'javascript',
-                theme: 'abcdef',
+                theme: document.body.classList.contains('dark') ? 'darcula' : 'default',
                 lineWrapping: true,
                 autofocus: false,
                 viewportMargin: Infinity
             };
             if (c.cm) c.cm.toTextArea();
             c.cm = CodeMirror.fromTextArea(c, conf);
+            me.current_behavior_cm = c.cm; // Store instance for refresh
+            setTimeout(function(){ c.cm.refresh(); }, 10);
 
             var ub = function() {
                 document.body.dirty();
@@ -163,6 +200,7 @@ function buildControlList() {
         on_delete: function() {
             build3D();
             document.body.dirty();
+            $(ME).find('.inspector-container').addClass('hideme').removeClass('is-maximized');
         },
         click_edit: function(ctl, index) {
             var div = $('#' + ctl.uuid);
@@ -173,7 +211,16 @@ function buildControlList() {
             var api = div[0].api;
             var meta = div[0].meta;
 
-            var puts = $(ME).find('.baseparams').find('input');
+            var inspector = $(ME).find('.inspector-container');
+            inspector.removeClass('hideme');
+            inspector.find('.inspector-title').text('Control: ' + ctl.name);
+            inspector.find('.inspector-content > div').hide();
+            inspector.find('.maximize-inspector-btn').hide(); // Hide for control properties
+            me.current_behavior_cm = null; // Clear any stale CM reference
+            
+            var detailView = inspector.find('.x3dctl-detail').show();
+
+            var puts = detailView.find('input');
             $(puts[0]).val(ctl.name);
 
             var pos = api.model.position;
@@ -189,7 +236,6 @@ function buildControlList() {
             $(puts[8]).val(scale.y);
             $(puts[9]).val(scale.z);
 
-            $(ME).find('.x3dctl-detail').css('display', 'inline-block');
             $(ME).find('.x3dctl').css('display', 'none');
             div.css('display', 'inline-block');
 
@@ -211,9 +257,9 @@ function buildControlList() {
                 current_api.rig.rot_x   = parseFloat($(puts[4]).val()) || 0;
                 current_api.rig.rot_y   = parseFloat($(puts[5]).val()) || 0;
                 current_api.rig.rot_z   = parseFloat($(puts[6]).val()) || 0;
-                current_api.rig.scale_x = parseFloat($(puts[7]).val()) || 0;
-                current_api.rig.scale_y = parseFloat($(puts[8]).val()) || 0;
-                current_api.rig.scale_z = parseFloat($(puts[9]).val()) || 0;
+                current_api.rig.scale_x = parseFloat($(puts[7]).val()) || 1;
+                current_api.rig.scale_y = parseFloat($(puts[8]).val()) || 1;
+                current_api.rig.scale_z = parseFloat($(puts[9]).val()) || 1;
 
                 // Update backing data model for saving
                 current_ctl.name     = $(puts[0]).val();
@@ -229,6 +275,7 @@ function buildControlList() {
                 
                 // Update name in the list view
                 current_row.text(current_ctl.name);
+                inspector.find('.inspector-title').text('Control: ' + current_ctl.name);
             });
         }
     };
@@ -280,6 +327,7 @@ function loadControl(ctl) {
 me.load = function(ctl, cb, parent) {
     if (!ctl.uuid) ctl.uuid = guid();
     var el = $('<div id="' + ctl.uuid + '" class="hideme x3dctl"/>');
+    // The editor for a control's own UI is now inside the inspector
     $(ME).find('.x3dctl-editor').append(el);
     var lib = ctl.db;
     var id = ctl.id;

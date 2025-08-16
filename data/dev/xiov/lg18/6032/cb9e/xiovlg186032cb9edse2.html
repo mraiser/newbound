@@ -1,60 +1,90 @@
-<div class="viewer"></div>
-<div class='ctllistwrap'>
-  <div>
-    <div class='navbar navbar-dark ctllistnavbar'>
-      <div class='cltab1-tab navbar-tab selected' data-id='cltab1'>Controls</div>
-      <div class='cltab2-tab navbar-tab' data-id='cltab2'>Behaviors</div>
-      <div class='hideme cltab3-tab navbar-tab' data-id='cltab3'>Poses</div>
+<div class="edit3d-container">
+    <div class="edit3d-sidebar">
+        <div class='ctllistwrap'>
+            <div class='navbar navbar-dark ctllistnavbar'>
+                <div class='cltab1-tab navbar-tab selected' data-id='cltab1'>Controls</div>
+                <div class='cltab2-tab navbar-tab' data-id='cltab2'>Behaviors</div>
+                <div class='hideme cltab3-tab navbar-tab' data-id='cltab3'>Poses</div>
+            </div>
+            <div class='cltab tab-content cltab1 selected'>
+                <div class='3dctllist x3dctllist'></div>
+                <div class='add-controls-area'>
+                    <div class='data-control add3dctlselect' data-control='dev:selectctl:{}'></div>
+                    <button class='coloredbutton add3dctlbutton'>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
+                        <span>Add Control</span>
+                    </button>
+                </div>
+            </div>
+            <div class='cltab tab-content cltab2'>
+                <div class='behaviorlist'></div>
+                 <div class="add-behavior-area">
+                    <button class="coloredbutton add3dbehaviorbutton">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
+                        <span>Add Behavior</span>
+                    </button>
+                </div>
+            </div>
+            <div class='cltab tab-content cltab3'>
+                TAB 3
+            </div>
+        </div>
+
+        <div class="inspector-container hideme">
+            <div class="inspector-header">
+                <h3 class="inspector-title">Properties</h3>
+                <div class="inspector-actions">
+                    <button class="maximize-inspector-btn roundbutton-small-white" title="Maximize">
+                        <svg class="maximize-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"></path></svg>
+                        <svg class="restore-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"></path></svg>
+                    </button>
+                    <button class="close-inspector-btn roundbutton-small-white" title="Close">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="inspector-content">
+                <div class='x3dctl-detail'>
+                    <div class='detail-section'>
+                        <label class='textinputlabel'>Name</label>
+                        <input type='text' class='textinput ctl-name-input'>
+                    </div>
+                     <div class='detail-section'>
+                        <div class='transform-grid'>
+                            <div class="transform-row-header">
+                                <span></span><span>X</span><span>Y</span><span>Z</span>
+                            </div>
+                            <div class="transform-row">
+                                <label>Position</label>
+                                <input type='number' class='textinput' value='10.0' step='0.1'>
+                                <input type='number' class='textinput' value='10.0' step='0.1'>
+                                <input type='number' class='textinput' value='10.0' step='0.1'>
+                            </div>
+                            <div class="transform-row">
+                                 <label>Rotation</label>
+                                <input type='number' class='textinput' value='0.0' step='0.1'>
+                                <input type='number' class='textinput' value='0.0' step='0.1'>
+                                <input type='number' class='textinput' value='0.0' step='0.1'>
+                            </div>
+                            <div class="transform-row">
+                                <label>Scale</label>
+                                <input type='number' class='textinput' value='1.0' step='0.1'>
+                                <input type='number' class='textinput' value='1.0' step='0.1'>
+                                <input type='number' class='textinput' value='1.0' step='0.1'>
+                            </div>
+                        </div>
+                    </div>
+                    <div class='x3dctl-editor'></div>
+                </div>
+                <div class='x3dbehavior-editor'>
+                    <div class='x3db-name'></div>
+                    <div class='bwrap'></div>
+                    <div class='bwrap-footer'>}</div>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
-  <div class='cltab tab-content cltab1 selected'>
-    <div class='3dctllist x3dctllist'></div>
-    <br>
-    <div class='data-control add3dctlselect' data-control='dev:selectctl:{}'></div>
-    <br>
-    <img src='../app/asset/app/add_icon-white.png' class='roundbutton add3dctlbutton'>
-  </div>
-  <div class='cltab tab-content cltab2'>
-    <div class='behaviorlist'></div>
-    <br><br>
-    <img src="../app/asset/app/add_icon-white.png" class="roundbutton add3dbehaviorbutton">
-  </div>
-  <div class='cltab tab-content cltab3'>
-    TAB 3
-  </div>
-</div>
-<div class='x3dctl-detail'>
-  <table border='0' cellpadding='0' cellspacing='10' class='padme baseparams'>
-    <tr>
-      <td colspan='5'><div class='textinputlabel'>Name</div><input type='text' class='textinput'><br><br></td>
-    </tr>
-    <tr>
-      <td class='xtitle'>Position</td>
-      <td>&nbsp;</td>
-      <td><div class='textinputlabel'>X</div><input type='number' class='textinput' value='10.0' step='0.1' size='5'></td>
-      <td><div class='textinputlabel'>Y</div><input type='number' class='textinput' value='10.0' step='0.1' size='5'></td>
-      <td><div class='textinputlabel'>Z</div><input type='number' class='textinput' value='10.0' step='0.1' size='5'></td>
-    </tr>
-    <tr>
-      <td class='xtitle'>Rotation</td>
-      <td>&nbsp;</td>
-      <td><div class='textinputlabel'>X</div><input type='number' class='textinput' value='0.0' step='0.1' size='5'></td>
-      <td><div class='textinputlabel'>Y</div><input type='number' class='textinput' value='0.0' step='0.1' size='5'></td>
-      <td><div class='textinputlabel'>Z</div><input type='number' class='textinput' value='0.0' step='0.1' size='5'></td>
-    </tr>
-    <tr>
-      <td class='xtitle'>Scale</td>
-      <td>&nbsp;</td>
-      <td><div class='textinputlabel'>X</div><input type='number' class='textinput' value='1.0' step='0.1' size='5'></td>
-      <td><div class='textinputlabel'>Y</div><input type='number' class='textinput' value='1.0' step='0.1' size='5'></td>
-      <td><div class='textinputlabel'>Z</div><input type='number' class='textinput' value='1.0' step='0.1' size='5'></td>
-    </tr>
-  </table>
-  <div class='x3dctl-editor padme'></div>
-</div>
-<div class='x3dbehavior-editor'>
-  <div class='x3db-name'></div>
-  <div class='bwrap'></div>
-  <br>
-  }
+    <div class="edit3d-main">
+        <div class="viewer"></div>
+    </div>
 </div>

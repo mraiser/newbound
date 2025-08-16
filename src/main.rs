@@ -9,8 +9,8 @@ use ndata::dataobject::DataObject;
 fn main() {
   env::set_var("RUST_BACKTRACE", "1");
   {
-    let _data_ref = flowlang::init("data");
-    generated_initializer::initialize_all_commands();
+    let data_ref = flowlang::init("data");
+    generated_initializer::initialize_all_commands(data_ref);
 
     let params: Vec<String> = env::args().collect();
     if params.len() > 1{

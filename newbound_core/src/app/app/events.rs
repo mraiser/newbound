@@ -1,5 +1,5 @@
 use ndata::dataobject::DataObject;
-use ndata::dataarray::*;
+use ndata::dataarray::DataArray;
 use flowlang::datastore::*;
 pub fn execute(o: DataObject) -> DataObject {
     let arg_0: String = o.get_string("app");

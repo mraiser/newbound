@@ -6,7 +6,7 @@ var ms = [ 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'Augu
 me.ready = function(){
   var data = ME.DATA.timer;
   var id = ME.DATA.timer.id;
-  var lib = ME.DATA.data.lib;
+  var lib = ME.DATA.data.lib ? ME.DATA.data.lib : ME.DATA.data.db;
   $('.timer_edit_name').text(data.name);
   
   $('#timer_edit')[0].uuid = id;
@@ -36,9 +36,9 @@ me.ready = function(){
   i = ms.length;
   while (i-->0) months = '<option>'+ms[i]+'</option>' + months;
   $('.monthselect').html(months);
-  
+
   json('../app/read', 'lib='+lib+'&id='+id, function(result) {
-    var data = me.data = result.data;
+    var data = me.data = result.data ? result.data : {};
     $('#timer_edit')[0].data = data;
     $('#timer_edit_task').val(data.cmd);
     if (data.start) {
