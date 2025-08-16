@@ -5,6 +5,7 @@ let
     pkg-config
     cargo
     rustc
+    rustup
     git
   ];
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath LLP;

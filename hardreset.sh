@@ -3,10 +3,14 @@ cd $DIR
 git clone https://github.com/mraiser/newbound.git CHUCKTHIS
 cp -r CHUCKTHIS/src/* src/
 cp -r CHUCKTHIS/data/* data/
-cp -r CHUCKTHIS/cmd/src/* cmd/src/
-cp CHUCKTHIS/cmd/Cargo.toml cmd/Cargo.toml
+mkdir -p newbound_core
+cp -r CHUCKTHIS/newbound_core/* newbound_core/
 cp CHUCKTHIS/Cargo.toml Cargo.toml
-rm -rf CHUCKTHIS
+rm -f src/lib.rs
 rustup update
-cargo run --release --features="serde_support" rebuild
-
+cd CHUCKTHIS
+cargo build --release --features="serde_support"
+cd ../
+CHUCKTHIS/target/release/newbound rebuild
+rm -rf CHUCKTHIS
+cargo run --release --features="serde_support"
