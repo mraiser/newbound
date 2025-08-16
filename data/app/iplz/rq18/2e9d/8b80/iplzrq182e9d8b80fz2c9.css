@@ -167,6 +167,10 @@ body.dark .menuicon {
   transition: background-color 0.2s ease;
 }
 
+.roundbutton-small {
+  background-color: rgba(0, 0, 0, 0.16);
+}
+
 .roundbutton-small:hover {
   background-color: rgba(0, 0, 0, 0.08);
 }
@@ -427,6 +431,7 @@ body.dark .regularbutton:hover {
 .coloredbutton:hover {
   background-color: var(--primary-color-dark);
   border-color: var(--primary-color-dark);
+  color: VAR(--text-color-dark);
 }
 
 .clearbutton {
