@@ -1106,7 +1106,7 @@ fn do_listen(ipaddr: String, port: i64) -> i64 {
         let _ = write_properties(properties_path.to_string_lossy().into_owned(), peer_runtime_config);
     }
 
-//  println!("[DO_LISTEN] P2P TCP listening on port {}", actual_port);
+  println!("P2P TCP listening on port {}", actual_port);
 
     thread::spawn(move || {
     //  println!("[DO_LISTEN] Listener thread started for port {}", actual_port);
