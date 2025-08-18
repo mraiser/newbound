@@ -6,6 +6,8 @@ cp -r CHUCKTHIS/data/* data/
 mkdir -p newbound_core
 cp -r CHUCKTHIS/newbound_core/* newbound_core/
 cp CHUCKTHIS/Cargo.toml Cargo.toml
+rm -f CHUCKTHIS/Cargo.lock
+rm -f Cargo.lock
 rm -f src/lib.rs
 rm -rf src/app
 rm -rf src/dev

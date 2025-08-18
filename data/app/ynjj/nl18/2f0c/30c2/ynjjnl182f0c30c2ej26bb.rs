@@ -42,7 +42,8 @@ for file in fs::read_dir(&p).unwrap() {
 
 
             let data = cmd.get_object("data");
-            let typ = if data.has("type") { &data.get_string("type") } else { "java" };
+            let typ = if data.has("type") { data.get_string("type") } else { "java".to_string() };
+            let typ = &typ;
             //let name = &data.get_string("name");
 
             let codename = &data.get_string(typ);
