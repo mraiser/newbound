@@ -1,5 +1,4 @@
-// fn listen(ipaddr: String, port: i64) -> i64
-do_init();
+    do_init();
     do_listen(ipaddr, port)
 }
 
@@ -353,8 +352,6 @@ impl P2PStream {
                 let mut p2p_stream_clone = con.stream.try_clone()?;
 
                 let mut bytes_to_send = ("fwd ".to_string() + &to).as_bytes().to_vec();
-                let buf_len = buf.len() as i16;
-                bytes_to_send.extend_from_slice(&buf_len.to_be_bytes());
                 bytes_to_send.extend_from_slice(buf);
 
                 let encrypted_buf = encrypt(&cipher, &bytes_to_send);
@@ -1268,11 +1265,9 @@ pub fn handle_next_message(mut conn: P2PConnection) -> bool {
         }
 
     } else if method_str == "rcv " {
-        if decrypted_payload.len() < 4 + 36 + 2 { eprintln!("[HANDLE_NEXT_MSG SID {}] rcv payload too short", conn.sessionid); return false; }
+        if decrypted_payload.len() < 4 + 36 { eprintln!("[HANDLE_NEXT_MSG SID {}] rcv payload too short", conn.sessionid); return false; }
         let from_uuid = String::from_utf8_lossy(&decrypted_payload[4..40]).into_owned();
-        let sub_packet_len = i16::from_be_bytes(decrypted_payload[40..42].try_into().expect("[HANDLE_NEXT_MSG] rcv sub_packet_len slice error")) as usize;
-        if decrypted_payload.len() < 42 + sub_packet_len { eprintln!("[HANDLE_NEXT_MSG SID {}] rcv payload shorter than specified sub-packet length", conn.sessionid); return false; }
-        let original_payload_with_len_prefix = &decrypted_payload[42 .. 42 + sub_packet_len];
+        let original_payload_with_len_prefix = &decrypted_payload[40..];
 
         if let Some(mut relay_conn_to_sender) = relay(&conn.uuid, &from_uuid, true) {
             if let P2PStream::Relay(ref mut relay_stream_to_sender) = relay_conn_to_sender.stream {
@@ -1287,17 +1282,14 @@ pub fn handle_next_message(mut conn: P2PConnection) -> bool {
         }
 
     } else if method_str == "fwd " {
-        if decrypted_payload.len() < 4 + 36 + 2 { eprintln!("[HANDLE_NEXT_MSG SID {}] fwd payload too short", conn.sessionid); return false; }
+        if decrypted_payload.len() < 4 + 36 { eprintln!("[HANDLE_NEXT_MSG SID {}] fwd payload too short", conn.sessionid); return false; }
         let target_uuid = String::from_utf8_lossy(&decrypted_payload[4..40]).into_owned();
-        let sub_packet_len = i16::from_be_bytes(decrypted_payload[40..42].try_into().expect("[HANDLE_NEXT_MSG] fwd sub_packet_len slice error")) as usize;
-        if decrypted_payload.len() < 42 + sub_packet_len { eprintln!("[HANDLE_NEXT_MSG SID {}] fwd payload shorter than specified sub-packet length", conn.sessionid); return false; }
-        let actual_payload_to_forward = &decrypted_payload[42 .. 42 + sub_packet_len];
+        let actual_payload_to_forward = &decrypted_payload[40..];
 
         if let Some(target_user) = get_user(&target_uuid) {
             if let Some(mut tcp_conn_to_target) = get_tcp(target_user) {
                 let mut message_for_target = "rcv ".as_bytes().to_vec();
                 message_for_target.extend_from_slice(conn.uuid.as_bytes());
-                message_for_target.extend_from_slice(&(sub_packet_len as i16).to_be_bytes());
                 message_for_target.extend_from_slice(actual_payload_to_forward);
 
                 let encrypted_for_target = encrypt(&tcp_conn_to_target.cipher, &message_for_target);

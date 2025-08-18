@@ -7,6 +7,11 @@ mkdir -p newbound_core
 cp -r CHUCKTHIS/newbound_core/* newbound_core/
 cp CHUCKTHIS/Cargo.toml Cargo.toml
 rm -f src/lib.rs
+rm -rf src/app
+rm -rf src/dev
+rm -rf src/peer
+rm -rf src/security
+rm -rf cmd
 rustup update
 cd CHUCKTHIS
 cargo build --release --features="serde_support"
