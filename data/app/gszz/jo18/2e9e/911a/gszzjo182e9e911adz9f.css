@@ -1,7 +1,36 @@
+/* Ensure the root control itself takes full height and uses flexbox for layout */
+#<%= me.UUID %> {
+  height: 100%; /* Take the full height of its parent container */
+  display: flex;
+  flex-direction: column; /* Arrange children (the app:ui control and .wrap) vertically */
+}
+
+/* The .wrap div should fill the remaining vertical space after the app:ui control (if it takes space) */
+/* It also needs to be a flex container to manage its own children (titlebar and padme) */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1; /* Allow .wrap to take all available vertical space */
+  overflow: hidden; /* Prevent .wrap itself from showing scrollbars; .padme will handle scrolling */
+}
+
+/* Ensure the titlebar maintains its height and doesn"t shrink */
+.titlebar {
+  flex-shrink: 0;
+}
+
+/* The .padme div should take all available vertical space within .wrap and be scrollable */
+.padme {
+  flex-grow: 1; /* Allow padme to take all remaining vertical space after the titlebar */
+  overflow-y: auto; /* Enable vertical scrolling for content that overflows */
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+  padding-bottom: 24px; /* Add some padding for better scroll experience */
+  box-sizing: border-box; /* Include padding in the element"s total height */
+}
+
 .applist-filters {
   margin-left: auto;
   margin-right: auto;
-  margin-bottom: 24px;
 }
 /* Make filter text color aware of dark mode */
 .applist-filters td {
@@ -10,6 +39,10 @@
 
 .applist {
   text-align: center;
+}
+.appwrap {
+  height:100%;
+  overflow-y:auto;
 }
 .appcard-wrap {
   width: 0px;

@@ -222,7 +222,7 @@ function activateControl(el, cb){
     if (c.require_groups) {
       json('../security/current_user', null, function(result){
         for (group in c.require_groups) {
-          if (result.data.groups.indexOf(c.require_groups[group]) == -1) {
+          if (result.data && result.data.groups && result.data.groups.indexOf(c.require_groups[group]) == -1) {
             window.location.href='../app/login.html';
           }
         }
