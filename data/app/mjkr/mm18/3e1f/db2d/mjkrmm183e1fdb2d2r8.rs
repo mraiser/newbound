@@ -189,19 +189,130 @@ pub fn http_listen() {
             true => headers.get_string("CONTENT-TYPE"),
             false => "text/plain".to_string()
           };
-          let mut max = clstr.parse::<i64>().unwrap();
+          let max = clstr.parse::<usize>().unwrap_or(0); 
 
           let s = ctstr.to_lowercase();
-          if s.starts_with("multipart/") {
+          if s.contains("application/json") {
+            if max > 0 {
+                let mut body_buf = vec![0; max];
+                match stream.read_exact(&mut body_buf) {
+                    Ok(_) => {
+                        let body_str = String::from_utf8_lossy(&body_buf).to_string();
+                        let json_params = DataObject::from_string(&body_str); 
+                        params = json_params;
+                    },
+                    Err(e) => {
+                        println!("Error reading JSON body: {}", e);
+                        // Keep params as new DataObject
+                    }
+                }
+            }
+          }
+          else if s.starts_with("multipart/form-data") {
             // MULTIPART
-            panic!("No MIME MULTIPART support yet");
+            let boundary = ctstr.split("boundary=").nth(1).map(|s| s.trim_matches('"'));
+            if let Some(boundary_str) = boundary {
+                let boundary_sep = "--".to_string() + boundary_str;
+                let boundary_end = boundary_sep.clone() + "--";
+
+                let mut temp_dir = std::env::temp_dir();
+                temp_dir.push("newbound_uploads");
+                temp_dir.push(unique_session_id()); // Unique dir per request
+                if let Err(e) = fs::create_dir_all(&temp_dir) { 
+                    println!("Failed to create temp dir: {}", e);
+                    // Continue with empty params
+                }
+
+                // Read until first boundary
+                loop {
+                    let line = read_line(&mut stream);
+                    if line.is_empty() { break; } // Stream error
+                    if line.trim() == boundary_sep { break; } // Found start
+                }
+
+                // Loop over parts
+                loop {
+                    let part_headers = parse_mime_headers(&mut stream);
+                    if !part_headers.has("CONTENT-DISPOSITION") {
+                        // Invalid part, probably end of stream
+                        break;
+                    }
+
+                    let (name, filename_opt) = parse_content_disposition(&part_headers.get_string("CONTENT-DISPOSITION"));
+                    if name.is_empty() { continue; } // Skip part with no name
+
+                    let mut part_data: Vec<u8> = Vec::new();
+                    let mut is_end = false;
+
+                    // Read part body
+                    loop {
+                        let line_bytes_res = read_line_as_bytes(&mut stream);
+                        if line_bytes_res.is_err() { 
+                            is_end = true; // Stream ended unexpectedly
+                            break; 
+                        }
+                        let line_bytes = line_bytes_res.unwrap();
+                        
+                        // Check if this line is a boundary
+                        let line_trimmed = trim_bytes_crlf(&line_bytes); // Trim only \r\n
+                        
+                        if line_trimmed == boundary_sep.as_bytes() {
+                            break; // End of this part
+                        }
+                        if line_trimmed == boundary_end.as_bytes() {
+                            is_end = true;
+                            break; // End of all parts
+                        }
+                        
+                        // Not a boundary, add to data
+                        part_data.extend_from_slice(&line_bytes);
+                    }
+                    
+                    // We read one line too many (the boundary). The *actual* data
+                    // ends before the \r\n of the *previous* line.
+                    if part_data.ends_with(b"\r\n") {
+                        part_data.truncate(part_data.len() - 2);
+                    }
+
+                    // Process the data
+                    if let Some(filename) = filename_opt {
+                        if !filename.is_empty() {
+                            // It's a file
+                            let temp_path = temp_dir.join(&filename);
+                            if let Err(e) = fs::write(&temp_path, &part_data) { // Pass part_data by ref
+                                println!("Failed to write temp file: {}", e);
+                            } else {
+                                params.put_string(&name, temp_path.to_str().unwrap_or(""));
+                            }
+                        } else {
+                             // Field with an empty filename, treat as text
+                             params.put_string(&name, &String::from_utf8_lossy(&part_data));
+                        }
+                    } else {
+                        // It's form data
+                        params.put_string(&name, &String::from_utf8_lossy(&part_data));
+                    }
+
+                    if is_end { break; }
+                }
+
+                // Cleanup temp dir
+                if let Err(e) = fs::remove_dir_all(&temp_dir) {
+                    println!("Failed to clean temp dir: {}", e);
+                }
+
+            } else {
+                println!("Multipart request without boundary!");
+            }
           }
           else {
-            while max > 0 {
+            // DEFAULT: Handle application/x-www-form-urlencoded
+            let mut max_i64 = max as i64; // Use i64 for compatibility with old logic
+            while max_i64 > 0 {
               let mut b_post = false; // Renamed b to b_post
               let mut buf = vec![];
               let n = read_until(&mut stream, b'=', &mut buf);
-              max -= n as i64;
+              max_i64 -= n as i64;
               let mut key = String::from_utf8_lossy(&buf).to_string();
               if key.ends_with("=") {
                 key = (&key[..n-1]).to_string();
@@ -209,7 +320,7 @@ pub fn http_listen() {
 
               buf = vec![];
               let n_val = read_until(&mut stream, b'&', &mut buf); // Renamed n to n_val
-              max -= n_val as i64;
+              max_i64 -= n_val as i64;
               let mut value = String::from_utf8_lossy(&buf).to_string();
               if value.ends_with("&") {
                 value = (&value[..n_val-1]).to_string();
@@ -1021,6 +1132,24 @@ fn read_until(reader: &mut TcpStream, c: u8, bufout: &mut Vec<u8>) -> usize {
   i
 }
 
+// Helper function to read a line as raw bytes (including \r\n)
+fn read_line_as_bytes(reader: &mut TcpStream) -> std::io::Result<Vec<u8>> {
+    let mut buf = [0];
+    let mut line: Vec<u8> = Vec::new();
+    loop {
+        match reader.read_exact(&mut buf) {
+            Ok(_) => {
+                line.push(buf[0]); // PUSH THE BYTE
+                if buf[0] == b'\n' {
+                    break; // Found \n
+                }
+            },
+            Err(e) => return if line.is_empty() { Err(e) } else { Ok(line) } // Return partial line on EOF
+        }
+    }
+    Ok(line)
+}
+
 pub fn format_result(command:Command, o:DataObject) -> DataObject {
   let mut d_formatted_result; // Renamed d to d_formatted_result
 
@@ -1053,3 +1182,57 @@ pub fn format_result(command:Command, o:DataObject) -> DataObject {
   if !d_formatted_result.has("status") { d_formatted_result.put_string("status", "ok"); }
 
   d_formatted_result
+}
+
+// Helper to parse MIME part headers
+fn parse_mime_headers(stream: &mut TcpStream) -> DataObject {
+    let mut headers = DataObject::new();
+    let mut last_key = "".to_string();
+    loop {
+        let line = read_line(stream); // read_line returns String, strips \r\n
+        if line.trim().is_empty() {
+            break; // End of headers
+        }
+        if line.starts_with(' ') || line.starts_with('\t') {
+            // Multi-line header
+            if !last_key.is_empty() {
+                let old_val = headers.get_string(&last_key);
+                headers.put_string(&last_key, &(old_val + "\r\n" + line.trim()));
+            }
+        } else {
+            if let Some(idx) = line.find(':') {
+                let key = line[..idx].to_uppercase().trim().to_string();
+                let val = line[idx+1..].trim().to_string();
+                headers.put_string(&key, &val);
+                last_key = key;
+            }
+        }
+    }
+    headers
+}
+
+// Helper to parse Content-Disposition header
+fn parse_content_disposition(disp: &str) -> (String, Option<String>) {
+    let mut name = "".to_string();
+    let mut filename = None;
+    for part in disp.split(';') {
+        let part = part.trim();
+        if part.starts_with("name=\"") {
+            name = part[6..part.len()-1].to_string();
+        } else if part.starts_with("filename=\"") {
+            filename = Some(part[10..part.len()-1].to_string());
+        }
+    }
+    (name, filename)
+}
+
+// Helper to trim \r\n from the end of a byte slice
+fn trim_bytes_crlf(bytes: &[u8]) -> &[u8] {
+    let mut end = bytes.len();
+    if end > 0 && bytes[end - 1] == b'\n' {
+        end -= 1;
+    }
+    if end > 0 && bytes[end - 1] == b'\r' {
+        end -= 1;
+    }
+    &bytes[..end]

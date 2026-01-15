@@ -880,7 +880,7 @@ pub fn get_relay(user: DataObject) -> Option<P2PConnection> {
 }
 
 
-pub fn relay(from_uuid: &str, to_uuid: &str, connected: bool) -> Option<P2PConnection> {
+pub fn relay(from_uuid: &str, to_uuid: &str, connected: bool) -> Option<(i64, P2PConnection, bool)> {
     do_init();
     let user_to = match get_user(to_uuid) {
         Some(u) => u,
@@ -890,7 +890,6 @@ pub fn relay(from_uuid: &str, to_uuid: &str, connected: bool) -> Option<P2PConne
         }
     };
     let user_connections = user_to.get_array("connections");
-
     {
         let p2pcons_guard = P2PCONS.get().read();
         for con_id_data in user_connections.objects() {
@@ -899,7 +898,8 @@ pub fn relay(from_uuid: &str, to_uuid: &str, connected: bool) -> Option<P2PConne
                     if let P2PStream::Relay(ref relay_stream) = p2p_conn_ref.stream {
                         if relay_stream.from == from_uuid && relay_stream.to == to_uuid {
                             if connected {
-                                return Some(p2p_conn_ref.duplicate());
+                                // Found existing connection. Return it with is_new = false.
+                                return Some((conid, p2p_conn_ref.duplicate(), false));
                             } else {
                                 let conn_to_shutdown = p2p_conn_ref.duplicate();
                                 drop(p2pcons_guard);
@@ -916,8 +916,9 @@ pub fn relay(from_uuid: &str, to_uuid: &str, connected: bool) -> Option<P2PConne
     if connected {
         let new_relay_stream = RelayStream::new(from_uuid.to_string(), to_uuid.to_string());
         let p2p_stream = P2PStream::Relay(new_relay_stream);
-        let (_conid, new_conn) = P2PConnection::begin(to_uuid.to_string(), p2p_stream);
-        return Some(new_conn);
+        // Create new connection. Return it with is_new = true.
+        let (conid, new_conn) = P2PConnection::begin(to_uuid.to_string(), p2p_stream);
+        return Some((conid, new_conn, true));
     }
     None
 }
@@ -1268,21 +1269,36 @@ pub fn handle_next_message(mut conn: P2PConnection) -> bool {
         }
 
     } else if method_str == "rcv " {
-        if decrypted_payload.len() < 4 + 36 + 2 { eprintln!("[HANDLE_NEXT_MSG SID {}] rcv payload too short", conn.sessionid); return false; }
+        if decrypted_payload.len() < 4 + 36 + 2 { 
+            eprintln!("[HANDLE_NEXT_MSG SID {}] rcv payload too short", conn.sessionid);
+            return false; 
+        }
         let from_uuid = String::from_utf8_lossy(&decrypted_payload[4..40]).into_owned();
         let sub_packet_len = i16::from_be_bytes(decrypted_payload[40..42].try_into().expect("[HANDLE_NEXT_MSG] rcv sub_packet_len slice error")) as usize;
-        if decrypted_payload.len() < 42 + sub_packet_len { eprintln!("[HANDLE_NEXT_MSG SID {}] rcv payload shorter than specified sub-packet length", conn.sessionid); return false; }
+        
+        if decrypted_payload.len() < 42 + sub_packet_len { 
+            eprintln!("[HANDLE_NEXT_MSG SID {}] rcv payload shorter than specified sub-packet length", conn.sessionid); 
+            return false;
+        }
+        
         let original_payload_with_len_prefix = &decrypted_payload[42 .. 42 + sub_packet_len];
-
-        if let Some(mut relay_conn_to_sender) = relay(&conn.uuid, &from_uuid, true) {
+        
+        if let Some((conid, mut relay_conn_to_sender, is_new)) = relay(&conn.uuid, &from_uuid, true) {
             if let P2PStream::Relay(ref mut relay_stream_to_sender) = relay_conn_to_sender.stream {
                 let data_to_buffer = DataBytes::from_bytes(&original_payload_with_len_prefix.to_vec());
+                
+                // 1. Always push data to the shared buffer
                 relay_stream_to_sender.buf.push_bytes(data_to_buffer);
                 relay_stream_to_sender.data.put_int("last_contact", time());
 
-                thread::spawn(move || {
-                    handle_next_message(relay_conn_to_sender);
-                });
+                // 2. Only spawn the handler thread if this is a fresh connection.
+                // The handle_connection loop will stay alive processing the buffer 
+                // until it empties and times out.
+                if is_new {
+                    thread::spawn(move || {
+                        handle_connection(conid, relay_conn_to_sender);
+                    });
+                }
             }
         }
 

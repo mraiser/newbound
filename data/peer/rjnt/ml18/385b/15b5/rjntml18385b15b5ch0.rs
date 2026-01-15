@@ -88,6 +88,9 @@ for (uuid, user) in users.objects(){
           let cons = o.get_object("connections");
           user.put_object("peers", cons.clone());
           
+          /**
+          * Disabled relay
+          *
           if get_tcp(user.clone()).is_some() {
             let users = system.get_object("users");
             for (uuid2,u) in users.objects() {
@@ -97,7 +100,9 @@ for (uuid, user) in users.objects(){
                 if b { relay(&uuid, &uuid2, b); }
               }
             }
-          }        
+          }
+          */
+          
           // Fixme - notify if something changes (latency?)
           fire_event("peer", "UPDATE", user_to_peer(user, uuid));
         }

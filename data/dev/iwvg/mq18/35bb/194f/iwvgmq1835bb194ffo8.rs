@@ -115,7 +115,10 @@ for lib in libs {
     let zipfile = devroot.join(&(lib.to_owned()+"_"+&(libversion-1).to_string()+".zip"));
     let _x = remove_file(zipfile);
     let zipfile = devroot.join(&(lib.to_owned()+"_"+&libversion.to_string()+".zip"));
-    zip(dir.to_owned(), zipfile.into_os_string().into_string().unwrap());
+    let success = zip(dir.to_owned(), zipfile.into_os_string().into_string().unwrap());
+    if !success {
+        panic!("Zip command failed! Please check if 'zip' is installed and in your PATH.");
+    }
     let h = hash(dir.to_owned());
     fs::write(hashfile, &h).expect("Unable to write file");
     

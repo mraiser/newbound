@@ -1,5 +1,6 @@
 use ndata::dataobject::DataObject;
 use ndata::data::Data;
+use std::io;
 use ndata::sharedmutex::SharedMutex;
 use std::net::UdpSocket;
 use std::sync::Once;
@@ -28,35 +29,147 @@ INIT_DISCOVERY_MUTEX.call_once(|| {
   let socket_address = "0.0.0.0:5770".to_string();
   let sock_res = UdpSocket::bind(&socket_address);
 
-  if let Ok(sock) = sock_res { // sock: UdpSocket
-    sock.set_broadcast(true).expect("DISCOVERY: Failed to set broadcast on socket");
+  match sock_res {
+    Ok(sock) => {
+      sock.set_broadcast(true).expect("DISCOVERY: Failed to set broadcast on socket");
 
-    unsafe {
-      DISCOVERY_SOCKET_MUTEX = Some(SharedMutex::new());
+      unsafe {
+        DISCOVERY_SOCKET_MUTEX = Some(SharedMutex::new());
+      }
+
+      let mutex_in_static_location = unsafe {
+        #[allow(static_mut_refs)]
+        DISCOVERY_SOCKET_MUTEX.as_mut().expect("Mutex should be Some after first init step")
+      };
+
+      mutex_in_static_location.set(sock);
+
+      println!("DISCOVERY UDP listening on port 5770");
+
+      thread::spawn(move || {
+        do_listen();
+      });
+
+      thread::spawn(move || {
+        do_send();
+      });
+    },
+    Err(e) if e.kind() == io::ErrorKind::AddrInUse => { // SLAVE PATH: Port is in use.
+      println!("DISCOVERY: Port 5770 in use. Starting in slave mode.");
+      thread::spawn(move || {
+        do_slave_work();
+      });
+    },
+    Err(e) => { // OTHER ERROR PATH
+      println!("DISCOVERY COULD NOT START. Error binding to {}: {:?}", socket_address, e);
     }
-
-    let mutex_in_static_location = unsafe {
-      #[allow(static_mut_refs)]
-      DISCOVERY_SOCKET_MUTEX.as_mut().expect("Mutex should be Some after first init step")
-    };
-
-    mutex_in_static_location.set(sock);
-
-    println!("DISCOVERY UDP listening on port 5770");
-
-    thread::spawn(move || {
-      do_listen();
-    });
-
-    thread::spawn(move || {
-      do_send();
-    });
-
-  } else {
-    println!("DISCOVERY COULD NOT START. Error binding to {}: {:?}", socket_address, sock_res.err());
   }
 });
 "OK".to_string()
+}
+
+fn do_slave_work() {
+  let mut system = DataStore::globals().get_object("system");
+
+  // Safely get nested DataObjects for this instance's information
+  let runtime: DataObject;
+  let meta: DataObject;
+  let config: DataObject;
+
+  if system.has("apps") {
+    let apps = system.get_object("apps");
+    if apps.has("app") && apps.get_object("app").has("runtime") {
+      runtime = apps.get_object("app").get_object("runtime");
+    } else {
+      println!("DISCOVERY (slave): Path system/apps/app/runtime not found. Slave thread cannot proceed.");
+      return;
+    }
+    if apps.has("peer") && apps.get_object("peer").has("runtime") {
+      meta = apps.get_object("peer").get_object("runtime");
+    } else {
+      println!("DISCOVERY (slave): Path system/apps/peer/runtime not found. Slave thread cannot proceed.");
+      return;
+    }
+  } else {
+    println!("DISCOVERY (slave): Path system/apps not found. Slave thread cannot proceed.");
+    return;
+  }
+
+  if system.has("config") {
+    config = system.get_object("config");
+  } else {
+    println!("DISCOVERY (slave): Path system/config not found. Slave thread cannot proceed.");
+    return;
+  }
+
+  let my_uuid = runtime.get_string("uuid");
+  let my_name = config.get_string("machineid");
+  let p2pport = Data::as_string(meta.get_property("port"))
+    .parse::<u16>()
+    .expect("DISCOVERY (slave): Failed to parse p2pport");
+  let httpport = Data::as_string(config.get_property("http_port"))
+    .parse::<u16>()
+    .expect("DISCOVERY (slave): Failed to parse httpport");
+
+  // Construct this instance's discovery packet to register with the master
+  let mut buf_template = my_uuid.as_bytes().to_vec();
+  buf_template.extend_from_slice(&p2pport.to_be_bytes());
+  buf_template.extend_from_slice(&httpport.to_be_bytes());
+  buf_template.extend_from_slice(my_name.as_bytes());
+
+  let master_addr = "127.0.0.1:5770";
+  let beat = Duration::from_millis(10000);
+
+  let socket = match UdpSocket::bind("0.0.0.0:0") {
+    Ok(s) => s,
+    Err(e) => {
+      println!("DISCOVERY (slave): Failed to bind to ephemeral port: {:?}", e);
+      return;
+    }
+  };
+  socket.set_read_timeout(Some(Duration::from_secs(2))).expect("DISCOVERY (slave): Failed to set read timeout");
+
+  while system.get_boolean("running") {
+    // 1. Register with master by sending our own discovery packet
+    if let Err(e) = socket.send_to(&buf_template, master_addr) {
+      println!("DISCOVERY (slave): Failed to send registration to master: {:?}", e);
+    }
+
+    // 2. Query master for the complete discovery list
+    if let Err(e) = socket.send_to(b"NEWBOUND_DISCOVERY_QUERY", master_addr) {
+      println!("DISCOVERY (slave): Failed to send query to master: {:?}", e);
+    }
+
+    // 3. Listen for the response
+    let mut recv_buf = [0; 65535]; // Buffer for the full discovery JSON
+    match socket.recv_from(&mut recv_buf) {
+      Ok((amt, _src)) => {
+        // 4. Update local DataStore with the data from the master
+        let json_str = String::from_utf8_lossy(&recv_buf[..amt]);
+        match DataObject::try_from_string(&json_str) {
+          Ok(received_data) => {
+            system.put_object("discovery", received_data);
+          },
+          Ok(_) => {
+            println!("DISCOVERY (slave): Received data from master is not a DataObject.");
+          },
+          Err(e) => {
+             println!("DISCOVERY (slave): Failed to parse JSON from master: {:?}. Received: {}", e, json_str);
+          }
+        }
+      },
+      Err(e) if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut => {
+        // This is an expected timeout if the master doesn't respond.
+      },
+      Err(e) => {
+        println!("DISCOVERY (slave): Error receiving data from master: {:?}", e);
+      }
+    }
+
+    // 5. Sleep and repeat
+    thread::sleep(beat);
+   }
+   println!("DISCOVERY (slave): Loop terminated as system.running is false.");
 }
 
 fn do_send() {
@@ -181,6 +294,14 @@ fn do_listen() {
         match socket_clone.recv_from(&mut recv_buf) {
           Ok((amt, src)) => {
             let data_slice = &recv_buf[..amt];
+            
+            if data_slice == b"NEWBOUND_DISCOVERY_QUERY" {
+              let discovery_json = &discovery_data_obj.to_string();
+              if let Err(e) = socket_clone.send_to(discovery_json.as_bytes(), src) {
+                println!("DISCOVERY (listen): Failed to send discovery data to slave {}: {:?}", src, e);
+              }
+              continue;
+            }
 
             if data_slice.len() < 40 {
               // println!("DISCOVERY (listen): Received packet too short ({} bytes) from {}", data_slice.len(), src);

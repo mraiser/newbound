@@ -13,7 +13,7 @@ pub fn initialize_all_commands(magic: (&'static str, NDataConfig)) {
 
     // Initialize crate: newbound_core
     {
-        let mut cmds = Vec::new();
+        let mut cmds = Vec::<(String, Transform, String)>::new();
         newbound_core::cmdinit(&mut cmds);
         for q in cmds {
             let cmd_details = RustCmd::detail(q.0.to_owned(), q.1, q.2.to_owned());

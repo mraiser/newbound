@@ -31,7 +31,7 @@ if store.exists(lib, id) {
       let ocmdid = cmd.get_string("id");
       let name = cmd.get_string("name");
       let cmd = store.get_data(lib, &ocmdid).get_object("data");
-      let lang = cmd.get_string("type");
+      let lang = cmd.try_get_string("type").unwrap_or(cmd.try_get_string("lang").unwrap_or("java".to_string()));
       let cmdid = cmd.get_string(&lang);
       let cmd = store.get_data(lib, &cmdid).get_object("data");
       let params;
@@ -46,15 +46,16 @@ if store.exists(lib, id) {
       for p in params.objects(){
         let p = p.object();
         // FIXME
-        let typ = p.get_string("type");
-        if typ != "Bot" && typ != "Data" {
-          let n = &p.get_string("name");
-          js += n;
-          js += ", ";
-          if args != "{" { args += ", "; }
-          args += n;
-          args += ": ";
-          args += n;
+        if let Ok(typ) = p.try_get_string("type") {
+          if typ != "Bot" && typ != "Data" {
+            let n = &p.get_string("name");
+            js += n;
+            js += ", ";
+            if args != "{" { args += ", "; }
+            args += n;
+            args += ": ";
+            args += n;
+          }
         }
       }
       args += "}";
@@ -69,7 +70,7 @@ if store.exists(lib, id) {
       js += &hex_encode(lib.to_string());
       js += "&id=";
       js += &hex_encode(ocmdid);
-      js += "&args='+args, function(result){\n    xxxxxcb(result);\n  });\n";
+      js += "&args='+args, function(result){\n    if (typeof xxxxxcb == 'function') xxxxxcb(result);\n  });\n";
       js += "}\n";
     }
   }
