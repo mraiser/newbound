@@ -28,6 +28,8 @@ hot-lib-reloader = { version = "^0.7", optional = true }
 aes = "^0.8"
 blake2 = "^0.10"
 libloading = "0.8"
+notify = "6.1.1"
+notify-debouncer-full = "0.3.1"
 
 [[bin]]
 name = "newbound"
