@@ -39,6 +39,7 @@
 
     // Extract settings from meta_do.cargo object
     // Note: library_root is no longer sourced from here.
+    let mut ffi_output = false;   // cargo.ffi — see the read below
     let mut response_types_array_output = DataArray::new(); // Made mutable
     let mut dependencies_string_lines_output: Vec<String> = Vec::new();
 
@@ -46,6 +47,19 @@
         let cargo_prop = meta_do.get_property("cargo");
         if cargo_prop.is_object() {
             let cargo_do = meta_do.get_object("cargo"); // cargo_do is a new handle
+
+            // Get "ffi" from cargo.ffi — the flag that makes this library's
+            // crate a hot-loadable dylib (and excludes it from the cargo
+            // workspace). Absent means false; a non-boolean is reported false
+            // rather than panicking the read.
+            if cargo_do.has("ffi") {
+                let ffi_prop = cargo_do.get_property("ffi");
+                if ffi_prop.is_boolean() {
+                    ffi_output = cargo_do.get_boolean("ffi");
+                } else {
+                    eprintln!("WARN: 'cargo.ffi' in meta.json for '{}' is not a boolean.", library_id);
+                }
+            }
 
             // Get "library_types" from cargo.crate_types
             if cargo_do.has("crate_types") {
@@ -94,6 +108,7 @@
     }
 
     // library_root is already put as "root"
+    config_response_do.put_boolean("ffi", ffi_output);
     config_response_do.put_array("library_types", response_types_array_output); // response_types_array_output is moved
     config_response_do.put_string("library_dependencies", &dependencies_string_lines_output.join("\n"));
 

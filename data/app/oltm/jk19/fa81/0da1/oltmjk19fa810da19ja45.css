@@ -1,0 +1,35 @@
+/* sceneplayer — a scene facet running standalone (scene-facet-design Part X,
+   SC-Q5's first half): play mode minus the editor chrome. */
+
+.nb-sceneplayer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+}
+.nb-sceneplayer .sp-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: radial-gradient(1200px 500px at 50% -10%, #232a31 0%, #171a1e 70%);
+}
+.nb-sceneplayer .sp-canvas .ss-label {
+  color: var(--text, #d8dee6);
+  background: color-mix(in srgb, var(--panel, #1f242a) 82%, transparent);
+  border: 1px solid var(--line, #333b44);
+  border-radius: 5px;
+  padding: 1px 7px;
+  white-space: nowrap;
+  user-select: none;
+}
+.nb-sceneplayer .sp-foot {
+  display: flex;
+  gap: 10px;
+  padding: 3px 8px;
+  border-top: 1px solid var(--line, #333b44);
+  color: var(--text-dim, #8a94a0);
+  font-size: 11px;
+}
+.nb-sceneplayer .sp-diag { color: var(--accent, #f0a63c); }

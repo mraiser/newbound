@@ -1,0 +1,165 @@
+.nb-frame {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: 52px;
+  padding: 0 18px;
+  flex: none;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  position: relative;
+  z-index: 40;
+}
+.nb-frame .fr-wordmark {
+  color: inherit;
+  text-decoration: none;
+  font-family: var(--disp);
+  font-size: 17px;
+  letter-spacing: 0.22em;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.nb-frame .fr-wordmark:hover { color: var(--accent); }
+.nb-frame .fr-wordmark .hex { color: var(--accent); font-size: 13px; }
+.nb-frame .fr-crumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 13px var(--mono);
+}
+.nb-frame .seg { color: var(--text-dim); padding: 4px 8px; border-radius: 6px; }
+.nb-frame button.seg:hover { color: var(--accent); }
+.nb-frame .seg.on { color: var(--text); background: var(--panel-2); }
+.nb-frame .sep { color: var(--text-faint); }
+.nb-frame .fr-cap {
+  font: 10px var(--mono);
+  color: var(--text-faint);
+  letter-spacing: 0.06em;
+  margin-left: 4px;
+}
+.nb-frame .fr-spacer { flex: 1; }
+.nb-frame .fr-session {
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: 11px var(--mono);
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+.nb-frame .fr-session:hover { color: var(--text); border-color: var(--text-faint); }
+.nb-frame .fr-session.on {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+  background: rgba(240, 166, 60, 0.07);
+}
+.nb-frame .fr-conn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: 11px var(--mono);
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+.nb-frame .fr-conn:hover { color: var(--text); border-color: var(--text-faint); }
+.nb-frame .conn-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.nb-frame .fr-conn.ok .conn-dot { background: var(--good); }
+
+.fr-stage {
+  position: fixed;
+  inset: 52px 0 0 0;
+  overflow: hidden;
+}
+
+/* connect dialog — the one blocking overlay (DESIGN §5.7) */
+.fr-connect {
+  margin: auto;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
+}
+.fr-connect::backdrop { background: rgba(13, 15, 18, 0.7); }
+.fr-connect .cn-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px 26px;
+  min-width: 420px;
+}
+.fr-connect .cn-modes { display: flex; gap: 8px; }
+.fr-connect .cn-mode {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: 12px var(--mono);
+  color: var(--text-dim);
+  text-align: left;
+}
+.fr-connect .cn-mode.on {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+  background: rgba(240, 166, 60, 0.07);
+}
+.fr-connect .cn-live { display: flex; flex-direction: column; gap: 8px; }
+.fr-connect input {
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: 12px var(--mono);
+  color: var(--text);
+}
+.fr-connect input::placeholder { color: var(--text-faint); }
+.fr-connect .cn-writable {
+  text-align: left;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: 12px var(--mono);
+  color: var(--text-dim);
+}
+.fr-connect .cn-writable.on {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: rgba(193, 90, 90, 0.08);
+}
+.fr-connect .cn-warn {
+  font-size: 11.5px;
+  color: var(--danger);
+  line-height: 1.5;
+  max-width: 48ch;
+}
+.fr-connect .cn-warn b { font-weight: 700; }
+.fr-connect .cn-actions { display: flex; gap: 9px; }
+.fr-connect .cn-go {
+  background: var(--accent);
+  color: #241a08;
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: 8px;
+  padding: 8px 18px;
+}
+.fr-connect .cn-cancel {
+  font-size: 13px;
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 14px;
+}
+.fr-connect .cn-err { color: var(--danger); font-size: 12px; max-width: 46ch; }
+
+/* the hidden attribute must always win (see tokens.css) */
+.nb-frame [hidden],
+.fr-connect [hidden] { display: none !important; }

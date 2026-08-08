@@ -1,131 +1,135 @@
-var me = this;
-var ME = $('#'+me.UUID)[0];
-me.uiReady = function(ui){
-  me.ui = ui;
-  ui.initPopups(ME);
-  $(ME).find('.wrap').css('display', 'block');
+// dev — the Development app's boot (the R-2 flip: this control's facets
+// ARE the app the platform serves at /dev/; its commands — compile,
+// rebuild_lib, lib_archive… — predate the boot and stay). It runs under
+// the STOCK mount: the shell's body is a data-control that
+// activateControls wraps as `el.api = new function(){ ...this facet... }`,
+// so this file is CLASSIC-script code — no import/export statements;
+// dynamic import() only.
+//
+// The module world (2026-07-30, the owner's design — first-class in
+// api.js): shared ES modules are MODULE CONTROLS — ordinary controls whose
+// record carries `module: true` (agent.code.set_module_flag). Installing a
+// flagged control registers its js facet as a named ES module on the page
+// (api.js: promise registry, order-free, css facets inject once) instead
+// of mounting UI. So this boot simply INSTALLS the two cluster controls —
+// app.modules and dev.devmodules, whose html facets list module divs (the
+// platform's own nested-composition idiom) — try-installs the OPTIONAL
+// agent add-on, then hands the loader the union control directory. There
+// is no manifest anywhere: what a page installs IS its module world. The
+// static entry (index.html, repo-only) never runs this — it imports
+// ./assets/loader.js off real files.
 
-  // --- Dark Mode Logic ---
-  const darkModePref = localStorage.getItem('darkMode');
-  const toggle = $(ME).find('#dark-mode-switch-dev');
+(async () => {
+  const host = document.querySelector(".nb-bench-boot") || document.body;
+  const fail = (msg) => {
+    host.innerHTML = "";
+    const p = document.createElement("p");
+    p.className = "nb-boot-err";
+    p.textContent = "development failed to boot: " + msg +
+      "\n\nIf this is a session problem, sign in via the instance's own UI " +
+      "(the sessionid cookie) and reload. If modules are missing, rerun " +
+      "tools/install-bench.py against this instance.";
+    host.appendChild(p);
+  };
+  try {
+    // The shell's body carries {"lib","id"} — this boot control's own library.
+    let lib = "dev";
+    try {
+      const dc = JSON.parse(document.body.dataset.control);
+      if (dc && dc.lib) lib = dc.lib;
+    } catch (e) { /* not the published shell — keep the default */ }
 
-  if (darkModePref === 'enabled') {
-    $('body').addClass('dark');
-    toggle.prop('checked', true);
-  }
+    const read = async (l, id) => {
+      const r = await fetch("/app/read?lib=" + encodeURIComponent(l) +
+                            "&id=" + encodeURIComponent(id));
+      const j = await r.json();
+      if (j.status !== "ok") throw new Error(j.msg || "app/read failed");
+      return j;
+    };
 
-  toggle.on('change', function() {
-    if ($(this).is(':checked')) {
-      $('body').addClass('dark');
-      localStorage.setItem('darkMode', 'enabled');
-    } else {
-      $('body').removeClass('dark');
-      localStorage.setItem('darkMode', 'disabled');
+    // 0. declare the platform environment BEFORE the module world builds:
+    //    a module may read it at import time (the loader's module-level
+    //    ROOT), and imports run as installs complete — so the object must
+    //    exist first and is FILLED IN PLACE below.
+    const bench = globalThis.__benchPlatform = {
+      lib, moduleUrls: {}, controls: {},
+      assetRoots: { "vendor/nb_three": "/app/asset/app/",
+                    "vendor/nb_codemirror": "/app/asset/dev/" },
+    };
+
+    // 1. the module world: install the cluster controls — controls
+    //    installing controls; each flagged child registers itself with
+    //    api.js, and the registry resolves inter-module imports whenever
+    //    each arrives (order-free)
+    const install = (l, n, el) => new Promise((res) => installControl(el || null, l, n, res));
+    const holder = document.createElement("div");
+    holder.hidden = true;
+    host.appendChild(holder);
+    const clusterEl = () => {
+      const d = document.createElement("div");
+      holder.appendChild(d);
+      return d;
+    };
+    const pluginHolder = document.createElement("div");
+    pluginHolder.id = "devpluginholder";
+    pluginHolder.hidden = true;
+    holder.appendChild(pluginHolder);
+    await Promise.all([
+      install("app", "modules", clusterEl()),
+      install(lib, "devmodules", clusterEl()),
+    ]);
+
+    // 2. the union control directory (cross-library mounts, R-1): one
+    //    index read per library the IDE spans; first library wins a name
+    const libs = [lib, "app", "agent"];
+    for (const l of libs) {
+      try {
+        const idx = await read(l, "controls");
+        for (const c of (idx.data.list || [])) {
+          if (!bench.controls[c.name]) bench.controls[c.name] = { lib: l, id: c.id };
+        }
+      } catch (e) { /* a library may be absent (the agent add-on) */ }
     }
-  });
-  // --- End Dark Mode Logic ---
 
-  me.build();
-};
-me.build = function(cb) {
-  json('../app/libs', null, function(result){
-    if (result.status != "ok") alert(result.msg);
-    else {
-      var libs = me.list = result.data;
-      libs.sort((a, b) => (a.id > b.id) ? 1 : -1);
-      var newhtml = '<table class="libstable tablelist">';
-//      newhtml += '<thead><tr><th>Library</th></tr></thead>';
-      newhtml += '<tbody class="publish-liblist">';
-      for (var i in libs){
-        var lib = libs[i];
-        if (lib.id) {
-          newhtml += '<tr data-lib="'+lib.id+'" class="publibid">'
-            + '<td>'
-            + lib.id
-            + '</td></tr>';
-        }
-        else console.log(lib);
-      }
-      newhtml += '</tbody></table>';
-      $(ME).find(".liblist").html(newhtml).find('.publibid').click(function(){
-        var lib = getByProperty(me.list, "id", $(this).data("lib"));
-        var el = $(ME).find('.scrollme2');
-        installControl(el[0], 'dev', 'libinfo', function(api){}, lib);
-      });
-      
-      var lib = getQueryParameter('lib');
-      if (lib && lib != 'null') { // FIXME - WTF?
-        lib = getByProperty(me.list, "id", lib);
-        var el = $(ME).find('.scrollme2');
-        installControl(el[0], 'dev', 'libinfo', function(api){}, lib);
-        var loc = window.location.href;
-        var i = loc.indexOf('?');
-        loc = loc.substring(0,i);
-        window.history.pushState(lib, "Libraries", loc);
-      }
-      
-      if (cb) cb();
-    }
-  });
-};
-$(ME).find('.importlibrarybutton').click(function(e){
-  window.location.href='github.html';
-});
-$(ME).find('.addlibrarybutton').click(function(e){
-  var data = {
-    title:'New Library',
-    text:'New library name',
-    subtext:'lowercase letters, numbers, and underscores only.',
-    clientX:e.clientX,
-    clientY:e.clientY,
-    cancel:'cancel',
-    ok:'create',
-    validate:function(val){
-      if (val.length == 0) {
-        document.body.api.ui.snackbar({"message": "Invalid characters"});
-        return false;
-      }
-      var validchars = 'abcdefghijklmnopqrstuvwxyz_0123456789';
-      var i = val.length;
-      while (i-->0) if (validchars.indexOf(val.charAt(i)) == -1) {
-        document.body.api.ui.snackbar({"message": "Invalid characters"});
-        return false;
-      }
-      return true;
-    },
-    cb: function(val){
-      json('../app/newlib', 'lib='+encodeURIComponent(val)+'&writers=[]&readers='+encodeURIComponent(JSON.stringify(["anonymous"])), function(result){
-        me.build(function(){
-          var lib = getByProperty(me.list, 'id', val);
-          installControl($(ME).find('.scrollme2')[0], 'dev', 'libinfo', function(){}, lib);
-        });
-      });
-    }
-  };
-  document.body.api.ui.prompt(data);
-});
-$(ME).find('.open-library-settings').click(function(){
-  json('../app/read', 'lib=runtime&id=metaidentity', function(result){
-    if (result.status != 'ok' && result.msg == 'No such database') {
-      json('../app/newlib', 'lib=runtime', load);
-    }
-    else {
-      var data = result.data;
-      if (!data) data = { 'displayname':'Some Dev', organization:'' };
-      
-      $('#devname').val(data.displayname);
-      $('#devorg').val(data.organization);
-      
-      json('../app/deviceid', null, function(result){
-        $('#editidentityuuid').text(result.msg);
-        document.body.MYUUID = result.msg;
-      });
-    }
-  });
-});
-$('#savemyidentity').click(function(){
-  var data = { 'displayname':$('#devname').val(), organization:$('#devorg').val() };
-  json('../app/write', 'readers=[]&writers=[]&lib=runtime&id=metaidentity&data='+encodeURIComponent(JSON.stringify(data)), function(result){
-    if (result.status != 'ok') alert('ERROR: '+result.msg);
-  });
-});
+    // 3. THE PLUGIN PASS (the owner's mechanism, revived): entries in
+    //    runtime/dev/plugins.json targeting THIS control (dev.dev) install
+    //    now, before the frame — so a plugin's module cluster (the agent
+    //    notebook) is registered by the time anything checks for it.
+    //    Boot-level plugins are HEADLESS by nature: the boot wipes the host
+    //    before mounting the frame, so UI plugins should target bench
+    //    surfaces instead (the loader runs this same pass per mount).
+    try {
+      const pid = (bench.controls["plugins"] || {}).id;
+      if (pid) {
+        const prec = await read("dev", pid);
+        const pcmd = (prec.data.cmd || []).find((c) => c.name === "list_plugins");
+        if (pcmd) {
+          const pr = await fetch("/app/exec?lib=dev&id=" + encodeURIComponent(pcmd.id) +
+                                 "&args=" + encodeURIComponent("{}"));
+          const pj = await pr.json();
+          const entries = (pj && pj.status === "ok" && pj.data) ? pj.data : {};
+          const mounts = [];
+          for (const key of Object.keys(entries)) {
+            const e = entries[key] || {};
+            if (e.target_lib !== lib || e.target_ctl !== lib) continue;
+            const slot = (e.selector && document.querySelector(e.selector)) || pluginHolder;
+            mounts.push(new Promise((res) => installControl(slot, e.plugin_lib, e.plugin_ctl, res)));
+          }
+          await Promise.all(mounts);
+        }
+      }
+    } catch (e) { /* no plugin registry on this instance — nothing to mount */ }
+
+    // 4. what the loader consumes: module urls straight from the page's
+    //    REGISTRY (api.js NB_MODULES) — filled into the declared object
+    for (const n of Object.keys(NB_MODULES)) {
+      if (NB_MODULES[n].url) bench.moduleUrls["assets/" + n + ".js"] = NB_MODULES[n].url;
+    }
+
+    const loader = await requireModule("loader");
+    host.innerHTML = "";
+    await loader.mountControl("frame", host);
+  } catch (e) {
+    fail(e && e.message ? e.message : String(e));
+  }
+})();

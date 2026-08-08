@@ -33,15 +33,31 @@ pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
   o.put_string("id", &id);
   o.put_string("name", &o.get_string("displayname"));
   
-  // FIXME - Each call gets the same lock
-  let tcp = get_tcp(o.clone()).is_some();
-  let udp = get_udp(o.clone()).is_some();
-  let relay = get_relay(o.clone()).is_some();
+  // One lookup per transport (the old code called each twice - once for the
+  // flag, and the connection was needed again for last_contact).
+  let tcpc = get_tcp(o.clone());
+  let udpc = get_udp(o.clone());
+  let relayc = get_relay(o.clone());
+  let tcp = tcpc.is_some();
+  let udp = udpc.is_some();
+  let relay = relayc.is_some();
   let connected = tcp || udp || relay;
-  
+
+  // last_contact: epoch ms of the most recent traffic on whichever transport
+  // is up, 0 when nothing is connected. NOTE a P2PStream::Tcp reports time()
+  // - TCP keeps no per-read stamp - so a live TCP peer always reads "now";
+  // only UDP and relay carry a real age. Clients must treat 0 as unknown.
+  let last_contact = match (&tcpc, &udpc, &relayc) {
+    (Some(c), _, _) => c.last_contact(),
+    (_, Some(c), _) => c.last_contact(),
+    (_, _, Some(c)) => c.last_contact(),
+    _ => 0,
+  };
+
   o.put_boolean("tcp", tcp);  
   o.put_boolean("udp", udp);  
   o.put_boolean("relay", relay);  
   o.put_boolean("connected", connected);  
+  o.put_int("last_contact", last_contact);
 
   o

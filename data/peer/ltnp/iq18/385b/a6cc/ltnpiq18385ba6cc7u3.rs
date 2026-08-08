@@ -4,7 +4,7 @@ if stream.is_ok() {
   let stream = stream.unwrap();
   //let remote_addr = stream.peer_addr().unwrap();
   //println!("P2P TCP outgoing request to {}", remote_addr);
-  let mut stream = P2PStream::Tcp(stream);
+  let mut stream = P2PStream::Tcp(Arc::new(stream), Arc::new(Mutex::new(())));
   let con = handshake(&mut stream, Some(uuid));
   if con.is_some() {
     thread::spawn(move || {

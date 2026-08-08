@@ -1,0 +1,84 @@
+<section class="nb-floweditor3d" tabindex="0">
+  <aside class="fx-palette">
+    <span class="lbl">node kinds</span>
+    <button class="fx-pal-item" data-kind="primitive"><span class="glyph" aria-hidden="true">⚙</span>primitive</button>
+    <button class="fx-pal-item" data-kind="command"><span class="glyph" aria-hidden="true">▤</span>command call</button>
+    <button class="fx-pal-item" data-kind="local"><span class="glyph" aria-hidden="true">▣</span>local sub-flow</button>
+    <button class="fx-pal-item" data-kind="constant"><span class="glyph" aria-hidden="true">◇</span>constant / matcher</button>
+    <button class="fx-pal-item" data-kind="persistent"><span class="glyph" aria-hidden="true">⛃</span>persistent slot</button>
+    <button class="fx-pal-item" data-kind="undefined"><span class="glyph" aria-hidden="true">▢</span>blank (undefined)</button>
+    <button class="fx-pal-item" data-kind="barterm"><span class="glyph" aria-hidden="true">⌘</span>params / return</button>
+    <p class="fx-layout-lbl lbl" hidden>auto-layout · a proposal</p>
+    <div class="fx-layout-btns" hidden>
+      <button class="fx-layout-btn" data-layout="tidy" title="layered y + barycenter x; z untouched">tidy</button>
+      <button class="fx-layout-btn" data-layout="untangle" title="same layering; independent subgraphs fan out in z">untangle</button>
+    </div>
+    <p class="fx-pal-note">The graph is the code, in space. Data falls −Y from
+      any angle; z untangles. Legacy graphs (all z=0) sit flat — press
+      <kbd>2</kbd> for the front-orthographic view, which reproduces the 2D
+      viewer exactly. <span class="fx-edit-note" hidden>Editing is on: drag a
+      palette kind into the scene (onto a wire to splice), drag ops to move,
+      drag an output socket to wire — or select one and press <kbd>W</kbd> to
+      wire from the keyboard. <kbd>Enter</kbd> edits the selection.
+      Every save is a journaled patch.</span><span class="fx-ro-note">Editing
+      needs a writable live connection; this is the viewer.</span></p>
+    <p class="fx-keys lbl">keys</p>
+    <ul class="fx-keys-list">
+      <li><kbd>drag empty</kbd> orbit · <kbd>space+drag</kbd> pan · <kbd>wheel</kbd> zoom</li>
+      <li><kbd>2</kbd> front-ortho · <kbd>3</kbd> perspective</li>
+      <li><kbd>F</kbd> frame selection · <kbd>A</kbd> frame deck</li>
+      <li><kbd>[</kbd> <kbd>]</kbd> walk case chain · <kbd>Tab</kbd> walk ops</li>
+      <li><kbd>dblclick</kbd> drill local · <kbd>Esc</kbd> back / clear</li>
+      <li class="fx-edit-keys" hidden><kbd>Enter</kbd> edit popover · <kbd>drag op</kbd> move · <kbd>alt+drag</kbd> depth / terminal</li>
+      <li class="fx-edit-keys" hidden><kbd>drag ▽socket</kbd> wire · <kbd>Del</kbd> wire/op · <kbd>⌘Z</kbd> undo · <kbd>⌘S</kbd> save</li>
+      <li class="fx-edit-keys" hidden><kbd>W</kbd> wire from the selection · <kbd>←</kbd><kbd>→</kbd> choose a legal target · <kbd>Enter</kbd> commits</li>
+    </ul>
+  </aside>
+
+  <div class="fx-main">
+    <div class="fx-head">
+      <button class="fx-back" title="Back">←</button>
+      <span class="fx-title"></span>
+      <span class="fx-crumbs"></span>
+      <span class="fx-spacer"></span>
+      <span class="fx-status" role="status"></span>
+      <span class="fx-decks" role="tablist" aria-label="case chain"></span>
+      <button class="fx-proj" aria-pressed="false" title="Front-orthographic (2) / perspective (3)">persp</button>
+      <button class="fx-frame" title="Frame the deck (A)">frame</button>
+      <button class="fx-run" hidden title="Run this flow (invoke_command) and watch the deliveries">run ▸</button>
+      <button class="fx-save" hidden title="Save the flow (⌘S) — a journaled write">save</button>
+    </div>
+    <div class="fx-stage">
+      <div class="fx-labels" aria-hidden="true"></div>
+      <div class="fx-tag" hidden></div>
+      <div class="fx-conflict" hidden>
+        <span class="fx-conflict-msg"></span>
+        <button class="fx-conflict-theirs">load theirs</button>
+        <button class="fx-conflict-mine">overwrite (mine)</button>
+      </div>
+      <div class="fx-layout-bar" hidden>
+        <span class="fx-layout-msg"></span>
+        <button class="fx-layout-apply">apply</button>
+        <button class="fx-layout-cancel">cancel</button>
+      </div>
+      <div class="fx-fallback" hidden></div>
+    </div>
+  </div>
+
+  <aside class="fx-inspect">
+    <span class="lbl">inspector</span>
+    <div class="fx-inspect-body">
+      <p class="fx-empty">Select an element. Local sub-flows drill in on
+        double-click — you are inside the program, not looking at a picture
+        of it.</p>
+    </div>
+    <div class="fx-diag" hidden>
+      <span class="lbl">diagnostics · this case</span>
+      <ul class="fx-diag-list"></ul>
+    </div>
+    <div class="fx-journal" hidden>
+      <span class="lbl">journal · this flow</span>
+      <ul class="fx-journal-list"></ul>
+    </div>
+  </aside>
+</section>

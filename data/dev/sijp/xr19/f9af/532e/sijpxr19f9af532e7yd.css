@@ -1,0 +1,565 @@
+.nb-workbench {
+  display: grid;
+  /* the preview's width is one custom property, so the drag handle, the
+     collapse and the fullscreen state are all just different values of it */
+  grid-template-columns: var(--pv-w, 400px) 1fr;
+  grid-template-rows: 1fr auto;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+.nb-workbench.pv-off { grid-template-columns: 0 1fr; }
+.nb-workbench.pv-off .wb-left { display: none; }
+.nb-workbench.pv-full { grid-template-columns: 1fr 0; }
+.nb-workbench.pv-full .wb-right { display: none; }
+/* A wide grab target over a hairline: the pointer wants ~9px, the eye wants
+   1px. The handle sits ON the column boundary rather than inside either
+   pane, so neither pane's overflow can clip it. */
+.nb-workbench .wb-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--pv-w, 400px);
+  width: 9px;
+  margin-left: -5px;
+  cursor: col-resize;
+  z-index: 6;
+  background: none;
+  border: none;
+}
+.nb-workbench .wb-resize::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: transparent;
+}
+.nb-workbench .wb-resize:hover::before,
+.nb-workbench .wb-resize:focus-visible::before { background: var(--accent); }
+.nb-workbench.pv-off .wb-resize,
+.nb-workbench.pv-full .wb-resize { display: none; }
+.nb-workbench.wb-resizing { cursor: col-resize; user-select: none; }
+.nb-workbench .wb-left {
+  grid-row: 1;
+  grid-column: 1;
+  border-right: 1px solid var(--line);
+  padding: 26px 28px;
+  overflow: auto;
+}
+.nb-workbench .wb-right {
+  grid-row: 1;
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.nb-workbench .wb-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 26px 0;
+  flex-wrap: wrap;
+}
+.nb-workbench .wb-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: 9px 9px 0 0;
+  font: 11.5px var(--mono);
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  background: var(--panel);
+}
+.nb-workbench .wb-chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+.nb-workbench .wb-chip:hover { color: var(--text); }
+.nb-workbench .wb-chip.on {
+  color: var(--text);
+  background: var(--panel-2);
+  border-color: var(--text-faint);
+}
+.nb-workbench .wb-chip.absent { opacity: 0.45; }
+.nb-workbench .wb-chip .cnt { font-size: 9px; color: var(--text-faint); }
+.nb-workbench .wb-chip .dirty { color: var(--accent); font-size: 13px; line-height: 0; }
+.nb-workbench .wb-chip.flash { animation: nb-chipflash 0.6s ease 2; }
+@keyframes nb-chipflash {
+  50% { border-color: var(--accent); color: var(--accent); }
+}
+.nb-workbench .wb-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nb-workbench .wb-rostate { font: 10.5px var(--mono); color: var(--text-faint); }
+.nb-workbench .wb-save {
+  font: 11px var(--mono);
+  letter-spacing: 0.05em;
+  background: var(--accent);
+  color: #241a08;
+  font-weight: 600;
+  border-radius: 7px;
+  padding: 7px 14px;
+}
+.nb-workbench .wb-save:disabled { opacity: 0.4; cursor: default; }
+
+.nb-workbench .wb-conflict {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 26px 0;
+  padding: 9px 14px;
+  border: 1px solid var(--accent-dim);
+  background: rgba(240, 166, 60, 0.08);
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+.nb-workbench .wb-conflict button {
+  font: 11px var(--mono);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 10px;
+  color: var(--text);
+}
+.nb-workbench .wb-conflict button:hover { border-color: var(--accent); }
+
+.nb-workbench .wb-pane {
+  flex: 1;
+  margin: 8px 26px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--text-faint);
+  border-radius: 0 10px 10px 10px;
+  overflow: auto;
+}
+.nb-workbench .wb-editors { height: 100%; }
+.nb-workbench .wb-editors > div { height: 100%; }
+.nb-workbench .wb-editors > div[hidden] { display: none; }
+.nb-workbench .wb-note {
+  padding: 14px 18px 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  max-width: 62ch;
+}
+.nb-workbench .wb-note code { font-family: var(--mono); font-size: 11px; }
+.nb-workbench .wb-cmd-rows { padding: 8px 0; }
+.nb-workbench .wb-cmd-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--line-soft);
+  font: 12.5px var(--mono);
+}
+.nb-workbench .wb-cmd-row:last-child { border-bottom: none; }
+.nb-workbench .wb-cmd-row .cname { color: var(--text); min-width: 140px; }
+.nb-workbench .wb-cmd-type {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2.5px 7px;
+  border-radius: 4px;
+  color: var(--ground);
+  font-weight: 700;
+  background: var(--text-dim);
+}
+.nb-workbench .wb-cmd-type.t-rust { background: var(--f-data); }
+.nb-workbench .wb-cmd-type.t-js { background: var(--f-js); }
+.nb-workbench .wb-cmd-type.t-java { background: var(--f-css); }
+.nb-workbench .wb-cmd-type.t-python { background: var(--f-3d); }
+.nb-workbench .wb-cmd-type.t-flow { background: var(--f-cmd); }
+.nb-workbench .wb-cmd-open {
+  margin-left: auto;
+  font: 11px var(--mono);
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+.nb-workbench .wb-cmd-open:hover { background: rgba(240, 166, 60, 0.1); }
+.nb-workbench .wb-cmd-open.wb-cmd-del { color: var(--danger); border-color: var(--danger); }
+.nb-workbench .wb-phase {
+  display: inline-block;
+  margin: 16px 18px 0;
+  font: 9px var(--mono);
+  letter-spacing: 0.12em;
+  color: var(--f-3d);
+  border: 1px solid var(--f-3d);
+  border-radius: 99px;
+  padding: 3px 9px;
+}
+.nb-workbench .wb-three-slot { padding: 4px 0 14px; height: 60%; }
+.nb-workbench .wb-scene { height: 100%; min-height: 420px; }
+.nb-workbench .wb-scene-slot { height: 100%; }
+.nb-workbench .wb-absent {
+  padding: 24px 18px;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+
+/* local history strip */
+.nb-workbench .wb-history {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  padding: 9px 28px;
+  overflow-x: auto;
+}
+.nb-workbench .wb-hist-chips { display: flex; gap: 8px; }
+.nb-workbench .wb-hist-chip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font: 10.5px var(--mono);
+  color: var(--text-dim);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 5px 11px;
+}
+.nb-workbench .wb-hist-chip:hover { border-color: var(--accent-dim); color: var(--text); }
+.nb-workbench .wb-hist-chip .hdot { width: 7px; height: 7px; border-radius: 50%; }
+.nb-workbench .wb-hist-cap {
+  margin-left: auto;
+  flex: none;
+  font: 10px var(--mono);
+  color: var(--text-faint);
+  letter-spacing: 0.02em;
+}
+.nb-workbench .wb-hist-cap .hi { color: var(--accent); }
+
+@media (max-width: 900px) {
+  /* stacked: there is no column boundary left to drag */
+  .nb-workbench { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; overflow: auto; }
+  .nb-workbench.pv-off, .nb-workbench.pv-full { grid-template-columns: 1fr; }
+  /* one column: the explicit placement above would put the editors off-grid */
+  .nb-workbench .wb-left, .nb-workbench .wb-right { grid-column: 1; grid-row: auto; }
+  .nb-workbench .wb-left { border-right: none; border-bottom: 1px solid var(--line); }
+  .nb-workbench .wb-resize { display: none; }
+}
+
+/* ── M4: patch path, journal strip, meta editing ─────────── */
+.nb-workbench .wb-label {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font: 11px var(--mono);
+  color: var(--text);
+  width: 150px;
+}
+.nb-workbench .wb-label::placeholder { color: var(--text-faint); }
+
+.nb-workbench .wb-meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 12px;
+}
+.nb-workbench .wb-meta .wm-view { color: var(--text-dim); }
+.nb-workbench .wb-meta .wm-view.empty { color: var(--text-faint); font-style: italic; }
+.nb-workbench .wb-meta .wm-groups-view { font: 10.5px var(--mono); color: var(--text-faint); }
+.nb-workbench .wb-meta .wm-edit,
+.nb-workbench .wb-cmd-open { font: 10.5px var(--mono); color: var(--accent); }
+.nb-workbench .wm-form {
+  flex-basis: 100%;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.nb-workbench .wm-form input,
+.nb-workbench .wb-cmd-meta input {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font: 11.5px var(--mono);
+  color: var(--text);
+  flex: 1 1 180px;
+}
+.nb-workbench .wm-form .wm-apply,
+.nb-workbench .wb-cmd-meta .cm-apply {
+  font: 11px var(--mono);
+  color: var(--ground);
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 4px 12px;
+}
+.nb-workbench .wm-form .wm-note,
+.nb-workbench .wb-cmd-meta .cm-note { font: 10.5px var(--mono); color: var(--danger); }
+
+.nb-workbench .wb-cmd-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 6px 4px 10px 18px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.nb-workbench .wb-cmd-meta .cm-desc.empty { color: var(--text-faint); font-style: italic; }
+.nb-workbench .wb-cmd-meta .cm-groups { font: 10.5px var(--mono); color: var(--text-faint); }
+
+.nb-workbench .wb-patch-chip { cursor: default; }
+.nb-workbench .wb-revert {
+  font: 11px var(--mono);
+  color: var(--text-dim);
+  padding: 0 0 0 4px;
+}
+.nb-workbench .wb-revert:hover { color: var(--accent); }
+
+/* the hidden attribute must always win over author display rules */
+.nb-workbench .wb-conflict[hidden],
+.nb-workbench .wm-form[hidden],
+.nb-workbench .wb-cmd-meta[hidden],
+.nb-workbench .wb-editors[hidden] { display: none; }
+
+/* ── command code pane ───────────────────────────────────── */
+.nb-workbench .wb-cmd-code { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
+.nb-workbench .wb-cmd-code[hidden] { display: none; }
+.nb-workbench .wcc-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.nb-workbench .wcc-back { font: 10.5px var(--mono); color: var(--accent); }
+.nb-workbench .wcc-name { font-family: var(--mono); color: var(--text); }
+.nb-workbench .wcc-sig { font: 11px var(--mono); color: var(--text-dim); }
+.nb-workbench .wcc-save {
+  margin-left: auto;
+  font: 11px var(--mono);
+  color: var(--ground);
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 4px 12px;
+}
+.nb-workbench .wcc-save:disabled { opacity: 0.4; cursor: default; }
+.nb-workbench .wcc-imports-row { display: flex; gap: 8px; align-items: flex-start;
+  padding: 4px 0 6px; }
+.nb-workbench .wcc-imports-row[hidden] { display: none; }
+.nb-workbench .wcc-imports { flex: 1; font: 12px var(--mono);
+  background: var(--panel); color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 6px; resize: vertical;
+  /* keep the resize grip clear of the page scrollbar */
+  margin-right: 50px; }
+.nb-workbench .wcc-err {
+  font: 11px var(--mono);
+  color: var(--danger);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  max-height: 180px;
+  overflow: auto;
+}
+.nb-workbench .wcc-err[hidden] { display: none; }
+.nb-workbench .wcc-editor { min-height: 360px; }
+.nb-workbench .wcc-editor > div { height: 100%; }
+
+/* ── publish panel (G-6) ─────────────────────────────────── */
+.nb-workbench .wb-publish {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 26px 0;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.nb-workbench .wb-publish[hidden] { display: none; }
+.nb-workbench .wp-cap { font-size: 11.5px; color: var(--text-dim); }
+.nb-workbench .wp-cap code { color: var(--text); }
+.nb-workbench .wp-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.nb-workbench .wp-fields label { display: flex; flex-direction: column; gap: 3px; }
+.nb-workbench .wp-fields input {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font: 11.5px var(--mono);
+  color: var(--text);
+}
+.nb-workbench .wp-actions { display: flex; align-items: center; gap: 12px; }
+.nb-workbench .wp-version { font: 10.5px var(--mono); color: var(--text-faint); }
+.nb-workbench .wp-go {
+  font: 11px var(--mono);
+  color: var(--ground);
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 4px 12px;
+}
+.nb-workbench .wp-note { font: 10.5px var(--mono); color: var(--danger); }
+.nb-workbench .wp-log {
+  font: 11px var(--mono);
+  color: var(--text-dim);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  max-height: 160px;
+  overflow: auto;
+}
+.nb-workbench .wp-log[hidden] { display: none; }
+
+/* ── timers/events panel (G-7) ───────────────────────────── */
+.nb-workbench .wb-wiring {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 26px 0;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.nb-workbench .wb-wiring[hidden] { display: none; }
+.nb-workbench .ww-cap { font-size: 11.5px; color: var(--text-dim); }
+.nb-workbench .ww-cap code { color: var(--text); font-family: var(--mono); font-size: 10.5px; }
+.nb-workbench .ww-cap .hi { color: var(--accent); }
+.nb-workbench .ww-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 8px 20px;
+}
+.nb-workbench .ww-h {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: 10px var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 2px 0 4px;
+}
+.nb-workbench .ww-add { font: 10.5px var(--mono); color: var(--accent); }
+.nb-workbench .ww-add[hidden] { display: none; }
+.nb-workbench .ww-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 12px;
+}
+.nb-workbench .ww-row:last-child { border-bottom: none; }
+.nb-workbench .ww-name { font-family: var(--mono); color: var(--text); }
+.nb-workbench .ww-detail { color: var(--text-dim); font-size: 11.5px; }
+.nb-workbench .ww-act {
+  margin-left: auto;
+  font: 10.5px var(--mono);
+  color: var(--accent);
+}
+.nb-workbench .ww-act + .ww-act { margin-left: 0; }
+.nb-workbench .ww-del { color: var(--danger); }
+.nb-workbench .ww-none { font-size: 11.5px; color: var(--text-faint); font-style: italic; padding: 4px 0; }
+.nb-workbench .ww-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+}
+.nb-workbench .ww-form[hidden] { display: none; }
+.nb-workbench .ww-form input,
+.nb-workbench .ww-form select {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font: 11.5px var(--mono);
+  color: var(--text);
+}
+.nb-workbench .ww-form input[type="number"] { width: 64px; }
+.nb-workbench .ww-form input[type="checkbox"] { width: auto; }
+.nb-workbench .ww-lbl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 11px var(--mono);
+  color: var(--text-dim);
+}
+.nb-workbench .ww-apply {
+  font: 11px var(--mono);
+  color: var(--ground);
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 4px 12px;
+}
+.nb-workbench .ww-note { font: 10.5px var(--mono); color: var(--danger); }
+
+/* ── new command form ────────────────────────────────────── */
+.nb-workbench .wb-newcmd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 18px 4px;
+}
+.nb-workbench .wb-newcmd input,
+.nb-workbench .wb-newcmd select {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 5px 9px;
+  font: 11.5px var(--mono);
+  color: var(--text);
+}
+.nb-workbench .wb-newcmd .wc-name { min-width: 170px; }
+.nb-workbench .wb-newcmd .wc-params { flex: 1; min-width: 200px; }
+.nb-workbench .wb-newcmd .wc-lbl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 11px var(--mono);
+  color: var(--text-dim);
+}
+.nb-workbench .wb-newcmd .wc-go {
+  font: 11px var(--mono);
+  color: var(--accent);
+  border: 1px dashed var(--accent-dim);
+  border-radius: 7px;
+  padding: 5px 12px;
+}
+.nb-workbench .wb-newcmd .wc-go:hover { background: rgba(240, 166, 60, 0.08); }
+.nb-workbench .wb-newcmd .wc-note { font: 10.5px var(--mono); color: var(--danger); flex-basis: 100%; }
+
+/* R-2 gap bar: preview modes + publish identity */
+.nb-workbench .wb-pv-bar { display: flex; gap: 6px; padding: 8px 10px 0; }
+.nb-workbench .wb-pv-bar .wb-pv-full { margin-left: auto; }
+.nb-workbench .wb-pv-bar button[aria-pressed="true"] {
+  color: var(--accent, #e8b34c); border-color: currentColor; }
+.nb-workbench .wb-pv-body { display: flex; flex-direction: column; gap: 6px;
+  height: calc(100% - 34px); padding: 8px 10px; }
+.nb-workbench .wb-pv-live-head { display: flex; align-items: center;
+  justify-content: space-between; gap: 8px; }
+.nb-workbench .wb-pv-frame { flex: 1; min-height: 240px; width: 100%;
+  border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.nb-workbench .wp-identity { display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px; font-size: 11.5px; }
+.nb-workbench .wpi-view { color: var(--text-dim); }
+.nb-workbench .wpi-view.warn { color: var(--warn, #d08050); }
+.nb-workbench .wpi-form { display: flex; flex-wrap: wrap; gap: 6px; }
+.nb-workbench .wpi-form[hidden] { display: none; }
+.nb-workbench .wpi-form input { min-width: 200px; }

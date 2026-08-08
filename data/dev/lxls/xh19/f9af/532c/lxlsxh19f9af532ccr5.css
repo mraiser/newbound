@@ -1,0 +1,110 @@
+.nb-floweditor {
+  display: grid;
+  grid-template-columns: 180px 1fr 280px;
+  height: 100%;
+  overflow: hidden;
+}
+.nb-floweditor .fe-palette {
+  border-right: 1px solid var(--line);
+  padding: 22px 18px;
+  overflow: auto;
+}
+.nb-floweditor .fe-palette > .lbl { display: block; margin-bottom: 10px; }
+.nb-floweditor .fe-pal-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 4px;
+  font: 11.5px var(--mono);
+  color: var(--text-dim);
+}
+.nb-floweditor .fe-pal-item .glyph { color: var(--f-cmd); width: 16px; text-align: center; }
+.nb-floweditor .fe-pal-note {
+  margin-top: 16px;
+  font-size: 11px;
+  color: var(--text-faint);
+  line-height: 1.55;
+}
+.nb-floweditor .fe-canvas {
+  position: relative;
+  overflow: auto;
+  background: radial-gradient(circle, var(--line-soft) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+.nb-floweditor .fe-head {
+  position: sticky;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 22px;
+  z-index: 5;
+}
+.nb-floweditor .fe-back {
+  font: 12px var(--mono);
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: var(--ground);
+}
+.nb-floweditor .fe-back:hover { color: var(--accent); border-color: var(--accent-dim); }
+.nb-floweditor .fe-title { font: 13px var(--mono); }
+.nb-floweditor .fe-title .t { color: var(--f-cmd); }
+.nb-floweditor .fe-crumbs { font: 11px var(--mono); color: var(--text-faint); }
+.nb-floweditor .fe-svg-wrap { display: flex; justify-content: center; padding: 4px 20px 40px; }
+
+.nb-floweditor .fnode { cursor: pointer; }
+.nb-floweditor .fnode rect.body { fill: var(--paper); stroke: var(--paper-edge); }
+.nb-floweditor .fnode.dark rect.body { fill: var(--panel-2); stroke: var(--line); }
+.nb-floweditor .fnode.k-local rect.body { stroke-width: 1.5; stroke-dasharray: none; }
+.nb-floweditor .fnode.k-local rect.inner { fill: none; stroke: var(--paper-edge); }
+.nb-floweditor .fnode:hover rect.body,
+.nb-floweditor .fnode.sel rect.body { stroke: var(--accent); stroke-width: 2; }
+.nb-floweditor .fnode text { font: 12px var(--mono); fill: var(--ink); }
+.nb-floweditor .fnode.dark text { fill: var(--text); }
+.nb-floweditor .fnode .sub { font-size: 9.5px; fill: var(--ink-dim); }
+.nb-floweditor .term { fill: var(--ground); stroke: var(--text-dim); stroke-width: 1.5; }
+.nb-floweditor .term.t-loop { stroke: var(--f-3d); }
+.nb-floweditor .term.t-list { stroke: var(--f-js); }
+.nb-floweditor .wire { fill: none; stroke: var(--text-faint); stroke-width: 1.8; }
+.nb-floweditor .wire-lbl { font: 9.5px var(--mono); fill: var(--text-dim); }
+.nb-floweditor .cond-flag {
+  font: 9px var(--mono);
+  fill: var(--danger);
+}
+
+.nb-floweditor .fe-inspect {
+  border-left: 1px solid var(--line);
+  padding: 22px 20px;
+  overflow: auto;
+}
+.nb-floweditor .fe-inspect-body { margin-top: 14px; font-size: 12.5px; color: var(--text-dim); line-height: 1.6; }
+.nb-floweditor .fe-empty { color: var(--text-faint); font-size: 12px; }
+.nb-floweditor .fi-name { font: 14px var(--mono); color: var(--text); margin-bottom: 4px; overflow-wrap: anywhere; }
+.nb-floweditor .fi-kind {
+  display: inline-block;
+  font: 9px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ground);
+  background: var(--f-cmd);
+  border-radius: 4px;
+  padding: 2px 7px;
+  margin-bottom: 12px;
+}
+.nb-floweditor dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 12px;
+  font: 11px var(--mono);
+  margin-top: 8px;
+}
+.nb-floweditor dt { color: var(--text-faint); }
+.nb-floweditor dd { color: var(--text); overflow-wrap: anywhere; }
+
+@media (max-width: 900px) {
+  .nb-floweditor { grid-template-columns: 1fr; }
+  .nb-floweditor .fe-palette, .nb-floweditor .fe-inspect { display: none; }
+}

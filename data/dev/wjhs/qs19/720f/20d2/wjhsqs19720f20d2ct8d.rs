@@ -96,6 +96,20 @@ if data.has("library_types") {
 }
 cargo_do.put_array("crate_types", types_array_input); // types_array_input is moved
 
+// ffi: whether this library's crate builds as a hot-loadable dylib (and is
+// excluded from the cargo workspace). Written only when the caller sends the
+// field, so an older client that omits it leaves the existing value alone.
+if data.has("ffi") {
+  let ffi_prop = data.get_property("ffi");
+  if ffi_prop.is_boolean() {
+    cargo_do.put_boolean("ffi", data.get_boolean("ffi"));
+  } else if ffi_prop.is_string() {
+    cargo_do.put_boolean("ffi", data.get_string("ffi") == "true");
+  } else {
+    eprintln!("WARN: Input 'ffi' for '{}' is neither boolean nor string; left unchanged.", library_id);
+  }
+}
+
 // Prepare and put dependencies into cargo_do
 let mut new_deps_do = DataObject::new();
 for line in library_dependencies_str_input.lines() {

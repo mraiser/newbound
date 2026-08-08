@@ -1,0 +1,127 @@
+<section class="nb-shelf">
+  <header class="sh-head">
+    <h1>The shelf</h1>
+    <p>Every library is a stack of cards. No folders, no tree — a library holds
+    assets and controls, a control holds everything else. Open a stack to fan
+    out its controls.</p>
+  </header>
+  <div class="sh-groups"></div>
+  <form class="sh-newlib" hidden>
+    <button type="button" class="sh-newlib-open">+ new library</button>
+    <span class="sh-newlib-fields" hidden>
+      <input class="sh-newlib-name" placeholder="library name — lowercase, no spaces"
+             aria-label="New library name">
+      <button type="submit" class="sh-newlib-go">create</button>
+      <span class="sh-newlib-note"></span>
+    </span>
+  </form>
+  <form class="sh-import" hidden>
+    <button type="button" class="sh-import-open">⇩ import from git</button>
+    <span class="sh-import-fields" hidden>
+      <input class="sh-import-url"
+             placeholder="git url — the repo becomes a library (dev.github.import)"
+             aria-label="Git repository url to import">
+      <button type="submit" class="sh-import-go">import</button>
+      <span class="sh-import-note"></span>
+    </span>
+    <div class="sh-import-list" hidden></div>
+  </form>
+  <form class="sh-plugins" hidden>
+    <button type="button" class="sh-plugins-open">◈ plugins</button>
+    <div class="sh-plugins-panel" hidden>
+      <p class="sh-plugins-cap lbl">plugin registrations — when TARGET is on a
+      page, PLUGIN mounts at SELECTOR (runtime/dev/plugins.json via
+      dev.plugins; changes apply on the next reload)</p>
+      <div class="sh-plugins-list"></div>
+      <div class="sh-plugins-fields">
+        <input class="sh-plug-name" placeholder="entry name" aria-label="Registration entry name">
+        <input class="sh-plug-tlib" placeholder="target lib — dev" aria-label="Target library">
+        <input class="sh-plug-tctl" placeholder="target ctl — dev · workbench · session…" aria-label="Target control">
+        <input class="sh-plug-plib" placeholder="plugin lib" aria-label="Plugin library">
+        <input class="sh-plug-pctl" placeholder="plugin ctl" aria-label="Plugin control">
+        <input class="sh-plug-sel" placeholder="selector — #devpluginholder" aria-label="Slot CSS selector">
+        <button type="submit" class="sh-plug-save">set</button>
+        <span class="sh-plugins-note"></span>
+      </div>
+    </div>
+  </form>
+  <div class="sh-fan" hidden>
+    <div class="sh-fan-head">
+      <span class="fh-name"></span>
+      <span class="lbl">controls — dots show which facets each card carries</span>
+    </div>
+    <p class="fh-desc"></p>
+    <div class="fh-tools" hidden>
+      <button class="fh-meta-btn" hidden>meta ▸</button>
+      <button class="fh-assets-btn">assets ▸</button>
+      <button class="fh-settings-btn">rust settings ▸</button>
+      <button class="fh-rebuild-btn" hidden>rebuild ▸</button>
+      <button class="fh-archive-btn" hidden>archive ▸</button>
+      <button class="fh-del-btn" hidden
+        title="rmdir semantics — refuses while the library has any controls; delete them first, each on purpose">delete library</button>
+    </div>
+    <form class="fh-meta" hidden>
+      <input class="fm-desc" placeholder="describe this library — agents discover it through desc">
+      <input class="fm-tags" placeholder="tags (comma-delimited — categorization, never security)">
+      <button type="submit" class="fm-apply">set</button>
+      <span class="fm-note"></span>
+    </form>
+    <div class="fh-assets" hidden>
+      <p class="fa-cap">The library's <code>_ASSETS</code> files, served at
+      <code>/app/asset/&lt;lib&gt;/&lt;name&gt;</code>. Writes go through the
+      agent API (<code>write_asset</code>/<code>rename_asset</code>/
+      <code>delete_asset</code>), journal-free but admin-gated.</p>
+      <div class="fa-rows"></div>
+      <form class="fa-new" hidden>
+        <input class="fa-name" placeholder="name (relative path, e.g. styles/x.css)">
+        <textarea class="fa-content" rows="3"
+          placeholder="text content — OR leave empty and give a server-side file path below"></textarea>
+        <input class="fa-tempfile"
+          placeholder="server-side file path (for binary/large files; instance-local)">
+        <button type="submit" class="fa-write">write asset</button>
+        <span class="fa-note"></span>
+      </form>
+    </div>
+    <form class="fh-rebuild" hidden>
+      <p class="fr-cap">Regenerates and recompiles this library's commands
+      from the store (<code>dev.dev.rebuild_lib</code>) — the old dev UI's
+      build button. Store edits (upserts, moves) can leave compiled code
+      behind the records until a rebuild or restart; this is the deliberate
+      catch-up act. Slow for big libraries; the instance keeps serving.</p>
+      <button type="submit" class="fr-go">rebuild now</button>
+      <span class="fr-note"></span>
+      <pre class="fr-out" hidden></pre>
+    </form>
+    <div class="fh-archive" hidden>
+      <p class="fk-cap">The library's versioned archive — <b>the peer
+      app-update path</b>: publishing an app builds a signed zip of each of
+      its libraries under <code>runtime/dev/libraries</code>, and peers in
+      the <code>update</code>/<code>admin</code> groups install updates from
+      exactly these. Git is development-only and plays no part here.</p>
+      <div class="fk-rows"></div>
+      <span class="fk-note"></span>
+    </div>
+    <form class="fh-settings" hidden>
+      <p class="fs-cap">Rust settings — meta.json's <code>root</code>,
+      <code>cargo.crate_types</code>, <code>cargo.dependencies</code>. Inert
+      until this library contains Rust; editable so adding Rust later has a
+      defined home. Saved via <code>dev.libsettings.save_library_config</code>.</p>
+      <label class="lbl">root <input class="fs-root"></label>
+      <label class="lbl fs-ffi-row"><input type="checkbox" class="fs-ffi">
+        ffi — build this library's crate as a hot-loadable dylib (excluded
+        from the cargo workspace, so its commands hot-swap on save)</label>
+      <label class="lbl">crate types (comma) <input class="fs-types"></label>
+      <label class="lbl">dependencies (one <code>name = spec</code> per line)
+        <textarea class="fs-deps" rows="4"></textarea></label>
+      <button type="submit" class="fs-save" hidden>save settings</button>
+      <span class="fs-note"></span>
+    </form>
+    <div class="sh-cards"></div>
+    <form class="sh-newctl" hidden>
+      <input class="sh-newctl-name" placeholder="new control name — lowercase, no spaces"
+             aria-label="New control name">
+      <button type="submit" class="sh-newctl-go">+ new control</button>
+      <span class="sh-newctl-note"></span>
+    </form>
+  </div>
+</section>

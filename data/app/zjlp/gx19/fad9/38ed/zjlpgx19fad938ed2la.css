@@ -1,0 +1,8 @@
+/* player — the stock-mountable scene player (docs/great-refactoring.md:
+   dest-app; the successor to app.scenegraph's mount idiom). The host app
+   sizes the mounted element; this fills it. */
+.nb-player-host {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  overflow: hidden;
+}

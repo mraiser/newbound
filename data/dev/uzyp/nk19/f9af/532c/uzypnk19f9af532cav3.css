@@ -1,0 +1,47 @@
+.nb-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 15px 12px;
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--paper-edge);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.nb-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
+}
+.nb-card .c-name {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.nb-card .c-desc {
+  font-size: 11.5px;
+  color: var(--ink-dim);
+  line-height: 1.4;
+  min-height: 16px;
+}
+.nb-card .c-dots {
+  display: flex;
+  gap: 5px;
+  margin-top: 6px;
+}
+.nb-card .c-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ddd6c8;
+}
+.nb-card .c-dot.on-html { background: var(--f-html); }
+.nb-card .c-dot.on-css { background: var(--f-css); }
+.nb-card .c-dot.on-js { background: var(--f-js); }
+.nb-card .c-dot.on-data { background: var(--f-data); }
+.nb-card .c-dot.on-scene { background: var(--f-3d); }
+.nb-card .c-dot.on-cmd { background: var(--f-cmd); }

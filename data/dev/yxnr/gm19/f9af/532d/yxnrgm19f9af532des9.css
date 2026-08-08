@@ -1,0 +1,73 @@
+.nb-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* Claim the host's height and give the surplus to the FRAME, so tall
+     markup scrolls inside it instead of growing the column and painting
+     over the hint below. Only visible once the pane can be made large —
+     which it now can. */
+  flex: 1;
+  min-height: 0;
+}
+.nb-preview .pv-caption, .nb-preview .pv-hint { flex: none; }
+.nb-preview .pv-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nb-preview .pv-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--good);
+  margin-right: 7px;
+  animation: nb-pv-pulse 2.4s infinite;
+}
+@keyframes nb-pv-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.nb-preview .pv-where { color: var(--text-faint); }
+.nb-preview .pv-frame {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 26px 24px;
+}
+.nb-preview .pv-stage {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--paper-edge);
+  border-radius: 6px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.nb-preview .pv-empty {
+  color: var(--text-faint);
+  font-size: 12px;
+  text-align: center;
+  padding: 20px 0;
+}
+.nb-preview .pv-hint {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.5;
+}
+.nb-preview .pv-hint b { color: var(--text-dim); font-weight: 600; }
+.nb-preview .pv-jsnote { color: var(--text-faint); font-style: italic; }
+.nb-preview .pv-tag {
+  position: fixed;
+  z-index: 80;
+  font: 9px/1 var(--mono);
+  letter-spacing: 0.06em;
+  background: var(--accent);
+  color: #241a08;
+  padding: 3px 6px;
+  border-radius: 3px;
+  pointer-events: none;
+  white-space: nowrap;
+}

@@ -1,0 +1,271 @@
+.nb-shelf {
+  height: 100%;
+  overflow: auto;
+  padding: 34px 42px 80px;
+}
+.nb-shelf .sh-head,
+.nb-shelf .sh-groups,
+.nb-shelf .sh-newlib,
+.nb-shelf .sh-fan {
+  max-width: 980px;
+  margin: 0 auto;
+}
+.nb-shelf h1 {
+  font-family: var(--disp);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  text-wrap: balance;
+}
+.nb-shelf .sh-head p {
+  color: var(--text-dim);
+  max-width: 62ch;
+  line-height: 1.55;
+}
+.nb-shelf .sh-group { margin-top: 30px; }
+.nb-shelf .sh-group > .lbl { display: block; margin-bottom: 12px; }
+.nb-shelf .sh-stacks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+.nb-shelf .sh-stack {
+  position: relative;
+  text-align: left;
+  padding: 14px 16px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.nb-shelf .sh-stack::before,
+.nb-shelf .sh-stack::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: -4px;
+  height: 4px;
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: var(--panel);
+}
+.nb-shelf .sh-stack::after {
+  top: -7px;
+  left: 8px;
+  right: 8px;
+  opacity: 0.6;
+}
+.nb-shelf .sh-stack:hover {
+  transform: translateY(-2px);
+  border-color: var(--text-faint);
+}
+.nb-shelf .sh-stack.on { border-color: var(--accent-dim); }
+.nb-shelf .sh-stack .s-name {
+  font-family: var(--mono);
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+.nb-shelf .sh-stack .s-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.nb-shelf .sh-fan { margin-top: 26px; }
+.nb-shelf .sh-fan-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.nb-shelf .fh-name {
+  font-family: var(--mono);
+  font-size: 15px;
+  color: var(--accent);
+}
+.nb-shelf .sh-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+/* ── M4: library meta + Rust settings panel ──────────────── */
+.nb-shelf .fh-desc { font-size: 12.5px; color: var(--text-dim); margin: 2px 0 0; }
+.nb-shelf .fh-desc.empty { color: var(--text-faint); font-style: italic; }
+.nb-shelf .fh-tools { display: flex; gap: 14px; margin-top: 4px; }
+.nb-shelf .fh-tools button { font: 10.5px var(--mono); color: var(--accent); }
+.nb-shelf .fh-tools .fh-del-btn { color: var(--danger); margin-left: auto; }
+
+/* ── deletion (CONTRACT §6.1): a slot wraps card + its delete ─ */
+.nb-shelf .sh-slot { display: flex; flex-direction: column; gap: 4px; }
+.nb-shelf .sh-ctl-del {
+  align-self: flex-end;
+  font: 10.5px var(--mono);
+  color: var(--danger);
+}
+.nb-shelf .fh-meta,
+.nb-shelf .fh-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.nb-shelf .fh-meta[hidden],
+.nb-shelf .fh-settings[hidden] { display: none; }
+.nb-shelf .fh-meta input,
+.nb-shelf .fh-settings input,
+.nb-shelf .fh-settings textarea {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font: 11.5px var(--mono);
+  color: var(--text);
+  flex: 1 1 200px;
+}
+.nb-shelf .fh-settings { flex-direction: column; align-items: stretch; }
+.nb-shelf .fh-settings .fs-cap { font-size: 11.5px; color: var(--text-dim); }
+.nb-shelf .fh-settings label { display: flex; flex-direction: column; gap: 3px; }
+/* the ffi checkbox reads as a row, against the panel's column-stacked labels */
+.nb-shelf .fh-settings .fs-ffi-row { flex-direction: row; align-items: flex-start; gap: 8px; }
+.nb-shelf .fh-settings .fs-ffi { flex: none; width: auto; margin-top: 2px; }
+.nb-shelf .fh-meta .fm-apply,
+.nb-shelf .fh-settings .fs-save {
+  font: 11px var(--mono);
+  color: var(--ground);
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 4px 12px;
+  align-self: flex-start;
+}
+.nb-shelf .fh-meta .fm-note,
+.nb-shelf .fh-settings .fs-note { font: 10.5px var(--mono); color: var(--danger); }
+.nb-shelf .fh-tools[hidden] { display: none; }
+
+/* ── asset browser (G-1) ─────────────────────────────────── */
+.nb-shelf .fh-assets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.nb-shelf .fh-assets[hidden] { display: none; }
+.nb-shelf .fh-assets .fa-cap { font-size: 11.5px; color: var(--text-dim); }
+.nb-shelf .fa-rows { display: flex; flex-direction: column; gap: 2px; }
+.nb-shelf .fa-rows.fa-empty { font: 11px var(--mono); color: var(--text-faint); }
+.nb-shelf .fa-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 4px 2px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 12.5px;
+}
+.nb-shelf .fa-row:last-child { border-bottom: none; }
+.nb-shelf .fa-open { font-family: var(--mono); color: var(--text); text-decoration: none; }
+.nb-shelf .fa-open:hover { color: var(--accent); }
+.nb-shelf .fa-size { font: 10.5px var(--mono); color: var(--text-faint); }
+.nb-shelf .fa-act { font: 10.5px var(--mono); color: var(--accent); }
+.nb-shelf .fa-act.fa-danger { color: var(--danger); margin-left: auto; }
+.nb-shelf .fa-new { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.nb-shelf .fa-new[hidden] { display: none; }
+.nb-shelf .fa-new input,
+.nb-shelf .fa-new textarea {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font: 11.5px var(--mono);
+  color: var(--text);
+}
+.nb-shelf .fa-new .fa-write {
+  align-self: flex-start;
+  font: 11px var(--mono);
+  color: var(--ground);
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 4px 12px;
+}
+.nb-shelf .fa-new .fa-note { font: 10.5px var(--mono); color: var(--danger); }
+
+/* ── creating controls / libraries ───────────────────────── */
+.nb-shelf .sh-newctl,
+.nb-shelf .sh-newlib {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+/* keep the centering from the shared column rule above — `auto` sides */
+.nb-shelf .sh-newlib { margin: 6px auto 22px; }
+.nb-shelf .sh-newlib-fields { display: flex; align-items: center; gap: 8px; }
+.nb-shelf .sh-newctl input,
+.nb-shelf .sh-newlib input {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 10px;
+  font: 11.5px var(--mono);
+  color: var(--text);
+  min-width: 260px;
+}
+.nb-shelf .sh-newctl-go,
+.nb-shelf .sh-newlib-go,
+.nb-shelf .sh-newlib-open {
+  font: 11px var(--mono);
+  color: var(--accent);
+  border: 1px dashed var(--accent-dim);
+  border-radius: 7px;
+  padding: 6px 14px;
+}
+.nb-shelf .sh-newctl-go:hover,
+.nb-shelf .sh-newlib-go:hover,
+.nb-shelf .sh-newlib-open:hover { background: rgba(240, 166, 60, 0.08); }
+.nb-shelf .sh-newctl-note,
+.nb-shelf .sh-newlib-note { font: 10.5px var(--mono); color: var(--danger); }
+.nb-shelf [hidden] { display: none !important; }
+
+/* R-2: rebuild + archive panels, git import */
+.nb-shelf .fh-rebuild, .nb-shelf .fh-archive {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  margin: 8px 0; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 8px; }
+.nb-shelf .fh-rebuild[hidden], .nb-shelf .fh-archive[hidden] { display: none; }
+.nb-shelf .fr-cap, .nb-shelf .fk-cap { font-size: 11.5px; color: var(--text-dim); margin: 0; }
+.nb-shelf .fr-cap code, .nb-shelf .fk-cap code { color: var(--text); }
+.nb-shelf .fr-out { font: 10.5px var(--mono); max-height: 160px; overflow: auto;
+  align-self: stretch; }
+.nb-shelf .fk-rows { display: flex; align-items: center; gap: 12px; }
+.nb-shelf .fk-meta { font-size: 11.5px; color: var(--text-dim); }
+.nb-shelf .fk-dl { font: 11.5px var(--mono); }
+.nb-shelf .sh-import { margin: 0 0 10px; }
+.nb-shelf .sh-import[hidden] { display: none; }
+.nb-shelf .sh-import-fields[hidden] { display: none; }
+.nb-shelf .sh-import-url { min-width: 340px; }
+.nb-shelf .sh-import-list { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
+.nb-shelf .sh-plugins { margin: 0 0 10px; }
+.nb-shelf .sh-plugins[hidden] { display: none; }
+.nb-shelf .sh-plugins-panel[hidden] { display: none; }
+.nb-shelf .sh-plugins-panel { margin-top: 6px; }
+.nb-shelf .sh-plugins-cap { max-width: 560px; }
+.nb-shelf .sh-plugins-list { margin: 6px 0; display: flex; flex-direction: column; gap: 3px; }
+.nb-shelf .sh-plug-row { font-size: 12px; display: flex; align-items: baseline; gap: 8px; }
+.nb-shelf .sh-plug-row code { color: var(--text-faint); }
+.nb-shelf .sh-plugins-fields { display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
+.nb-shelf .sh-plugins-fields input { min-width: 120px; }
+.nb-shelf .sh-plug-sel { min-width: 180px; }
+.nb-shelf .sh-plugins-note { font-size: 11px; color: var(--text-faint); }

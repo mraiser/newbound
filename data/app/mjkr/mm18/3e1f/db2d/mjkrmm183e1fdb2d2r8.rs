@@ -1153,7 +1153,10 @@ fn read_line_as_bytes(reader: &mut TcpStream) -> std::io::Result<Vec<u8>> {
 pub fn format_result(command:Command, o:DataObject) -> DataObject {
   let mut d_formatted_result; // Renamed d to d_formatted_result
 
-  if command.return_type == "FLAT" {
+  if o.has("status") && o.get_string("status") == "err" {
+      d_formatted_result = o;
+  }
+  else if command.return_type == "FLAT" {
     if command.lang == "flow" && o.clone().keys().len() > 1 {
       d_formatted_result = o;
     }

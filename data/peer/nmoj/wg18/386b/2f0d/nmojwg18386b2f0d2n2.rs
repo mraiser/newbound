@@ -68,12 +68,20 @@ let name = match user.has("displayname") {
   _ => uuid.to_string()
 };
 let mut timeout = 0;
+let mut numtimes = 0; // FIXME - Major hack
 while ! res.has(pidstr) {
   // TIGHTLOOP
   timeout += 1;
   let beat = Duration::from_millis(timeout);
   thread::sleep(beat);
-  if timeout > 450 { println!("Unusually long wait in peer:service:exec [{}/{}/{}/{}]", &name, &app, &cmd, pid); timeout = 0; }
+  if timeout > 450 { 
+    println!("Unusually long wait in peer:service:exec [{}/{}/{}/{}]", &name, &app, &cmd, pid); 
+    if numtimes > 4 || time() - stream.last_contact() > 120000 { // WTF?!
+      return DataObject::from_string("{\"status\":\"err\",\"msg\":\"SERVICE EXEC TIMEOUT\"}"); 
+    }
+    timeout = 0;
+    numtimes += 1;
+  }
   
   wait();
 }

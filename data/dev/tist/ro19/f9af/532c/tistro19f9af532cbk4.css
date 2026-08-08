@@ -1,0 +1,39 @@
+.nb-editor {
+  height: 100%;
+}
+.nb-editor .cm-editor {
+  height: 100%;
+  background: transparent;
+  font-size: 12.5px;
+}
+.nb-editor .cm-editor.cm-focused { outline: none; }
+.nb-editor .cm-scroller {
+  font-family: var(--mono);
+  line-height: 1.75;
+}
+.nb-editor .cm-gutters {
+  background: transparent;
+  border-right: none;
+  color: var(--text-faint);
+  font-size: 10.5px;
+}
+.nb-editor .cm-lineNumbers .cm-gutterElement {
+  min-width: 48px;
+  padding-right: 14px;
+}
+.nb-editor .cm-activeLine { background: rgba(255, 255, 255, 0.03); }
+/* The caret. CM6 draws its own .cm-cursor ONLY when drawSelection() is in
+   the extension list - ours is not, so the browser's NATIVE caret is what
+   shows, and CM's base theme sets `caret-color: black` (its dark variant
+   applies only to themes flagged dark). Black on this panel is invisible,
+   which is what the accent rule below was written for and never reached.
+   Colour the native caret; keep the drawn-cursor rule so the two agree if
+   drawSelection is ever added. */
+.nb-editor .cm-content { caret-color: var(--accent); }
+.nb-editor .cm-cursor { border-left-color: var(--accent); border-left-width: 2px; }
+.nb-editor .cm-selectionBackground,
+.nb-editor .cm-editor ::selection { background: rgba(240, 166, 60, 0.2); }
+.nb-editor .cm-nb-hl {
+  background: rgba(240, 166, 60, 0.13);
+  box-shadow: inset 3px 0 0 var(--accent);
+}

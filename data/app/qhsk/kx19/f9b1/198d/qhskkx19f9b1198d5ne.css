@@ -1,0 +1,81 @@
+/* tokens.css — every color, type role, and motion rule in the bench UI.
+   Source of truth: DESIGN.md §5.2–§5.4. No other file declares colors.
+
+   CONTRACT v1 (kit v1, docs/kit.md): the custom-property NAMES below and
+   the .lbl role are STABLE — bricks and host apps may rely on them.
+   Values may tune; names only ever get added. The [hidden] rule and the
+   reduced-motion block are part of the contract too. */
+
+:root {
+  /* graphite — the tool */
+  --ground: #171a1e;
+  --panel: #1f242a;
+  --panel-2: #262c33;
+  --panel-3: #2d343c;
+  --line: #333b44;
+  --line-soft: #2a313a;
+  --text: #d8dee6;
+  --text-dim: #8a94a0;
+  --text-faint: #5c6672;
+
+  /* paper — the content */
+  --paper: #f6f4ee;
+  --paper-edge: #d9d2c4;
+  --ink: #2a2620;
+  --ink-dim: #7a7264;
+
+  /* interaction (exactly one meaning: selection/focus/primary) */
+  --accent: #f0a63c;
+  --accent-dim: #a9762e;
+
+  /* facet identity hues */
+  --f-html: #e2725b;
+  --f-css: #56a3d9;
+  --f-js: #ead16c;
+  --f-data: #a78bda;
+  --f-3d: #62bd8c;
+  --f-cmd: #d96ba0;
+
+  /* semantic state */
+  --good: #4fae6e;
+  --danger: #c15a5a;
+
+  /* type roles */
+  --sans: system-ui, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --disp: "Futura", "Avenir Next", "URW Gothic", "Century Gothic", "Trebuchet MS", sans-serif;
+}
+
+/* ── global base ─────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* The `hidden` attribute must always win. Author `display` rules outrank the
+   UA's [hidden]{display:none}, which has silently un-hidden overlay bars
+   three times now (workbench conflict banner, the 3D editor's layout/
+   conflict bars blocking the canvas, the session's confirm bar). Nothing in
+   the bench toggles element.style.display, so !important costs nothing:
+   `hidden` means hidden, everywhere, including in controls written later. */
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--ground);
+  color: var(--text);
+  font: 14px/1.5 var(--sans);
+  overflow: hidden;
+}
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* the uppercase mono label role — used by every control */
+.lbl {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

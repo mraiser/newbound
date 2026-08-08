@@ -1,0 +1,28 @@
+<section class="nb-floweditor">
+  <aside class="fe-palette">
+    <span class="lbl">node kinds</span>
+    <div class="fe-pal-item"><span class="glyph" aria-hidden="true">▤</span>command call</div>
+    <div class="fe-pal-item"><span class="glyph" aria-hidden="true">⚙</span>primitive</div>
+    <div class="fe-pal-item"><span class="glyph" aria-hidden="true">▣</span>local sub-flow</div>
+    <div class="fe-pal-item"><span class="glyph" aria-hidden="true">◇</span>constant / matcher</div>
+    <div class="fe-pal-item"><span class="glyph" aria-hidden="true">⌘</span>params / return</div>
+    <p class="fe-pal-note">Data falls top to bottom, Prograph-style. Branching
+    is a constant-matcher plus a condition rule chaining to the next case.
+    Editing lands in a later milestone — this is the viewer.</p>
+  </aside>
+  <div class="fe-canvas">
+    <div class="fe-head">
+      <button class="fe-back">←</button>
+      <span class="fe-title"></span>
+      <span class="fe-crumbs"></span>
+    </div>
+    <div class="fe-svg-wrap"></div>
+  </div>
+  <aside class="fe-inspect">
+    <span class="lbl">inspector</span>
+    <div class="fe-inspect-body">
+      <p class="fe-empty">Select a node. Local sub-flows open on double-click —
+      the graph is the code, not a picture of it.</p>
+    </div>
+  </aside>
+</section>

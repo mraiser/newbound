@@ -1,0 +1,137 @@
+<section class="nb-workbench">
+  <div class="wb-left"></div>
+  <div class="wb-resize" role="separator" aria-orientation="vertical" tabindex="0"
+       aria-label="preview width" title="drag to resize the preview — double-click to reset"></div>
+  <div class="wb-right">
+    <div class="wb-chips" role="tablist" aria-label="facets"></div>
+    <div class="wb-meta">
+      <span class="wm-view"></span>
+      <span class="wm-tags-view"></span>
+      <span class="wm-groups-view" title="security groups — the permission field; edited via the deliberate set_groups act, not here"></span>
+      <button class="wm-preview" aria-pressed="true" title="show or hide the preview pane">preview</button>
+      <button class="wm-edit" hidden>meta ▸</button>
+      <button class="wm-publish" hidden>publish ▸</button>
+      <button class="wm-wiring">timers/events ▸</button>
+      <form class="wm-form" hidden>
+        <input class="wm-desc" placeholder="describe this control — agents discover it through desc">
+        <input class="wm-tags" placeholder="tags (comma-delimited — categorization, never security)">
+        <button type="submit" class="wm-apply">set</button>
+        <span class="wm-note"></span>
+      </form>
+    </div>
+    <div class="wb-publish" hidden>
+      <p class="wp-cap"></p>
+      <div class="wp-identity">
+        <span class="wpi-view"></span>
+        <button class="wpi-edit" hidden>identity ▸</button>
+        <form class="wpi-form" hidden>
+          <input class="wpi-name" placeholder="display name — publishing signs with it">
+          <input class="wpi-org" placeholder="organization (may be empty)">
+          <button type="submit" class="wpi-save">set identity</button>
+          <span class="wpi-note"></span>
+        </form>
+      </div>
+      <div class="wp-fields"></div>
+      <div class="wp-actions">
+        <span class="wp-version"></span>
+        <button class="wp-go" hidden>publish</button>
+        <span class="wp-note"></span>
+      </div>
+      <pre class="wp-log" hidden></pre>
+    </div>
+    <div class="wb-wiring" hidden>
+      <p class="ww-cap"></p>
+      <div class="ww-grid">
+        <section>
+          <h4 class="ww-h">timers <button class="ww-add ww-timer-add" hidden>set a timer ▸</button></h4>
+          <div class="ww-rows ww-timer-rows"></div>
+          <form class="ww-form ww-timer-form" hidden>
+            <input class="wt-name" placeholder="timer name — the replace key" required>
+            <label class="ww-lbl">runs <select class="wt-cmd"></select></label>
+            <label class="ww-lbl">first after <input class="wt-start" type="number" min="0" value="1" required>
+              <select class="wt-startunit"></select></label>
+            <label class="ww-lbl"><input class="wt-repeat" type="checkbox"> repeat every
+              <input class="wt-interval" type="number" min="1" value="1">
+              <select class="wt-intervalunit"></select></label>
+            <button type="submit" class="ww-apply">set timer</button>
+            <span class="ww-note"></span>
+          </form>
+        </section>
+        <section>
+          <h4 class="ww-h">event handlers <button class="ww-add ww-event-add" hidden>set a handler ▸</button></h4>
+          <div class="ww-rows ww-event-rows"></div>
+          <form class="ww-form ww-event-form" hidden>
+            <input class="we-name" placeholder="handler name — the replace key" required>
+            <label class="ww-lbl">on <input class="we-bot" placeholder="app (e.g. app, peer)" required>
+              : <input class="we-event" placeholder="event name" required></label>
+            <label class="ww-lbl">runs <select class="we-cmd"></select></label>
+            <button type="submit" class="ww-apply">set handler</button>
+            <span class="ww-note"></span>
+          </form>
+        </section>
+      </div>
+    </div>
+    <div class="wb-conflict" role="alert" aria-live="assertive" hidden>
+      <span class="wc-msg"></span>
+      <button class="wc-theirs">load theirs</button>
+      <button class="wc-mine">overwrite anyway</button>
+    </div>
+    <div class="wb-pane">
+      <div class="wb-editors"></div>
+      <div class="wb-cmds" hidden>
+        <p class="wb-note">Commands are the control's verbs — callable from its
+        js, from other controls, and by agents.</p>
+        <form class="wb-newcmd" hidden>
+          <input class="wc-name" placeholder="new command name" aria-label="New command name">
+          <select class="wc-lang" aria-label="Language">
+            <option value="rust">rust</option>
+            <option value="python">python</option>
+            <option value="flow">flow</option>
+          </select>
+          <label class="wc-lbl">returns <select class="wc-ret" aria-label="Return type"></select></label>
+          <input class="wc-params" placeholder="params — a: String, n: Integer"
+                 aria-label="Parameters">
+          <button type="submit" class="wc-go">+ new command</button>
+          <span class="wc-note"></span>
+        </form>
+        <div class="wb-cmd-rows"></div>
+        <div class="wb-cmd-code" hidden>
+          <div class="wcc-head">
+            <button class="wcc-back">◂ commands</button>
+            <span class="wcc-name"></span>
+            <span class="wcc-type wb-cmd-type"></span>
+            <span class="wcc-sig"></span>
+            <button class="wcc-save" hidden disabled>save ⌘s</button>
+          </div>
+          <label class="wcc-imports-row" hidden>
+            <span class="lbl">imports</span>
+            <textarea class="wcc-imports" rows="2" spellcheck="false"
+              title="file-level use/import statements (the impl record's import field) — saved via set_command_imports"></textarea>
+          </label>
+          <pre class="wcc-err" hidden></pre>
+          <div class="wcc-editor"></div>
+        </div>
+      </div>
+      <div class="wb-scene" hidden>
+        <div class="wb-scene-slot"></div>
+      </div>
+      <div class="wb-three" hidden>
+        <span class="wb-phase">legacy</span>
+        <p class="wb-note">This control carries a legacy <code>three</code>
+        facet (the pre-redesign 3D format — it runs in the platform's
+        <code>app.scenegraph</code>, not here; analysis in
+        <code>docs/three-facet-strategy.md</code>). Shown raw, read-only.
+        The go-forward 3D facet is <code>scene</code>.</p>
+        <div class="wb-three-slot"></div>
+      </div>
+      <p class="wb-absent" hidden></p>
+    </div>
+  </div>
+  <footer class="wb-history">
+    <span class="lbl">local history</span>
+    <div class="wb-hist-chips"></div>
+    <span class="wb-hist-cap">saved through <span class="hi">dev.save_control</span>
+    (fallback) — the shared journal needs the <span class="hi">agent</span>
+    library built on this instance</span>
+  </footer>
+</section>

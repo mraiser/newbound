@@ -1,0 +1,33 @@
+<section class="nb-sceneeditor">
+  <div class="se-toolbar">
+    <button class="se-mode" title="toggle build / play">play ▸</button>
+    <select class="se-add" aria-label="Add a node" title="add a node to the scene">
+      <option value="">+ node…</option>
+    </select>
+    <button class="se-undo" title="undo (⌘z)" disabled>↺</button>
+    <button class="se-redo" title="redo (⇧⌘z)" disabled>↻</button>
+    <button class="se-diagbtn" title="diagnostics">✓</button>
+    <span class="se-flex"></span>
+    <input class="se-label" placeholder="label this save" hidden>
+    <button class="se-save" hidden disabled>save ⌘s</button>
+    <span class="se-cap"></span>
+  </div>
+  <div class="se-conflict" role="alert" hidden>
+    <span class="se-conflict-msg">someone else changed this scene since you loaded it</span>
+    <button class="se-theirs">load theirs</button>
+    <button class="se-mine">overwrite anyway</button>
+  </div>
+  <div class="se-body">
+    <div class="se-canvas"></div>
+    <aside class="se-rail">
+      <nav class="se-tabs" role="tablist">
+        <button data-tab="nodes" class="on">nodes</button>
+        <button data-tab="state">state</button>
+        <button data-tab="bind">bind</button>
+        <button data-tab="wires">wires</button>
+        <button data-tab="mounts">mounts</button>
+      </nav>
+      <div class="se-panel"></div>
+    </aside>
+  </div>
+</section>

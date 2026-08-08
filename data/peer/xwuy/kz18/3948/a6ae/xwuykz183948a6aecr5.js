@@ -53,8 +53,12 @@ me.ready = function(){
   });
 
   json('../security/users', null, function(result){
-    var u = result.data[ME.DATA.id];
-    var g = u.groups[0] ? u.groups : 'anonymous';
+    // A peer that is not (or is no longer) a local user has no record here,
+    // and an unauthorized call carries no data at all. Neither is a reason to
+    // throw: the exception used to abort this callback and leave the rest of
+    // the panel's fields unfilled.
+    var u = (result.data || {})[ME.DATA.id];
+    var g = u && u.groups && u.groups[0] ? u.groups : 'anonymous';
     $(ME).find('.rp-lock').text(g);
   });  
   

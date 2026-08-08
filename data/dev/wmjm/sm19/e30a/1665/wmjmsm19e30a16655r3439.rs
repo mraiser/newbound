@@ -1,0 +1,1 @@
+compile(lib, control_name, cmd_name)

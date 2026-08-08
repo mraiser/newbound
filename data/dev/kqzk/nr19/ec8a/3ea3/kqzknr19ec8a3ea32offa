@@ -1,0 +1,1 @@
+{"data":{"attachmentkeynames":["rs"],"desc":"Create a new library with the given name.","import":"use ndata::dataarray::DataArray;\nuse flowlang::datastore::DataStore;\n","params":[{"name":"lib","type":"String"}],"returntype":"String","type":"rust"},"id":"kqzknr19ec8a3ea32offa","readers":[],"time":1784390864081,"username":"system","writers":[]}

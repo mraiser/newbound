@@ -1,0 +1,190 @@
+/* sceneeditor — the scene facet's workbench pane (scene-facet-design Part V).
+   Canvas + right rail; the stage's DOM labels (.ss-label) are styled here
+   because the stage host lives inside this control. */
+
+.nb-sceneeditor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.nb-sceneeditor .se-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line, #333b44);
+  flex: none;
+}
+.nb-sceneeditor .se-flex { flex: 1; }
+.nb-sceneeditor .se-toolbar button,
+.nb-sceneeditor .se-toolbar select {
+  font: inherit;
+  background: var(--panel2, #262c33);
+  color: var(--text, #d8dee6);
+  border: 1px solid var(--line, #333b44);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.nb-sceneeditor .se-toolbar button:disabled { opacity: 0.45; cursor: default; }
+.nb-sceneeditor .se-mode.playing { border-color: var(--f-3d, #62bd8c); color: var(--f-3d, #62bd8c); }
+.nb-sceneeditor .se-diagbtn.bad { color: var(--danger, #c15a5a); border-color: var(--danger, #c15a5a); }
+.nb-sceneeditor .se-diagbtn.warn { color: var(--accent, #f0a63c); }
+.nb-sceneeditor .se-label {
+  font: inherit;
+  background: var(--panel, #1f242a);
+  color: var(--text, #d8dee6);
+  border: 1px solid var(--line, #333b44);
+  border-radius: 6px;
+  padding: 3px 8px;
+  width: 150px;
+}
+.nb-sceneeditor .se-save { border-color: var(--f-3d, #62bd8c); }
+.nb-sceneeditor .se-cap { color: var(--text-dim, #8a94a0); font-size: 11px; }
+
+.nb-sceneeditor .se-conflict {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: color-mix(in srgb, var(--danger, #c15a5a) 18%, transparent);
+  border-bottom: 1px solid var(--danger, #c15a5a);
+  flex: none;
+}
+.nb-sceneeditor .se-conflict button {
+  font: inherit;
+  border: 1px solid var(--line, #333b44);
+  background: var(--panel2, #262c33);
+  color: var(--text, #d8dee6);
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.nb-sceneeditor .se-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.nb-sceneeditor .se-canvas {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(1200px 500px at 50% -10%, #232a31 0%, #171a1e 70%);
+}
+.nb-sceneeditor .se-canvas .ss-label {
+  color: var(--text, #d8dee6);
+  background: color-mix(in srgb, var(--panel, #1f242a) 82%, transparent);
+  border: 1px solid var(--line, #333b44);
+  border-radius: 5px;
+  padding: 1px 7px;
+  white-space: nowrap;
+  user-select: none;
+  cursor: default;
+}
+
+.nb-sceneeditor .se-rail {
+  width: 290px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--line, #333b44);
+  min-height: 0;
+}
+.nb-sceneeditor .se-tabs {
+  display: flex;
+  flex: none;
+  border-bottom: 1px solid var(--line, #333b44);
+}
+.nb-sceneeditor .se-tabs button {
+  flex: 1;
+  font: inherit;
+  font-size: 11px;
+  padding: 5px 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim, #8a94a0);
+  cursor: pointer;
+}
+.nb-sceneeditor .se-tabs button.on {
+  color: var(--text, #d8dee6);
+  border-bottom-color: var(--f-3d, #62bd8c);
+}
+.nb-sceneeditor .se-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  min-height: 0;
+}
+
+/* rail building blocks */
+.nb-sceneeditor .se-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 5px;
+}
+.nb-sceneeditor .se-row.sel { background: color-mix(in srgb, var(--f-3d, #62bd8c) 14%, transparent); }
+.nb-sceneeditor .se-row .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.nb-sceneeditor .se-row button,
+.nb-sceneeditor .se-panel button {
+  font: inherit;
+  font-size: 11px;
+  background: var(--panel2, #262c33);
+  color: var(--text, #d8dee6);
+  border: 1px solid var(--line, #333b44);
+  border-radius: 5px;
+  padding: 1px 7px;
+  cursor: pointer;
+}
+.nb-sceneeditor .se-panel button:disabled { opacity: 0.45; cursor: default; }
+.nb-sceneeditor .se-kind { color: var(--text-faint, #5c6672); font-size: 10px; }
+.nb-sceneeditor .se-panel h4 {
+  margin: 10px 0 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint, #5c6672);
+}
+.nb-sceneeditor .se-panel input,
+.nb-sceneeditor .se-panel select {
+  font: inherit;
+  font-size: 11px;
+  background: var(--panel, #1f242a);
+  color: var(--text, #d8dee6);
+  border: 1px solid var(--line, #333b44);
+  border-radius: 5px;
+  padding: 2px 6px;
+  max-width: 100%;
+}
+.nb-sceneeditor .se-panel input.num { width: 56px; }
+.nb-sceneeditor .se-panel input.bad { border-color: var(--danger, #c15a5a); }
+.nb-sceneeditor .se-grid3 {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr 1fr;
+  gap: 4px 6px;
+  align-items: center;
+  margin: 4px 0;
+}
+.nb-sceneeditor .se-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 6px 0;
+  align-items: center;
+}
+.nb-sceneeditor .se-note { color: var(--text-dim, #8a94a0); font-size: 11px; }
+.nb-sceneeditor .se-err { color: var(--danger, #c15a5a); font-size: 11px; }
+.nb-sceneeditor .se-diag-list { margin: 4px 0; padding-left: 16px; }
+.nb-sceneeditor .se-diag-list .error { color: var(--danger, #c15a5a); }
+.nb-sceneeditor .se-diag-list .warn { color: var(--accent, #f0a63c); }
+.nb-sceneeditor .se-diag-list .info { color: var(--text-dim, #8a94a0); }
+.nb-sceneeditor .se-expr { width: 100%; }
+.nb-sceneeditor .se-live { color: var(--f-3d, #62bd8c); }

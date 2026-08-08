@@ -6,6 +6,8 @@ let mut meta = DataObject::new();
 meta.put_string("username", "system");
 meta.put_array("readers", readers);
 meta.put_array("writers", writers);
+meta.put_object("cargo", DataObject::from_string(r#"{"crate_types":["dylib"],"dependencies":{},"ffi":true}"#));
+meta.put_string("root", &lib);
 
 let path2 = path.join("meta.json");
 fs::write(path2, meta.to_string()).expect("Unable to write file");
