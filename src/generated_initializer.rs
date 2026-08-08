@@ -2,6 +2,7 @@
 use flowlang::rustcmd::{RustCmd, Transform};
 use flowlang::datastore::DataStore;
 use ndata::NDataConfig;
+use cmd;
 use newbound_core;
 
 pub fn initialize_all_commands(magic: (&'static str, NDataConfig)) {
@@ -10,6 +11,16 @@ pub fn initialize_all_commands(magic: (&'static str, NDataConfig)) {
         globals.put_object("RUST_COMMANDS", ndata::dataobject::DataObject::new());
     }
     let mut cmd_map = globals.get_object("RUST_COMMANDS");
+
+    // Initialize crate: cmd
+    {
+        let mut cmds = Vec::<(String, Transform, String)>::new();
+        cmd::cmdinit(&mut cmds);
+        for q in cmds {
+            let cmd_details = RustCmd::detail(q.0.to_owned(), q.1, q.2.to_owned());
+            cmd_map.put_object(&q.0, cmd_details);
+        }
+    }
 
     // Initialize crate: newbound_core
     {

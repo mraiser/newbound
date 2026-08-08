@@ -4,11 +4,49 @@ use flowlang::datastore::DataStore;
 use std::fs;
 
 pub fn execute(o: DataObject) -> DataObject {
-    let arg_0: String = o.get_string("id");
-    let ax = get_library_config(arg_0);
-    let mut result_obj = DataObject::new();
+    use std::panic;
+    for p in ["id"] {
+        if !o.has(p) {
+            let mut e = DataObject::new();
+            e.put_string("status", "err");
+            e.put_string("msg", &format!("missing required parameter: {}", p));
+            let mut result_obj = DataObject::new();
+            result_obj.put_object("a", e);
+            return result_obj;
+        }
+    }
+    let ax = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        let arg_0: String = o.get_string("id");
+        get_library_config(arg_0)
+    }));
+    match ax {
+        Ok(ax) => {
+            let mut result_obj = DataObject::new();
     result_obj.put_object("a", ax);
-    result_obj
+            result_obj
+        }
+        Err(err) => {
+            let mut err_obj = DataObject::new();
+            err_obj.put_string("status", "err");
+
+            let msg = if let Some(s) = err.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = err.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "Unknown panic occurred".to_string()
+            };
+
+            err_obj.put_string("msg", &msg);
+            // Wrapped in the same `a` envelope a successful return uses.
+            // Unwrapped, callers that unpack the envelope (newbound's
+            // format_result, for one) report an opaque 500 — "Not an object:
+            // DString(\"err\")" — instead of this message.
+            let mut result_obj = DataObject::new();
+            result_obj.put_object("a", err_obj);
+            result_obj
+        }
+    }
 }
 
 pub fn get_library_config(id: String) -> DataObject {
@@ -53,6 +91,7 @@ pub fn get_library_config(id: String) -> DataObject {
 
     // Extract settings from meta_do.cargo object
     // Note: library_root is no longer sourced from here.
+    let mut ffi_output = false;   // cargo.ffi — see the read below
     let mut response_types_array_output = DataArray::new(); // Made mutable
     let mut dependencies_string_lines_output: Vec<String> = Vec::new();
 
@@ -60,6 +99,19 @@ pub fn get_library_config(id: String) -> DataObject {
         let cargo_prop = meta_do.get_property("cargo");
         if cargo_prop.is_object() {
             let cargo_do = meta_do.get_object("cargo"); // cargo_do is a new handle
+
+            // Get "ffi" from cargo.ffi — the flag that makes this library's
+            // crate a hot-loadable dylib (and excludes it from the cargo
+            // workspace). Absent means false; a non-boolean is reported false
+            // rather than panicking the read.
+            if cargo_do.has("ffi") {
+                let ffi_prop = cargo_do.get_property("ffi");
+                if ffi_prop.is_boolean() {
+                    ffi_output = cargo_do.get_boolean("ffi");
+                } else {
+                    eprintln!("WARN: 'cargo.ffi' in meta.json for '{}' is not a boolean.", library_id);
+                }
+            }
 
             // Get "library_types" from cargo.crate_types
             if cargo_do.has("crate_types") {
@@ -108,6 +160,7 @@ pub fn get_library_config(id: String) -> DataObject {
     }
 
     // library_root is already put as "root"
+    config_response_do.put_boolean("ffi", ffi_output);
     config_response_do.put_array("library_types", response_types_array_output); // response_types_array_output is moved
     config_response_do.put_string("library_dependencies", &dependencies_string_lines_output.join("\n"));
 

@@ -1,5 +1,7 @@
 // This file is auto-generated and managed by the flowlang build script.
 use flowlang::rustcmd::Transform;
+pub mod code;
+pub mod editcommand;
 pub mod plugins;
 pub mod libsettings;
 pub mod github;
@@ -11,4 +13,6 @@ pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
     github::cmdinit(cmds);
     libsettings::cmdinit(cmds);
     plugins::cmdinit(cmds);
+    editcommand::cmdinit(cmds);
+    code::cmdinit(cmds);
 }

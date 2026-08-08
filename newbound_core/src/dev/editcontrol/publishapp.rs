@@ -24,11 +24,49 @@ use aes::cipher::{
 use flowlang::x25519::*;
 
 pub fn execute(o: DataObject) -> DataObject {
-    let arg_0: DataObject = o.get_object("data");
-    let ax = publishapp(arg_0);
-    let mut result_obj = DataObject::new();
+    use std::panic;
+    for p in ["data"] {
+        if !o.has(p) {
+            let mut e = DataObject::new();
+            e.put_string("status", "err");
+            e.put_string("msg", &format!("missing required parameter: {}", p));
+            let mut result_obj = DataObject::new();
+            result_obj.put_object("a", e);
+            return result_obj;
+        }
+    }
+    let ax = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        let arg_0: DataObject = o.get_object("data");
+        publishapp(arg_0)
+    }));
+    match ax {
+        Ok(ax) => {
+            let mut result_obj = DataObject::new();
     result_obj.put_array("a", ax);
-    result_obj
+            result_obj
+        }
+        Err(err) => {
+            let mut err_obj = DataObject::new();
+            err_obj.put_string("status", "err");
+
+            let msg = if let Some(s) = err.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = err.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "Unknown panic occurred".to_string()
+            };
+
+            err_obj.put_string("msg", &msg);
+            // Wrapped in the same `a` envelope a successful return uses.
+            // Unwrapped, callers that unpack the envelope (newbound's
+            // format_result, for one) report an opaque 500 — "Not an object:
+            // DString(\"err\")" — instead of this message.
+            let mut result_obj = DataObject::new();
+            result_obj.put_object("a", err_obj);
+            result_obj
+        }
+    }
 }
 
 pub fn publishapp(data: DataObject) -> DataArray {
@@ -149,7 +187,10 @@ for lib in libs {
     let zipfile = devroot.join(&(lib.to_owned()+"_"+&(libversion-1).to_string()+".zip"));
     let _x = remove_file(zipfile);
     let zipfile = devroot.join(&(lib.to_owned()+"_"+&libversion.to_string()+".zip"));
-    zip(dir.to_owned(), zipfile.into_os_string().into_string().unwrap());
+    let success = zip(dir.to_owned(), zipfile.into_os_string().into_string().unwrap());
+    if !success {
+        panic!("Zip command failed! Please check if 'zip' is installed and in your PATH.");
+    }
     let h = hash(dir.to_owned());
     fs::write(hashfile, &h).expect("Unable to write file");
     

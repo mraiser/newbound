@@ -7,16 +7,56 @@ use ndata::data::Data;
 use crate::peer::service::listen::get_best;
 use crate::security::security::init::get_user;
 use flowlang::command::Command;
+use flowlang::flowlang::system::time::time;
+use crate::peer::service::listen::P2PConnection;
 
 pub fn execute(o: DataObject) -> DataObject {
-    let arg_0: String = o.get_string("uuid");
-    let arg_1: String = o.get_string("app");
-    let arg_2: String = o.get_string("cmd");
-    let arg_3: DataObject = o.get_object("params");
-    let ax = exec(arg_0, arg_1, arg_2, arg_3);
-    let mut result_obj = DataObject::new();
+    use std::panic;
+    for p in ["uuid", "app", "cmd", "params"] {
+        if !o.has(p) {
+            let mut e = DataObject::new();
+            e.put_string("status", "err");
+            e.put_string("msg", &format!("missing required parameter: {}", p));
+            let mut result_obj = DataObject::new();
+            result_obj.put_object("a", e);
+            return result_obj;
+        }
+    }
+    let ax = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        let arg_0: String = o.get_string("uuid");
+        let arg_1: String = o.get_string("app");
+        let arg_2: String = o.get_string("cmd");
+        let arg_3: DataObject = o.get_object("params");
+        exec(arg_0, arg_1, arg_2, arg_3)
+    }));
+    match ax {
+        Ok(ax) => {
+            let mut result_obj = DataObject::new();
     result_obj.put_object("a", ax);
-    result_obj
+            result_obj
+        }
+        Err(err) => {
+            let mut err_obj = DataObject::new();
+            err_obj.put_string("status", "err");
+
+            let msg = if let Some(s) = err.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = err.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "Unknown panic occurred".to_string()
+            };
+
+            err_obj.put_string("msg", &msg);
+            // Wrapped in the same `a` envelope a successful return uses.
+            // Unwrapped, callers that unpack the envelope (newbound's
+            // format_result, for one) report an opaque 500 — "Not an object:
+            // DString(\"err\")" — instead of this message.
+            let mut result_obj = DataObject::new();
+            result_obj.put_object("a", err_obj);
+            result_obj
+        }
+    }
 }
 
 pub fn exec(uuid: String, app: String, cmd: String, params: DataObject) -> DataObject {
@@ -90,12 +130,20 @@ let name = match user.has("displayname") {
   _ => uuid.to_string()
 };
 let mut timeout = 0;
+let mut numtimes = 0; // FIXME - Major hack
 while ! res.has(pidstr) {
   // TIGHTLOOP
   timeout += 1;
   let beat = Duration::from_millis(timeout);
   thread::sleep(beat);
-  if timeout > 450 { println!("Unusually long wait in peer:service:exec [{}/{}/{}/{}]", &name, &app, &cmd, pid); timeout = 0; }
+  if timeout > 450 { 
+    println!("Unusually long wait in peer:service:exec [{}/{}/{}/{}]", &name, &app, &cmd, pid); 
+    if numtimes > 4 || time() - stream.last_contact() > 120000 { // WTF?!
+      return DataObject::from_string("{\"status\":\"err\",\"msg\":\"SERVICE EXEC TIMEOUT\"}"); 
+    }
+    timeout = 0;
+    numtimes += 1;
+  }
   
   wait();
 }

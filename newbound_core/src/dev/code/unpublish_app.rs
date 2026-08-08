@@ -1,0 +1,115 @@
+use flowlang::datastore::DataStore;
+use flowlang::flowlang::file::read_properties::read_properties;
+use flowlang::flowlang::file::write_properties::write_properties;
+use ndata::dataobject::DataObject;
+pub fn execute(o: DataObject) -> DataObject {
+    use std::panic;
+    for p in ["lib", "app", "remove_runtime", "author"] {
+        if !o.has(p) {
+            let mut e = DataObject::new();
+            e.put_string("status", "err");
+            e.put_string("msg", &format!("missing required parameter: {}", p));
+            let mut result_obj = DataObject::new();
+            result_obj.put_object("a", e);
+            return result_obj;
+        }
+    }
+    let ax = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        let arg_0: String = o.get_string("lib");
+        let arg_1: String = o.get_string("app");
+        let arg_2: bool = o.get_boolean("remove_runtime");
+        let arg_3: String = o.get_string("author");
+        unpublish_app(arg_0, arg_1, arg_2, arg_3)
+    }));
+    match ax {
+        Ok(ax) => {
+            let mut result_obj = DataObject::new();
+    result_obj.put_object("a", ax);
+            result_obj
+        }
+        Err(err) => {
+            let mut err_obj = DataObject::new();
+            err_obj.put_string("status", "err");
+
+            let msg = if let Some(s) = err.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = err.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "Unknown panic occurred".to_string()
+            };
+
+            err_obj.put_string("msg", &msg);
+            // Wrapped in the same `a` envelope a successful return uses.
+            // Unwrapped, callers that unpack the envelope (newbound's
+            // format_result, for one) report an opaque 500 — "Not an object:
+            // DString(\"err\")" — instead of this message.
+            let mut result_obj = DataObject::new();
+            result_obj.put_object("a", err_obj);
+            result_obj
+        }
+    }
+}
+
+pub fn unpublish_app(lib: String, app: String, remove_runtime: bool, author: String) -> DataObject {
+// The missing half of publishapp, and the deliberate act the deletion
+// refusals point at ("unpublish first"). Removes the app descriptor
+// (data/<lib>/_APPS/<app>) and the app's config.properties apps= entry
+// (publishapp appends there itself, so this is symmetric), then refreshes
+// the in-memory snapshot - the app stops being served immediately, no
+// restart. remove_runtime additionally deletes runtime/<app>: right for an
+// app whose runtime tree was publish-generated (the bench boot's was),
+// WRONG for one with hand-authored platform files (dev's carries
+// template.html and preview.html) - the caller decides, on purpose.
+// The journal has no home for this (descriptors are not records); the
+// canonical repo's git history is the record.
+
+let _author = author;
+let store = DataStore::new();
+let approot = store.root.join(&lib).join("_APPS").join(&app);
+if !approot.join("app.properties").exists() {
+    let mut o = DataObject::new();
+    o.put_string("status", "err");
+    o.put_string("msg", &format!("No published app '{}' in library '{}' (_APPS/{}/app.properties not found)", app, lib, app));
+    return o;
+}
+let _x = std::fs::remove_dir_all(&approot);
+
+let mut removed_runtime = false;
+if remove_runtime {
+    let rt = store.root.parent().unwrap().join("runtime").join(&app);
+    if rt.exists() {
+        let _x = std::fs::remove_dir_all(&rt);
+        removed_runtime = true;
+    }
+}
+
+// config.properties may be absent (a repo checkout ships only the
+// example); the apps= edit is instance state, skipped when so.
+let configfile = store.root.parent().unwrap().join("config.properties");
+let mut config_edited = false;
+if configfile.exists() {
+    let path = configfile.to_owned().into_os_string().into_string().unwrap();
+    let mut config = read_properties(path.to_owned());
+    if config.has("apps") {
+        let s = config.get_string("apps");
+        let kept: Vec<&str> = s.split(",").filter(|x| *x != app.as_str()).collect();
+        let joined = kept.join(",");
+        if joined != s {
+            config.put_string("apps", &joined);
+            write_properties(path, config);
+            config_edited = true;
+        }
+    }
+}
+
+flowlang::appserver::init_globals();
+
+let mut o = DataObject::new();
+o.put_string("status", "ok");
+o.put_string("msg", &format!("App '{}' unpublished from library '{}'", app, lib));
+o.put_boolean("removed_runtime", removed_runtime);
+o.put_boolean("config_edited", config_edited);
+o
+
+}
