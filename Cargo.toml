@@ -18,7 +18,7 @@ javascript_runtime = ["flowlang/javascript_runtime"]
 cmd = { path = "./cmd" }
 newbound_core = { path = "./newbound_core" }
 
-flowlang = { version="0.3.28" }
+flowlang = { version="0.3.30" }
 ndata = "0.3.16"
 
 serde = { version = "^1.0", features = ["derive"], optional = true }
