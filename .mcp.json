@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "newbound": {
+      "command": "./target/release/newbound",
+      "args": ["mcp"]
+    }
+  }
+}

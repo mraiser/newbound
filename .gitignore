@@ -67,3 +67,12 @@ data/xoxo
 /runtime/imgproc
 /runtime/testflow
 /runtime/xoxo
+
+# The agent library set (mraiser/newbound-agent) overlays here via
+# symlinks (its tools/overlay.sh). Never tracked in this repo.
+/data/agent
+/data/kb
+/data/scratch
+/agent
+/kb
+/scratch
