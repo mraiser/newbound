@@ -22,6 +22,14 @@ export function init(host, { name, onOpen }) {
     /** Fill in description + facet dots once the control record is loaded. */
     setRecord(record) {
       root.querySelector(".c-desc").textContent = record?.desc ?? "";
+      // The access badge: the security-group string verbatim; open
+      // (anonymous) shows nothing; no groups = the platform default,
+      // admin-only.
+      const gateEl = root.querySelector(".c-gate");
+      const g = (record?.groups ?? "").trim();
+      const open = g.split(",").map((s) => s.trim()).includes("anonymous");
+      gateEl.textContent = record ? (g ? (open ? "" : `⛨ ${g}`) : "⛨ admin") : "";
+      gateEl.title = g ? `security groups: ${g}` : "admin only — no groups granted";
       for (const dot of dotsEl.children) {
         const facet = dot.dataset.facet;
         // The 3d dot lights on the scene facet OR the legacy three facet

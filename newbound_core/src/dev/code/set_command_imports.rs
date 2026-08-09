@@ -131,7 +131,13 @@ let mut impl_doc = store.get_data(&lib, &impl_id).get_object("data");
 let old_imports = if impl_doc.has("import") { impl_doc.get_string("import") } else { "".to_string() };
 impl_doc.put_string("import", &imports.replace("\r", ""));
 
-data::write::write(lib.clone(), impl_id.clone(), impl_doc, DataArray::new(), DataArray::new());
+// Preserve the record's existing readers/writers — data::write::write stamps
+// whatever it is passed, and an imports edit must not reset a gated command
+// to admin-only (the arrays dev.code.set_groups derives).
+let ex = store.get_data(&lib, &impl_id);
+let ex_readers = if ex.has("readers") { ex.get_array("readers") } else { DataArray::new() };
+let ex_writers = if ex.has("writers") { ex.get_array("writers") } else { DataArray::new() };
+data::write::write(lib.clone(), impl_id.clone(), impl_doc, ex_readers, ex_writers);
 
 // Compile via Command rather than the typed api: survives regeneration of
 // the dev library under any wrapper template (the upsert_command posture).

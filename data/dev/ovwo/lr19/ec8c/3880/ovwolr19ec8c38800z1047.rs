@@ -101,7 +101,18 @@ if store.exists(&lib, &ctlid) {
   nucmd_doc.put_string("type", "rust");
   nucmd_doc.put_string("rust", &rustid);
   
-  data::write::write(lib.clone(), nuid.clone(), nucmd_doc, DataArray::new(), DataArray::new());
+  // Preserve an existing command's readers/writers across the upsert — the
+  // meta record's readers are exactly what check_security consults, so
+  // re-upserting a gated command must not reset it to admin-only. A NEW
+  // command still starts with empty arrays (= admin-only until set_groups).
+  let mut nu_readers = DataArray::new();
+  let mut nu_writers = DataArray::new();
+  if store.exists(&lib, &nuid) {
+      let exmeta = store.get_data(&lib, &nuid);
+      if exmeta.has("readers") { nu_readers = exmeta.get_array("readers"); }
+      if exmeta.has("writers") { nu_writers = exmeta.get_array("writers"); }
+  }
+  data::write::write(lib.clone(), nuid.clone(), nucmd_doc, nu_readers, nu_writers);
   
   let mut nurust = if store.exists(&lib, &rustid) {
       store.get_data(&lib, &rustid).get_object("data")
@@ -124,7 +135,15 @@ if store.exists(&lib, &ctlid) {
   nurust.put_string("returntype", &return_type);
   nurust.put_string("type", &lang);
   
-  data::write::write(lib.clone(), rustid.clone(), nurust, DataArray::new(), DataArray::new());
+  // Same preservation for the impl record (old editcommand kept both in sync).
+  let mut imp_readers = DataArray::new();
+  let mut imp_writers = DataArray::new();
+  if store.exists(&lib, &rustid) {
+      let eximpl = store.get_data(&lib, &rustid);
+      if eximpl.has("readers") { imp_readers = eximpl.get_array("readers"); }
+      if eximpl.has("writers") { imp_writers = eximpl.get_array("writers"); }
+  }
+  data::write::write(lib.clone(), rustid.clone(), nurust, imp_readers, imp_writers);
   
   // Compile via Command rather than the typed api: survives regeneration of the
   // dev library under any wrapper template, and reads the result defensively.
