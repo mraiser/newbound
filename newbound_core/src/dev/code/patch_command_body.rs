@@ -144,8 +144,14 @@ if !normalized_current.contains(&normalized_old) {
 let new_code = normalized_current.replace(&normalized_old, &new_snippet.replace("\r", ""));
 impl_doc.put_string(&ext, &new_code);
 
-// Save the updated implementation back to the datastore
-data::write::write(lib.clone(), impl_id.clone(), impl_doc, DataArray::new(), DataArray::new());
+// Save the updated implementation back to the datastore, PRESERVING the
+// record's existing readers/writers: data::write::write stamps whatever it
+// is passed, and a code edit must not reset a gated command to admin-only
+// (the arrays dev.code.set_groups derives from the groups string).
+let ex = store.get_data(&lib, &impl_id);
+let ex_readers = if ex.has("readers") { ex.get_array("readers") } else { DataArray::new() };
+let ex_writers = if ex.has("writers") { ex.get_array("writers") } else { DataArray::new() };
+data::write::write(lib.clone(), impl_id.clone(), impl_doc, ex_readers, ex_writers);
 
 // Compile, and report a failure in the SAME shape upsert_command and
 // set_command_imports use: {status:"err", kind:"compile_error", msg}.

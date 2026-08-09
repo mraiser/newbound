@@ -543,8 +543,10 @@ export async function init(host, { lib, ctlId, toast }) {
     metaEl.querySelector(".wm-tags-view").textContent =
       record.tags ? `tags: ${record.tags}` : "";
     const g = metaEl.querySelector(".wm-groups-view");
-    g.textContent = record.groups ? `security groups: ${record.groups}` : "";
+    g.textContent = record.groups
+      ? `security groups: ${record.groups}` : "security: admin only";
     metaEl.querySelector(".wm-edit").hidden = !patchMode;
+    metaEl.querySelector(".wm-groups-btn").hidden = !patchMode;
     // publish rides dev commands, not the agent lib — live mode is enough
     metaEl.querySelector(".wm-publish").hidden = store.mode() !== "live";
   }
@@ -590,6 +592,49 @@ export async function init(host, { lib, ctlId, toast }) {
     renderMeta();
     toast.show(dArg && tChanged ? "meta + tags → saved"
       : dArg ? "set_control_meta → saved" : "set_tags → saved");
+  });
+
+  // ── groups (set_groups — the deliberate permission act) ────
+  // Its own affordance and form, never part of the meta form (the
+  // 2026-07-31 correction). Writes the control's groups string and derives
+  // the enforced readers on the control record AND its inline data records
+  // — the records app.read serves, so this is what gates rendering for
+  // non-admin users.
+  metaEl.querySelector(".wm-groups-btn").addEventListener("click", async () => {
+    const form = metaEl.querySelector(".wm-groups-form");
+    form.hidden = !form.hidden;
+    if (!form.hidden) {
+      const input = form.querySelector(".wm-groups-in");
+      input.value = record.groups ?? "";
+      form.querySelector(".wm-groups-note").textContent = "";
+      form.querySelector(".wm-groups-apply").textContent = "set groups";
+      input.focus();
+      const known = await store.securityGroups();
+      form.querySelector(".wm-groups-known").textContent =
+        known.length ? `known groups: ${known.join(", ")}` : "";
+    }
+  });
+
+  metaEl.querySelector(".wm-groups-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const form = metaEl.querySelector(".wm-groups-form");
+    const note = form.querySelector(".wm-groups-note");
+    const apply = form.querySelector(".wm-groups-apply");
+    const v = form.querySelector(".wm-groups-in").value.trim();
+    if (v === (record.groups ?? "").trim()) { note.textContent = "nothing changed"; return; }
+    if (!v && apply.textContent !== "really clear? (admin-only)") {
+      apply.textContent = "really clear? (admin-only)";
+      setTimeout(() => { apply.textContent = "set groups"; }, 2500);
+      return;
+    }
+    const r = await store.setGroups(lib, name, "", v);
+    if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
+    if (v) record.groups = v; else delete record.groups;
+    store.invalidateControl(lib, ctlId);
+    form.hidden = true;
+    apply.textContent = "set groups";
+    renderMeta();
+    toast.show(`set_groups → readers [${(r.readers ?? []).join(", ") || "— admin only"}] on this control + its inline data`);
   });
 
   // ── publish (G-6, reusing dev.editcontrol) ────────────────
@@ -1294,7 +1339,7 @@ export async function init(host, { lib, ctlId, toast }) {
           detail.querySelector(".cm-tags").textContent =
             meta.tags ? `tags: ${meta.tags}` : "";
           detail.querySelector(".cm-groups").textContent =
-            meta.groups ? `security groups: ${meta.groups}` : "";
+            meta.groups ? `security groups: ${meta.groups}` : "security: admin only";
           return;
         }
         detail.innerHTML = `
@@ -1302,9 +1347,34 @@ export async function init(host, { lib, ctlId, toast }) {
           <input class="cm-tags-in" placeholder="tags (comma-delimited — categorization, never security)">
           <button class="cm-apply">set</button>
           <button class="cm-gen" title="Draft a description from the command's code (agent.plugin.describe_command)">generate ▸</button>
+          <input class="cm-groups-in"
+            placeholder="security groups (comma-delimited) — empty = admin only"
+            title="who can execute this command — check_security reads the readers derived from this">
+          <button class="cm-groups-apply"
+            title="the deliberate set_groups act — writes the groups string and derives the enforced readers on this command's meta + impl records">set groups</button>
           <span class="cm-note"></span>`;
         detail.querySelector(".cm-desc-in").value = meta.desc;
         detail.querySelector(".cm-tags-in").value = meta.tags;
+        detail.querySelector(".cm-groups-in").value = meta.groups ?? "";
+        const groupsApply = detail.querySelector(".cm-groups-apply");
+        groupsApply.addEventListener("click", async () => {
+          const note = detail.querySelector(".cm-note");
+          const gv = detail.querySelector(".cm-groups-in").value.trim();
+          if (gv === (meta.groups ?? "").trim()) { note.textContent = "groups: nothing changed"; return; }
+          if (!gv && groupsApply.textContent !== "really clear? (admin-only)") {
+            groupsApply.textContent = "really clear? (admin-only)";
+            setTimeout(() => { groupsApply.textContent = "set groups"; }, 2500);
+            return;
+          }
+          const r = await store.setGroups(lib, name, cmdEntry.name, gv);
+          if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
+          meta.groups = gv;
+          groupsApply.textContent = "set groups";
+          store.invalidateControl(lib, cmdEntry.id);
+          store.invalidateControl(lib, meta.implId);
+          note.textContent = "";
+          toast.show(`set_groups → readers [${(r.readers ?? []).join(", ") || "— admin only"}] on ${cmdEntry.name}`);
+        });
         detail.querySelector(".cm-gen").addEventListener("click", async () => {
           const note = detail.querySelector(".cm-note");
           const gen = detail.querySelector(".cm-gen");

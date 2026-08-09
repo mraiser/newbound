@@ -53,6 +53,8 @@
     <p class="fh-desc"></p>
     <div class="fh-tools" hidden>
       <button class="fh-meta-btn" hidden>meta ▸</button>
+      <button class="fh-groups-btn" hidden
+        title="security groups — who can see and run this library's contents; the deliberate set_groups act, distinct from meta">groups ▸</button>
       <button class="fh-assets-btn">assets ▸</button>
       <button class="fh-settings-btn">rust settings ▸</button>
       <button class="fh-rebuild-btn" hidden>rebuild ▸</button>
@@ -65,6 +67,20 @@
       <input class="fm-tags" placeholder="tags (comma-delimited — categorization, never security)">
       <button type="submit" class="fm-apply">set</button>
       <span class="fm-note"></span>
+    </form>
+    <form class="fh-groups" hidden>
+      <p class="fg-cap">The library gate: comma-delimited security groups,
+      written to <code>meta.json</code> as both the <code>groups</code>
+      string and the enforced <code>readers</code> array
+      (<code>set_groups</code>). Empty = admin-only. The convention for a
+      library serving non-admin users is <code>anonymous</code> here, with
+      fine-grained groups on individual controls and commands. Takes effect
+      on restart.</p>
+      <input class="fg-input"
+        placeholder="groups (comma-delimited, e.g. anonymous) — empty = admin only">
+      <span class="fg-known lbl"></span>
+      <button type="submit" class="fg-apply">set groups</button>
+      <span class="fg-note"></span>
     </form>
     <div class="fh-assets" hidden>
       <p class="fa-cap">The library's <code>_ASSETS</code> files, served at

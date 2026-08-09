@@ -272,7 +272,9 @@
 .nb-workbench .wb-meta .wm-view.empty { color: var(--text-faint); font-style: italic; }
 .nb-workbench .wb-meta .wm-groups-view { font: 10.5px var(--mono); color: var(--text-faint); }
 .nb-workbench .wb-meta .wm-edit,
+.nb-workbench .wb-meta .wm-groups-btn,
 .nb-workbench .wb-cmd-open { font: 10.5px var(--mono); color: var(--accent); }
+.nb-workbench .wm-groups-form,
 .nb-workbench .wm-form {
   flex-basis: 100%;
   display: flex;
@@ -281,6 +283,7 @@
   flex-wrap: wrap;
 }
 .nb-workbench .wm-form input,
+.nb-workbench .wm-groups-form input,
 .nb-workbench .wb-cmd-meta input {
   background: var(--panel-2);
   border: 1px solid var(--line);
@@ -291,7 +294,9 @@
   flex: 1 1 180px;
 }
 .nb-workbench .wm-form .wm-apply,
-.nb-workbench .wb-cmd-meta .cm-apply {
+.nb-workbench .wm-groups-form .wm-groups-apply,
+.nb-workbench .wb-cmd-meta .cm-apply,
+.nb-workbench .wb-cmd-meta .cm-groups-apply {
   font: 11px var(--mono);
   color: var(--ground);
   background: var(--accent);
@@ -299,7 +304,9 @@
   padding: 4px 12px;
 }
 .nb-workbench .wm-form .wm-note,
+.nb-workbench .wm-groups-form .wm-groups-note,
 .nb-workbench .wb-cmd-meta .cm-note { font: 10.5px var(--mono); color: var(--danger); }
+.nb-workbench .wm-groups-known { flex-basis: 100%; font: 10.5px var(--mono); color: var(--text-faint); }
 
 .nb-workbench .wb-cmd-meta {
   display: flex;
@@ -325,6 +332,7 @@
 /* the hidden attribute must always win over author display rules */
 .nb-workbench .wb-conflict[hidden],
 .nb-workbench .wm-form[hidden],
+.nb-workbench .wm-groups-form[hidden],
 .nb-workbench .wb-cmd-meta[hidden],
 .nb-workbench .wb-editors[hidden] { display: none; }
 
