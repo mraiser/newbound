@@ -636,9 +636,9 @@ dependencies = [
 
 [[package]]
 name = "flowlang"
-version = "0.3.30"
+version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b633caa454e249a0cef01b6e1d1b38fed1efe668c29321e907d9bcda282fef1"
+checksum = "62a4a691b3508c78de7b1f9c91b7cc331e3020242f33b22072bc0ea42b7654e2"
 dependencies = [
  "deno_core",
  "jni 0.21.1",
@@ -1631,9 +1631,9 @@ dependencies = [
 
 [[package]]
 name = "ndata"
-version = "0.3.16"
+version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d62fa11d0371311a6dec4ce79f6f0c595ece8f8019af338db94f04dcc3ff53fa"
+checksum = "f3d9d3922a5311cc8a7c6b3d62ece7d2b4a913e34923fcd3218a1d115c105129"
 dependencies = [
  "serde_json",
 ]

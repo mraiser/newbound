@@ -1,4 +1,5 @@
 [workspace]
+exclude = ["agent", "scratch", "kb"]
 resolver = "2"
 
 [package]
@@ -18,8 +19,8 @@ javascript_runtime = ["flowlang/javascript_runtime"]
 cmd = { path = "./cmd" }
 newbound_core = { path = "./newbound_core" }
 
-flowlang = { version="0.3.30" }
-ndata = "0.3.16"
+flowlang = { version="0.3.31" }
+ndata = "0.3.17"
 
 serde = { version = "^1.0", features = ["derive"], optional = true }
 serde_json = { version = "^1.0", optional = true }
