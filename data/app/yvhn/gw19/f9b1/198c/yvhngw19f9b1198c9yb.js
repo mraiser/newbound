@@ -40,8 +40,13 @@ const defs = new Map();
 // plugins render into the slot). Fetched once per page, fire-and-forget.
 let pluginsP = null;
 function pluginEntries(store) {
+  // store.invoke wraps the reply as {envelope, ms} (or an Error value) —
+  // unwrap before reading status, or the registry always reads as empty.
   pluginsP ??= store.invoke("dev", "plugins", "list_plugins", {})
-    .then((r) => (r && r.status === "ok" && r.data) ? r.data : {})
+    .then((r) => {
+      const env = (r && !(r instanceof Error)) ? r.envelope : null;
+      return (env && env.status === "ok" && env.data) ? env.data : {};
+    })
     .catch(() => ({}));
   return pluginsP;
 }

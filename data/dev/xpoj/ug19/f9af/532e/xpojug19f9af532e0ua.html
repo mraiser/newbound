@@ -3,7 +3,7 @@
   <header class="ss-head">
     <span class="lbl ss-title">▤ session</span>
     <span class="ss-sub">a notebook over your commands — every cell is a call, outputs stay put</span>
-    <button class="ss-newctx" title="Insert a divider — the agent's memory resets here; the cells stay">─ new context</button>
+    <button class="ss-newctx" title="Insert a divider — conversation context resets here; the cells stay">─ new context</button>
     <button class="ss-wipe" title="Delete every cell in this notebook">wipe</button>
     <button class="ss-max" aria-pressed="false" title="Toggle full screen">◱ full</button>
     <button class="ss-close" aria-label="Close session">✕</button>
@@ -18,33 +18,16 @@
              aria-label="Arguments as JSON">
       <button class="ss-run">run ▸</button>
     </div>
-    <div class="ss-chatrow">
-      <span class="ss-gutter">[✳]</span>
-      <textarea class="ss-ask" rows="1"
-        placeholder="or ask in plain language — the agent sees your context and this notebook"
-        aria-label="Ask the agent"></textarea>
-      <button class="ss-send">ask ▸</button>
-    </div>
-    <div class="ss-ctx">
-      <span class="ctxlbl">context</span>
-      <div class="ss-ctx-rows"></div>
-      <button class="ss-tools" aria-pressed="false">tools ▸</button>
-    </div>
-    <div class="ss-toolpick" hidden>
-      <p class="ss-toolcap">Attached tools ride along with full schemas (a
-      sensible core set by default; pin/unpin here, persisted in this
-      browser). The agent can discover and call <b>every</b> command
-      regardless — find_tools/call_command — with the same per-call gates:
-      reads run directly, anything mutating stops at the typed confirm.</p>
-      <div class="ss-toollist"></div>
-    </div>
+    <!-- the plugin slot: the registry (dev.plugins) decides what, if
+         anything, mounts here — the notebook doesn't know or care -->
+    <div class="ss-plugins"></div>
     <div class="ss-confirm" hidden>
       <span class="ss-confirm-msg"></span>
       <input class="ss-confirm-input" aria-label="Type the command name to confirm">
       <button class="ss-confirm-cancel">cancel</button>
     </div>
-    <p class="ss-cap">Read-listed commands run directly — yours and the
-    agent's. Anything else needs a writable connection and a typed
-    confirmation — same rules as the bench.</p>
+    <p class="ss-cap">Read-listed commands run directly. Anything else
+    needs a writable connection and a typed confirmation — same rules as
+    the bench.</p>
   </div>
 </aside>

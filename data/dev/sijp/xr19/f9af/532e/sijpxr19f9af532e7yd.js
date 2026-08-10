@@ -12,16 +12,6 @@ import { store } from "../../assets/store.js";
 import { FACETS } from "../../assets/facets.js";
 import { chatctx } from "../../assets/chatctx.js";
 
-// The ask-provider socket — an optional module named `ask`, installed by
-// whatever add-on registers it through the plugin registry. The workbench
-// names no providing library; it powers the generate ▸ desc drafter.
-// ask === null ⇒ the button never renders.
-const ask = await (async () => {
-  const P = globalThis.__benchPlatform ?? null;
-  if (P && !P.moduleUrls["assets/ask.js"]) return null;
-  try { return await import("../../assets/ask.js"); } catch { return null; }
-})();
-
 const UI_FACETS = new Set(["html", "css", "js"]);
 const CMD_LANGS = ["rust", "js", "java", "python", "py", "flow"];
 const EDITOR_LANG = { html: "html", css: "css", js: "js", data: "json", three: "json" };
@@ -1356,7 +1346,7 @@ export async function init(host, { lib, ctlId, toast }) {
           <input class="cm-desc-in" placeholder="describe this command — agents read this">
           <input class="cm-tags-in" placeholder="tags (comma-delimited — categorization, never security)">
           <button class="cm-apply">set</button>
-          ${ask ? `<button class="cm-gen" title="Draft a description from the command's code (the ask provider drafts it)">generate ▸</button>` : ""}
+          <span class="cm-ext"></span>
           <input class="cm-groups-in"
             placeholder="security groups (comma-delimited) — empty = admin only"
             title="who can execute this command — check_security reads the readers derived from this">
@@ -1385,37 +1375,15 @@ export async function init(host, { lib, ctlId, toast }) {
           note.textContent = "";
           toast.show(`set_groups → readers [${(r.readers ?? []).join(", ") || "— admin only"}] on ${cmdEntry.name}`);
         });
-        if (ask) detail.querySelector(".cm-gen").addEventListener("click", async () => {
-          const note = detail.querySelector(".cm-note");
-          const gen = detail.querySelector(".cm-gen");
-          gen.disabled = true;
-          note.textContent = "generating…";
-          const rc = await store.readCommand(lib, name, cmdEntry.name);
-          if (rc.status !== "ok") {
-            note.textContent = `could not read the command: ${rc.msg}`;
-            gen.disabled = false;
-            return;
-          }
-          const lang2 = rc.type ?? "rust";
-          const ext2 = lang2 === "rust" ? "rs" : lang2;
-          const r = await ask.describeCommand({
-            command_name: cmdEntry.name,
-            lang: lang2,
-            returntype: rc.returntype ?? "",
-            groups: meta.groups ?? "",
-            params: rc.params ?? [],
-            imports: rc.import ?? "",
-            code: typeof rc[ext2] === "string" ? rc[ext2] : "",
-            current_description: detail.querySelector(".cm-desc-in").value.trim(),
-          });
-          gen.disabled = false;
-          if (r.status !== "ok") {
-            note.textContent = `generate failed: ${r.msg}`;
-            return;
-          }
-          detail.querySelector(".cm-desc-in").value = (r.msg ?? "").trim();
-          note.textContent = "drafted — review, then set";
-        });
+        // the command-meta extension point: a slot plus one bubbling event —
+        // whatever plugin cares (if any) injects its own affordances here;
+        // the workbench neither knows nor checks who listens
+        detail.querySelector(".cm-ext").dispatchEvent(
+          new CustomEvent("nb-command-meta", { bubbles: true, detail: {
+            lib, ctl: name, cmd: cmdEntry.name, groups: meta.groups ?? "",
+            descInput: detail.querySelector(".cm-desc-in"),
+            note: detail.querySelector(".cm-note"),
+          } }));
         detail.querySelector(".cm-apply").addEventListener("click", async () => {
           const note = detail.querySelector(".cm-note");
           const desc = detail.querySelector(".cm-desc-in").value.trim();

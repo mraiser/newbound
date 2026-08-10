@@ -117,73 +117,7 @@
 }
 .nb-session .ss-cap { margin-top: 6px; font-size: 11px; color: var(--text-faint); }
 
-/* ── the agent in the notebook ────────────────────────────── */
-.nb-session .ss-chatrow {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  margin-top: 8px;
-}
-.nb-session .ss-ask {
-  flex: 1;
-  resize: none;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font: 12px var(--mono);
-  color: var(--text);
-}
-.nb-session .ss-send {
-  font: 11px var(--mono);
-  color: var(--ground);
-  background: var(--accent);
-  border-radius: 7px;
-  padding: 7px 14px;
-}
-.nb-session .ss-send:disabled { opacity: 0.4; cursor: default; }
-.nb-session .ss-ctx {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin-top: 6px;
-}
-.nb-session .ss-ctx .ctxlbl {
-  font: 9.5px var(--mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-.nb-session .ss-ctx-rows { display: flex; flex-wrap: wrap; gap: 4px 14px; }
-.nb-session .ss-ctx label {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  font: 11px var(--mono);
-  color: var(--text-dim);
-}
-.nb-session .ss-ctx .none { font: 11px var(--mono); color: var(--text-faint); font-style: italic; }
-.nb-session .ss-tools { font: 10.5px var(--mono); color: var(--accent); margin-left: auto; }
-.nb-session .ss-toolpick {
-  margin-top: 6px;
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  max-height: 180px;
-  overflow: auto;
-}
-.nb-session .ss-toolpick[hidden] { display: none; }
-.nb-session .ss-toolcap { font-size: 11px; color: var(--text-faint); margin-bottom: 6px; }
-.nb-session .ss-toollist label {
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-  font: 11.5px var(--mono);
-  color: var(--text-dim);
-  padding: 2px 0;
-}
-.nb-session .ss-toollist .tdesc { font-size: 10.5px; color: var(--text-faint); }
+/* ── chat cells & rich replies (rendered by the notebook) ── */
 .nb-session .ss-cell.ss-agent .ss-gutter { color: var(--accent); }
 .nb-session .ss-cell.ss-chat .who { font: 11px var(--mono); color: var(--accent); }
 .nb-session .ss-busy { font: 11px var(--mono); color: var(--text-faint); font-style: italic; padding: 6px 0; }
@@ -231,16 +165,6 @@
   white-space: pre;
 }
 .nb-session .ss-code pre[hidden] { display: none; }
-.nb-session .ss-toollist .tgate {
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border-radius: 99px;
-  padding: 1px 7px;
-  border: 1px solid var(--line);
-}
-.nb-session .ss-toollist .tgate.g-auto { color: var(--f-js); }
-.nb-session .ss-toollist .tgate.g-confirm { color: var(--danger); }
 .nb-session .ss-newctx,
 .nb-session .ss-wipe {
   font: 10.5px var(--mono);
