@@ -35,7 +35,10 @@ pub fn check_auth(lib:&str, id:&str, session_id:&str, write:bool) -> bool {
     return true; 
   }
   
-  let libdata = system.get_object("libraries").get_object(lib);
+  // An uninstalled library has no entry in system.libraries: deny, don't panic.
+  let libraries = system.get_object("libraries");
+  if !libraries.has(lib) { return false; }
+  let libdata = libraries.get_object(lib);
   let libgroups = libdata.get_array("readers");
   
   let which;
@@ -93,7 +96,9 @@ pub fn check_security(command:&Command, session_id:&str) -> bool {
     return true; 
   }
     
-  let lib = system.get_object("libraries").get_object(&command.lib);
+  let libraries = system.get_object("libraries");
+  if !libraries.has(&command.lib) { return false; }
+  let lib = libraries.get_object(&command.lib);
   
   let libgroups = lib.get_property("readers");
   let cmdgroups = &command.readers;

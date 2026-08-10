@@ -80,8 +80,17 @@
     ]);
 
     // 2. the union control directory (cross-library mounts, R-1): one
-    //    index read per library the IDE spans; first library wins a name
-    const libs = [lib, "app", "agent"];
+    //    index read per library the IDE spans; first library wins a name.
+    //    Optional add-ons (the agent library) are consulted only when the
+    //    instance's library list says they are installed — a plugin that
+    //    isn't there costs no failed call and no server-side complaint.
+    let installed = null;
+    try {
+      const lr = await fetch("/app/libs");
+      const lj = await lr.json();
+      if (Array.isArray(lj.data)) installed = new Set(lj.data.map((x) => x.id));
+    } catch (e) { /* list unavailable — fall back to probing each library */ }
+    const libs = [lib, "app", "agent"].filter((l) => !installed || installed.has(l));
     for (const l of libs) {
       try {
         const idx = await read(l, "controls");

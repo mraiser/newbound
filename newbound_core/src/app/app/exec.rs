@@ -54,6 +54,12 @@ pub fn execute(o: DataObject) -> DataObject {
 }
 
 pub fn exec(lib: String, id: String, args: DataObject, nn_sessionid: String) -> DataObject {
+if !flowlang::datastore::DataStore::globals().get_object("system").get_object("libraries").has(&lib) {
+  let mut o = DataObject::new();
+  o.put_string("status", "err");
+  o.put_string("msg", &format!("NO SUCH LIBRARY: {}", lib));
+  return o;
+}
 if check_auth(&lib, &id, &nn_sessionid, false) {
   let mut args = args.clone();
   args.put_string("nn_sessionid", &nn_sessionid);

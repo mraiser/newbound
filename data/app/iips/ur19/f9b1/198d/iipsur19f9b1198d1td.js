@@ -77,9 +77,16 @@ export const store = {
     return cached("libs", async () => unwrap(await client.libs()));
   },
 
-  /** A library's control index: [{ctl, db, id, lib, name}]. */
+  /** A library's control index: [{ctl, db, id, lib, name}]. Checks the
+      (cached) library list first: an uninstalled library — the agent
+      add-on is optional by design — answers an Error without a wire
+      call, so an absent plugin costs no request and no server noise. */
   controls(lib) {
     return cached(`controls:${lib}`, async () => {
+      const libs = await this.libs();
+      if (Array.isArray(libs) && !libs.some((l) => l.id === lib)) {
+        return new Error(`library "${lib}" is not installed on this instance`);
+      }
       const data = unwrap(await client.read(lib, "controls"));
       return data instanceof Error ? data : (data.list ?? []);
     });
