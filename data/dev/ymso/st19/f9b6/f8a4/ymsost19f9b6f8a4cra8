@@ -1,1 +1,0 @@
-{"data":{"attachmentkeynames":["js"],"cmd":[],"desc":"MODULE: the context-fence provider registry. Surfaces register what they have open; the agent reads it. Lives in dev because the registration point belongs to the surfaces.","id":"ymsost19f9b6f8a4cra8","module":true,"name":"chatctx","tags":"dest-agent"},"time":1786366352669}

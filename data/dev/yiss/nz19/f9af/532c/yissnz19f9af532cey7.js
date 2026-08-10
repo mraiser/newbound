@@ -5,7 +5,7 @@
 import { mountControl, ROOT, PLATFORM_LIB } from "../../assets/loader.js";
 import { store } from "../../assets/store.js";
 import { hasWebGL } from "../../assets/webgl.js";
-import { chatctx } from "../../assets/chatctx.js";
+import { viewctx } from "../../assets/viewctx.js";
 
 export async function init(host) {
   const stage = host.querySelector(".fr-stage");
@@ -72,7 +72,7 @@ export async function init(host) {
   async function route() {
     if (!store.connected()) return;
     if (stageApi) { stageApi.dispose?.(); stageApi = null; }
-    chatctx.unregister("flow");   // re-registered below when a flow mounts
+    viewctx.unregister("flow");   // re-registered below when a flow mounts
     const [, screen, lib, ctlId] = location.hash.split("/");
 
     if (location.hash.startsWith("#/player/")) {
@@ -170,18 +170,18 @@ export async function init(host) {
           location.hash = `#/bench/${lib}/${ctlIdF}`;
           return;
         }
-        // chat context: the flow body as loaded (in-flight 3D edits aren't
+        // view context: the flow body as loaded (in-flight 3D edits aren't
         // reflected until saved — the label says "as saved")
-        const graphForChat = typeof raw === "string" ? raw : JSON.stringify(raw);
-        chatctx.register("flow", () => ({
+        const graphAsSaved = typeof raw === "string" ? raw : JSON.stringify(raw);
+        viewctx.register("flow", () => ({
           label: `${ctlName} ▸ ${cmdName} flow body (as saved)`,
-          fields: { lib, ctl: ctlName, cmdname: cmdName, flow: graphForChat },
+          fields: { lib, ctl: ctlName, cmdname: cmdName, flow: graphAsSaved },
         }));
         stageApi = await mountControl(flowControl, slot, {
           title: { prefix: `${lib} ▸ ${ctlName} ▸`, name: cmdName, suffix: "(flowlang)" },
           graph: typeof raw === "string" ? JSON.parse(raw) : raw,
           // names (not ids) — the flow-body pair resolves ctl/cmd by name, like
-          // every agent command. Editing engages when the connection is writable
+          // the rest of the write API. Editing engages when the connection is writable
           // and the flow-body API is present (floweditor3d checks).
           source: { lib, ctl: ctlName, cmd: cmdName },
           onBack: () => { location.hash = `#/bench/${lib}/${ctlIdF}`; },

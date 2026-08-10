@@ -19,7 +19,7 @@
 //
 // Controls resolve CROSS-LIBRARY through the boot's union directory
 // (__benchPlatform.controls: name -> {lib, id}) — the Great Refactoring's
-// R-1, where the IDE's controls live in dev/app/agent while the boot stays
+// R-1, where the IDE's controls may live in ANY library while the boot stays
 // behind /<lib>/. A boot that didn't build the directory falls back to the
 // boot library's own index.
 

@@ -10,7 +10,7 @@
 import { mountControl } from "../../assets/loader.js";
 import { store } from "../../assets/store.js";
 import { FACETS } from "../../assets/facets.js";
-import { chatctx } from "../../assets/chatctx.js";
+import { viewctx } from "../../assets/viewctx.js";
 
 const UI_FACETS = new Set(["html", "css", "js"]);
 const CMD_LANGS = ["rust", "js", "java", "python", "py", "flow"];
@@ -40,7 +40,7 @@ export async function init(host, { lib, ctlId, toast }) {
   }
   const name = record.name ?? entry?.name ?? "unnamed";
   const writable = store.writable();
-  // journalMode: the CONTRACT §6 agent API answers here (journal readable
+  // journalMode: the CONTRACT §6 write API answers here (journal readable
   // even on a read-only live connection). patchMode: saves go through it.
   const journalMode = await store.patchApi();
   const patchMode = writable && journalMode;
@@ -402,7 +402,7 @@ export async function init(host, { lib, ctlId, toast }) {
     host.querySelector(".wb-history .lbl").textContent = "patches";
     host.querySelector(".wb-hist-cap").innerHTML =
       `every save is a patch through <span class="hi">patch_control_facet</span>
-       — you and the agent use the same door`;
+       — every caller uses the same door`;
     const wrap = host.querySelector(".wb-hist-chips");
     const r = await store.listPatches(lib, name, 40);
     const entries = r.status === "ok" ? (r.patches ?? []) : [];
@@ -538,7 +538,7 @@ export async function init(host, { lib, ctlId, toast }) {
   function renderMeta() {
     const view = metaEl.querySelector(".wm-view");
     view.textContent = record.desc
-      || "no description — agents discover this control through desc";
+      || "no description — discovery reads desc";
     view.classList.toggle("empty", !record.desc);
     metaEl.querySelector(".wm-tags-view").textContent =
       record.tags ? `tags: ${record.tags}` : "";
@@ -996,7 +996,7 @@ export async function init(host, { lib, ctlId, toast }) {
 
   // ── command code pane (DESIGN §4.2.4: text-language commands open a
   // code pane in place of the table) ────────────────────────
-  // read_command / patch_command_body ride the agent API; the snippet is
+  // read_command / patch_command_body ride the write API; the snippet is
   // computed like facet saves. patch_command_body recompiles on success
   // and has no base hash — exact-match is the only concurrency guard, so
   // a server-side change surfaces as "snippet not found" with a re-read.
@@ -1334,7 +1334,7 @@ export async function init(host, { lib, ctlId, toast }) {
         if (!patchMode) {
           detail.innerHTML = `<span class="cm-desc"></span><span class="cm-tags"></span><span class="cm-groups"></span>`;
           detail.querySelector(".cm-desc").textContent =
-            meta.desc || "no description — agents discover commands through desc";
+            meta.desc || "no description — discovery reads desc";
           detail.querySelector(".cm-desc").classList.toggle("empty", !meta.desc);
           detail.querySelector(".cm-tags").textContent =
             meta.tags ? `tags: ${meta.tags}` : "";
@@ -1343,7 +1343,7 @@ export async function init(host, { lib, ctlId, toast }) {
           return;
         }
         detail.innerHTML = `
-          <input class="cm-desc-in" placeholder="describe this command — agents read this">
+          <input class="cm-desc-in" placeholder="describe this command — discovery reads this">
           <input class="cm-tags-in" placeholder="tags (comma-delimited — categorization, never security)">
           <button class="cm-apply">set</button>
           <span class="cm-ext"></span>
@@ -1628,7 +1628,7 @@ export async function init(host, { lib, ctlId, toast }) {
   // Live getters: dirty editor buffers win over the loaded record, and the
   // command provider yields nothing while the code pane is closed.
   const unregCtx = [
-    chatctx.register("workbench", () => ({
+    viewctx.register("workbench", () => ({
       label: `${lib} ▸ ${name} facets`,
       fields: {
         lib,
@@ -1638,7 +1638,7 @@ export async function init(host, { lib, ctlId, toast }) {
         js: editors.get("js")?.api.getValue() ?? record.js ?? null,
       },
     })),
-    chatctx.register("command", () => codeState ? {
+    viewctx.register("command", () => codeState ? {
       label: `command ${codeState.cmdName} body`,
       fields: {
         cmdname: codeState.cmdName,

@@ -1,4 +1,4 @@
-// Comma-delimited CATEGORIZATION tags (agent discovery, dest-* homes, deprecated marks, memory keying). Plain metadata - carries NO permission meaning. The groups field is SECURITY groups and is never written by tag conventions (the owner's correction, 2026-07-31).
+// Comma-delimited CATEGORIZATION tags at library, control, or command level. Plain metadata for discovery and organization - carries NO permission meaning. The groups field is SECURITY groups and is never written by tag conventions (the owner's correction, 2026-07-31).
 // Targeting: ctl=="" -> the library's meta.json; cmd=="" -> the control
 // record; else the command's IMPL record (set_command_meta's chain).
 // EXPLICIT REPLACE: the value is stored verbatim; empty string CLEARS the

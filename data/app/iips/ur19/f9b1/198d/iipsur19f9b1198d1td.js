@@ -78,9 +78,9 @@ export const store = {
   },
 
   /** A library's control index: [{ctl, db, id, lib, name}]. Checks the
-      (cached) library list first: an uninstalled library — the agent
-      add-on is optional by design — answers an Error without a wire
-      call, so an absent plugin costs no request and no server noise. */
+      (cached) library list first: an uninstalled library answers an
+      Error without a wire call, so an absent optional library costs no
+      request and no server noise. */
   controls(lib) {
     return cached(`controls:${lib}`, async () => {
       const libs = await this.libs();
@@ -198,11 +198,11 @@ export const store = {
   // ── the dev.code write API (CONTRACT §6, [live]) ─────────
   // The command family on dev.code, exec'd by id like everything else.
   // FLAT returns: fields sit top-level on the envelope; err envelopes carry
-  // msg (and current_hash for stale_base). agentCall never throws and never
+  // msg (and current_hash for stale_base). codeCall never throws and never
   // returns Error — always an envelope, so callers branch on status only.
 
-  agentCmdIds() {
-    return cached("agent:cmdids", async () => {
+  codeCmdIds() {
+    return cached("code:cmdids", async () => {
       const controls = await this.controls("dev");
       if (controls instanceof Error) return controls;
       const code = controls.find((c) => c.name === "code");
@@ -214,15 +214,15 @@ export const store = {
   },
 
   /** True when the CONTRACT §6 write API is resolvable on this connection
-      (live mode + the agent library carries the new commands). */
+      (live mode + the instance carries the new commands). */
   async patchApi() {
     if (this.mode() !== "live") return false;
-    const ids = await this.agentCmdIds();
+    const ids = await this.codeCmdIds();
     return !(ids instanceof Error) && Boolean(ids.patch_control_facet);
   },
 
-  async agentCall(name, args) {
-    const ids = await this.agentCmdIds();
+  async codeCall(name, args) {
+    const ids = await this.codeCmdIds();
     if (ids instanceof Error) return { status: "err", msg: ids.message };
     if (!ids[name]) {
       return { status: "err", msg: `dev.code.${name} not found — is the write API built on this instance?` };
@@ -231,15 +231,15 @@ export const store = {
   },
 
   readFacet(lib, ctl, facet) {
-    return this.agentCall("read_control_facet", { lib, ctl, facet });
+    return this.codeCall("read_control_facet", { lib, ctl, facet });
   },
 
   /** One exact-match edit; empty oldSnippet creates/replaces the whole
-      facet. author is this bench's user — agents send their own. */
+      facet. author is this bench's user — other callers send their own. */
   async patchFacet(lib, ctl, facet, { oldSnippet, newSnippet, base = "", label = "" }) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
     const user = await this.user();
-    return this.agentCall("patch_control_facet", {
+    return this.codeCall("patch_control_facet", {
       lib, ctl, facet,
       old_snippet: oldSnippet, new_snippet: newSnippet,
       base, label, author: user?.displayname || user?.id || "bench",
@@ -247,24 +247,24 @@ export const store = {
   },
 
   listPatches(lib, ctl, limit = 0) {
-    return this.agentCall("list_control_patches", { lib, ctl, limit });
+    return this.codeCall("list_control_patches", { lib, ctl, limit });
   },
 
   /** desc/groups setters. Empty string = leave untouched (v1 cannot clear
       a field — CONTRACT §6); send "" for anything unchanged. */
   setControlMeta(lib, ctl, desc, groups) {
     if (!this.writable()) return Promise.resolve({ status: "err", msg: "this connection is read-only" });
-    return this.agentCall("set_control_meta", { lib, ctl, desc, groups });
+    return this.codeCall("set_control_meta", { lib, ctl, desc, groups });
   },
 
   setCommandMeta(lib, ctl, cmd, desc, groups) {
     if (!this.writable()) return Promise.resolve({ status: "err", msg: "this connection is read-only" });
-    return this.agentCall("set_command_meta", { lib, ctl, cmd, desc, groups });
+    return this.codeCall("set_command_meta", { lib, ctl, cmd, desc, groups });
   },
 
   setLibraryMeta(lib, desc, groups) {
     if (!this.writable()) return Promise.resolve({ status: "err", msg: "this connection is read-only" });
-    return this.agentCall("set_library_meta", { lib, desc, groups });
+    return this.codeCall("set_library_meta", { lib, desc, groups });
   },
 
   /** Comma-delimited CATEGORIZATION tags at any level — ctl=""/cmd="" step
@@ -273,7 +273,7 @@ export const store = {
   async setTags(lib, ctl, cmd, tags) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
     const user = await this.user();
-    return this.agentCall("set_tags", {
+    return this.codeCall("set_tags", {
       lib, ctl, cmd, tags, author: user?.displayname || user?.id || "bench",
     });
   },
@@ -286,7 +286,7 @@ export const store = {
   async setGroups(lib, ctl, cmd, groups) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
     const user = await this.user();
-    return this.agentCall("set_groups", {
+    return this.codeCall("set_groups", {
       lib, ctl, cmd, groups, author: user?.displayname || user?.id || "bench",
     });
   },
@@ -303,13 +303,13 @@ export const store = {
 
   // ── the flow-body pair (CONTRACT §6, [live] 2026-07-25) ───────────────────
   // Whole-Case reads/writes for the 3D flow editor. ctl/cmd are NAMES (like
-  // every agent command). `body` travels as a JSON object inside the exec args
+  // every write-API command). `body` travels as a JSON object inside the exec args
   // (the command receives the Case; it re-derives params/returntype from the
   // bars). FLAT returns: fields sit top-level on the envelope.
 
   /** {status, body, hash, exists} — the Case graph as JSON + concurrency hash. */
   readFlowBody(lib, ctl, cmd) {
-    return this.agentCall("read_flow_body", { lib, ctl, cmd });
+    return this.codeCall("read_flow_body", { lib, ctl, cmd });
   },
 
   /** Whole-Case write. base = the hash from the last read (empty = unguarded);
@@ -318,17 +318,17 @@ export const store = {
   async writeFlowBody(lib, ctl, cmd, body, { base = "", label = "" } = {}) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
     const user = await this.user();
-    return this.agentCall("write_flow_body", {
+    return this.codeCall("write_flow_body", {
       lib, ctl, cmd, body, base, label,
       author: user?.displayname || user?.id || "bench",
     });
   },
 
-  /** True when the flow-body pair is resolvable (live + agent library carries
-      it). Gates the 3D editor's editing mode. */
+  /** True when the flow-body pair is resolvable on this connection.
+      Gates the 3D editor's editing mode. */
   async flowApi() {
     if (this.mode() !== "live") return false;
-    const ids = await this.agentCmdIds();
+    const ids = await this.codeCmdIds();
     return !(ids instanceof Error) && Boolean(ids.write_flow_body);
   },
 
@@ -341,7 +341,7 @@ export const store = {
 
   /** {status, scene, hash, exists} — the facet as JSON + concurrency hash. */
   readControlScene(lib, ctl) {
-    return this.agentCall("read_control_scene", { lib, ctl });
+    return this.codeCall("read_control_scene", { lib, ctl });
   },
 
   /** Whole-object write. base = the hash from the last read (empty =
@@ -351,7 +351,7 @@ export const store = {
   async writeControlScene(lib, ctl, scene, { base = "", label = "" } = {}) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
     const user = await this.user();
-    const r = await this.agentCall("write_control_scene", {
+    const r = await this.codeCall("write_control_scene", {
       lib, ctl, scene, base, label,
       author: user?.displayname || user?.id || "bench",
     });
@@ -363,21 +363,21 @@ export const store = {
     return r;
   },
 
-  /** True when the scene pair is resolvable (live + agent library carries
-      it). Gates the scene editor's save affordance. */
+  /** True when the scene pair is resolvable on this connection.
+      Gates the scene editor's save affordance. */
   async sceneApi() {
     if (this.mode() !== "live") return false;
-    const ids = await this.agentCmdIds();
+    const ids = await this.codeCmdIds();
     return !(ids instanceof Error) && Boolean(ids.write_control_scene);
   },
 
-  /** Execute a command via agent.code.invoke_command (the validator's door —
+  /** Execute a command via dev.code.invoke_command (the validator's door —
       it EXECUTES the flow). The 3D editor's run affordance; kept behind the
       writable gate: running arbitrary flows is a disposable-instance
       activity, same posture as saves. */
   invokeCommand(lib, ctl, cmd, args = {}) {
     if (!this.writable()) return Promise.resolve({ status: "err", msg: "this connection is read-only" });
-    return this.agentCall("invoke_command", { lib, ctl, cmd, args });
+    return this.codeCall("invoke_command", { lib, ctl, cmd, args });
   },
 
   /** Create an empty control in a library (the record + its index entry);
@@ -385,7 +385,7 @@ export const store = {
       an empty old_snippet). Existing name ⇒ the platform errs. */
   async addControl(lib, ctl) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
-    const r = await this.agentCall("add_control", { lib, ctl });
+    const r = await this.codeCall("add_control", { lib, ctl });
     if (r.status === "ok") this.invalidateControls(lib);
     return r;
   },
@@ -395,7 +395,7 @@ export const store = {
       not build". params: [{name, type}] in flowlang types. */
   async upsertCommand(lib, ctl, cmd, { lang, returnType, params = [], imports = "", codeBody = "" }) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
-    const r = await this.agentCall("upsert_command", {
+    const r = await this.codeCall("upsert_command", {
       lib, ctl, cmd, lang, return_type: returnType, params,
       imports, code_body: codeBody,
     });
@@ -406,7 +406,7 @@ export const store = {
   /** Create an empty library. */
   async addLibrary(lib) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
-    const r = await this.agentCall("add_library", { lib });
+    const r = await this.codeCall("add_library", { lib });
     if (r.status === "ok") {
       this.invalidateLibs();
       this.invalidateControls(lib);
@@ -425,7 +425,7 @@ export const store = {
   async deleteCommand(lib, ctl, cmd) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
     const user = await this.user();
-    const r = await this.agentCall("delete_command", {
+    const r = await this.codeCall("delete_command", {
       lib, ctl, cmd, author: user?.displayname || user?.id || "bench",
     });
     if (r.status === "ok") this.invalidateControls(lib);
@@ -435,7 +435,7 @@ export const store = {
   async deleteControl(lib, ctl) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
     const user = await this.user();
-    const r = await this.agentCall("delete_control", {
+    const r = await this.codeCall("delete_control", {
       lib, ctl, author: user?.displayname || user?.id || "bench",
     });
     if (r.status === "ok") this.invalidateControls(lib);
@@ -445,7 +445,7 @@ export const store = {
   async deleteLibrary(lib) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
     const user = await this.user();
-    const r = await this.agentCall("delete_library", {
+    const r = await this.codeCall("delete_library", {
       lib, author: user?.displayname || user?.id || "bench",
     });
     if (r.status === "ok") {
@@ -457,7 +457,7 @@ export const store = {
 
   // ── assets (P1 commands; CONTRACT §6) ────────────────────
   listAssets(lib) {
-    return this.agentCall("list_assets", { lib });
+    return this.codeCall("list_assets", { lib });
   },
 
   /** Create/replace one asset. Inline `content` for UTF-8 text; `tempfile`
@@ -465,17 +465,17 @@ export const store = {
       instance shares the caller's machine — CONTRACT §6 upload caveat). */
   writeAsset(lib, name, content, tempfile = "") {
     if (!this.writable()) return Promise.resolve({ status: "err", msg: "this connection is read-only" });
-    return this.agentCall("write_asset", { lib, name, content, tempfile });
+    return this.codeCall("write_asset", { lib, name, content, tempfile });
   },
 
   renameAsset(lib, from, to) {
     if (!this.writable()) return Promise.resolve({ status: "err", msg: "this connection is read-only" });
-    return this.agentCall("rename_asset", { lib, from, to });
+    return this.codeCall("rename_asset", { lib, from, to });
   },
 
   deleteAsset(lib, name) {
     if (!this.writable()) return Promise.resolve({ status: "err", msg: "this connection is read-only" });
-    return this.agentCall("delete_asset", { lib, name });
+    return this.codeCall("delete_asset", { lib, name });
   },
 
   /** A command's implementation record (code under its ext key — `rs` for
@@ -483,7 +483,7 @@ export const store = {
       an Object envelope, so the payload sits under `data` (CONTRACT §6
       envelope note); flatten it for callers. */
   async readCommand(lib, ctl, cmd) {
-    const r = await this.agentCall("read_command", { lib, ctl, cmd });
+    const r = await this.codeCall("read_command", { lib, ctl, cmd });
     if (r.status !== "ok") return r;
     return { status: "ok", ...(r.data && typeof r.data === "object" ? r.data : {}) };
   },
@@ -495,7 +495,7 @@ export const store = {
       only guard. */
   patchCommandBody(lib, ctl, cmd, oldSnippet, newSnippet) {
     if (!this.writable()) return Promise.resolve({ status: "err", msg: "this connection is read-only" });
-    return this.agentCall("patch_command_body", {
+    return this.codeCall("patch_command_body", {
       lib, ctl, cmd, old_snippet: oldSnippet, new_snippet: newSnippet,
     });
   },
@@ -505,7 +505,7 @@ export const store = {
       reach. set_command_imports recompiles; flow commands are refused. */
   setCommandImports(lib, ctl, cmd, imports) {
     if (!this.writable()) return Promise.resolve({ status: "err", msg: "this connection is read-only" });
-    return this.agentCall("set_command_imports", { lib, ctl, cmd, imports });
+    return this.codeCall("set_command_imports", { lib, ctl, cmd, imports });
   },
 
   // ── timers/events (P2 commands; CONTRACT §6) ─────────────
@@ -517,7 +517,7 @@ export const store = {
   async setTimer(lib, ctl, { name, cmd, start, startunit, interval, intervalunit, repeat }) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
     const user = await this.user();
-    return this.agentCall("set_timer", {
+    return this.codeCall("set_timer", {
       lib, ctl, name, cmd, start, startunit, interval, intervalunit, repeat,
       author: user?.displayname || user?.id || "bench",
     });
@@ -526,7 +526,7 @@ export const store = {
   async removeTimer(lib, ctl, name) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
     const user = await this.user();
-    return this.agentCall("remove_timer", {
+    return this.codeCall("remove_timer", {
       lib, ctl, name, author: user?.displayname || user?.id || "bench",
     });
   },
@@ -534,7 +534,7 @@ export const store = {
   async setEventHandler(lib, ctl, { name, bot, event, cmd }) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
     const user = await this.user();
-    return this.agentCall("set_event_handler", {
+    return this.codeCall("set_event_handler", {
       lib, ctl, name, bot, event, cmd,
       author: user?.displayname || user?.id || "bench",
     });
@@ -543,7 +543,7 @@ export const store = {
   async removeEventHandler(lib, ctl, name) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
     const user = await this.user();
-    return this.agentCall("remove_event_handler", {
+    return this.codeCall("remove_event_handler", {
       lib, ctl, name, author: user?.displayname || user?.id || "bench",
     });
   },
@@ -573,12 +573,12 @@ export const store = {
       the API pair: /app/read cannot serve the runtime lib (it answers 500 —
       store-only, never app-loaded). */
   metaIdentity() {
-    return this.agentCall("get_meta_identity", {});
+    return this.codeCall("get_meta_identity", {});
   },
 
   setMetaIdentity(displayname, organization) {
     const user = this.user();
-    return this.agentCall("set_meta_identity", {
+    return this.codeCall("set_meta_identity", {
       displayname, organization,
       author: user?.displayname || user?.id || "bench",
     });
@@ -602,7 +602,7 @@ export const store = {
   async setPlugin(name, entry) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
     const user = await this.user();
-    return this.agentCall("set_plugin", {
+    return this.codeCall("set_plugin", {
       name,
       target_lib: entry.target_lib, target_ctl: entry.target_ctl,
       plugin_lib: entry.plugin_lib, plugin_ctl: entry.plugin_ctl,
@@ -614,7 +614,7 @@ export const store = {
   async removePlugin(name) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
     const user = await this.user();
-    return this.agentCall("remove_plugin", {
+    return this.codeCall("remove_plugin", {
       name, author: user?.displayname || user?.id || "bench",
     });
   },

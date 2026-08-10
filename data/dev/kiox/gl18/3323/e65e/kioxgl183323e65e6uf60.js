@@ -8,13 +8,13 @@
 //
 // The module world (2026-07-30, the owner's design — first-class in
 // api.js): shared ES modules are MODULE CONTROLS — ordinary controls whose
-// record carries `module: true` (agent.code.set_module_flag). Installing a
+// record carries `module: true` (dev.code.set_module_flag). Installing a
 // flagged control registers its js facet as a named ES module on the page
 // (api.js: promise registry, order-free, css facets inject once) instead
 // of mounting UI. So this boot simply INSTALLS the two cluster controls —
 // app.modules and dev.devmodules, whose html facets list module divs (the
-// platform's own nested-composition idiom) — try-installs the OPTIONAL
-// agent add-on, then hands the loader the union control directory. There
+// platform's own nested-composition idiom) — then hands the loader the
+// union control directory. There
 // is no manifest anywhere: what a page installs IS its module world. The
 // static entry (index.html, repo-only) never runs this — it imports
 // ./assets/loader.js off real files.

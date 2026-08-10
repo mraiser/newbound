@@ -127,7 +127,7 @@ fn result_cache() -> DataObject {
 }
 
 // Where cargo ACTUALLY writes this crate's artifacts. A crate EXCLUDED from
-// the workspace (the FFI libs - agent, scratch, kb) gets its own target/;
+// the workspace (any FFI-rooted library) gets its own target/;
 // a workspace MEMBER (newbound_core, which hosts app/dev/peer/security) gets
 // the WORKSPACE's target/ and its own never exists - so looking only under
 // <root>/target found nothing, and every SUCCESSFUL non-FFI compile reported

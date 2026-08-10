@@ -18,7 +18,7 @@ import { TOKEN_NAMES } from "../../assets/scenetokens.js";
 import { project, envOf } from "../../assets/sceneproject.js";
 import { createRuntime } from "../../assets/scenerun.js";
 import { hasWebGL } from "../../assets/webgl.js";
-import { chatctx } from "../../assets/chatctx.js";
+import { viewctx } from "../../assets/viewctx.js";
 
 const dark = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: dark)").matches;
 const reducedMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -841,8 +841,8 @@ export async function init(host, { lib, name, record, toast, onSaved }) {
   undoBtn.addEventListener("click", undo);
   redoBtn.addEventListener("click", redo);
 
-  // ── chat context (the notebook agent sees the open scene) ─────────────────
-  const unregCtx = chatctx.register("scene", () => ({
+  // ── view context (consumers see the open scene) ───────────────────────────
+  const unregCtx = viewctx.register("scene", () => ({
     label: `scene facet — ${lib} ▸ ${name}`,
     fields: {
       [`${lib}:${name}.scene`]: JSON.stringify(doc.serialize()),

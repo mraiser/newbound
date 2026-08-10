@@ -3,16 +3,14 @@
 // connection AND a typed confirmation (DESIGN §5.6's inline pattern).
 // Non-modal (DESIGN §5.7): the screen behind stays interactive.
 //
-// The notebook becomes a chat surface only when a plugin makes it one
-// (owner's direction 2026-07-25, as amended 2026-08-10): the notebook
-// itself knows NOTHING about any such plugin. It renders cells — command
-// cells, chat cells, dividers — runs the confirm ceremonies, and exposes
-// one plugin slot (.ss-plugins) carrying a small notebook API; the plugin
-// registry (dev.plugins) decides what, if anything, grafts on. Whatever
-// mounts there drives the notebook through that API and nothing else.
+// The notebook knows exactly two cell shapes of its own — command cells
+// and dividers. A plugin may write cells with a custom `kind` and register
+// a renderer for it through the slot api (addRenderer); a custom kind with
+// no renderer shows as plain text so nothing is ever silently hidden. The
+// notebook carries no knowledge of any particular plugin, cell vocabulary,
+// or what a custom cell means.
 
 import { store } from "../../assets/store.js";
-import { chatctx } from "../../assets/chatctx.js";
 
 const TRANSCRIPT_KEY = "bench.session";
 const TRANSCRIPT_LIMIT = 40;
@@ -122,6 +120,10 @@ export function init(host, { toast, onClose }) {
     return entries.at(-1);
   }
 
+  // Renderers for custom cell kinds, registered through the slot api by
+  // whatever plugin writes those kinds. kind -> (entry) => Element.
+  const renderers = {};
+
   function renderCell(entry) {
     if (entry.kind === "divider") {
       const div = document.createElement("div");
@@ -131,11 +133,29 @@ export function init(host, { toast, onClose }) {
       div.scrollIntoView({ block: "nearest" });
       return div;
     }
-    if (entry.kind === "chat-user" || entry.kind === "chat-agent") {
-      return renderChatCell(entry);
+    if (entry.kind) {
+      const render = renderers[entry.kind];
+      if (render) {
+        const el = render(entry);
+        cellsEl.appendChild(el);
+        el.scrollIntoView({ block: "nearest" });
+        return el;
+      }
+      const cell = document.createElement("div");
+      cell.className = "ss-cell";
+      const out = document.createElement("div");
+      out.className = "ss-cell-out" + (entry.error ? " err" : "");
+      out.textContent = entry.text ?? JSON.stringify(entry);
+      cell.appendChild(out);
+      cellsEl.appendChild(cell);
+      cell.scrollIntoView({ block: "nearest" });
+      return cell;
     }
+    // a command cell. `auto` marks cells a plugin ran rather than the user
+    // (the stored flag was once named `agent` — accept old transcripts).
+    const auto = entry.auto ?? entry.agent;
     const cell = document.createElement("div");
-    cell.className = "ss-cell" + (entry.agent ? " ss-agent" : "");
+    cell.className = "ss-cell" + (auto ? " ss-auto" : "");
     const input = document.createElement("div");
     input.className = "ss-cell-in";
     input.innerHTML =
@@ -143,7 +163,7 @@ export function init(host, { toast, onClose }) {
       `<span class="args"></span><span class="ms"></span>` +
       `<button class="rerun">run again ▸</button>`;
     input.querySelector(".ss-gutter").textContent =
-      entry.agent ? `[${entry.n}·✳]` : `[${entry.n}]`;
+      auto ? `[${entry.n}·✳]` : `[${entry.n}]`;
     input.querySelector(".call").textContent = entry.call;
     input.querySelector(".args").textContent = entry.args !== "{}" ? entry.args : "";
     input.querySelector(".ms").textContent = entry.ms != null ? `${entry.ms}ms` : "";
@@ -159,140 +179,6 @@ export function init(host, { toast, onClose }) {
     cellsEl.appendChild(cell);
     cell.scrollIntoView({ block: "nearest" });
     return cell;
-  }
-
-  // ── chat cells ────────────────────────────────────────────
-  function renderChatCell(entry) {
-    const cell = document.createElement("div");
-    cell.className = "ss-cell ss-chat";
-    const input = document.createElement("div");
-    input.className = "ss-cell-in";
-    const who = entry.kind === "chat-user" ? "you ▸" : "agent ▸";
-    input.innerHTML = `<span class="ss-gutter"></span><span class="who"></span>`;
-    input.querySelector(".ss-gutter").textContent = `[${entry.n}·✳]`;
-    input.querySelector(".who").textContent = who;
-    const out = document.createElement("div");
-    out.className = "ss-cell-out" + (entry.error ? " err" : "");
-    if (entry.kind === "chat-agent" && !entry.error) {
-      renderReply(out, entry.text);
-    } else {
-      out.textContent = entry.text;
-    }
-    cell.append(input, out);
-    cellsEl.appendChild(cell);
-    cell.scrollIntoView({ block: "nearest" });
-    return cell;
-  }
-
-  // Reply grammar (the notebook's rich-cell display format): <think> folds
-  // behind a chip, ``` fences become code cards; an html/css/js fence offers
-  // apply-as-patch — a journaled whole-facet replace (label "chat").
-  function renderReply(host, raw) {
-    const lines = (raw ?? "").split("\n");
-    let think = null;
-    let code = null;
-    let lang = null;
-    let textBuf = [];
-    const flushText = () => {
-      const t = textBuf.join("\n").trim();
-      if (t) host.appendChild(document.createTextNode(t + "\n"));
-      textBuf = [];
-    };
-    for (const line of lines) {
-      if (line.startsWith("<think>")) {
-        flushText();
-        think = [line.slice(7)];
-      } else if (line.startsWith("</think>")) {
-        const body = (think ?? []).join("\n").trim();
-        think = null;
-        if (body) {
-          const btn = document.createElement("button");
-          btn.className = "ss-think-btn";
-          btn.textContent = "show thinking ▸";
-          const div = document.createElement("div");
-          div.className = "ss-think";
-          div.hidden = true;
-          div.textContent = body;
-          btn.addEventListener("click", () => {
-            div.hidden = !div.hidden;
-            btn.textContent = div.hidden ? "show thinking ▸" : "hide thinking ▾";
-          });
-          host.append(btn, div);
-        }
-      } else if (think) {
-        think.push(line);
-      } else if (line.startsWith("```")) {
-        if (code === null) {
-          flushText();
-          lang = line.slice(3).trim().toLowerCase();
-          code = [];
-        } else {
-          host.appendChild(codeCard(code.join("\n"), lang));
-          code = null;
-        }
-      } else if (code) {
-        code.push(line);
-      } else {
-        textBuf.push(line);
-      }
-    }
-    if (code) host.appendChild(codeCard(code.join("\n"), lang));
-    flushText();
-  }
-
-  function codeCard(source, lang) {
-    const card = document.createElement("div");
-    card.className = "ss-code";
-    const head = document.createElement("div");
-    head.className = "ss-code-head";
-    const tag = document.createElement("span");
-    tag.className = "langtag";
-    tag.textContent = lang || "code";
-    head.appendChild(tag);
-    const pre = document.createElement("pre");
-    pre.hidden = true;
-    pre.textContent = source;
-    const view = document.createElement("button");
-    view.textContent = "view ▸";
-    view.addEventListener("click", () => {
-      pre.hidden = !pre.hidden;
-      view.textContent = pre.hidden ? "view ▸" : "hide ▾";
-    });
-    head.appendChild(view);
-    const wb = chatctx.snapshot().find((p) => p.key === "workbench");
-    if (["html", "css", "js"].includes(lang) && store.writable() && wb) {
-      const apply = document.createElement("button");
-      apply.className = "ss-apply";
-      apply.textContent = "apply as patch ▸";
-      apply.addEventListener("click", async () => {
-        if (apply.textContent === "apply as patch ▸") {
-          apply.textContent = `replace whole ${lang} facet of ${wb.fields.ctl}?`;
-          setTimeout(() => {
-            if (!apply.disabled) apply.textContent = "apply as patch ▸";
-          }, 3000);
-          return;
-        }
-        const rf = await store.readFacet(wb.fields.lib, wb.fields.ctl, lang);
-        if (rf.status !== "ok") {
-          toast.show(`apply failed: ${rf.msg}`);
-          return;
-        }
-        const r = await store.patchFacet(wb.fields.lib, wb.fields.ctl, lang, {
-          oldSnippet: "", newSnippet: source.replace(/\r/g, ""),
-          base: rf.hash, label: "chat",
-        });
-        if (r.status !== "ok") {
-          toast.show(`apply failed: ${r.msg}`);
-          return;
-        }
-        apply.textContent = `applied · ${r.patch_id}`;
-        apply.disabled = true;
-        toast.show(`chat → patch_control_facet · ${r.patch_id} — reload the control to see it`);
-      });
-      head.appendChild(apply);
-    }
-    card.append(head, pre);
-    return card;
   }
 
   for (const entry of readTranscript()) renderCell(entry);
@@ -406,7 +292,7 @@ export function init(host, { toast, onClose }) {
   });
 
   // ── the plugin slot ───────────────────────────────────────
-  // The notebook knows NOTHING about what grafts onto it (kb doctrine:
+  // The notebook knows NOTHING about what grafts onto it (doctrine:
   // plugins graft onto things that don't know anything about them). One
   // slot div; the plugin registry (dev.plugins) decides what, if
   // anything, mounts there — and whatever does finds the notebook the
@@ -422,9 +308,10 @@ export function init(host, { toast, onClose }) {
     isOpen() {
       return root.classList.contains("open");
     },
-    /** Persist one cell and render it; returns the stored entry. Shapes:
-        command cells {call, args, output, ms, error, agent}, chat cells
-        {kind:"chat-user"|"chat-agent", text, error}, {kind:"divider"}. */
+    /** Persist one cell and render it; returns the stored entry. The
+        notebook's own shapes: command cells {call, args, output, ms,
+        error, auto} and {kind:"divider"}. Any other `kind` is a plugin's
+        own; pair it with addRenderer. */
     pushCell(entry) {
       const stored = pushTranscript(entry);
       renderCell(stored);
@@ -432,6 +319,14 @@ export function init(host, { toast, onClose }) {
     },
     /** The transcript, oldest first (bounded by the notebook's limit). */
     cells: readTranscript,
+    /** Register a renderer for a custom cell kind — (entry) => Element —
+        and re-render the transcript so earlier cells of that kind pick
+        it up. */
+    addRenderer(kind, fn) {
+      renderers[kind] = fn;
+      cellsEl.replaceChildren();
+      for (const entry of readTranscript()) renderCell(entry);
+    },
     /** The typed-command-name confirm ceremony (DESIGN §5.6). */
     confirmTyped: askConfirm,
     /** The one-press re-confirm for an already-typed-confirmed command. */

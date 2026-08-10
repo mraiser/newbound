@@ -57,10 +57,17 @@ pub fn execute(o: DataObject) -> DataObject {
 }
 
 pub fn patch_control_facet(lib: String, ctl: String, facet: String, old_snippet: String, new_snippet: String, base: String, label: String, author: String) -> DataObject {
-if facet != "html" && facet != "css" && facet != "js" && facet != "memory" && facet != "prompt" {
+// Facet-agnostic (the owner's rule, 2026-08-10): a facet is any named
+// text on a control record. Only the record's STRUCTURAL keys are
+// refused - the platform enforces no vocabulary of facet names and no
+// facet schema; what a facet means is its author's business.
+let reserved = ["data", "three", "cmd", "timer", "event", "name", "desc",
+    "groups", "tags", "module", "readers", "writers", "id", "ctl", "db",
+    "lib", "attachmentkeynames"];
+if facet.trim().is_empty() || reserved.contains(&facet.as_str()) {
     let mut o = DataObject::new();
     o.put_string("status", "err");
-    o.put_string("msg", &format!("Unsupported facet '{}'. Supported: html, css, js, memory (kb entries, docs/memory.md), prompt (the curriculum core, docs/prompting.md); the data and three facets are not facet-patchable.", facet));
+    o.put_string("msg", &format!("'{}' is a structural key on control records, not a facet.", facet));
     return o;
 }
 

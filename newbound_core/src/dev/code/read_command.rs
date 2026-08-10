@@ -123,7 +123,7 @@ if !impl_doc.has(&ext) {
     return o;
 }
 
-// Assemble the final result object for the LLM by extending the native document
+// Assemble the final result object for the caller by extending the native document
 let mut result = impl_doc.clone();
 result.put_string("status", "ok");
 result.put_string("lib", &lib);

@@ -39,7 +39,7 @@ checkout via its `tools/overlay.sh` symlinks. The working process for
 agent-driven development is that repo's `docs/interim-process.md`, and
 the kb library's memory facets (`kb.doctrine`, `kb.workflow`,
 `kb.platform-api`) are the accumulated understanding — sessions read
-them at start and deposit into them (`dev-code-remember`) at end.
+them at start and deposit into them (`agent-archivist-remember`) at end.
 Without the overlay this repo builds and runs standalone
 (`cargo build --release --features=serde_support`); the regenerated
 initializer that knows the FFI crates is overlay-local state and stays

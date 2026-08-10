@@ -1,18 +1,18 @@
-// chatctx.js — the chat drawer's context registry. Surfaces publish a
-// PROVIDER ("what am I looking at"), the drawer snapshots them at send
-// time — the bench's answer to the legacy plugin's DOM scraping: no
-// selectors, no .cm reach-ins, just the surfaces saying so themselves.
+// viewctx.js — the "what is the user looking at" registry. Surfaces
+// publish a PROVIDER; consumers snapshot them on demand — the bench's
+// answer to DOM scraping: no selectors, no reach-ins, just the surfaces
+// saying so themselves.
 //
-// A provider is () => ({ label, fields }) — label is what the drawer's
-// include-checkbox says; fields merge into the query context when checked
-// (use the legacy control_query key names: lib/ctl/html/css/js/cmdname/…
-// so the backend sees the shape it already knows). Return null when the
-// surface currently has nothing to offer. Register returns an unregister
-// function; surfaces unregister on dispose.
+// A provider is () => ({ label, fields }) — label is what a consumer's
+// include-checkbox says; fields merge into the consumer's context when
+// included (keys are the surface's own vocabulary: lib/ctl/html/css/js/
+// cmdname/…). Return null when the surface currently has nothing to
+// offer. Register returns an unregister function; surfaces unregister
+// on dispose.
 
 const providers = new Map();
 
-export const chatctx = {
+export const viewctx = {
   register(key, fn) {
     providers.set(key, fn);
     return () => {
@@ -25,8 +25,7 @@ export const chatctx = {
   },
 
   /** One provider's live value by key — for providers that compose on
-      others (an add-on's memory module keys pushed entries on the open
-      surface). A direct call, so no snapshot recursion. */
+      others. A direct call, so no snapshot recursion. */
   peek(key) {
     const fn = providers.get(key);
     if (!fn) return null;

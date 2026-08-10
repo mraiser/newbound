@@ -80,7 +80,7 @@ export async function init(host, { openLib, openControl, toast }) {
   function renderLibMeta(lib) {
     const descEl = host.querySelector(".fh-desc");
     descEl.textContent = lib.desc
-      || "no description — agents discover this library through desc";
+      || "no description — discovery reads desc";
     descEl.classList.toggle("empty", !lib.desc);
     host.querySelector(".fh-tools").hidden = false;
     host.querySelector(".fh-meta-btn").hidden = !(writable && patchApi);
@@ -204,7 +204,7 @@ export async function init(host, { openLib, openControl, toast }) {
     };
   }
 
-  // ── assets (G-1, the P1 agent commands) ───────────────────
+  // ── assets (G-1, the P1 asset commands) ───────────────────
   function fmtSize(n) {
     if (n < 1024) return `${n} B`;
     if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;

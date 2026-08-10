@@ -117,54 +117,10 @@
 }
 .nb-session .ss-cap { margin-top: 6px; font-size: 11px; color: var(--text-faint); }
 
-/* ── chat cells & rich replies (rendered by the notebook) ── */
-.nb-session .ss-cell.ss-agent .ss-gutter { color: var(--accent); }
-.nb-session .ss-cell.ss-chat .who { font: 11px var(--mono); color: var(--accent); }
+/* the ✳ marker: cells a plugin ran rather than the user */
+.nb-session .ss-cell.ss-auto .ss-gutter { color: var(--accent); }
 .nb-session .ss-busy { font: 11px var(--mono); color: var(--text-faint); font-style: italic; padding: 6px 0; }
-.nb-session .ss-think-btn {
-  font: 10px var(--mono);
-  color: var(--text-faint);
-  border: 1px solid var(--line);
-  border-radius: 99px;
-  padding: 2px 9px;
-  margin: 2px 0;
-}
-.nb-session .ss-think {
-  color: var(--text-faint);
-  font-size: 11.5px;
-  border-left: 2px solid var(--line);
-  padding-left: 10px;
-  margin: 4px 0;
-  white-space: pre-wrap;
-}
-.nb-session .ss-think[hidden] { display: none; }
-.nb-session .ss-code {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  margin: 6px 0;
-  background: var(--panel-2);
-}
-.nb-session .ss-code-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 10px;
-  font: 10.5px var(--mono);
-  color: var(--text-dim);
-  border-bottom: 1px solid var(--line-soft);
-}
-.nb-session .ss-code-head .langtag { color: var(--accent); }
-.nb-session .ss-code-head button { font: 10.5px var(--mono); color: var(--accent); margin-left: auto; }
-.nb-session .ss-code-head button + button { margin-left: 0; }
-.nb-session .ss-code-head .ss-apply { color: var(--f-js); }
-.nb-session .ss-code pre {
-  font: 11px var(--mono);
-  padding: 8px 10px;
-  overflow: auto;
-  max-height: 240px;
-  white-space: pre;
-}
-.nb-session .ss-code pre[hidden] { display: none; }
+
 .nb-session .ss-newctx,
 .nb-session .ss-wipe {
   font: 10.5px var(--mono);
