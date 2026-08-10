@@ -2,12 +2,28 @@
 // connection chip, and the hash router that mounts shelf/workbench into the
 // stage. Routes: #/shelf · #/shelf/<lib> · #/bench/<lib>/<ctlId>
 
-import { mountControl, ROOT, PLATFORM_LIB } from "../../assets/loader.js";
-import { store } from "../../assets/store.js";
-import { hasWebGL } from "../../assets/webgl.js";
-import { viewctx } from "../../assets/viewctx.js";
 
-export async function init(host) {
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+var readyP = (async () => {
+  const { store } = await requireModule("store", "frame");
+  const { hasWebGL } = await requireModule("webgl", "frame");
+  const { viewctx } = await requireModule("viewctx", "frame");
+  // mount a child control and resolve with its api once it is ready —
+  // installControl is the platform's own mounter; waitReady is the
+  // convention converted controls expose when their setup is async
+  const MOUNT_HOMES = { sceneplayer: "app" };
+  function mount(name, el, props) {
+    return new Promise(function (res) {
+      installControl(el, MOUNT_HOMES[name] || "dev", name, function (api) {
+        if (api && api.waitReady) api.waitReady(function () { res(api); });
+        else res(api);
+      }, props || {});
+    });
+  }
+
+async function init(host) {
   const stage = host.querySelector(".fr-stage");
   const crumb = {
     shelf: host.querySelector(".seg-shelf"),
@@ -19,21 +35,21 @@ export async function init(host) {
   const connBtn = host.querySelector(".fr-conn");
   const dialog = host.querySelector(".fr-connect");
 
-  const toast = await mountControl("toast", host.querySelector(".fr-toast-slot"));
+  const toast = await mount("toast", host.querySelector(".fr-toast-slot"));
 
   const nav = {
     openLib: (lib) => { location.hash = `#/shelf/${lib}`; },
     openControl: (lib, id) => { location.hash = `#/bench/${lib}/${id}`; },
   };
 
-  await mountControl("jump", host.querySelector(".fr-jump-slot"), nav);
+  await mount("jump", host.querySelector(".fr-jump-slot"), nav);
 
   // session drawer — mounted lazily on first open
   const sessionBtn = host.querySelector(".fr-session");
   let sessionApi = null;
   sessionBtn.addEventListener("click", async () => {
     if (!sessionApi) {
-      sessionApi = await mountControl("session", host.querySelector(".fr-session-slot"), {
+      sessionApi = await mount("session", host.querySelector(".fr-session-slot"), {
         toast,
         onClose: () => sessionBtn.classList.remove("on"),
       });
@@ -88,7 +104,7 @@ export async function init(host) {
       slot.style.height = "100%";
       stage.appendChild(slot);
       const ctlName = decodeURIComponent(location.hash.split("/")[3] ?? "");
-      const api = await mountControl("sceneplayer", slot, {
+      const api = await mount("sceneplayer", slot, {
         lib: decodeURIComponent(lib ?? ""), ctl: ctlName,
         caption: `${lib} ▸ ${ctlName}`,
         // state changes flow OUT to an embedding parent (the peer app's
@@ -125,19 +141,9 @@ export async function init(host) {
       slot.style.height = "100%";
       stage.appendChild(slot);
       if (lib === "sample") {
-        // resolved against ROOT, not this module: in platform mode frame.js
-        // is a blob module with no usable base URL. The specimen fixture is
-        // repo-only (fixtures are neither code nor media, so the installer
-        // doesn't ship it) — platform-served bench says so without probing.
-        let fx = null;
-        if (!PLATFORM_LIB) {
-          try {
-            const r = await fetch(
-              new URL("harness/fixtures/flow_sample.json", ROOT),
-              { cache: "no-cache" });
-            if (r.ok) fx = await r.json();
-          } catch { /* fall through to the caption */ }
-        }
+        // the specimen fixture shipped with the repo-era static bench; the
+        // platform-served IDE has no copy — the caption below says so
+        const fx = null;
         if (!fx) {
           setCrumb("flowlang", "sample (unavailable here)");
           slot.innerHTML = `<p style="font: 12px var(--mono, monospace);
@@ -148,7 +154,7 @@ export async function init(host) {
           return;
         }
         setCrumb("flowlang", "sample ▸ a+b (crate test data)");
-        stageApi = await mountControl(flowControl, slot, {
+        stageApi = await mount(flowControl, slot, {
           title: { prefix: "flowlang ▸", name: "sample", suffix: "(crate test data)" },
           graph: fx.response.data,
           source: null, // the bundled specimen isn't a real command — read-only
@@ -177,7 +183,7 @@ export async function init(host) {
           label: `${ctlName} ▸ ${cmdName} flow body (as saved)`,
           fields: { lib, ctl: ctlName, cmdname: cmdName, flow: graphAsSaved },
         }));
-        stageApi = await mountControl(flowControl, slot, {
+        stageApi = await mount(flowControl, slot, {
           title: { prefix: `${lib} ▸ ${ctlName} ▸`, name: cmdName, suffix: "(flowlang)" },
           graph: typeof raw === "string" ? JSON.parse(raw) : raw,
           // names (not ids) — the flow-body pair resolves ctl/cmd by name, like
@@ -194,7 +200,7 @@ export async function init(host) {
       slot.style.height = "100%";
       stage.appendChild(slot);
       setCrumb(lib, "…");
-      const wb = await mountControl("workbench", slot, { lib, ctlId, toast });
+      const wb = await mount("workbench", slot, { lib, ctlId, toast });
       stageApi = wb;
       setCrumb(lib, wb.name ?? "…");
     } else {
@@ -203,7 +209,7 @@ export async function init(host) {
         const slot = document.createElement("div");
         slot.style.height = "100%";
         stage.appendChild(slot);
-        shelfApi = await mountControl("shelf", slot, { ...nav, toast });
+        shelfApi = await mount("shelf", slot, { ...nav, toast });
       }
       setCrumb(null, null);
       if (lib) {
@@ -303,9 +309,12 @@ export async function init(host) {
   });
 
   // ── startup ───────────────────────────────────────────────
+  if (!store.connected()) {
+    // same-origin connect — a saved same-origin live config wins, so the
+    // "saves ON" toggle survives reloads; failure falls to the dialog below
+    try { await store.ensureConnected(); } catch (e) { /* the connect dialog remains */ }
+  }
   if (store.connected()) {
-    // platform boot: the loader already connected same-origin to read the
-    // frame's own facets — reuse that connection.
     setConnChip();
     store.prefetchControls();
     if (!location.hash.startsWith("#/")) location.hash = "#/shelf";
@@ -321,3 +330,11 @@ export async function init(host) {
 
   return {};
 }
+
+  return init(ME, ME.DATA || {});
+})().catch(function (e) {
+  console.log("frame failed to start: " + (e && e.message ? e.message : e));
+  return null;
+});
+readyP.then(function (api) { if (api) Object.assign(me, api); });
+me.waitReady = function (cb) { readyP.then(function () { cb(me); }); };

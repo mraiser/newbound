@@ -3,10 +3,26 @@
 // shelf invents none; G-2). The fan carries the library's desc/groups meta
 // (set_library_meta) and the "Rust settings" panel (dev.libsettings).
 
-import { mountControl } from "../../assets/loader.js";
-import { store } from "../../assets/store.js";
 
-export async function init(host, { openLib, openControl, toast }) {
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+var readyP = (async () => {
+  const { store } = await requireModule("store", "shelf");
+  try { await store.ensureConnected(); } catch (e) { /* reads surface it */ }
+  // mount a child control and resolve with its api once it is ready —
+  // installControl is the platform's own mounter; waitReady is the
+  // convention converted controls expose when their setup is async
+  function mount(name, el, props) {
+    return new Promise(function (res) {
+      installControl(el, "dev", name, function (api) {
+        if (api && api.waitReady) api.waitReady(function () { res(api); });
+        else res(api);
+      }, props || {});
+    });
+  }
+
+async function init(host, { openLib, openControl, toast }) {
   const groupsEl = host.querySelector(".sh-groups");
   const fanEl = host.querySelector(".sh-fan");
   const cardsEl = host.querySelector(".sh-cards");
@@ -694,7 +710,7 @@ export async function init(host, { openLib, openControl, toast }) {
       const slot = document.createElement("div");
       slot.className = "sh-slot";
       cardsEl.appendChild(slot);
-      const card = await mountControl("card", slot, {
+      const card = await mount("card", slot, {
         name: ctl.name,
         onOpen: () => openControl(libId, ctl.id),
       });
@@ -732,3 +748,11 @@ export async function init(host, { openLib, openControl, toast }) {
 
   return { showFan };
 }
+
+  return init(ME, ME.DATA || {});
+})().catch(function (e) {
+  console.log("shelf failed to start: " + (e && e.message ? e.message : e));
+  return null;
+});
+readyP.then(function (api) { if (api) Object.assign(me, api); });
+me.waitReady = function (cb) { readyP.then(function () { cb(me); }); };

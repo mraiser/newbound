@@ -7,10 +7,26 @@
 // dev.save_control adapter and localStorage history remain as the fallback,
 // and the strip's caption says which door is in use.
 
-import { mountControl } from "../../assets/loader.js";
-import { store } from "../../assets/store.js";
-import { FACETS } from "../../assets/facets.js";
-import { viewctx } from "../../assets/viewctx.js";
+
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+var readyP = (async () => {
+  const { store } = await requireModule("store", "workbench");
+  const { FACETS } = await requireModule("facets", "workbench");
+  const { viewctx } = await requireModule("viewctx", "workbench");
+  try { await store.ensureConnected(); } catch (e) { /* reads surface it */ }
+  // mount a child control and resolve with its api once it is ready —
+  // installControl is the platform's own mounter; waitReady is the
+  // convention converted controls expose when their setup is async
+  function mount(name, el, props) {
+    return new Promise(function (res) {
+      installControl(el, "dev", name, function (api) {
+        if (api && api.waitReady) api.waitReady(function () { res(api); });
+        else res(api);
+      }, props || {});
+    });
+  }
 
 const UI_FACETS = new Set(["html", "css", "js"]);
 const CMD_LANGS = ["rust", "js", "java", "python", "py", "flow"];
@@ -28,7 +44,7 @@ function commandLang(entry) {
   return CMD_LANGS.find((lang) => entry[lang] !== undefined) ?? "?";
 }
 
-export async function init(host, { lib, ctlId, toast }) {
+async function init(host, { lib, ctlId, toast }) {
   const index = await store.controls(lib);
   const entry = (index instanceof Error ? [] : index).find((c) => c.id === ctlId);
   const record = await store.control(lib, ctlId);
@@ -146,7 +162,7 @@ export async function init(host, { lib, ctlId, toast }) {
     if (editors.has(facet)) return editors.get(facet);
     const slot = document.createElement("div");
     editorsEl.appendChild(slot);
-    const api = await mountControl("editor", slot, {
+    const api = await mount("editor", slot, {
       language: EDITOR_LANG[facet] ?? "html",
       readOnly: !(writable && UI_FACETS.has(facet)),
       onChange: () => {
@@ -1038,7 +1054,7 @@ export async function init(host, { lib, ctlId, toast }) {
     codeEl.querySelector(".wcc-sig").textContent = sig;
 
     if (!codeApi) {
-      codeApi = await mountControl("editor", codeEl.querySelector(".wcc-editor"), {
+      codeApi = await mount("editor", codeEl.querySelector(".wcc-editor"), {
         language: "js",   // closest tinting for rust/python; not semantic
         readOnly: !patchMode,
         onChange: () => updateCodeDirty(),
@@ -1430,7 +1446,7 @@ export async function init(host, { lib, ctlId, toast }) {
     const viewer = document.createElement("div");
     viewer.style.height = "100%";
     slot.appendChild(viewer);
-    const api = await mountControl("editor", viewer, { language: "json", readOnly: true });
+    const api = await mount("editor", viewer, { language: "json", readOnly: true });
     api.setSource(facetSource("three"));
   }
 
@@ -1440,7 +1456,7 @@ export async function init(host, { lib, ctlId, toast }) {
     const inner = document.createElement("div");
     inner.style.height = "100%";
     slot.appendChild(inner);
-    await mountControl("sceneeditor", inner, {
+    await mount("sceneeditor", inner, {
       lib, name, record, toast,
       onSaved: (scene) => {
         record.scene = scene;
@@ -1605,7 +1621,7 @@ export async function init(host, { lib, ctlId, toast }) {
       return;
     }
 
-    await mountControl("preview", inner, {
+    await mount("preview", inner, {
       lib,
       name,
       record,
@@ -1660,3 +1676,11 @@ export async function init(host, { lib, ctlId, toast }) {
     ? "html" : "cmd");
   return { name, dispose: () => unregCtx.forEach((u) => u()) };
 }
+
+  return init(ME, ME.DATA || {});
+})().catch(function (e) {
+  console.log("workbench failed to start: " + (e && e.message ? e.message : e));
+  return null;
+});
+readyP.then(function (api) { if (api) Object.assign(me, api); });
+me.waitReady = function (cb) { readyP.then(function () { cb(me); }); };

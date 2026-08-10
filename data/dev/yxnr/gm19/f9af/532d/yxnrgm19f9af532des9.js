@@ -3,7 +3,13 @@
 // tag naming the source, click maps the element back to its line in the html
 // facet via onPick. JS execution is deliberately off in M1 (see DEVIATIONS.md).
 
-export function init(host, { lib, name, record, onPick }) {
+
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+var readyP = (async () => {
+
+function init(host, { lib, name, record, onPick }) {
   host.querySelector(".pv-where").textContent = `${lib} ▸ ${name}`;
   const stage = host.querySelector(".pv-stage");
   const tag = host.querySelector(".pv-tag");
@@ -82,3 +88,11 @@ export function init(host, { lib, name, record, onPick }) {
 
   return {};
 }
+
+  return init(ME, ME.DATA || {});
+})().catch(function (e) {
+  console.log("preview failed to start: " + (e && e.message ? e.message : e));
+  return null;
+});
+readyP.then(function (api) { if (api) Object.assign(me, api); });
+me.waitReady = function (cb) { readyP.then(function () { cb(me); }); };

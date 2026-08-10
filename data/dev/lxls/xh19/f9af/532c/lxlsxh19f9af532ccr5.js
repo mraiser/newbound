@@ -4,6 +4,12 @@
 // on double-click; `nextcase` chains render as case tabs. Editing is a later
 // milestone.
 
+
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+var readyP = (async () => {
+
 const S = 140;               // px per world unit
 const NODE_H = 46;
 const BAR_H = 36;
@@ -19,7 +25,7 @@ function svgEl(tag, attrs = {}, text) {
   return el;
 }
 
-export function init(host, { title, graph, onBack }) {
+function init(host, { title, graph, onBack }) {
   host.querySelector(".fe-title").innerHTML = "";
   const titleEl = host.querySelector(".fe-title");
   titleEl.append(title.prefix + " ");
@@ -251,3 +257,11 @@ export function init(host, { title, graph, onBack }) {
   render();
   return {};
 }
+
+  return init(ME, ME.DATA || {});
+})().catch(function (e) {
+  console.log("floweditor failed to start: " + (e && e.message ? e.message : e));
+  return null;
+});
+readyP.then(function (api) { if (api) Object.assign(me, api); });
+me.waitReady = function (cb) { readyP.then(function () { cb(me); }); };

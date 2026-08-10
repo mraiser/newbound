@@ -20,19 +20,26 @@
 // assets/flowproject.js; the mutations (with inverses) live in
 // assets/flowdoc.js.
 
-import { mountScene } from "../../vendor/nb_three/scenestage.js";
-import { store } from "../../assets/store.js";
-import { parse, propagationRounds, diffFlow } from "../../assets/flowdoc.js";
-import { toScene, terminalWorld, GEO } from "../../assets/flowproject.js";
-import { PRIMS, FAMILIES, signature } from "../../assets/flowprims.js";
-import { tidy, untangle } from "../../assets/flowlayout.js";
-import { hasWebGL } from "../../assets/webgl.js";
+
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+var readyP = (async () => {
+  const { store } = await requireModule("store", "floweditor3d");
+  const { parse, propagationRounds, diffFlow } = await requireModule("flowdoc", "floweditor3d");
+  const { toScene, terminalWorld, GEO } = await requireModule("flowproject", "floweditor3d");
+  const { PRIMS, FAMILIES, signature } = await requireModule("flowprims", "floweditor3d");
+  const { tidy, untangle } = await requireModule("flowlayout", "floweditor3d");
+  const { hasWebGL } = await requireModule("webgl", "floweditor3d");
+  // the vendored stage off its real asset URL — page-relative for tunneling
+  const { mountScene } = await import("../app/asset/app/vendor/nb_three/scenestage.js");
+  try { await store.ensureConnected(); } catch (e) { /* reads surface it */ }
 
 const KIND_GLYPH = { primitive: "⚙", command: "▤", local: "▣", constant: "◇", match: "◇", persistent: "⛃", undefined: "▢" };
 const SNAP = 0.05;
 const ACCENT = "#62bd8c";   // the projection's fixed palette (flowproject SCENE_COLORS)
 
-export function init(host, { title, graph, source, onBack }) {
+function init(host, { title, graph, source, onBack }) {
   const titleEl = host.querySelector(".fx-title");
   titleEl.replaceChildren(document.createTextNode((title?.prefix || "") + " "));
   const t = document.createElement("span"); t.className = "t"; t.textContent = title?.name || "flow";
@@ -1528,3 +1535,11 @@ export function init(host, { title, graph, source, onBack }) {
 }
 
 function escape(s) { return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+
+  return init(ME, ME.DATA || {});
+})().catch(function (e) {
+  console.log("floweditor3d failed to start: " + (e && e.message ? e.message : e));
+  return null;
+});
+readyP.then(function (api) { if (api) Object.assign(me, api); });
+me.waitReady = function (cb) { readyP.then(function () { cb(me); }); };

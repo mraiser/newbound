@@ -7,23 +7,30 @@
 // fallback path, so without the pair (or on read-only connections) the pane
 // is view/play with the caption saying why.
 
-import { mountScene } from "../../vendor/nb_three/scenestage.js";
-import { store } from "../../assets/store.js";
-import {
-  parse as parseScene, KINDS, MATERIAL_KINDS, LIGHT_MODES,
-  bindablePaths, MOUNT_BIND, NODE_EVENTS, STATE_TYPES,
-} from "../../assets/scenedoc.js";
-import { parse as parseExpr } from "../../assets/sceneexpr.js";
-import { TOKEN_NAMES } from "../../assets/scenetokens.js";
-import { project, envOf } from "../../assets/sceneproject.js";
-import { createRuntime } from "../../assets/scenerun.js";
-import { hasWebGL } from "../../assets/webgl.js";
-import { viewctx } from "../../assets/viewctx.js";
+
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+var readyP = (async () => {
+  const { store } = await requireModule("store", "sceneeditor");
+  const {
+    parse: parseScene, KINDS, MATERIAL_KINDS, LIGHT_MODES,
+    bindablePaths, MOUNT_BIND, NODE_EVENTS, STATE_TYPES,
+  } = await requireModule("scenedoc", "sceneeditor");
+  const { parse: parseExpr } = await requireModule("sceneexpr", "sceneeditor");
+  const { TOKEN_NAMES } = await requireModule("scenetokens", "sceneeditor");
+  const { project, envOf } = await requireModule("sceneproject", "sceneeditor");
+  const { createRuntime } = await requireModule("scenerun", "sceneeditor");
+  const { hasWebGL } = await requireModule("webgl", "sceneeditor");
+  const { viewctx } = await requireModule("viewctx", "sceneeditor");
+  // the vendored stage off its real asset URL — page-relative for tunneling
+  const { mountScene } = await import("../app/asset/app/vendor/nb_three/scenestage.js");
+  try { await store.ensureConnected(); } catch (e) { /* reads surface it */ }
 
 const dark = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: dark)").matches;
 const reducedMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export async function init(host, { lib, name, record, toast, onSaved }) {
+async function init(host, { lib, name, record, toast, onSaved }) {
   const root = host.querySelector(".nb-sceneeditor");
   const canvasEl = root.querySelector(".se-canvas");
   const panelEl = root.querySelector(".se-panel");
@@ -870,3 +877,11 @@ export async function init(host, { lib, name, record, toast, onSaved }) {
   refresh();
   return { dispose };
 }
+
+  return init(ME, ME.DATA || {});
+})().catch(function (e) {
+  console.log("sceneeditor failed to start: " + (e && e.message ? e.message : e));
+  return null;
+});
+readyP.then(function (api) { if (api) Object.assign(me, api); });
+me.waitReady = function (cb) { readyP.then(function () { cb(me); }); };

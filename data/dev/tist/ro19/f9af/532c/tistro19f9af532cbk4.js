@@ -3,12 +3,19 @@
 // Kept deliberately small: mount, get/set source, line highlights, dirty
 // notification, read-only toggle. Nothing else.
 
-import {
-  Compartment, Decoration, EditorState, EditorView, HighlightStyle,
-  RangeSetBuilder, StateEffect, StateField, css, defaultKeymap, history,
-  historyKeymap, highlightSelectionMatches, html, indentWithTab, javascript,
-  json, keymap, lineNumbers, searchKeymap, syntaxHighlighting, tags,
-} from "../../vendor/nb_codemirror/cm6.js";
+
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+var readyP = (async () => {
+  // the vendored CodeMirror bundle off its real asset URL — page-relative
+  // so a tunneled mount (/peer/remote/UUID/local/…) resolves in the tunnel
+  const {
+    Compartment, Decoration, EditorState, EditorView, HighlightStyle,
+    RangeSetBuilder, StateEffect, StateField, css, defaultKeymap, history,
+    historyKeymap, highlightSelectionMatches, html, indentWithTab, javascript,
+    json, keymap, lineNumbers, searchKeymap, syntaxHighlighting, tags,
+  } = await import("../app/asset/dev/vendor/nb_codemirror/cm6.js");
 
 const LANGUAGES = {
   html: () => html(),
@@ -57,7 +64,7 @@ function readOnlyExt(value) {
   return [EditorState.readOnly.of(value), EditorView.editable.of(!value)];
 }
 
-export function init(host, { language = "html", readOnly = true, onChange, onSave } = {}) {
+function init(host, { language = "html", readOnly = true, onChange, onSave } = {}) {
   const readOnlyConf = new Compartment();
   let suppressChange = false;
 
@@ -118,3 +125,11 @@ export function init(host, { language = "html", readOnly = true, onChange, onSav
     },
   };
 }
+
+  return init(ME, ME.DATA || {});
+})().catch(function (e) {
+  console.log("editor failed to start: " + (e && e.message ? e.message : e));
+  return null;
+});
+readyP.then(function (api) { if (api) Object.assign(me, api); });
+me.waitReady = function (cb) { readyP.then(function () { cb(me); }); };

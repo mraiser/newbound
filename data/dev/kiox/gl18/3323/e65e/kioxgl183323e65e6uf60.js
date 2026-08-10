@@ -1,67 +1,37 @@
-// dev — the Development app's boot (the R-2 flip: this control's facets
-// ARE the app the platform serves at /dev/; its commands — compile,
-// rebuild_lib, lib_archive… — predate the boot and stay). It runs under
-// the STOCK mount: the shell's body is a data-control that
-// activateControls wraps as `el.api = new function(){ ...this facet... }`,
-// so this file is CLASSIC-script code — no import/export statements;
-// dynamic import() only.
+// dev — the Development app's boot (the R-2 flip: this control's facets ARE
+// the app the platform serves at /dev/; its commands — compile, rebuild_lib,
+// lib_archive… — predate the boot and stay). It runs under the STOCK mount,
+// so this is CLASSIC-script code: no import/export statements; dynamic
+// import() only.
 //
-// The module world (2026-07-30, the owner's design — first-class in
-// api.js): shared ES modules are MODULE CONTROLS — ordinary controls whose
-// record carries `module: true` (dev.code.set_module_flag). Installing a
-// flagged control registers its js facet as a named ES module on the page
-// (api.js: promise registry, order-free, css facets inject once) instead
-// of mounting UI. So this boot simply INSTALLS the two cluster controls —
-// app.modules and dev.devmodules, whose html facets list module divs (the
-// platform's own nested-composition idiom) — then hands the loader the
-// union control directory. There
-// is no manifest anywhere: what a page installs IS its module world. The
-// static entry (index.html, repo-only) never runs this — it imports
-// ./assets/loader.js off real files.
+// The module world (2026-07-30, the owner's design — first-class in api.js):
+// shared ES modules are MODULE CONTROLS — ordinary controls whose record
+// carries `module: true` (dev.code.set_module_flag). Installing the two
+// cluster controls (app.modules, dev.devmodules) registers every flagged
+// module on the page, order-free. What a page installs IS its module world —
+// no manifest, no environment object, no union directory: every control
+// mounts by (lib, name) through installControl, the platform's own mounter.
+
+var me = this;
+var ME = document.getElementById(me.UUID);
 
 (async () => {
-  const host = document.querySelector(".nb-bench-boot") || document.body;
+  const host = ME.querySelector(".nb-bench-boot") || ME;
   const fail = (msg) => {
     host.innerHTML = "";
     const p = document.createElement("p");
     p.className = "nb-boot-err";
     p.textContent = "development failed to boot: " + msg +
       "\n\nIf this is a session problem, sign in via the instance's own UI " +
-      "(the sessionid cookie) and reload. If modules are missing, rerun " +
-      "tools/install-bench.py against this instance.";
+      "(the sessionid cookie) and reload.";
     host.appendChild(p);
   };
   try {
-    // The shell's body carries {"lib","id"} — this boot control's own library.
-    let lib = "dev";
-    try {
-      const dc = JSON.parse(document.body.dataset.control);
-      if (dc && dc.lib) lib = dc.lib;
-    } catch (e) { /* not the published shell — keep the default */ }
-
-    const read = async (l, id) => {
-      const r = await fetch("/app/read?lib=" + encodeURIComponent(l) +
-                            "&id=" + encodeURIComponent(id));
-      const j = await r.json();
-      if (j.status !== "ok") throw new Error(j.msg || "app/read failed");
-      return j;
-    };
-
-    // 0. declare the platform environment BEFORE the module world builds:
-    //    a module may read it at import time (the loader's module-level
-    //    ROOT), and imports run as installs complete — so the object must
-    //    exist first and is FILLED IN PLACE below.
-    const bench = globalThis.__benchPlatform = {
-      lib, moduleUrls: {}, controls: {},
-      assetRoots: { "vendor/nb_three": "/app/asset/app/",
-                    "vendor/nb_codemirror": "/app/asset/dev/" },
-    };
-
     // 1. the module world: install the cluster controls — controls
     //    installing controls; each flagged child registers itself with
     //    api.js, and the registry resolves inter-module imports whenever
     //    each arrives (order-free)
-    const install = (l, n, el) => new Promise((res) => installControl(el || null, l, n, res));
+    const install = (l, n, el) => new Promise((res) => installControl(el, l, n, res));
     const holder = document.createElement("div");
     holder.hidden = true;
     host.appendChild(holder);
@@ -76,77 +46,37 @@
     holder.appendChild(pluginHolder);
     await Promise.all([
       install("app", "modules", clusterEl()),
-      install(lib, "devmodules", clusterEl()),
+      install("dev", "devmodules", clusterEl()),
     ]);
 
-    // 2. the union control directory (cross-library mounts, R-1): one
-    //    index read per library the IDE spans; first library wins a name.
-    //    The boot names NO add-on: beyond its own library and app, the
-    //    directory covers exactly the libraries the plugin registry
-    //    contributes (step 3) — registering a plugin is what makes a
-    //    library's controls resolvable here. The /app/libs filter keeps a
-    //    stale registry entry for a removed library from costing a call.
-    let installed = null;
+    // 2. THE PLUGIN PASS (boot level): registry entries targeting dev.dev
+    //    install now, before the frame — so a plugin's module cluster is
+    //    registered by the time anything checks for it. Boot-level plugins
+    //    are HEADLESS by nature: the boot wipes the host before mounting
+    //    the frame. Per-control plugins ride the classic dev:plugins div
+    //    in each host control's own html instead.
     try {
-      const lr = await fetch("/app/libs");
-      const lj = await lr.json();
-      if (Array.isArray(lj.data)) installed = new Set(lj.data.map((x) => x.id));
-    } catch (e) { /* list unavailable — fall back to probing each library */ }
-    const sweep = async (l) => {
-      if (installed && !installed.has(l)) return;
-      try {
-        const idx = await read(l, "controls");
-        for (const c of (idx.data.list || [])) {
-          if (!bench.controls[c.name]) bench.controls[c.name] = { lib: l, id: c.id };
-        }
-      } catch (e) { /* a library may be absent */ }
-    };
-    await sweep(lib);
-    await sweep("app");
-
-    // 3. THE PLUGIN PASS (the owner's mechanism, revived): the registry is
-    //    read once; its entries name the add-on libraries (their controls
-    //    join the union directory above) and the plugins targeting THIS
-    //    control (dev.dev) install now, before the frame — so a plugin's
-    //    module cluster (a notebook provider) is registered by the time
-    //    anything checks for it.
-    //    Boot-level plugins are HEADLESS by nature: the boot wipes the host
-    //    before mounting the frame, so UI plugins should target bench
-    //    surfaces instead (the loader runs this same pass per mount).
-    try {
-      const pid = (bench.controls["plugins"] || {}).id;
-      if (pid) {
-        const prec = await read("dev", pid);
-        const pcmd = (prec.data.cmd || []).find((c) => c.name === "list_plugins");
-        if (pcmd) {
-          const pr = await fetch("/app/exec?lib=dev&id=" + encodeURIComponent(pcmd.id) +
-                                 "&args=" + encodeURIComponent("{}"));
-          const pj = await pr.json();
-          const entries = (pj && pj.status === "ok" && pj.data) ? pj.data : {};
-          const pluginLibs = new Set(Object.values(entries)
-            .map((e) => (e || {}).plugin_lib).filter((l) => l && l !== lib && l !== "app"));
-          for (const l of pluginLibs) await sweep(l);
-          const mounts = [];
-          for (const key of Object.keys(entries)) {
-            const e = entries[key] || {};
-            if (e.target_lib !== lib || e.target_ctl !== lib) continue;
-            const slot = (e.selector && document.querySelector(e.selector)) || pluginHolder;
-            mounts.push(new Promise((res) => installControl(slot, e.plugin_lib, e.plugin_ctl, res)));
-          }
-          await Promise.all(mounts);
-        }
+      const { store } = await requireModule("store", "dev-boot");
+      await store.ensureConnected();
+      const r = await store.invoke("dev", "plugins", "list_plugins", {});
+      const env = (r && !(r instanceof Error)) ? r.envelope : null;
+      const entries = (env && env.status === "ok" && env.data) ? env.data : {};
+      const mounts = [];
+      for (const key of Object.keys(entries)) {
+        const e = entries[key] || {};
+        if (e.target_lib !== "dev" || e.target_ctl !== "dev") continue;
+        const slot = (e.selector && document.querySelector(e.selector)) || pluginHolder;
+        mounts.push(new Promise((res) => installControl(slot, e.plugin_lib, e.plugin_ctl, res)));
       }
+      await Promise.all(mounts);
     } catch (e) { /* no plugin registry on this instance — nothing to mount */ }
 
-    // 4. what the loader consumes: module urls straight from the page's
-    //    REGISTRY (api.js NB_MODULES) — filled into the declared object
-    for (const n of Object.keys(NB_MODULES)) {
-      if (NB_MODULES[n].url) bench.moduleUrls["assets/" + n + ".js"] = NB_MODULES[n].url;
-    }
-
-    const loader = await requireModule("loader");
+    // 3. the frame — a stock mount like any other control
     host.innerHTML = "";
-    await loader.mountControl("frame", host);
+    const frameEl = document.createElement("div");
+    frameEl.style.height = "100%";
+    host.appendChild(frameEl);
+    await new Promise((res) => installControl(frameEl, "dev", "frame", res));
   } catch (e) {
     fail(e && e.message ? e.message : String(e));
   }
