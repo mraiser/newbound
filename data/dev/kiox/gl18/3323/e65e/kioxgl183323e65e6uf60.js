@@ -81,29 +81,35 @@
 
     // 2. the union control directory (cross-library mounts, R-1): one
     //    index read per library the IDE spans; first library wins a name.
-    //    Optional add-ons (the agent library) are consulted only when the
-    //    instance's library list says they are installed — a plugin that
-    //    isn't there costs no failed call and no server-side complaint.
+    //    The boot names NO add-on: beyond its own library and app, the
+    //    directory covers exactly the libraries the plugin registry
+    //    contributes (step 3) — registering a plugin is what makes a
+    //    library's controls resolvable here. The /app/libs filter keeps a
+    //    stale registry entry for a removed library from costing a call.
     let installed = null;
     try {
       const lr = await fetch("/app/libs");
       const lj = await lr.json();
       if (Array.isArray(lj.data)) installed = new Set(lj.data.map((x) => x.id));
     } catch (e) { /* list unavailable — fall back to probing each library */ }
-    const libs = [lib, "app", "agent"].filter((l) => !installed || installed.has(l));
-    for (const l of libs) {
+    const sweep = async (l) => {
+      if (installed && !installed.has(l)) return;
       try {
         const idx = await read(l, "controls");
         for (const c of (idx.data.list || [])) {
           if (!bench.controls[c.name]) bench.controls[c.name] = { lib: l, id: c.id };
         }
-      } catch (e) { /* a library may be absent (the agent add-on) */ }
-    }
+      } catch (e) { /* a library may be absent */ }
+    };
+    await sweep(lib);
+    await sweep("app");
 
-    // 3. THE PLUGIN PASS (the owner's mechanism, revived): entries in
-    //    runtime/dev/plugins.json targeting THIS control (dev.dev) install
-    //    now, before the frame — so a plugin's module cluster (the agent
-    //    notebook) is registered by the time anything checks for it.
+    // 3. THE PLUGIN PASS (the owner's mechanism, revived): the registry is
+    //    read once; its entries name the add-on libraries (their controls
+    //    join the union directory above) and the plugins targeting THIS
+    //    control (dev.dev) install now, before the frame — so a plugin's
+    //    module cluster (a notebook provider) is registered by the time
+    //    anything checks for it.
     //    Boot-level plugins are HEADLESS by nature: the boot wipes the host
     //    before mounting the frame, so UI plugins should target bench
     //    surfaces instead (the loader runs this same pass per mount).
@@ -117,6 +123,9 @@
                                  "&args=" + encodeURIComponent("{}"));
           const pj = await pr.json();
           const entries = (pj && pj.status === "ok" && pj.data) ? pj.data : {};
+          const pluginLibs = new Set(Object.values(entries)
+            .map((e) => (e || {}).plugin_lib).filter((l) => l && l !== lib && l !== "app"));
+          for (const l of pluginLibs) await sweep(l);
           const mounts = [];
           for (const key of Object.keys(entries)) {
             const e = entries[key] || {};

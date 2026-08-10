@@ -25,8 +25,8 @@ export const chatctx = {
   },
 
   /** One provider's live value by key — for providers that compose on
-      others (agent.memory keys pushed entries on the open surface).
-      A direct call, so no snapshot recursion. */
+      others (an add-on's memory module keys pushed entries on the open
+      surface). A direct call, so no snapshot recursion. */
   peek(key) {
     const fn = providers.get(key);
     if (!fn) return null;

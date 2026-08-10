@@ -5,9 +5,9 @@
 //
 // The notebook is ALSO the chat surface (owner's direction, 2026-07-25 —
 // replacing the agentchat drawer): a plain-language ask becomes a user
-// cell, the agent answers via agent.llm.chat_llm driven client-side
-// (assets/agentloop.js owns the system prompt, context fences, and the
-// tool loop), and every tool call the agent makes lands HERE as a cell —
+// cell, the agent answers through the ask-provider module (which owns the
+// system prompt, context fences, the tool loop, and its own backend
+// wiring), and every tool call the agent makes lands HERE as a cell —
 // read-listed ones run directly, mutating ones stop at the same typed
 // confirm the user's own cells do. The notebook's recent cells are the
 // agent's conversational memory.
@@ -16,24 +16,21 @@ import { store } from "../../assets/store.js";
 import { chatctx } from "../../assets/chatctx.js";
 
 // The notebook seam (great-refactoring.md, R-1): the console is dev's own;
-// the ask row PLUGS IN from the agent library's modules. Availability is
-// known from the boot's module graph (agentloop/agentprompt are optional
-// MODMAP entries), so a platform without the agent lib skips the import —
-// no probe fetch, no console noise; static mode always has the files.
+// the ask row PLUGS IN through the ASK-PROVIDER SOCKET — an optional
+// module named `ask`. The session names no providing library: any add-on
+// that registers a plugin whose cluster installs an `ask` module control
+// fills the socket (the agent add-on does). Availability is known from
+// the boot's module graph, so a platform without a provider skips the
+// import — no probe fetch, no console noise.
 // agent === null ⇒ the ask machinery never wires and its strips are
 // removed at init; the notebook is still a full REPL.
 const agent = await (async () => {
   const P = globalThis.__benchPlatform ?? null;
-  if (P && !(P.moduleUrls["assets/agentloop.js"] &&
-             P.moduleUrls["assets/agentprompt.js"])) return null;
+  if (P && !P.moduleUrls["assets/ask.js"]) return null;
   try {
-    const [loop, prompt] = await Promise.all([
-      import("../../assets/agentloop.js"),
-      import("../../assets/agentprompt.js"),
-    ]);
-    return { ...loop, ADDENDUM: prompt.ADDENDUM };
+    return await import("../../assets/ask.js");
   } catch (e) {
-    console.warn("agent modules unavailable — the notebook stays a REPL", e);
+    console.warn("no ask provider — the notebook stays a REPL", e);
     return null;
   }
 })();
@@ -467,7 +464,7 @@ export function init(host, { toast, onClose }) {
 
   async function ensureCatalog() {
     if (mcpTools !== null) return mcpTools;
-    const r = await store.listTools();
+    const r = await agent.listTools();
     mcpTools = r.status === "ok" ? (r.tools ?? []) : [];
     updateToolsBtn();   // the count means defaults ∩ catalog once known
     return mcpTools;
@@ -714,27 +711,20 @@ export function init(host, { toast, onClose }) {
       });
       busy.remove();
       renderCell(pushTranscript({ kind: "chat-agent", text }));
-      // the archivist's intake (docs/memory.md): completed turns queue in
-      // the runtime lib; the timer sweep distills them — fire-and-forget
-      store.invoke("agent", "archivist", "log_turn", {
+      // the provider's turn intake (the archivist) — fire-and-forget
+      agent.logTurn?.({
         venue: "notebook",
         ask: message.slice(0, 4000),
         reply: (text ?? "").slice(0, 4000),
         tools: "",
         author: "notebook",
-      }).catch(() => {});
+      })?.catch?.(() => {});
     } catch (e) {
       busy.remove();
       let text = `error: ${e.message || "the request failed (see the instance console)"}`;
-      // chat_llm reads system.apps.agent.runtime (VLLM_URL/VLLM_MODEL) —
-      // absent when the agent app isn't exposed. Say so instead of leaving
-      // the panic bare.
-      if (/Key '(agent|VLLM_URL|VLLM_MODEL)' not found/.test(e.message ?? "")) {
-        text += "\n\nThis instance's agent app isn't configured: add `agent` to " +
-          "config.properties apps=, put VLLM_URL and VLLM_MODEL in " +
-          "runtime/agent/botd.properties, and restart " +
-          "(tools/scratch-instance.md has the recipe).";
-      }
+      // the provider knows its own configuration story — let it annotate
+      const hint = agent.errorHint?.(e.message ?? "") ?? "";
+      if (hint) text += "\n\n" + hint;
       renderCell(pushTranscript({ kind: "chat-agent", error: true, text }));
     }
     sendBtn.disabled = false;

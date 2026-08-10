@@ -220,7 +220,7 @@ export async function init(host, { openLib, openControl, toast }) {
     async function refresh() {
       const r = await store.listAssets(lib.id);
       if (r.status !== "ok") {
-        rowsEl.textContent = `assets need the agent API on a live connection — ${r.msg}`;
+        rowsEl.textContent = `assets need the write API on a live connection — ${r.msg}`;
         rowsEl.className = "fa-rows fa-empty";
         return;
       }

@@ -1,9 +1,9 @@
-// workbench — the bench screen. M4: when the agent write API (CONTRACT §6)
-// is present, every save is a patch through patch_control_facet — minimal
-// exact-match snippet (whole-facet replace as the fallback shape), base-hash
-// concurrency, and the shared per-control journal rendered as the timeline
-// with inverse-patch revert. Absent ui facets are creatable (empty
-// old_snippet). Where the agent library isn't built (or in mock mode) the M2
+// workbench — the bench screen. M4: when the CONTRACT §6 write API
+// (dev.code) is present, every save is a patch through patch_control_facet —
+// minimal exact-match snippet (whole-facet replace as the fallback shape),
+// base-hash concurrency, and the shared per-control journal rendered as the
+// timeline with inverse-patch revert. Absent ui facets are creatable (empty
+// old_snippet). Where the write API isn't built (or in mock mode) the M2
 // dev.save_control adapter and localStorage history remain as the fallback,
 // and the strip's caption says which door is in use.
 
@@ -11,6 +11,16 @@ import { mountControl } from "../../assets/loader.js";
 import { store } from "../../assets/store.js";
 import { FACETS } from "../../assets/facets.js";
 import { chatctx } from "../../assets/chatctx.js";
+
+// The ask-provider socket — an optional module named `ask`, installed by
+// whatever add-on registers it through the plugin registry. The workbench
+// names no providing library; it powers the generate ▸ desc drafter.
+// ask === null ⇒ the button never renders.
+const ask = await (async () => {
+  const P = globalThis.__benchPlatform ?? null;
+  if (P && !P.moduleUrls["assets/ask.js"]) return null;
+  try { return await import("../../assets/ask.js"); } catch { return null; }
+})();
 
 const UI_FACETS = new Set(["html", "css", "js"]);
 const CMD_LANGS = ["rust", "js", "java", "python", "py", "flow"];
@@ -195,7 +205,7 @@ export async function init(host, { lib, ctlId, toast }) {
     } else if (!facetPresent(facet) && !(patchMode && UI_FACETS.has(facet))) {
       absentEl.hidden = false;
       absentEl.textContent = UI_FACETS.has(facet)
-        ? `this control has no ${facet} facet — creating one needs the agent write API (CONTRACT §6)`
+        ? `this control has no ${facet} facet — creating one needs the write API (CONTRACT §6)`
         : `this control has no ${facet} facet — creating one is not wired up yet`;
     } else if (!facetPresent(facet) && patchMode && UI_FACETS.has(facet)) {
       // Facet absence is a normal state: open an empty editor; saving
@@ -326,7 +336,7 @@ export async function init(host, { lib, ctlId, toast }) {
     toast.show(`patch_control_facet → applied · ${r.patch_id} · live`);
   }
 
-  // The M2 adapter path — the fallback when the agent library isn't built.
+  // The M2 adapter path — the fallback when the write API isn't built.
   async function saveAdapter(facet, source, overwrite) {
     if (!overwrite) {
       const onServer = await store.facetOnServer(lib, ctlId, facet);
@@ -547,7 +557,7 @@ export async function init(host, { lib, ctlId, toast }) {
       ? `security groups: ${record.groups}` : "security: admin only";
     metaEl.querySelector(".wm-edit").hidden = !patchMode;
     metaEl.querySelector(".wm-groups-btn").hidden = !patchMode;
-    // publish rides dev commands, not the agent lib — live mode is enough
+    // publish rides dev commands, not the write API — live mode is enough
     metaEl.querySelector(".wm-publish").hidden = store.mode() !== "live";
   }
 
@@ -872,7 +882,7 @@ export async function init(host, { lib, ctlId, toast }) {
          short-interval timer fires for real on this instance. Changes are
          journaled in the strip (facets <code>timer</code>/<code>event</code>).`
       : `The control's wiring: timers and event handlers run this control's
-         commands without a browser. Editing needs the agent write API on a
+         commands without a browser. Editing needs the write API on a
          live connection with saves ON (CONTRACT §6).`;
     for (const kind of ["timer", "event"]) {
       const rows = wiringEl.querySelector(kind === "timer" ? ".ww-timer-rows" : ".ww-event-rows");
@@ -1029,7 +1039,7 @@ export async function init(host, { lib, ctlId, toast }) {
       codeEl.querySelector(".wcc-sig").textContent = "";
       errEl.hidden = false;
       errEl.textContent = `could not read this command's body: ${r.msg}` +
-        (journalMode ? "" : " — command bodies need the agent API (live connection)");
+        (journalMode ? "" : " — command bodies need the write API (live connection)");
       return;
     }
     const ext = (r.type ?? lang) === "rust" ? "rs" : (r.type ?? lang);
@@ -1346,7 +1356,7 @@ export async function init(host, { lib, ctlId, toast }) {
           <input class="cm-desc-in" placeholder="describe this command — agents read this">
           <input class="cm-tags-in" placeholder="tags (comma-delimited — categorization, never security)">
           <button class="cm-apply">set</button>
-          <button class="cm-gen" title="Draft a description from the command's code (agent.plugin.describe_command)">generate ▸</button>
+          ${ask ? `<button class="cm-gen" title="Draft a description from the command's code (the ask provider drafts it)">generate ▸</button>` : ""}
           <input class="cm-groups-in"
             placeholder="security groups (comma-delimited) — empty = admin only"
             title="who can execute this command — check_security reads the readers derived from this">
@@ -1375,7 +1385,7 @@ export async function init(host, { lib, ctlId, toast }) {
           note.textContent = "";
           toast.show(`set_groups → readers [${(r.readers ?? []).join(", ") || "— admin only"}] on ${cmdEntry.name}`);
         });
-        detail.querySelector(".cm-gen").addEventListener("click", async () => {
+        if (ask) detail.querySelector(".cm-gen").addEventListener("click", async () => {
           const note = detail.querySelector(".cm-note");
           const gen = detail.querySelector(".cm-gen");
           gen.disabled = true;
@@ -1388,7 +1398,7 @@ export async function init(host, { lib, ctlId, toast }) {
           }
           const lang2 = rc.type ?? "rust";
           const ext2 = lang2 === "rust" ? "rs" : lang2;
-          const r = await store.describeCommand({
+          const r = await ask.describeCommand({
             command_name: cmdEntry.name,
             lang: lang2,
             returntype: rc.returntype ?? "",

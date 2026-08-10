@@ -195,8 +195,8 @@ export const store = {
     return { envelope, ms: Math.round(performance.now() - started) };
   },
 
-  // ── the agent write API (CONTRACT §6, [live]) ────────────
-  // The command family on agent.code, exec'd by id like everything else.
+  // ── the dev.code write API (CONTRACT §6, [live]) ─────────
+  // The command family on dev.code, exec'd by id like everything else.
   // FLAT returns: fields sit top-level on the envelope; err envelopes carry
   // msg (and current_hash for stale_base). agentCall never throws and never
   // returns Error — always an envelope, so callers branch on status only.
@@ -548,50 +548,11 @@ export const store = {
     });
   },
 
-  // ── chat (the agent.plugin backend; CONTRACT §6 note) ────
-  // Same call shape as agentCall but against any control in the agent
-  // library — the chat commands live on agent.plugin (and their successor
-  // on agent.llm), not agent.code.
-
-  agentLibIds(ctlName) {
-    return cached(`agent:cmdids:${ctlName}`, async () => {
-      const controls = await this.controls("agent");
-      if (controls instanceof Error) return controls;
-      const ctl = controls.find((c) => c.name === ctlName);
-      if (!ctl) return new Error(`agent.${ctlName} not found`);
-      const record = await this.control("agent", ctl.id);
-      if (record instanceof Error) return record;
-      return Object.fromEntries((record.cmd ?? []).map((c) => [c.name, c.id]));
-    });
-  },
-
-  async agentLibCall(ctlName, cmdName, args) {
-    const ids = await this.agentLibIds(ctlName);
-    if (ids instanceof Error) return { status: "err", msg: ids.message };
-    if (!ids[cmdName]) {
-      return { status: "err", msg: `agent.${ctlName}.${cmdName} not found on this instance` };
-    }
-    return client.exec("agent", ids[cmdName], args);
-  },
-
-  /** The MCP tool list (agent.plugin.list_tools, FLAT {tools:[...]}). */
-  listTools() {
-    return this.agentLibCall("plugin", "list_tools", {});
-  },
-
-  /** One chat_llm completion (agent.llm — the OpenAI-compatible bridge to
-      the instance's configured model). JSONObject envelope: the payload
-      ({kind, content | tool_calls, assistant_message}) sits under data.
-      The session's agent loop (assets/agentloop.js) drives this directly —
-      control_query and tool_loop are deliberately not called. */
-  chatLlm(messages, tools) {
-    return this.agentLibCall("llm", "chat_llm", { messages, tools });
-  },
-
-  /** Draft a command description (agent.plugin.describe_command, String). */
-  describeCommand(args) {
-    return this.agentLibCall("plugin", "describe_command", args);
-  },
+  // ── add-on backends ──────────────────────────────────────
+  // The store carries NO add-on-specific API. An optional library's
+  // provider module (installed through the plugin registry) makes its
+  // own calls with the generic surface above — controls()/control()/
+  // invoke() — and owns its library and command names itself.
 
   /** Current server-side source of one facet — the conflict check. */
   // ── R-2 gap bar + ports (great-refactoring.md) ───────────
