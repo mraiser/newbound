@@ -1,60 +1,86 @@
 // sceneplayer — a scene facet running standalone (scene-facet-design Part X,
 // SC-Q5's first half): the runtime + stage in affordant mode, no editor
-// chrome. Props: {lib, ctl} to load a control's scene facet through the
+// chrome. DATA: {lib, ctl} to load a control's scene facet through the
 // store, or {doc} (a raw facet object) to run one directly — embedders like
-// the peer thread hold their own doc and drive state via the returned api.
+// the peer thread hold their own doc and drive state via the api. Optional
+// {caption, onState}.
 //
-// api: { setState(field, value), stateOf(), runtime, dispose }.
+// api: { setState(field, value), stateOf(), runtime, dispose, waitReady(cb) }.
+// Loading is async — setState/dispose queue behind it; waitReady(cb) fires
+// once the runtime is up (or the scene turned out empty).
 
-import { mountScene } from "../../vendor/nb_three/scenestage.js";
-import { store } from "../../assets/store.js";
-import { parse as parseScene } from "../../assets/scenedoc.js";
-import { createRuntime } from "../../assets/scenerun.js";
-import { hasWebGL } from "../../assets/webgl.js";
+var me = this;
+var ME = document.getElementById(me.UUID);
 
-const dark = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: dark)").matches;
-const reducedMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+var dark = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: dark)").matches;
+var reducedMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-async function loadSceneDoc(lib, ctl) {
-  if (await store.sceneApi()) {
-    const r = await store.readControlScene(lib, ctl);
-    if (r.status === "ok" && r.exists) return parseScene(r.scene);
-    if (r.status === "ok") return null;
-  }
-  const controls = await store.controls(lib);
-  if (controls instanceof Error) return null;
-  const entry = controls.find((c) => c.name === ctl);
-  if (!entry) return null;
-  const rec = await store.control(lib, entry.id);
-  if (rec instanceof Error || rec.scene === undefined) return null;
-  return parseScene(rec.scene);
+var rt = null;
+var stage = null;
+var watchdog = null;
+
+me.runtime = null;
+me.setState = function (field, value) { readyP.then(function () { if (rt) rt.setState(field, value); }); };
+me.stateOf = function () { return rt ? rt.stateOf() : {}; };
+me.dispose = function () { readyP.then(disposeNow); };
+me.waitReady = function (cb) { readyP.then(function () { cb(me); }); };
+
+function disposeNow() {
+  clearInterval(watchdog);
+  if (rt) { rt.dispose(); rt = null; me.runtime = null; }
+  if (stage) { stage.dispose(); stage = null; }
 }
 
-export async function init(host, { lib, ctl, doc: rawDoc, caption, onState }) {
-  const canvasEl = host.querySelector(".sp-canvas");
-  const footEl = host.querySelector(".sp-foot");
-  const capEl = host.querySelector(".sp-cap");
-  const diagEl = host.querySelector(".sp-diag");
+var readyP = (async () => {
+  const canvasEl = ME.querySelector(".sp-canvas");
+  const footEl = ME.querySelector(".sp-foot");
+  const capEl = ME.querySelector(".sp-cap");
+  const diagEl = ME.querySelector(".sp-diag");
+
+  const { store } = await requireModule("store", "sceneplayer");
+  await store.ensureConnected();
+  const { hasWebGL } = await requireModule("webgl", "sceneplayer");
+  const { parse: parseScene } = await requireModule("scenedoc", "sceneplayer");
+  const { createRuntime } = await requireModule("scenerun", "sceneplayer");
 
   if (!hasWebGL()) {
     canvasEl.innerHTML = `<p style="padding:14px" class="sp-cap">no WebGL here — this scene cannot render</p>`;
-    return { dispose() {}, setState() {}, stateOf: () => ({}) };
+    return;
   }
 
-  const doc = rawDoc !== undefined
-    ? parseScene(rawDoc)
-    : await loadSceneDoc(lib, ctl);
+  async function loadSceneDoc(lib, ctl) {
+    if (await store.sceneApi()) {
+      const r = await store.readControlScene(lib, ctl);
+      if (r.status === "ok" && r.exists) return parseScene(r.scene);
+      if (r.status === "ok") return null;
+    }
+    const controls = await store.controls(lib);
+    if (controls instanceof Error) return null;
+    const entry = controls.find((c) => c.name === ctl);
+    if (!entry) return null;
+    const rec = await store.control(lib, entry.id);
+    if (rec instanceof Error || rec.scene === undefined) return null;
+    return parseScene(rec.scene);
+  }
+
+  const doc = ME.DATA.doc !== undefined
+    ? parseScene(ME.DATA.doc)
+    : await loadSceneDoc(ME.DATA.lib, ME.DATA.ctl);
   if (!doc) {
     canvasEl.innerHTML = "";
     footEl.hidden = false;
-    capEl.textContent = `${lib} ▸ ${ctl} has no scene facet`;
-    return { dispose() {}, setState() {}, stateOf: () => ({}) };
+    capEl.textContent = `${ME.DATA.lib} ▸ ${ME.DATA.ctl} has no scene facet`;
+    return;
   }
 
-  if (caption) { footEl.hidden = false; capEl.textContent = caption; }
+  if (ME.DATA.caption) { footEl.hidden = false; capEl.textContent = ME.DATA.caption; }
+
+  // the vendored stage, off its real asset URL — page-relative so a
+  // tunneled mount (/peer/remote/UUID/local/…) resolves inside the tunnel
+  const { mountScene } = await import("../app/asset/app/vendor/nb_three/scenestage.js");
 
   let diagCount = 0;
-  const stage = mountScene(canvasEl, {
+  stage = mountScene(canvasEl, {
     pickMode: "affordant",
     showSlots: false,
     onTap: (id) => rt.handleTap(id),
@@ -70,7 +96,7 @@ export async function init(host, { lib, ctl, doc: rawDoc, caption, onState }) {
   });
   let hoverLast = null;
 
-  const rt = createRuntime({
+  rt = createRuntime({
     doc,
     stage,
     theme: dark() ? "dark" : "light",
@@ -91,25 +117,15 @@ export async function init(host, { lib, ctl, doc: rawDoc, caption, onState }) {
       diagEl.textContent = `△ ${diagCount}`;
       diagEl.title = rt.diags.slice(-8).join("\n");
     },
-    onState,
+    onState: ME.DATA.onState,
   });
+  me.runtime = rt;
   await rt.start();
 
   // outlive-proofing: the host may vanish without a dispose call
-  const watchdog = setInterval(() => {
-    if (!host.isConnected) dispose();
+  watchdog = setInterval(() => {
+    if (!ME.isConnected) disposeNow();
   }, 2000);
-
-  function dispose() {
-    clearInterval(watchdog);
-    rt.dispose();
-    stage.dispose();
-  }
-
-  return {
-    setState: (field, value) => rt.setState(field, value),
-    stateOf: () => rt.stateOf(),
-    runtime: rt,
-    dispose,
-  };
-}
+})().catch((e) => {
+  console.log("sceneplayer failed to start: " + (e && e.message ? e.message : e));
+});

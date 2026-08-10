@@ -17,6 +17,7 @@ const FIXTURES = (() => {
 
 let client = null;
 let config = null;
+let connectingP = null;
 const cache = new Map();
 
 function cached(key, fetcher) {
@@ -54,6 +55,26 @@ export const store = {
       return probe;
     }
     return { mode: cfg.mode, libCount: probe.length };
+  },
+
+  /** Connect to the platform this page is served from, unless already
+      connected (single-flight across concurrent callers). A saved
+      same-origin live config wins so the "saves ON" toggle survives
+      reloads. Throws when the platform is unreachable. */
+  async ensureConnected() {
+    if (client) return;
+    if (!connectingP) {
+      const saved = this.savedConfig();
+      const cfg = saved?.mode === "live" && saved.baseUrl === location.origin
+        ? saved
+        : { mode: "live", baseUrl: location.origin, sessionid: "", writable: false };
+      connectingP = this.connect(cfg);
+    }
+    const result = await connectingP;
+    if (result instanceof Error) {
+      connectingP = null;
+      throw new Error("cannot read the platform this page is served from: " + result.message);
+    }
   },
 
   savedConfig() {
