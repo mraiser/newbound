@@ -12,6 +12,19 @@ export async function init(host, { openLib, openControl, toast }) {
   const cardsEl = host.querySelector(".sh-cards");
   const stackEls = new Map();
 
+  // The library gate, as boot-time meta reports it (readers refresh on
+  // restart): anonymous = open (no badge), named groups shown, empty =
+  // admin-only. The groups intent string prevails when present — it is what
+  // set_groups writes, and the enforced readers are derived from it.
+  function renderGate(stack, lib) {
+    const el = stack.querySelector(".s-gate");
+    if (!el) return;
+    const g = (lib.groups ?? (Array.isArray(lib.readers) ? lib.readers.join(",") : "")).trim();
+    const open = g.split(",").map((s) => s.trim()).includes("anonymous");
+    el.textContent = g ? (open ? "" : `⛨ ${g}`) : "⛨ admin";
+    el.title = g ? `security groups: ${g}` : "admin only — no groups granted";
+  }
+
   const libs = await store.libs();
   if (libs instanceof Error) {
     toast.show(`could not list libraries: ${libs.message}`);
@@ -46,8 +59,9 @@ export async function init(host, { openLib, openControl, toast }) {
       const stack = document.createElement("button");
       stack.className = "sh-stack";
       stack.innerHTML =
-        `<span class="s-name"></span><span class="s-meta">v${lib.version ?? "?"}</span>`;
+        `<span class="s-name"></span><span class="s-gate"></span><span class="s-meta">v${lib.version ?? "?"}</span>`;
       stack.querySelector(".s-name").textContent = lib.id;
+      renderGate(stack, lib);
       if (lib.desc) stack.title = lib.desc;
       stack.addEventListener("click", () => openLib(lib.id));
       grid.appendChild(stack);
@@ -70,6 +84,7 @@ export async function init(host, { openLib, openControl, toast }) {
     descEl.classList.toggle("empty", !lib.desc);
     host.querySelector(".fh-tools").hidden = false;
     host.querySelector(".fh-meta-btn").hidden = !(writable && patchApi);
+    host.querySelector(".fh-groups-btn").hidden = !(writable && patchApi);
     host.querySelector(".fh-del-btn").hidden = !(writable && patchApi);
     host.querySelector(".fh-rebuild-btn").hidden = !writable;
     host.querySelector(".fh-archive-btn").hidden = store.mode() !== "live";
@@ -143,6 +158,49 @@ export async function init(host, { openLib, openControl, toast }) {
       form.hidden = true;
       renderLibMeta(lib);
       toast.show("library meta → saved to meta.json (the instance re-reads it on restart)");
+    };
+  }
+
+  // ── library groups (set_groups — the deliberate permission act) ────
+  // Writes meta.json's groups string AND the enforced readers array derived
+  // from it. Its own form, never part of the meta form (the 2026-07-31
+  // correction): permission is not edited casually alongside desc/tags.
+  function wireLibGroups(lib) {
+    const form = host.querySelector(".fh-groups");
+    const btn = host.querySelector(".fh-groups-btn");
+    const input = form.querySelector(".fg-input");
+    const note = form.querySelector(".fg-note");
+    const apply = form.querySelector(".fg-apply");
+    btn.onclick = async () => {
+      form.hidden = !form.hidden;
+      if (!form.hidden) {
+        input.value = lib.groups ?? "";
+        note.textContent = "";
+        apply.textContent = "set groups";
+        input.focus();
+        const known = await store.securityGroups();
+        form.querySelector(".fg-known").textContent =
+          known.length ? `known groups: ${known.join(", ")}` : "";
+      }
+    };
+    form.onsubmit = async (ev) => {
+      ev.preventDefault();
+      const v = input.value.trim();
+      if (v === (lib.groups ?? "").trim()) { note.textContent = "nothing changed"; return; }
+      if (!v && apply.textContent !== "really clear? (admin-only)") {
+        apply.textContent = "really clear? (admin-only)";
+        setTimeout(() => { apply.textContent = "set groups"; }, 2500);
+        return;
+      }
+      const r = await store.setGroups(lib.id, "", "", v);
+      if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
+      lib.groups = v;
+      lib.readers = r.readers ?? [];
+      const stack = stackEls.get(lib.id);
+      if (stack) renderGate(stack, lib);
+      form.hidden = true;
+      apply.textContent = "set groups";
+      toast.show(`set_groups → readers [${(r.readers ?? []).join(", ") || "— admin only"}] — the library gate refreshes on restart`);
     };
   }
 
@@ -600,6 +658,7 @@ export async function init(host, { openLib, openControl, toast }) {
     fanEl.hidden = false;
     host.querySelector(".fh-name").textContent = libId;
     host.querySelector(".fh-meta").hidden = true;
+    host.querySelector(".fh-groups").hidden = true;
     host.querySelector(".fh-settings").hidden = true;
     host.querySelector(".fh-assets").hidden = true;
     host.querySelector(".fh-rebuild").hidden = true;
@@ -609,6 +668,7 @@ export async function init(host, { openLib, openControl, toast }) {
     const lib = libs.find((l) => l.id === libId) ?? { id: libId };
     renderLibMeta(lib);
     wireLibMeta(lib);
+    wireLibGroups(lib);
     wireLibDelete(lib);
     wireSettings(lib);
     wireAssets(lib);

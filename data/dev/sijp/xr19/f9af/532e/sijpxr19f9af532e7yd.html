@@ -7,16 +7,25 @@
     <div class="wb-meta">
       <span class="wm-view"></span>
       <span class="wm-tags-view"></span>
-      <span class="wm-groups-view" title="security groups — the permission field; edited via the deliberate set_groups act, not here"></span>
+      <span class="wm-groups-view" title="security groups — who can see and run this control; empty = admin only"></span>
       <button class="wm-preview" aria-pressed="true" title="show or hide the preview pane">preview</button>
       <button class="wm-edit" hidden>meta ▸</button>
       <button class="wm-publish" hidden>publish ▸</button>
       <button class="wm-wiring">timers/events ▸</button>
+      <button class="wm-groups-btn" hidden
+        title="security groups — the deliberate set_groups act: writes the groups string and derives the enforced readers on this control and its inline data">groups ▸</button>
       <form class="wm-form" hidden>
         <input class="wm-desc" placeholder="describe this control — agents discover it through desc">
         <input class="wm-tags" placeholder="tags (comma-delimited — categorization, never security)">
         <button type="submit" class="wm-apply">set</button>
         <span class="wm-note"></span>
+      </form>
+      <form class="wm-groups-form" hidden>
+        <input class="wm-groups-in"
+          placeholder="groups (comma-delimited, e.g. anonymous) — empty = admin only">
+        <span class="wm-groups-known lbl"></span>
+        <button type="submit" class="wm-groups-apply">set groups</button>
+        <span class="wm-groups-note"></span>
       </form>
     </div>
     <div class="wb-publish" hidden>

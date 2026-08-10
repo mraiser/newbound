@@ -271,15 +271,27 @@ export const store = {
     });
   },
 
-  /** The SECURITY-group string, explicitly (CONTRACT §6.8, "" clears).
-      The bench UI shows groups read-only — this wrapper exists for
-      deliberate acts, never casual meta editing. */
+  /** The SECURITY-group string, explicitly (CONTRACT §6.8, "" clears) — the
+      deliberate permission act. The platform derives the ENFORCED readers
+      arrays from this string (set_groups writes both, at every level), so
+      this is the one write that changes who can see and run things. Empty
+      string clears the field: admin-only. */
   async setGroups(lib, ctl, cmd, groups) {
     if (!this.writable()) return { status: "err", msg: "this connection is read-only" };
     const user = await this.user();
     return this.agentCall("set_groups", {
       lib, ctl, cmd, groups, author: user?.displayname || user?.id || "bench",
     });
+  },
+
+  /** Known security groups (the union across users, plus anonymous), for
+      pickers. security/groups is admin-gated server-side; anything but an
+      ok array — mock mode, a non-admin session — answers []. */
+  async securityGroups() {
+    try {
+      const r = await client.call("security", "groups", {});
+      return r?.status === "ok" && Array.isArray(r.data) ? r.data : [];
+    } catch { return []; }
   },
 
   // ── the flow-body pair (CONTRACT §6, [live] 2026-07-25) ───────────────────

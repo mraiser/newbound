@@ -1,9 +1,58 @@
-// The DELIBERATE editor for the comma-delimited SECURITY-group string (the field save_control's old UI edited; readers arrays are derived from this intent at save time). Never used for tags/categorization - that is set_tags.
-// Targeting: ctl=="" -> the library's meta.json; cmd=="" -> the control
-// record; else the command's IMPL record (set_command_meta's chain).
+// The DELIBERATE editor for the platform's security-group intent — and its
+// enforcement. Writes the comma-delimited groups string AND derives the
+// enforced readers arrays from it (split on comma, trimmed) — the same
+// derivation the retired editcontrol/editcommand save paths performed.
+// Never used for tags/categorization - that is set_tags.
+// Targeting: ctl=="" -> the library's meta.json (its readers are the library
+// gate in check_security/check_auth; the in-memory system.libraries snapshot
+// refreshes on restart); cmd=="" -> the control record plus its inline data
+// records (the records app.read serves the UI from — save_control parity);
+// else the command META record (the record check_security reads via
+// lookup_command_id) plus its impl record (the old editcommand set both).
 // EXPLICIT REPLACE: the value is stored verbatim; empty string CLEARS the
-// field (unlike set_*_meta's empty-means-untouched). Unjournaled like the
-// meta family. Record-level readers/writers are never modified here.
+// groups field and derives an empty readers array (= admin-only). Unjournaled
+// like the meta family. writers is never modified here.
+
+fn derived(value: &str) -> DataArray {
+    let mut a = DataArray::new();
+    for g in value.split(',') {
+        let g = g.trim();
+        if !g.is_empty() { a.push_string(g); }
+    }
+    a
+}
+fn as_vec(a: &DataArray) -> Vec<String> {
+    let mut v = Vec::new();
+    for i in 0..a.len() { v.push(a.get_string(i)); }
+    v
+}
+// Set a record's top-level readers to the derived array; true if changed.
+fn set_record_readers(lib: &str, id: &str, value: &str) -> bool {
+    let store = DataStore::new();
+    let mut rec = store.get_data(lib, id);
+    let old = if rec.has("readers") { as_vec(&rec.get_array("readers")) } else { Vec::new() };
+    let nu = derived(value);
+    if old == as_vec(&nu) { return false; }
+    rec.put_array("readers", nu);
+    rec.put_int("time", time());
+    store.set_data(lib, id, rec);
+    true
+}
+// Set the groups string on a record's data; true if changed.
+fn set_record_groups(lib: &str, id: &str, value: &str) -> bool {
+    let store = DataStore::new();
+    let mut record = store.get_data(lib, id);
+    let mut data_obj = record.get_object("data");
+    let old = if data_obj.has("groups") { data_obj.get_string("groups") } else { String::new() };
+    if old == value { return false; }
+    if value.is_empty() { data_obj.remove_property("groups"); }
+    else { data_obj.put_string("groups", value); }
+    record.put_object("data", data_obj);
+    record.put_int("time", time());
+    store.set_data(lib, id, record);
+    true
+}
+
 let _author = author;
 let value = groups.trim().to_string();
 let store = DataStore::new();
@@ -27,10 +76,13 @@ if ctl.is_empty() {
     };
     let mut meta = DataObject::from_string(&s);
     let old = if meta.has("groups") { meta.get_string("groups") } else { String::new() };
-    let changed = old != value;
+    let oldreaders = if meta.has("readers") { as_vec(&meta.get_array("readers")) } else { Vec::new() };
+    let nureaders = derived(&value);
+    let changed = old != value || oldreaders != as_vec(&nureaders);
     if changed {
         if value.is_empty() { meta.remove_property("groups"); }
         else { meta.put_string("groups", &value); }
+        meta.put_array("readers", nureaders);
         if let Err(e) = std::fs::write(&path, meta.to_string()) {
             let mut o = DataObject::new();
             o.put_string("status", "err");
@@ -42,6 +94,7 @@ if ctl.is_empty() {
     o.put_string("status", "ok");
     o.put_boolean("changed", changed);
     o.put_string("groups", &value);
+    o.put_array("readers", derived(&value));
     return o;
 }
 
@@ -54,8 +107,27 @@ if !store.exists(&lib, &ctlid) {
     return o;
 }
 
-let target_id = if cmd.is_empty() {
-    ctlid.clone()
+let mut changed = false;
+
+if cmd.is_empty() {
+    // The control record: intent string + enforced readers, then the same
+    // readers onto its inline data records — these are the records app.read
+    // serves to the browser, so they gate what the UI can even render.
+    if set_record_groups(&lib, &ctlid, &value) { changed = true; }
+    if set_record_readers(&lib, &ctlid, &value) { changed = true; }
+    let data_obj = store.get_data(&lib, &ctlid).get_object("data");
+    if data_obj.has("data") {
+        let list = data_obj.get_array("data");
+        for i in 0..list.len() {
+            let item = list.get_object(i);
+            if item.has("id") {
+                let did = item.get_string("id");
+                if store.exists(&lib, &did) {
+                    if set_record_readers(&lib, &did, &value) { changed = true; }
+                }
+            }
+        }
+    }
 } else {
     let data_obj = store.get_data(&lib, &ctlid).get_object("data");
     let list = if data_obj.has("cmd") { data_obj.get_array("cmd") } else { DataArray::new() };
@@ -88,23 +160,17 @@ let target_id = if cmd.is_empty() {
         o.put_string("msg", "Command metadata not found in datastore");
         return o;
     }
-    impl_id
-};
-
-let mut record = store.get_data(&lib, &target_id);
-let mut data_obj = record.get_object("data");
-let old = if data_obj.has("groups") { data_obj.get_string("groups") } else { String::new() };
-let changed = old != value;
-if changed {
-    if value.is_empty() { data_obj.remove_property("groups"); }
-    else { data_obj.put_string("groups", &value); }
-    record.put_object("data", data_obj);
-    record.put_int("time", time());
-    store.set_data(&lib, &target_id, record);
+    // The groups intent string lives on the impl record (set_command_meta's
+    // chain); readers go on BOTH the meta record (the array check_security
+    // consults) and the impl record (old editcommand parity).
+    if set_record_groups(&lib, &impl_id, &value) { changed = true; }
+    if set_record_readers(&lib, &cmd_id, &value) { changed = true; }
+    if set_record_readers(&lib, &impl_id, &value) { changed = true; }
 }
 
 let mut o = DataObject::new();
 o.put_string("status", "ok");
 o.put_boolean("changed", changed);
 o.put_string("groups", &value);
+o.put_array("readers", derived(&value));
 o

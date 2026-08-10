@@ -108,6 +108,7 @@
   color: var(--danger);
 }
 .nb-shelf .fh-meta,
+.nb-shelf .fh-groups,
 .nb-shelf .fh-settings {
   display: flex;
   flex-wrap: wrap;
@@ -120,8 +121,10 @@
   border-radius: 8px;
 }
 .nb-shelf .fh-meta[hidden],
+.nb-shelf .fh-groups[hidden],
 .nb-shelf .fh-settings[hidden] { display: none; }
 .nb-shelf .fh-meta input,
+.nb-shelf .fh-groups input,
 .nb-shelf .fh-settings input,
 .nb-shelf .fh-settings textarea {
   background: var(--panel-2);
@@ -139,6 +142,7 @@
 .nb-shelf .fh-settings .fs-ffi-row { flex-direction: row; align-items: flex-start; gap: 8px; }
 .nb-shelf .fh-settings .fs-ffi { flex: none; width: auto; margin-top: 2px; }
 .nb-shelf .fh-meta .fm-apply,
+.nb-shelf .fh-groups .fg-apply,
 .nb-shelf .fh-settings .fs-save {
   font: 11px var(--mono);
   color: var(--ground);
@@ -148,8 +152,13 @@
   align-self: flex-start;
 }
 .nb-shelf .fh-meta .fm-note,
+.nb-shelf .fh-groups .fg-note,
 .nb-shelf .fh-settings .fs-note { font: 10.5px var(--mono); color: var(--danger); }
 .nb-shelf .fh-tools[hidden] { display: none; }
+.nb-shelf .sh-stack .s-gate { font: 10px var(--mono); color: var(--text-faint); }
+.nb-shelf .sh-stack .s-gate:empty { display: none; }
+.nb-shelf .fh-groups .fg-cap { flex-basis: 100%; font-size: 11.5px; color: var(--text-dim); }
+.nb-shelf .fh-groups .fg-known { flex-basis: 100%; font: 10.5px var(--mono); color: var(--text-faint); }
 
 /* ── asset browser (G-1) ─────────────────────────────────── */
 .nb-shelf .fh-assets {

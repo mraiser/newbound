@@ -28,6 +28,8 @@
   line-height: 1.4;
   min-height: 16px;
 }
+.nb-card .c-gate { font: 10px var(--mono); color: var(--ink-dim); }
+.nb-card .c-gate:empty { display: none; }
 .nb-card .c-dots {
   display: flex;
   gap: 5px;
