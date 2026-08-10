@@ -407,13 +407,21 @@ export function init(host, { toast, onClose }) {
 
   // ── the plugin slot ───────────────────────────────────────
   // The notebook knows NOTHING about what grafts onto it (kb doctrine:
-  // plugins graft onto things that don't know anything about them). It
-  // exposes one slot div carrying a small notebook API and announces
-  // opens with a DOM event; the plugin registry (dev.plugins) decides
-  // what, if anything, mounts there. No plugin ⇒ the REPL above is the
-  // whole notebook.
-  const slot = host.querySelector(".ss-plugins");
-  slot.nbNotebook = {
+  // plugins graft onto things that don't know anything about them). One
+  // slot div; the plugin registry (dev.plugins) decides what, if
+  // anything, mounts there — and whatever does finds the notebook the
+  // STOCK way: walk up the DOM to the first ancestor carrying `.api`,
+  // the same convention installControl gives every stock control. No
+  // plugin ⇒ the REPL above is the whole notebook.
+  const api = {
+    open() {
+      root.classList.add("open");
+      callInput.focus();
+    },
+    close,
+    isOpen() {
+      return root.classList.contains("open");
+    },
     /** Persist one cell and render it; returns the stored entry. Shapes:
         command cells {call, args, output, ms, error, agent}, chat cells
         {kind:"chat-user"|"chat-agent", text, error}, {kind:"divider"}. */
@@ -441,16 +449,6 @@ export function init(host, { toast, onClose }) {
     },
     toast,
   };
-
-  return {
-    open() {
-      root.classList.add("open");
-      slot.dispatchEvent(new CustomEvent("nb-session-open", { bubbles: true }));
-      callInput.focus();
-    },
-    close,
-    isOpen() {
-      return root.classList.contains("open");
-    },
-  };
+  root.api = api;
+  return api;
 }
