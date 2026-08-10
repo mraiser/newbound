@@ -13,10 +13,21 @@
 // Security posture (design §3.7): nothing here executes code — expressions
 // go through sceneexpr's parser, and the only platform touchpoint is the
 // injected `invoke` callback (the editor gates it like run ▸).
+//
+// LIBRARY control — headless: defines window.NB_SCENERUN once (idempotent across
+// installs). Consumers list this control as a hidden data-control child
+// div and use the global from their ready.
 
-import { compile } from "./sceneexpr.js";
-import { parseTarget, parseOn } from "./scenedoc.js";
-import { project, envOf, deltaFor, instanceSpec } from "./sceneproject.js";
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+me.ready = function () {
+  if (window.NB_SCENERUN) return;
+  // sibling libraries — child divs in this control's html, ready first
+  const { compile } = window.NB_SCENEEXPR;
+  const { parseTarget, parseOn } = window.NB_SCENEDOC;
+  const { project, envOf, deltaFor, instanceSpec } = window.NB_SCENEPROJECT;
+  window.NB_SCENERUN = (function () {
 
 const MOUNT_DEPTH_CAP = 8;
 const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
@@ -32,7 +43,7 @@ const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
  *   reduced    — bool: prefers-reduced-motion (ease→snap, stepped clock)
  *   now        — () → ms (injectable clock; defaults to performance.now)
  */
-export function createRuntime(opts) {
+function createRuntime(opts) {
   return new SceneRuntime(opts);
 }
 
@@ -608,3 +619,7 @@ class SceneRuntime {
     this.instances.clear();
   }
 }
+
+    return { createRuntime };
+  })();
+};

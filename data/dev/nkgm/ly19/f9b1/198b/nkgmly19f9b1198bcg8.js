@@ -32,6 +32,17 @@
 // A case with no crossings relaxes to a no-op in z: legacy planar graphs
 // that are already untangled stay exactly where component separation put
 // them (verified in tools/flow3d-check.mjs).
+//
+// LIBRARY control — headless: defines window.NB_FLOWLAYOUT once (idempotent across
+// installs). Consumers list this control as a hidden data-control child
+// div and use the global from their ready.
+
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+me.ready = function () {
+  if (window.NB_FLOWLAYOUT) return;
+  window.NB_FLOWLAYOUT = (function () {
 
 const Y_PITCH = 1.6;
 const X_GAP = 0.6;
@@ -60,7 +71,7 @@ function opEdges(c) {
 /** Longest-path layering from the input bar: ops fed by no other op sit in
     layer 0; every wire descends at least one layer. Cycle-tolerant (I-2
     violations park the leftovers below — the editor must open broken flows). */
-export function layerAssign(c) {
+function layerAssign(c) {
   const N = c.cmds.length;
   const { out, into } = opEdges(c);
   const indeg = into.map((a) => a.length);
@@ -130,7 +141,7 @@ function layersOf(c, depth) {
 const yOf = (depth, maxD) => (maxD / 2 - depth) * Y_PITCH;
 
 /** The "tidy" proposal: layered y, barycenter-ordered x, z untouched. */
-export function tidy(c) {
+function tidy(c) {
   const N = c.cmds.length;
   if (!N) return { label: "auto-layout: tidy", positions: [] };
   const depth = layerAssign(c);
@@ -147,7 +158,7 @@ export function tidy(c) {
 }
 
 /** Connected components over the undirected op graph. */
-export function components(c) {
+function components(c) {
   const N = c.cmds.length;
   const { out, into } = opEdges(c);
   const comp = new Array(N).fill(-1);
@@ -211,7 +222,7 @@ function bandIndex(c, depth) {
     across a band (they cross in the front projection) AND sit within `zGap`
     of each other there (z hasn't resolved them). This is the objective the
     relaxation minimizes — exported so callers and tests can measure it. */
-export function countCrossings(c, depth, positions, zGap = Z_GAP) {
+function countCrossings(c, depth, positions, zGap = Z_GAP) {
   const bands = bandIndex(c, depth);
   let n = 0;
   for (const [d, ws] of bands) {
@@ -274,7 +285,7 @@ function separateLayers(c, depth, pos, zSpan, zGap, passes = 16, eps = 1e-7) {
 
 /** Per-layer force relaxation in the xz plane (§7.1). Pure: takes proposed
     positions, returns NEW ones with y copied through untouched. */
-export function relax(c, depth, positions, opts = {}) {
+function relax(c, depth, positions, opts = {}) {
   const o = { ...RELAX, zSpan: Z_SPAN, zGap: Z_GAP, ...opts };
   const N = c.cmds.length;
   const pos = positions.map((p) => ({ ...p }));
@@ -334,7 +345,7 @@ export function relax(c, depth, positions, opts = {}) {
     out in z within ±Z_SPAN; x packed per component (centered at 0 — depth
     separates them); then the per-layer xz relaxation resolves what remains
     INSIDE each component (§7.1). */
-export function untangle(c) {
+function untangle(c) {
   const N = c.cmds.length;
   if (!N) return { label: "auto-layout: untangle", positions: [] };
   const depth = layerAssign(c);
@@ -360,3 +371,7 @@ export function untangle(c) {
   const relaxed = relax(c, depth, positions, { iters: N > 200 ? 24 : RELAX.iters });
   return { label: "auto-layout: untangle", positions: relaxed };
 }
+
+    return { layerAssign, tidy, components, countCrossings, relax, untangle };
+  })();
+};

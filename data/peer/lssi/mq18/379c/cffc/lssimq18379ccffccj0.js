@@ -326,13 +326,12 @@ function stopHudWatch(){
 
 me.ready = function(){
   var el = $(ME).find('.viewer');
-  installControl(el[0], 'app', 'player', function(api){
+  installControl(el[0], 'app', 'sceneplayer', function(api){
     me.player = api;
-    api.onstate = function(field, value){
-      if (field == 'focus') onSceneFocus(value);
-    };
     api.waitReady(startFeed);
-  }, {lib: 'peer', ctl: 'peer'});
+  }, {lib: 'peer', ctl: 'peer', onState: function(prefix, field, value){
+    if (field == 'focus') onSceneFocus(value);
+  }});
 
   subscribe_event("peer", "UPDATE", function(data){
     var found = false;

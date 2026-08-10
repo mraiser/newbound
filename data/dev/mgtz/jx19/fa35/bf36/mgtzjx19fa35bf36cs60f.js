@@ -11,21 +11,41 @@
 var me = this;
 var ME = document.getElementById(me.UUID);
 
-var readyP = (async () => {
-  const { store } = await requireModule("store", "sceneeditor");
+var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   const {
     parse: parseScene, KINDS, MATERIAL_KINDS, LIGHT_MODES,
     bindablePaths, MOUNT_BIND, NODE_EVENTS, STATE_TYPES,
-  } = await requireModule("scenedoc", "sceneeditor");
-  const { parse: parseExpr } = await requireModule("sceneexpr", "sceneeditor");
-  const { TOKEN_NAMES } = await requireModule("scenetokens", "sceneeditor");
-  const { project, envOf } = await requireModule("sceneproject", "sceneeditor");
-  const { createRuntime } = await requireModule("scenerun", "sceneeditor");
-  const { hasWebGL } = await requireModule("webgl", "sceneeditor");
-  const { viewctx } = await requireModule("viewctx", "sceneeditor");
+  } = window.NB_SCENEDOC;
+  const { parse: parseExpr } = window.NB_SCENEEXPR;
+  const { TOKEN_NAMES } = window.NB_SCENETOKENS;
+  const { project, envOf } = window.NB_SCENEPROJECT;
+  const { createRuntime } = window.NB_SCENERUN;
+  const { hasWebGL } = window.NB_WEBGL;
+  const { viewctx } = window.NB_VIEWCTX;
   // the vendored stage off its real asset URL — page-relative for tunneling
   const { mountScene } = await import("../app/asset/app/vendor/nb_three/scenestage.js");
-  try { await store.ensureConnected(); } catch (e) { /* reads surface it */ }
+  const jsonP = (c2, v2) => new Promise((res2) => json(c2, v2, res2));
+  const invokeP = (l2, c2, m2, a2) => new Promise((res2) => invokeCommand(l2, c2, m2, a2, res2));
+  const code = (m2, a2) => invokeP("dev", "code", m2, a2);
+  let AUTHOR = "dev";
+  jsonP("../security/current_user", null).then((r2) => {
+    if (r2.status === "ok" && r2.data) AUTHOR = r2.data.displayname || r2.data.id || "dev";
+  });
+  const readRec = async (l2, id2) => {
+    const r2 = await jsonP("../app/read", "lib=" + encodeURIComponent(l2) + "&id=" + encodeURIComponent(id2));
+    return r2.status === "ok" ? r2.data : new Error(r2.msg || "read failed");
+  };
+  const controlsOf = async (l2) => {
+    const d2 = await readRec(l2, "controls");
+    return d2 instanceof Error ? d2 : (d2.list ?? []);
+  };
+  const libsOf = async () => {
+    const r2 = await jsonP("../app/libs", null);
+    return r2.status === "ok" ? (r2.data ?? []) : new Error(r2.msg || "libs failed");
+  };
+  const readControlScene = (l2, c2) => code("read_control_scene", { lib: l2, ctl: c2 });
+  const writeControlScene = (l2, c2, sc2, { base = "", label = "" } = {}) =>
+    code("write_control_scene", { lib: l2, ctl: c2, scene: sc2, base, label, author: AUTHOR });
 
 const dark = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: dark)").matches;
 const reducedMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -54,15 +74,15 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   }
 
   // ── the doc + the save gate ───────────────────────────────────────────────
-  const sceneApi = await store.sceneApi();
-  const writable = store.writable();
+  const sceneApi = true;
+  const writable = true;
   const canSave = sceneApi && writable;
   let hash = "";
   let doc, absent;
 
   async function loadDoc() {
     if (sceneApi) {
-      const r = await store.readControlScene(lib, name);
+      const r = await readControlScene(lib, name);
       if (r.status === "ok") {
         absent = !r.exists;
         hash = r.hash || "";
@@ -78,7 +98,7 @@ async function init(host, { lib, name, record, toast, onSaved }) {
 
   capEl.textContent = absent && !canSave
     ? "no scene facet — " + (writable ? "the write API here predates write_control_scene" : "read-only connection")
-    : canSave ? "" : (store.mode() === "mock"
+    : canSave ? "" : (false
       ? "mock mode — view & play only"
       : writable ? "saves need write_control_scene (CONTRACT §6) on this instance" : "read-only — view & play");
   saveBtn.hidden = labelIn.hidden = !canSave;
@@ -220,19 +240,19 @@ async function init(host, { lib, name, record, toast, onSaved }) {
       theme: dark() ? "dark" : "light",
       reduced: reducedMotion(),
       loadDoc: async (mlib, mctl) => {
-        const controls = await store.controls(mlib);
+        const controls = await controlsOf(mlib);
         if (controls instanceof Error) return null;
         const entry = controls.find((c) => c.name === mctl);
         if (!entry) return null;
-        const rec = await store.control(mlib, entry.id);
+        const rec = await readRec(mlib, entry.id);
         if (rec instanceof Error || rec.scene === undefined) return null;
         return parseScene(rec.scene);
       },
       // The run ▸ posture (design §3.5): command invocation only on a
       // writable live connection — a disposable-instance activity.
-      invoke: writable && store.mode() === "live"
+      invoke: true
         ? async (ilib, ictl, icmd, args) => {
-            const r = await store.invokeCommand(ilib, ictl, icmd, args);
+            const r = await invokeP(ilib, ictl, icmd, args);
             if (r.status !== "ok") return new Error(r.msg || "invoke failed");
             return r.data ?? r.msg ?? r;
           }
@@ -269,7 +289,7 @@ async function init(host, { lib, name, record, toast, onSaved }) {
 
   async function save(overwrite = false) {
     if (!canSave || !dirty()) return;
-    const r = await store.writeControlScene(lib, name, doc.serialize(), {
+    const r = await writeControlScene(lib, name, doc.serialize(), {
       base: overwrite ? "" : hash, label: composedLabel(),
     });
     if (r.status === "ok") {
@@ -796,7 +816,7 @@ async function init(host, { lib, name, record, toast, onSaved }) {
     }
     const form = el("div", "se-form");
     const libSel = el("select");
-    const libs = await store.libs();
+    const libs = await libsOf();
     if (!(libs instanceof Error)) for (const l of libs) {
       const o = el("option", null, l.name ?? l);
       o.value = l.name ?? l;
@@ -805,7 +825,7 @@ async function init(host, { lib, name, record, toast, onSaved }) {
     const ctlSel = el("select");
     const fillCtls = async () => {
       ctlSel.replaceChildren();
-      const controls = await store.controls(libSel.value);
+      const controls = await controlsOf(libSel.value);
       if (controls instanceof Error) return;
       for (const c of controls) { const o = el("option", null, c.name); o.value = c.name; ctlSel.appendChild(o); }
     };
@@ -879,7 +899,7 @@ async function init(host, { lib, name, record, toast, onSaved }) {
 }
 
   return init(ME, ME.DATA || {});
-})().catch(function (e) {
+}).catch(function (e) {
   console.log("sceneeditor failed to start: " + (e && e.message ? e.message : e));
   return null;
 });

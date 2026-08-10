@@ -6,4 +6,20 @@
 // legacy `three` facet is NOT in the fixed order — where a control carries
 // one, the workbench appends a read-only "three · legacy" chip, and the
 // shelf's 3d dot lights on either (SC-Q2).
-export const FACETS = ["html", "css", "js", "data", "scene", "cmd"];
+//
+// LIBRARY control — headless: defines window.NB_FACETS once (idempotent across
+// installs). Consumers list this control as a hidden data-control child
+// div and use the global from their ready.
+
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+me.ready = function () {
+  if (window.NB_FACETS) return;
+  window.NB_FACETS = (function () {
+
+const FACETS = ["html", "css", "js", "data", "scene", "cmd"];
+
+    return { FACETS };
+  })();
+};

@@ -1,7 +1,0 @@
-/* bridge — kit v1's stock-dialect bootstrap (docs/kit.md). The host app
-   sizes the mounted element; this fills it — the same posture as player. */
-.nb-bridge-host {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  overflow: hidden;
-}

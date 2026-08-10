@@ -18,8 +18,19 @@
 // string, else numeric; truthiness is JS-like; `&&`/`||`/`?:` short-circuit.
 // Eval never throws to callers — evalExpr returns {ok, value|error}; a
 // failed eval keeps the property's last good value (design §2.6).
+//
+// LIBRARY control — headless: defines window.NB_SCENEEXPR once (idempotent across
+// installs). Consumers list this control as a hidden data-control child
+// div and use the global from their ready.
 
-export const FUNCTIONS = {
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+me.ready = function () {
+  if (window.NB_SCENEEXPR) return;
+  window.NB_SCENEEXPR = (function () {
+
+const FUNCTIONS = {
   sin: Math.sin, cos: Math.cos, tan: Math.tan, atan2: Math.atan2,
   sqrt: Math.sqrt, abs: Math.abs, min: Math.min, max: Math.max,
   clamp: (v, lo, hi) => Math.min(Math.max(v, lo), hi),
@@ -33,7 +44,7 @@ const ARITY = {
   clamp: 3, lerp: 3, floor: 1, ceil: 1, round: 1, pow: 2, sign: 1,
   deg: 1, rad: 1,
 };
-export const CONSTANTS = { PI: Math.PI };
+const CONSTANTS = { PI: Math.PI };
 
 // ── tokenizer ───────────────────────────────────────────────────────────────
 const PUNCT = ["||", "&&", "==", "!=", "<=", ">=", "<", ">", "+", "-", "*",
@@ -162,7 +173,7 @@ function collectDeps(ast, out) {
 
 /** Parse an expression. Returns {ok:true, ast, deps:Set} or
     {ok:false, error, pos}. Never throws. */
-export function parse(src) {
+function parse(src) {
   if (typeof src !== "string" || src.trim() === "") {
     return { ok: false, error: "empty expression", pos: 0 };
   }
@@ -215,7 +226,7 @@ function ev(ast, scope) {
 
 /** Evaluate a parsed ast against a scope object. Returns {ok:true, value} or
     {ok:false, error} — never throws (a scene never throws, design §2.6). */
-export function evalExpr(ast, scope) {
+function evalExpr(ast, scope) {
   try {
     return { ok: true, value: ev(ast, scope || {}) };
   } catch (e) {
@@ -226,8 +237,12 @@ export function evalExpr(ast, scope) {
 /** Convenience: parse once, evaluate many. Returns {ok, error?, deps?,
     run(scope) → {ok, value|error}}. (Named `run`, not `eval`, so the
     no-dynamic-code grep stays unambiguous — design acceptance 2.) */
-export function compile(src) {
+function compile(src) {
   const p = parse(src);
   if (!p.ok) return { ok: false, error: p.error, pos: p.pos };
   return { ok: true, deps: p.deps, run: (scope) => evalExpr(p.ast, scope) };
 }
+
+    return { FUNCTIONS, CONSTANTS, parse, evalExpr, compile };
+  })();
+};

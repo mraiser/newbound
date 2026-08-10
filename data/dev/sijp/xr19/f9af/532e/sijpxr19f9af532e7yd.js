@@ -11,11 +11,64 @@
 var me = this;
 var ME = document.getElementById(me.UUID);
 
-var readyP = (async () => {
-  const { store } = await requireModule("store", "workbench");
-  const { FACETS } = await requireModule("facets", "workbench");
-  const { viewctx } = await requireModule("viewctx", "workbench");
-  try { await store.ensureConnected(); } catch (e) { /* reads surface it */ }
+var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
+  const { FACETS } = window.NB_FACETS;
+  const { viewctx } = window.NB_VIEWCTX;
+  // ── backend calls: api.js primitives only ─────────────────
+  const jsonP = (c2, v2) => new Promise((res2) => json(c2, v2, res2));
+  const invokeP = (l2, c2, m2, a2) => new Promise((res2) => invokeCommand(l2, c2, m2, a2, res2));
+  const invoke = async (l2, c2, m2, a2) => {
+    const t0 = performance.now();
+    const envelope = await invokeP(l2, c2, m2, a2);
+    return { envelope, ms: Math.round(performance.now() - t0) };
+  };
+  const code = (m2, a2) => invokeP("dev", "code", m2, a2);
+  let AUTHOR = "dev";
+  jsonP("../security/current_user", null).then((r2) => {
+    if (r2.status === "ok" && r2.data) AUTHOR = r2.data.displayname || r2.data.id || "dev";
+  });
+  const readRec = async (l2, id2) => {
+    const r2 = await jsonP("../app/read", "lib=" + encodeURIComponent(l2) + "&id=" + encodeURIComponent(id2));
+    return r2.status === "ok" ? r2.data : new Error(r2.msg || "read failed");
+  };
+  const controlsOf = async (l2) => {
+    const d2 = await readRec(l2, "controls");
+    return d2 instanceof Error ? d2 : (d2.list ?? []);
+  };
+  const readFacet = (l2, c2, f2) => code("read_control_facet", { lib: l2, ctl: c2, facet: f2 });
+  const patchFacet = (l2, c2, f2, { oldSnippet, newSnippet, base = "", label = "" }) =>
+    code("patch_control_facet", { lib: l2, ctl: c2, facet: f2, old_snippet: oldSnippet,
+      new_snippet: newSnippet, base, label, author: AUTHOR });
+  const listPatches = (l2, c2, n2) => code("list_control_patches", { lib: l2, ctl: c2, limit: n2 ?? 0 });
+  const setControlMeta = (l2, c2, d2, g2) => code("set_control_meta", { lib: l2, ctl: c2, desc: d2, groups: g2 });
+  const setCommandMeta = (l2, c2, m2, d2, g2) => code("set_command_meta", { lib: l2, ctl: c2, cmd: m2, desc: d2, groups: g2 });
+  const setTags = (l2, c2, m2, t2) => code("set_tags", { lib: l2, ctl: c2, cmd: m2, tags: t2, author: AUTHOR });
+  const setGroups = (l2, c2, m2, g2) => code("set_groups", { lib: l2, ctl: c2, cmd: m2, groups: g2, author: AUTHOR });
+  const securityGroups = async () => {
+    const r2 = await jsonP("../security/groups", null);
+    return r2 && r2.status === "ok" && Array.isArray(r2.data) ? r2.data : [];
+  };
+  const writeControlScene = (l2, c2, sc2, { base = "", label = "" } = {}) =>
+    code("write_control_scene", { lib: l2, ctl: c2, scene: sc2, base, label, author: AUTHOR });
+  const readCommand = async (l2, c2, m2) => {
+    const r2 = await code("read_command", { lib: l2, ctl: c2, cmd: m2 });
+    if (r2.status !== "ok") return r2;
+    return { status: "ok", ...(r2.data && typeof r2.data === "object" ? r2.data : {}) };
+  };
+  const patchCommandBody = (l2, c2, m2, o2, n2) =>
+    code("patch_command_body", { lib: l2, ctl: c2, cmd: m2, old_snippet: o2, new_snippet: n2 });
+  const setCommandImports = (l2, c2, m2, i2) => code("set_command_imports", { lib: l2, ctl: c2, cmd: m2, imports: i2 });
+  const upsertCommand = (l2, c2, m2, { lang, returnType, params = [], imports = "", codeBody = "" }) =>
+    code("upsert_command", { lib: l2, ctl: c2, cmd: m2, lang, return_type: returnType, params, imports, code_body: codeBody });
+  const writeFlowBody = (l2, c2, m2, b2, { base = "", label = "" } = {}) =>
+    code("write_flow_body", { lib: l2, ctl: c2, cmd: m2, body: b2, base, label, author: AUTHOR });
+  const deleteCommand = (l2, c2, m2) => code("delete_command", { lib: l2, ctl: c2, cmd: m2, author: AUTHOR });
+  const setTimer = (l2, c2, t2) => code("set_timer", { lib: l2, ctl: c2, ...t2, author: AUTHOR });
+  const removeTimer = (l2, c2, n2) => code("remove_timer", { lib: l2, ctl: c2, name: n2, author: AUTHOR });
+  const setEventHandler = (l2, c2, e2) => code("set_event_handler", { lib: l2, ctl: c2, ...e2, author: AUTHOR });
+  const removeEventHandler = (l2, c2, n2) => code("remove_event_handler", { lib: l2, ctl: c2, name: n2, author: AUTHOR });
+  const metaIdentity = () => code("get_meta_identity", {});
+  const setMetaIdentity = (d2, o2) => code("set_meta_identity", { displayname: d2, organization: o2, author: AUTHOR });
   // mount a child control and resolve with its api once it is ready —
   // installControl is the platform's own mounter; waitReady is the
   // convention converted controls expose when their setup is async
@@ -45,9 +98,9 @@ function commandLang(entry) {
 }
 
 async function init(host, { lib, ctlId, toast }) {
-  const index = await store.controls(lib);
+  const index = await controlsOf(lib);
   const entry = (index instanceof Error ? [] : index).find((c) => c.id === ctlId);
-  const record = await store.control(lib, ctlId);
+  const record = await readRec(lib, ctlId);
   if (record instanceof Error) {
     host.querySelector(".wb-absent").hidden = false;
     host.querySelector(".wb-absent").textContent =
@@ -55,10 +108,10 @@ async function init(host, { lib, ctlId, toast }) {
     return { name: entry?.name ?? "unavailable" };
   }
   const name = record.name ?? entry?.name ?? "unnamed";
-  const writable = store.writable();
+  const writable = true;
   // journalMode: the CONTRACT §6 write API answers here (journal readable
   // even on a read-only live connection). patchMode: saves go through it.
-  const journalMode = await store.patchApi();
+  const journalMode = true;
   const patchMode = writable && journalMode;
   const hashes = new Map();       // facet -> base hash from read_control_facet
 
@@ -176,7 +229,7 @@ async function init(host, { lib, ctlId, toast }) {
     if (journalMode && UI_FACETS.has(facet)) {
       // The API's read is the authority: \r-normalized source + the base
       // hash that patch_control_facet checks concurrency against.
-      const rf = await store.readFacet(lib, name, facet);
+      const rf = await readFacet(lib, name, facet);
       if (rf.status === "ok") {
         source = rf.source;
         hashes.set(facet, rf.hash);
@@ -241,8 +294,7 @@ async function init(host, { lib, ctlId, toast }) {
     const facet = activeFacet;
     if (!writable || !UI_FACETS.has(facet) || !dirty.has(facet)) return;
     const source = editors.get(facet).api.getValue();
-    if (patchMode) return savePatch(facet, source, overwrite);
-    return saveAdapter(facet, source, overwrite);
+    return savePatch(facet, source, overwrite);
   }
 
   // The patch path (CONTRACT §6): compute the minimal exact-match snippet
@@ -280,7 +332,7 @@ async function init(host, { lib, ctlId, toast }) {
     let base;
     if (overwrite) {
       // Rebase mine over theirs: re-read for a fresh base, replace whole.
-      const rf = await store.readFacet(lib, name, facet);
+      const rf = await readFacet(lib, name, facet);
       if (rf.status !== "ok") {
         toast.show(`re-read failed: ${rf.msg}`);
         return;
@@ -297,7 +349,7 @@ async function init(host, { lib, ctlId, toast }) {
       base = hashes.get(facet) ?? "";
     }
 
-    const r = await store.patchFacet(lib, name, facet, { ...patch, base, label });
+    const r = await patchFacet(lib, name, facet, { ...patch, base, label });
     if (r.status !== "ok") {
       if (r.msg === "stale_base") {
         conflictEl.hidden = false;
@@ -305,7 +357,7 @@ async function init(host, { lib, ctlId, toast }) {
           `the ${facet} facet changed on the server since you loaded it`;
         conflictEl.querySelector(".wc-theirs").onclick = async () => {
           pushHistory(facet, source, "conflict-stash");
-          const rf = await store.readFacet(lib, name, facet);
+          const rf = await readFacet(lib, name, facet);
           if (rf.status === "ok") {
             editors.get(facet).api.setSource(rf.source);
             baselines.set(facet, rf.source);
@@ -335,58 +387,10 @@ async function init(host, { lib, ctlId, toast }) {
     dirty.delete(facet);
     chips.get(facet)?.classList.remove("absent");
     if (labelInput) labelInput.value = "";
-    store.invalidateControl(lib, ctlId);
     refreshDirtyUi();
     renderStrip();
     refreshPreview();
     toast.show(`patch_control_facet → applied · ${r.patch_id} · live`);
-  }
-
-  // The M2 adapter path — the fallback when the write API isn't built.
-  async function saveAdapter(facet, source, overwrite) {
-    if (!overwrite) {
-      const onServer = await store.facetOnServer(lib, ctlId, facet);
-      if (onServer instanceof Error) {
-        toast.show(`conflict check failed: ${onServer.message}`);
-        return;
-      }
-      if (onServer !== baselines.get(facet)) {
-        conflictEl.hidden = false;
-        conflictEl.querySelector(".wc-msg").textContent =
-          `the ${facet} facet changed on the server since you loaded it`;
-        conflictEl.querySelector(".wc-theirs").onclick = () => {
-          pushHistory(facet, source, "conflict-stash");
-          editors.get(facet).api.setSource(onServer);
-          baselines.set(facet, onServer);
-          record[facet] = onServer;
-          dirty.delete(facet);
-          conflictEl.hidden = true;
-          refreshDirtyUi();
-          renderHistory();
-          refreshPreview();
-          toast.show("loaded theirs — your version is in local history");
-        };
-        conflictEl.querySelector(".wc-mine").onclick = () => {
-          conflictEl.hidden = true;
-          save(true);
-        };
-        return;
-      }
-    }
-
-    const result = await store.saveControlFacet(lib, ctlId, facet, source);
-    if (result instanceof Error) {
-      toast.show(`save failed: ${result.message}`);
-      return;
-    }
-    baselines.set(facet, source);
-    record[facet] = source;
-    dirty.delete(facet);
-    pushHistory(facet, source, "save");
-    refreshDirtyUi();
-    renderHistory();
-    refreshPreview();
-    toast.show(`dev.save_control → saved · ${facet}`);
   }
 
   // ── local history ─────────────────────────────────────────
@@ -420,7 +424,7 @@ async function init(host, { lib, ctlId, toast }) {
       `every save is a patch through <span class="hi">patch_control_facet</span>
        — every caller uses the same door`;
     const wrap = host.querySelector(".wb-hist-chips");
-    const r = await store.listPatches(lib, name, 40);
+    const r = await listPatches(lib, name, 40);
     const entries = r.status === "ok" ? (r.patches ?? []) : [];
     const chipsOut = entries.map((p) => {
       const chip = document.createElement("span");
@@ -460,7 +464,7 @@ async function init(host, { lib, ctlId, toast }) {
   async function revertScene(p) {
     let body;
     try { body = p.old ? JSON.parse(p.old) : {}; } catch { body = {}; }
-    const r = await store.writeControlScene(lib, name, body, {
+    const r = await writeControlScene(lib, name, body, {
       base: "", label: `revert ${p.patch_id}`,
     });
     if (r.status !== "ok") {
@@ -479,7 +483,7 @@ async function init(host, { lib, ctlId, toast }) {
     // Revert = the inverse edit as a NEW patch (history is append-only).
     // The inverse's old_snippet is the patch's `new`; if that text is no
     // longer present exactly once, the facet has moved on — no write.
-    const r = await store.patchFacet(lib, name, p.facet, {
+    const r = await patchFacet(lib, name, p.facet, {
       oldSnippet: p.new, newSnippet: p.old, base: "",
       label: `revert ${p.patch_id}`,
     });
@@ -489,7 +493,7 @@ async function init(host, { lib, ctlId, toast }) {
         : `revert failed: ${r.msg}`);
       return;
     }
-    const rf = await store.readFacet(lib, name, p.facet);
+    const rf = await readFacet(lib, name, p.facet);
     if (rf.status === "ok") {
       record[p.facet] = rf.source;
       baselines.set(p.facet, rf.source);
@@ -497,7 +501,6 @@ async function init(host, { lib, ctlId, toast }) {
       editors.get(p.facet)?.api.setSource(rf.source);
       dirty.delete(p.facet);
     }
-    store.invalidateControl(lib, ctlId);
     refreshDirtyUi();
     renderStrip();
     refreshPreview();
@@ -564,7 +567,7 @@ async function init(host, { lib, ctlId, toast }) {
     metaEl.querySelector(".wm-edit").hidden = !patchMode;
     metaEl.querySelector(".wm-groups-btn").hidden = !patchMode;
     // publish rides dev commands, not the write API — live mode is enough
-    metaEl.querySelector(".wm-publish").hidden = store.mode() !== "live";
+    metaEl.querySelector(".wm-publish").hidden = false;
   }
 
   metaEl.querySelector(".wm-edit").addEventListener("click", () => {
@@ -594,16 +597,15 @@ async function init(host, { lib, ctlId, toast }) {
       return;
     }
     if (dArg) {
-      const r = await store.setControlMeta(lib, name, dArg, "");
+      const r = await setControlMeta(lib, name, dArg, "");
       if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
       record.desc = dArg;
     }
     if (tChanged) {
-      const r = await store.setTags(lib, name, "", tags);
+      const r = await setTags(lib, name, "", tags);
       if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
       record.tags = tags;
     }
-    store.invalidateControl(lib, ctlId);
     form.hidden = true;
     renderMeta();
     toast.show(dArg && tChanged ? "meta + tags → saved"
@@ -625,7 +627,7 @@ async function init(host, { lib, ctlId, toast }) {
       form.querySelector(".wm-groups-note").textContent = "";
       form.querySelector(".wm-groups-apply").textContent = "set groups";
       input.focus();
-      const known = await store.securityGroups();
+      const known = await securityGroups();
       form.querySelector(".wm-groups-known").textContent =
         known.length ? `known groups: ${known.join(", ")}` : "";
     }
@@ -643,10 +645,9 @@ async function init(host, { lib, ctlId, toast }) {
       setTimeout(() => { apply.textContent = "set groups"; }, 2500);
       return;
     }
-    const r = await store.setGroups(lib, name, "", v);
+    const r = await setGroups(lib, name, "", v);
     if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
     if (v) record.groups = v; else delete record.groups;
-    store.invalidateControl(lib, ctlId);
     form.hidden = true;
     apply.textContent = "set groups";
     renderMeta();
@@ -671,7 +672,7 @@ async function init(host, { lib, ctlId, toast }) {
     const view = publishEl.querySelector(".wpi-view");
     const form = publishEl.querySelector(".wpi-form");
     const edit = publishEl.querySelector(".wpi-edit");
-    const mi = await store.metaIdentity();
+    const mi = await metaIdentity();
     const data = mi?.status === "ok" && mi.exists ? mi : null;
     edit.hidden = !writable || !data;
     if (data) {
@@ -698,7 +699,7 @@ async function init(host, { lib, ctlId, toast }) {
     const displayname = publishEl.querySelector(".wpi-name").value.trim();
     const organization = publishEl.querySelector(".wpi-org").value.trim();
     if (!displayname) { note.textContent = "a display name is required"; return; }
-    const r = await store.setMetaIdentity(displayname, organization);
+    const r = await setMetaIdentity(displayname, organization);
     if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
     note.textContent = "";
     toast.show(`set_meta_identity → ${r.created ? "created" : "updated"}`);
@@ -710,7 +711,7 @@ async function init(host, { lib, ctlId, toast }) {
     if (publishEl.hidden) return;
     const cap = publishEl.querySelector(".wp-cap");
     cap.textContent = "loading publish context…";
-    const got = await store.invoke("dev", "editcontrol", "get_publish_context",
+    const got = await invoke("dev", "editcontrol", "get_publish_context",
       { lib, control_id: ctlId });
     if (got instanceof Error || got.envelope.status !== "ok") {
       cap.textContent = `could not load the publish context: ${
@@ -756,7 +757,7 @@ async function init(host, { lib, ctlId, toast }) {
     for (const input of publishEl.querySelectorAll(".wp-fields input")) {
       data[input.dataset.key] = input.value;
     }
-    const r = await store.invoke("dev", "editcontrol", "publishapp", { data });
+    const r = await invoke("dev", "editcontrol", "publishapp", { data });
     if (r instanceof Error || r.envelope.status !== "ok") {
       note.textContent = `publish failed: ${
         r instanceof Error ? r.message : r.envelope.msg}`;
@@ -767,7 +768,6 @@ async function init(host, { lib, ctlId, toast }) {
     log.hidden = false;
     log.textContent = (r.envelope.data ?? []).join("\n") || "(no output)";
     toast.show(`publishapp → published · ${data.id ?? name}`);
-    store.invalidateControl(lib, ctlId);
   });
 
   // ── timers/events (G-7, the P2 setters — CONTRACT §6) ─────
@@ -785,11 +785,7 @@ async function init(host, { lib, ctlId, toast }) {
   async function refreshWiringArrays() {
     // A replaced component keeps its record id — drop the cached copies or
     // the detail line re-renders stale.
-    for (const e of [...(record.timer ?? []), ...(record.event ?? [])]) {
-      store.invalidateControl(lib, e.id);
-    }
-    store.invalidateControl(lib, ctlId);
-    const fresh = await store.control(lib, ctlId);
+    const fresh = await readRec(lib, ctlId);
     if (fresh instanceof Error) return;
     record.timer = fresh.timer;
     record.event = fresh.event;
@@ -801,7 +797,7 @@ async function init(host, { lib, ctlId, toast }) {
     row.innerHTML = `<span class="ww-name"></span><span class="ww-detail">…</span>`;
     row.querySelector(".ww-name").textContent = entry.name;
     const detail = row.querySelector(".ww-detail");
-    store.control(lib, entry.id).then((comp) => {
+    readRec(lib, entry.id).then((comp) => {
       if (comp instanceof Error) {
         detail.textContent = "component record unreadable";
         return;
@@ -830,8 +826,8 @@ async function init(host, { lib, ctlId, toast }) {
           return;
         }
         const r = kind === "timer"
-          ? await store.removeTimer(lib, name, entry.name)
-          : await store.removeEventHandler(lib, name, entry.name);
+          ? await removeTimer(lib, name, entry.name)
+          : await removeEventHandler(lib, name, entry.name);
         if (r.status !== "ok") {
           toast.show(`remove failed: ${r.msg}`);
           return;
@@ -916,7 +912,7 @@ async function init(host, { lib, ctlId, toast }) {
     ev.preventDefault();
     const form = ev.currentTarget;
     const note = form.querySelector(".ww-note");
-    const r = await store.setTimer(lib, name, {
+    const r = await setTimer(lib, name, {
       name: form.querySelector(".wt-name").value.trim(),
       cmd: form.querySelector(".wt-cmd").value,
       start: Number(form.querySelector(".wt-start").value),
@@ -940,7 +936,7 @@ async function init(host, { lib, ctlId, toast }) {
     ev.preventDefault();
     const form = ev.currentTarget;
     const note = form.querySelector(".ww-note");
-    const r = await store.setEventHandler(lib, name, {
+    const r = await setEventHandler(lib, name, {
       name: form.querySelector(".we-name").value.trim(),
       bot: form.querySelector(".we-bot").value.trim(),
       event: form.querySelector(".we-event").value.trim(),
@@ -964,8 +960,8 @@ async function init(host, { lib, ctlId, toast }) {
     let r;
     if (!p.old) {
       r = p.facet === "timer"
-        ? await store.removeTimer(lib, name, p.cmd)
-        : await store.removeEventHandler(lib, name, p.cmd);
+        ? await removeTimer(lib, name, p.cmd)
+        : await removeEventHandler(lib, name, p.cmd);
     } else {
       let old;
       try {
@@ -980,11 +976,11 @@ async function init(host, { lib, ctlId, toast }) {
         return;
       }
       r = p.facet === "timer"
-        ? await store.setTimer(lib, name, {
+        ? await setTimer(lib, name, {
             name: p.cmd, cmd: cmdName, start: old.start, startunit: old.startunit,
             interval: old.interval, intervalunit: old.intervalunit, repeat: old.repeat,
           })
-        : await store.setEventHandler(lib, name, {
+        : await setEventHandler(lib, name, {
             name: p.cmd, bot: old.bot, event: old.event, cmd: cmdName,
           });
     }
@@ -1000,12 +996,12 @@ async function init(host, { lib, ctlId, toast }) {
 
   async function commandMeta(cmdEntry) {
     // desc/tags/groups live on the command's implementation record (CONTRACT §6).
-    const cmdRec = await store.control(lib, cmdEntry.id);
+    const cmdRec = await readRec(lib, cmdEntry.id);
     if (cmdRec instanceof Error) return null;
     const lang = cmdRec.type ?? commandLang(cmdEntry);
     const implId = cmdRec[lang];
     if (!implId) return null;
-    const impl = await store.control(lib, implId);
+    const impl = await readRec(lib, implId);
     if (impl instanceof Error) return null;
     return { desc: impl.desc ?? "", tags: impl.tags ?? "", groups: impl.groups ?? "", implId };
   }
@@ -1040,7 +1036,7 @@ async function init(host, { lib, ctlId, toast }) {
     typeEl.className = `wcc-type wb-cmd-type t-${lang}`;
     codeEl.querySelector(".wcc-sig").textContent = "…";
 
-    const r = await store.readCommand(lib, name, cmdEntry.name);
+    const r = await readCommand(lib, name, cmdEntry.name);
     if (r.status !== "ok") {
       codeEl.querySelector(".wcc-sig").textContent = "";
       errEl.hidden = false;
@@ -1095,7 +1091,7 @@ async function init(host, { lib, ctlId, toast }) {
     // imports first (set_command_imports recompiles): a body edit that
     // needs a new `use` compiles on the second call, not on ordering luck
     if (impEl.value !== (codeState.importsBaseline ?? "")) {
-      const r = await store.setCommandImports(lib, name, codeState.cmdName, impEl.value);
+      const r = await setCommandImports(lib, name, codeState.cmdName, impEl.value);
       if (r.status !== "ok" && r.kind !== "compile_error") {
         errEl.hidden = false;
         errEl.textContent = `set_command_imports failed: ${r.msg}`;
@@ -1111,7 +1107,7 @@ async function init(host, { lib, ctlId, toast }) {
 
     const patch = computePatch(codeState.baseline, source);
     if (patch && !(patch.oldSnippet === "" && codeState.baseline !== "")) {
-      const r = await store.patchCommandBody(lib, name, codeState.cmdName,
+      const r = await patchCommandBody(lib, name, codeState.cmdName,
         patch.oldSnippet, patch.newSnippet);
       if (r.status !== "ok") {
         errEl.hidden = false;
@@ -1215,14 +1211,14 @@ async function init(host, { lib, ctlId, toast }) {
 
     let r;
     if (wcLang.value === "flow") {
-      r = await store.writeFlowBody(lib, name, cmdName, starterFlowBody(parsed.params),
+      r = await writeFlowBody(lib, name, cmdName, starterFlowBody(parsed.params),
         { label: `create ${cmdName}` });
     } else {
       const ret = wcRet.value;
       const body = wcLang.value === "python"
         ? "return None"
         : RUST_STARTER[ret] ?? "DataObject::new()";
-      r = await store.upsertCommand(lib, name, cmdName,
+      r = await upsertCommand(lib, name, cmdName,
         { lang: wcLang.value, returnType: ret, params: parsed.params, codeBody: body });
     }
     if (r.status !== "ok" && r.kind !== "compile_error") {
@@ -1232,8 +1228,7 @@ async function init(host, { lib, ctlId, toast }) {
     wcNote.textContent = "";
     wcName.value = "";
     wcParams.value = "";
-    store.invalidateControl(lib, ctlId);
-    const fresh = await store.control(lib, ctlId);
+    const fresh = await readRec(lib, ctlId);
     if (!(fresh instanceof Error)) record.cmd = fresh.cmd ?? [];
     const made = (record.cmd ?? []).find((c) => c.name === cmdName);
     host.querySelector(".wb-cmd-rows").replaceChildren();
@@ -1290,7 +1285,7 @@ async function init(host, { lib, ctlId, toast }) {
       const guess = commandLang(cmdEntry);
       setLang(guess);
       if (guess === "flow") addFlowOpen(); else addCodeOpen(guess);
-      store.control(lib, cmdEntry.id).then((cmdRec) => {
+      readRec(lib, cmdEntry.id).then((cmdRec) => {
         if (cmdRec instanceof Error || !cmdRec.type) return;
         if (cmdRec.type !== guess) setLang(cmdRec.type);
         if (cmdRec.type === "flow") {
@@ -1319,13 +1314,12 @@ async function init(host, { lib, ctlId, toast }) {
             setTimeout(() => { del.textContent = "delete"; }, 2500);
             return;
           }
-          const r = await store.deleteCommand(lib, name, cmdEntry.name);
+          const r = await deleteCommand(lib, name, cmdEntry.name);
           if (r.status !== "ok") {
             toast.show(`delete failed: ${r.msg}`);
             return;
           }
-          store.invalidateControl(lib, ctlId);
-          const fresh = await store.control(lib, ctlId);
+          const fresh = await readRec(lib, ctlId);
           if (!(fresh instanceof Error)) record.cmd = fresh.cmd ?? [];
           host.querySelector(".wb-cmd-rows").replaceChildren();
           renderCommands();
@@ -1382,12 +1376,10 @@ async function init(host, { lib, ctlId, toast }) {
             setTimeout(() => { groupsApply.textContent = "set groups"; }, 2500);
             return;
           }
-          const r = await store.setGroups(lib, name, cmdEntry.name, gv);
+          const r = await setGroups(lib, name, cmdEntry.name, gv);
           if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
           meta.groups = gv;
           groupsApply.textContent = "set groups";
-          store.invalidateControl(lib, cmdEntry.id);
-          store.invalidateControl(lib, meta.implId);
           note.textContent = "";
           toast.show(`set_groups → readers [${(r.readers ?? []).join(", ") || "— admin only"}] on ${cmdEntry.name}`);
         });
@@ -1414,17 +1406,15 @@ async function init(host, { lib, ctlId, toast }) {
             return;
           }
           if (dArg) {
-            const r = await store.setCommandMeta(lib, name, cmdEntry.name, dArg, "");
+            const r = await setCommandMeta(lib, name, cmdEntry.name, dArg, "");
             if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
             meta.desc = dArg;
           }
           if (tChanged) {
-            const r = await store.setTags(lib, name, cmdEntry.name, tags);
+            const r = await setTags(lib, name, cmdEntry.name, tags);
             if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
             meta.tags = tags;
           }
-          store.invalidateControl(lib, cmdEntry.id);
-          store.invalidateControl(lib, meta.implId);
           note.textContent = "";
           toast.show(tChanged && !dArg ? "set_tags → saved" : "set_command_meta → saved");
         });
@@ -1591,15 +1581,6 @@ async function init(host, { lib, ctlId, toast }) {
     previewSlot.appendChild(inner);
 
     if (previewMode === "live") {
-      if (store.mode() !== "live") {
-        const p = document.createElement("p");
-        p.className = "wb-note";
-        p.textContent = "live preview runs the control on the platform " +
-          "(/dev/preview.html) — connect to an instance first; mock mode " +
-          "has no platform to run it.";
-        inner.appendChild(p);
-        return;
-      }
       const head = document.createElement("div");
       head.className = "wb-pv-live-head";
       const cap = document.createElement("span");
@@ -1678,7 +1659,7 @@ async function init(host, { lib, ctlId, toast }) {
 }
 
   return init(ME, ME.DATA || {});
-})().catch(function (e) {
+}).catch(function (e) {
   console.log("workbench failed to start: " + (e && e.message ? e.message : e));
   return null;
 });

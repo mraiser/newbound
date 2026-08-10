@@ -31,17 +31,26 @@ function disposeNow() {
   if (stage) { stage.dispose(); stage = null; }
 }
 
-var readyP = (async () => {
+var readyP = new Promise(function (res2) { me.ready = res2; }).then(async () => {
   const canvasEl = ME.querySelector(".sp-canvas");
   const footEl = ME.querySelector(".sp-foot");
   const capEl = ME.querySelector(".sp-cap");
   const diagEl = ME.querySelector(".sp-diag");
 
-  const { store } = await requireModule("store", "sceneplayer");
-  await store.ensureConnected();
-  const { hasWebGL } = await requireModule("webgl", "sceneplayer");
-  const { parse: parseScene } = await requireModule("scenedoc", "sceneplayer");
-  const { createRuntime } = await requireModule("scenerun", "sceneplayer");
+  const { hasWebGL } = window.NB_WEBGL;
+  const { parse: parseScene } = window.NB_SCENEDOC;
+  const { createRuntime } = window.NB_SCENERUN;
+  const jsonP = (c2, v2) => new Promise((res2) => json(c2, v2, res2));
+  const invokeP = (l2, c2, m2, a2) => new Promise((res2) => invokeCommand(l2, c2, m2, a2, res2));
+  const code = (m2, a2) => invokeP("dev", "code", m2, a2);
+  const readRec = async (l2, id2) => {
+    const r2 = await jsonP("../app/read", "lib=" + encodeURIComponent(l2) + "&id=" + encodeURIComponent(id2));
+    return r2.status === "ok" ? r2.data : new Error(r2.msg || "read failed");
+  };
+  const controlsOf = async (l2) => {
+    const d2 = await readRec(l2, "controls");
+    return d2 instanceof Error ? d2 : (d2.list ?? []);
+  };
 
   if (!hasWebGL()) {
     canvasEl.innerHTML = `<p style="padding:14px" class="sp-cap">no WebGL here — this scene cannot render</p>`;
@@ -49,16 +58,16 @@ var readyP = (async () => {
   }
 
   async function loadSceneDoc(lib, ctl) {
-    if (await store.sceneApi()) {
-      const r = await store.readControlScene(lib, ctl);
+    {
+      const r = await code("read_control_scene", { lib, ctl });
       if (r.status === "ok" && r.exists) return parseScene(r.scene);
       if (r.status === "ok") return null;
     }
-    const controls = await store.controls(lib);
+    const controls = await controlsOf(lib);
     if (controls instanceof Error) return null;
     const entry = controls.find((c) => c.name === ctl);
     if (!entry) return null;
-    const rec = await store.control(lib, entry.id);
+    const rec = await readRec(lib, entry.id);
     if (rec instanceof Error || rec.scene === undefined) return null;
     return parseScene(rec.scene);
   }
@@ -102,14 +111,11 @@ var readyP = (async () => {
     theme: dark() ? "dark" : "light",
     reduced: reducedMotion(),
     loadDoc: loadSceneDoc,
-    // the run ▸ posture (design §3.5): invoke only on a writable live connection
-    invoke: store.writable() && store.mode() === "live"
-      ? async (ilib, ictl, icmd, args) => {
-          const r = await store.invokeCommand(ilib, ictl, icmd, args);
-          if (r.status !== "ok") return new Error(r.msg || "invoke failed");
-          return r.data ?? r.msg ?? r;
-        }
-      : undefined,
+    invoke: async (ilib, ictl, icmd, args) => {
+      const r = await invokeP(ilib, ictl, icmd, args);
+      if (r.status !== "ok") return new Error(r.msg || "invoke failed");
+      return r.data ?? r.msg ?? r;
+    },
     onDiag: () => {
       diagCount++;
       footEl.hidden = false;
@@ -126,6 +132,6 @@ var readyP = (async () => {
   watchdog = setInterval(() => {
     if (!ME.isConnected) disposeNow();
   }, 2000);
-})().catch((e) => {
+}).catch((e) => {
   console.log("sceneplayer failed to start: " + (e && e.message ? e.message : e));
 });

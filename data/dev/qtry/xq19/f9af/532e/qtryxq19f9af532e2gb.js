@@ -8,8 +8,57 @@ var me = this;
 var ME = document.getElementById(me.UUID);
 
 var readyP = (async () => {
-  const { store } = await requireModule("store", "shelf");
-  try { await store.ensureConnected(); } catch (e) { /* reads surface it */ }
+  // ── backend calls: api.js primitives only ─────────────────
+  const jsonP = (c2, v2) => new Promise((res2) => json(c2, v2, res2));
+  const invokeP = (l2, c2, m2, a2) => new Promise((res2) => invokeCommand(l2, c2, m2, a2, res2));
+  const invoke = async (l2, c2, m2, a2) => {
+    const t0 = performance.now();
+    const envelope = await invokeP(l2, c2, m2, a2);
+    return { envelope, ms: Math.round(performance.now() - t0) };
+  };
+  const code = (m2, a2) => invokeP("dev", "code", m2, a2);
+  let AUTHOR = "dev";
+  jsonP("../security/current_user", null).then((r2) => {
+    if (r2.status === "ok" && r2.data) AUTHOR = r2.data.displayname || r2.data.id || "dev";
+  });
+  const readRec = async (l2, id2) => {
+    const r2 = await jsonP("../app/read", "lib=" + encodeURIComponent(l2) + "&id=" + encodeURIComponent(id2));
+    return r2.status === "ok" ? r2.data : new Error(r2.msg || "read failed");
+  };
+  const controlsOf = async (l2) => {
+    const d2 = await readRec(l2, "controls");
+    return d2 instanceof Error ? d2 : (d2.list ?? []);
+  };
+  const libsOf = async () => {
+    const r2 = await jsonP("../app/libs", null);
+    return r2.status === "ok" ? (r2.data ?? []) : new Error(r2.msg || "libs failed");
+  };
+  const setLibraryMeta = (l2, d2, g2) => code("set_library_meta", { lib: l2, desc: d2, groups: g2 });
+  const setTags = (l2, c2, m2, t2) => code("set_tags", { lib: l2, ctl: c2, cmd: m2, tags: t2, author: AUTHOR });
+  const setGroups = (l2, c2, m2, g2) => code("set_groups", { lib: l2, ctl: c2, cmd: m2, groups: g2, author: AUTHOR });
+  const securityGroups = async () => {
+    const r2 = await jsonP("../security/groups", null);
+    return r2 && r2.status === "ok" && Array.isArray(r2.data) ? r2.data : [];
+  };
+  const deleteLibrary = (l2) => code("delete_library", { lib: l2, author: AUTHOR });
+  const deleteControl = (l2, c2) => code("delete_control", { lib: l2, ctl: c2, author: AUTHOR });
+  const addControl = (l2, c2) => code("add_control", { lib: l2, ctl: c2 });
+  const addLibrary = (l2) => code("add_library", { lib: l2 });
+  const listAssets = (l2) => code("list_assets", { lib: l2 });
+  const writeAsset = (l2, n2, c2, t2) => code("write_asset", { lib: l2, name: n2, content: c2, tempfile: t2 });
+  const renameAsset = (l2, f2, t2) => code("rename_asset", { lib: l2, from: f2, to: t2 });
+  const deleteAsset = (l2, n2) => code("delete_asset", { lib: l2, name: n2 });
+  const setPlugin = (n2, e2) => code("set_plugin", { name: n2, target_lib: e2.target_lib,
+    target_ctl: e2.target_ctl, plugin_lib: e2.plugin_lib, plugin_ctl: e2.plugin_ctl,
+    selector: e2.selector, author: AUTHOR });
+  const removePlugin = (n2) => code("remove_plugin", { name: n2, author: AUTHOR });
+  const listPlugins = async () => {
+    const got = await invoke("dev", "plugins", "list_plugins", {});
+    if (got.envelope.status !== "ok") return new Error(got.envelope.msg ?? "list_plugins failed");
+    return got.envelope.data ?? {};
+  };
+  const appCmdUrl = (a2, m2, p2) => "../" + a2 + "/" + m2 + "?" +
+    Object.entries(p2).map(([k2, v2]) => k2 + "=" + encodeURIComponent(String(v2))).join("&");
   // mount a child control and resolve with its api once it is ready —
   // installControl is the platform's own mounter; waitReady is the
   // convention converted controls expose when their setup is async
@@ -41,13 +90,13 @@ async function init(host, { openLib, openControl, toast }) {
     el.title = g ? `security groups: ${g}` : "admin only — no groups granted";
   }
 
-  const libs = await store.libs();
+  const libs = await libsOf();
   if (libs instanceof Error) {
     toast.show(`could not list libraries: ${libs.message}`);
     return {};
   }
-  const writable = store.writable();
-  const patchApi = await store.patchApi();
+  const writable = true;
+  const patchApi = true;
 
   const groups = new Map();
   for (const lib of [...libs].sort((a, b) => a.id.localeCompare(b.id))) {
@@ -83,7 +132,7 @@ async function init(host, { openLib, openControl, toast }) {
       grid.appendChild(stack);
       stackEls.set(lib.id, stack);
 
-      store.controls(lib.id).then((controls) => {
+      controlsOf(lib.id).then((controls) => {
         if (!(controls instanceof Error)) {
           stack.querySelector(".s-meta").textContent =
             `${controls.length} controls · v${lib.version ?? "?"}`;
@@ -103,7 +152,7 @@ async function init(host, { openLib, openControl, toast }) {
     host.querySelector(".fh-groups-btn").hidden = !(writable && patchApi);
     host.querySelector(".fh-del-btn").hidden = !(writable && patchApi);
     host.querySelector(".fh-rebuild-btn").hidden = !writable;
-    host.querySelector(".fh-archive-btn").hidden = store.mode() !== "live";
+    host.querySelector(".fh-archive-btn").hidden = false;
   }
 
   // ── library delete (delete_library, CONTRACT §6.1) ────────
@@ -119,7 +168,7 @@ async function init(host, { openLib, openControl, toast }) {
         setTimeout(() => { del.textContent = "delete library"; }, 2500);
         return;
       }
-      const r = await store.deleteLibrary(lib.id);
+      const r = await deleteLibrary(lib.id);
       if (r.status !== "ok") {
         del.textContent = "delete library";
         toast.show(`delete failed: ${r.msg}`);
@@ -162,12 +211,12 @@ async function init(host, { openLib, openControl, toast }) {
         return;
       }
       if (dArg) {
-        const r = await store.setLibraryMeta(lib.id, dArg, "");
+        const r = await setLibraryMeta(lib.id, dArg, "");
         if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
         lib.desc = dArg;
       }
       if (tChanged) {
-        const r = await store.setTags(lib.id, "", "", tagsV);
+        const r = await setTags(lib.id, "", "", tagsV);
         if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
         lib.tags = tagsV;
       }
@@ -194,7 +243,7 @@ async function init(host, { openLib, openControl, toast }) {
         note.textContent = "";
         apply.textContent = "set groups";
         input.focus();
-        const known = await store.securityGroups();
+        const known = await securityGroups();
         form.querySelector(".fg-known").textContent =
           known.length ? `known groups: ${known.join(", ")}` : "";
       }
@@ -208,7 +257,7 @@ async function init(host, { openLib, openControl, toast }) {
         setTimeout(() => { apply.textContent = "set groups"; }, 2500);
         return;
       }
-      const r = await store.setGroups(lib.id, "", "", v);
+      const r = await setGroups(lib.id, "", "", v);
       if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
       lib.groups = v;
       lib.readers = r.readers ?? [];
@@ -234,7 +283,7 @@ async function init(host, { openLib, openControl, toast }) {
     const note = form.querySelector(".fa-note");
 
     async function refresh() {
-      const r = await store.listAssets(lib.id);
+      const r = await listAssets(lib.id);
       if (r.status !== "ok") {
         rowsEl.textContent = `assets need the write API on a live connection — ${r.msg}`;
         rowsEl.className = "fa-rows fa-empty";
@@ -264,7 +313,7 @@ async function init(host, { openLib, openControl, toast }) {
           ren.addEventListener("click", async () => {
             const to = prompt(`rename ${a.name} to (relative path):`, a.name);
             if (!to || to === a.name) return;
-            const rr = await store.renameAsset(lib.id, a.name, to);
+            const rr = await renameAsset(lib.id, a.name, to);
             if (rr.status !== "ok") toast.show(`rename failed: ${rr.msg}`);
             refresh();
           });
@@ -278,7 +327,7 @@ async function init(host, { openLib, openControl, toast }) {
               setTimeout(() => { del.textContent = "delete"; }, 2500);
               return;
             }
-            const rr = await store.deleteAsset(lib.id, a.name);
+            const rr = await deleteAsset(lib.id, a.name);
             if (rr.status !== "ok") toast.show(`delete failed: ${rr.msg}`);
             refresh();
           });
@@ -305,7 +354,7 @@ async function init(host, { openLib, openControl, toast }) {
         note.textContent = "a name is required";
         return;
       }
-      const r = await store.writeAsset(lib.id, name, tempfile ? "" : content, tempfile);
+      const r = await writeAsset(lib.id, name, tempfile ? "" : content, tempfile);
       if (r.status !== "ok") {
         note.textContent = `failed: ${r.msg}`;
         return;
@@ -329,7 +378,7 @@ async function init(host, { openLib, openControl, toast }) {
     host.querySelector(".fh-settings-btn").onclick = async () => {
       panel.hidden = !panel.hidden;
       if (panel.hidden) return;
-      const got = await store.invoke("dev", "libsettings", "get_library_config", { id: lib.id });
+      const got = await invoke("dev", "libsettings", "get_library_config", { id: lib.id });
       if (got instanceof Error || got.envelope.status !== "ok") {
         panel.querySelector(".fs-note").textContent =
           `could not load settings: ${got instanceof Error ? got.message : got.envelope.msg}`;
@@ -349,7 +398,7 @@ async function init(host, { openLib, openControl, toast }) {
       const note = panel.querySelector(".fs-note");
       const types = panel.querySelector(".fs-types").value
         .split(",").map((t) => t.trim()).filter(Boolean);
-      const saved = await store.invoke("dev", "libsettings", "save_library_config", {
+      const saved = await invoke("dev", "libsettings", "save_library_config", {
         data: {
           id: lib.id,
           library_root: panel.querySelector(".fs-root").value.trim(),
@@ -386,7 +435,7 @@ async function init(host, { openLib, openControl, toast }) {
       const out = panel.querySelector(".fr-out");
       go.disabled = true;
       note.textContent = "rebuilding — compiles run on the instance, this can take a while…";
-      const r = await store.invoke("dev", "dev", "rebuild_lib", { lib: lib.id });
+      const r = await invoke("dev", "dev", "rebuild_lib", { lib: lib.id });
       go.disabled = false;
       if (r instanceof Error || r.envelope.status !== "ok") {
         note.textContent = `rebuild failed: ${
@@ -419,7 +468,7 @@ async function init(host, { openLib, openControl, toast }) {
       const note = panel.querySelector(".fk-note");
       rows.replaceChildren();
       note.textContent = "";
-      const got = await store.invoke("dev", "dev", "lib_info", { lib: lib.id });
+      const got = await invoke("dev", "dev", "lib_info", { lib: lib.id });
       if (got instanceof Error || got.envelope.status !== "ok") {
         note.textContent = `no archive info: ${
           got instanceof Error ? got.message : got.envelope.msg}`;
@@ -439,7 +488,7 @@ async function init(host, { openLib, openControl, toast }) {
       const dl = document.createElement("a");
       dl.className = "fk-dl";
       dl.textContent = `⇓ ${lib.id}_${version}.zip`;
-      dl.href = store.appCmdUrl("dev", "lib_archive", { lib: lib.id, version });
+      dl.href = appCmdUrl("dev", "lib_archive", { lib: lib.id, version });
       dl.download = `${lib.id}_${version}.zip`;
       rows.append(meta, dl);
     };
@@ -473,20 +522,20 @@ async function init(host, { openLib, openControl, toast }) {
       newCtlNote.textContent = complaint;
       return;
     }
-    const existing = await store.controls(fanLib);
+    const existing = await controlsOf(fanLib);
     if (!(existing instanceof Error) && existing.some((c) => c.name === name)) {
       newCtlNote.textContent = `${fanLib} already has a control named ${name}`;
       return;
     }
     newCtlNote.textContent = "creating…";
-    const r = await store.addControl(fanLib, name);
+    const r = await addControl(fanLib, name);
     if (r.status !== "ok") {
       newCtlNote.textContent = `failed: ${r.msg}`;
       return;
     }
     newCtlNote.textContent = "";
     newCtlName.value = "";
-    const controls = await store.controls(fanLib);
+    const controls = await controlsOf(fanLib);
     const made = controls instanceof Error
       ? null : controls.find((c) => c.name === name);
     toast.show(`add_control → ${fanLib} ▸ ${name} — its facets are empty; type and save to create them`);
@@ -521,7 +570,7 @@ async function init(host, { openLib, openControl, toast }) {
       return;
     }
     newLibNote.textContent = "creating…";
-    const r = await store.addLibrary(name);
+    const r = await addLibrary(name);
     if (r.status !== "ok") {
       newLibNote.textContent = `failed: ${r.msg}`;
       return;
@@ -546,7 +595,7 @@ async function init(host, { openLib, openControl, toast }) {
     host.querySelector(".sh-import-note").textContent = "";
     if (importFields.hidden) { importList.hidden = true; return; }
     host.querySelector(".sh-import-url").focus();
-    const got = await store.invoke("dev", "github", "list", {});
+    const got = await invoke("dev", "github", "list", {});
     if (!(got instanceof Error) && got.envelope.status === "ok") {
       const data = got.envelope.data ?? {};
       const names = Array.isArray(data) ? data
@@ -564,7 +613,7 @@ async function init(host, { openLib, openControl, toast }) {
     const note = host.querySelector(".sh-import-note");
     if (!url) { note.textContent = "paste a git url"; return; }
     note.textContent = "cloning + building on the instance…";
-    const r = await store.invoke("dev", "github", "import", { url });
+    const r = await invoke("dev", "github", "import", { url });
     if (r instanceof Error || r.envelope.status !== "ok") {
       note.textContent = `import failed: ${
         r instanceof Error ? r.message : r.envelope.msg}`;
@@ -578,7 +627,6 @@ async function init(host, { openLib, openControl, toast }) {
       return;
     }
     note.textContent = text + " — reload to see it on the shelf";
-    store.invalidateLibs();
     toast.show("github.import → " + (url.split("/").pop() || url));
   });
 
@@ -594,7 +642,7 @@ async function init(host, { openLib, openControl, toast }) {
   const plugFields = ["name", "tlib", "tctl", "plib", "pctl", "sel"].map(
     (k) => host.querySelector(".sh-plug-" + k));
   async function renderPlugins() {
-    const entries = await store.listPlugins();
+    const entries = await listPlugins();
     plugList.replaceChildren();
     if (entries instanceof Error) {
       plugNote.textContent = `list_plugins failed: ${entries.message}`;
@@ -632,7 +680,7 @@ async function init(host, { openLib, openControl, toast }) {
           setTimeout(() => { rm.textContent = "✕"; }, 2500);
           return;
         }
-        const r = await store.removePlugin(n);
+        const r = await removePlugin(n);
         if (r.status !== "ok") {
           plugNote.textContent = `remove failed: ${r.msg}`;
           return;
@@ -658,7 +706,7 @@ async function init(host, { openLib, openControl, toast }) {
       return;
     }
     plugNote.textContent = "writing…";
-    const r = await store.setPlugin(name, { target_lib, target_ctl, plugin_lib, plugin_ctl, selector });
+    const r = await setPlugin(name, { target_lib, target_ctl, plugin_lib, plugin_ctl, selector });
     if (r.status !== "ok") {
       plugNote.textContent = `set_plugin failed: ${r.msg}`;
       return;
@@ -694,7 +742,7 @@ async function init(host, { openLib, openControl, toast }) {
     newCtlForm.hidden = !(writable && patchApi);
     newCtlNote.textContent = "";
 
-    const controls = await store.controls(libId);
+    const controls = await controlsOf(libId);
     if (controls instanceof Error) {
       toast.show(`could not read ${libId}: ${controls.message}`);
       return;
@@ -714,7 +762,7 @@ async function init(host, { openLib, openControl, toast }) {
         name: ctl.name,
         onOpen: () => openControl(libId, ctl.id),
       });
-      store.control(libId, ctl.id).then((record) => {
+      readRec(libId, ctl.id).then((record) => {
         card.setRecord(record instanceof Error ? null : record);
       });
       if (writable && patchApi) {
@@ -731,7 +779,7 @@ async function init(host, { openLib, openControl, toast }) {
             setTimeout(() => { del.textContent = "delete"; }, 2500);
             return;
           }
-          const r = await store.deleteControl(libId, ctl.name);
+          const r = await deleteControl(libId, ctl.name);
           if (r.status !== "ok") {
             toast.show(`delete failed: ${r.msg}`);
             return;

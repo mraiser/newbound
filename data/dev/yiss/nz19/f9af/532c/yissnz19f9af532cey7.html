@@ -11,33 +11,13 @@
   <div class="fr-spacer"></div>
   <div class="fr-jump-slot"></div>
   <button class="fr-session" aria-pressed="false" title="Session — run commands notebook-style">▤ session</button>
-  <button class="fr-conn" title="Connection settings">
-    <span class="conn-dot" aria-hidden="true"></span><span class="conn-text">not connected</span>
+  <button class="fr-conn" title="Signed-in user">
+    <span class="conn-dot" aria-hidden="true"></span><span class="conn-text"></span>
   </button>
 </header>
 <main class="fr-stage"></main>
 <div class="fr-session-slot"></div>
 <div class="fr-toast-slot"></div>
-
-<dialog class="fr-connect">
-  <form method="dialog" class="cn-form">
-    <span class="lbl">connection</span>
-    <div class="cn-modes" role="radiogroup" aria-label="mode">
-      <button type="button" class="cn-mode" data-mode="mock">mock — fixtures, no backend</button>
-      <button type="button" class="cn-mode" data-mode="live">live — running instance</button>
-    </div>
-    <div class="cn-live" hidden>
-      <input class="cn-url" placeholder="base url" aria-label="Base URL">
-      <input class="cn-sid" placeholder="sessionid (dev console of the tab newbound opens)" aria-label="Session id">
-      <button type="button" class="cn-writable" aria-pressed="false">saves off — read-only connection</button>
-      <p class="cn-warn" hidden>saves go through dev.save_control on whatever
-      instance this points at. Point it at a <b>disposable copy only</b> —
-      never the primary instance.</p>
-    </div>
-    <div class="cn-actions">
-      <button type="button" class="cn-go">connect</button>
-      <button value="cancel" class="cn-cancel">cancel</button>
-    </div>
-    <p class="cn-err" role="alert" hidden></p>
-  </form>
-</dialog>
+<div class="data-control" data-control="app:tokens" hidden></div>
+<div class="data-control" data-control="app:webgl" hidden></div>
+<div class="data-control" data-control="dev:viewctx" hidden></div>

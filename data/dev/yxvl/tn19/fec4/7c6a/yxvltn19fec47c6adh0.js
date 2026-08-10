@@ -9,10 +9,21 @@
 // cmdname/…). Return null when the surface currently has nothing to
 // offer. Register returns an unregister function; surfaces unregister
 // on dispose.
+//
+// LIBRARY control — headless: defines window.NB_VIEWCTX once (idempotent across
+// installs). Consumers list this control as a hidden data-control child
+// div and use the global from their ready.
+
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+me.ready = function () {
+  if (window.NB_VIEWCTX) return;
+  window.NB_VIEWCTX = (function () {
 
 const providers = new Map();
 
-export const viewctx = {
+const viewctx = {
   register(key, fn) {
     providers.set(key, fn);
     return () => {
@@ -48,4 +59,8 @@ export const viewctx = {
     }
     return out;
   },
+};
+
+    return { viewctx };
+  })();
 };

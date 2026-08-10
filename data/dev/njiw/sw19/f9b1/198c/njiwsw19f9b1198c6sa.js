@@ -7,7 +7,19 @@
 // pos.y ± halfH, pos.z), so the z=0 front projection is the 2D viewer's picture.
 
 // ── geometry constants (versioned with the editor, never persisted) ─────────
-export const GEO = {
+//
+// LIBRARY control — headless: defines window.NB_FLOWPROJECT once (idempotent across
+// installs). Consumers list this control as a hidden data-control child
+// div and use the global from their ready.
+
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+me.ready = function () {
+  if (window.NB_FLOWPROJECT) return;
+  window.NB_FLOWPROJECT = (function () {
+
+const GEO = {
   deckPitch: 8,          // nextcase decks recede in −Z at this pitch (§2.4)
   barGap: 1.2,           // bar sits this far beyond the outermost op (§3.1)
   socketR: 0.06,
@@ -32,7 +44,7 @@ const GLYPH_OF = {
 
 /** Half the world height of an op body by type — where its top/bottom edges
     (and thus its sockets) sit. */
-export function halfH(opType) {
+function halfH(opType) {
   if (opType === "constant" || opType === "match") return GEO.capH / 2;
   if (opType === "local") return GEO.glassH / 2;
   if (opType === "persistent") return GEO.cylH / 2;
@@ -227,7 +239,7 @@ function projectMiniature(sub, glassId, out) {
  * @param {object} opts { activeDeck?: number } — which deck of the chain is front
  * @returns {{specs: object[], bounds: object, deckCount: number}}
  */
-export function project(rootCase, opts = {}) {
+function project(rootCase, opts = {}) {
   const out = { specs: [], bounds: null, deckCount: 0 };
   const active = opts.activeDeck ?? 0;
   let c = rootCase, deck = 0;
@@ -247,14 +259,14 @@ const deckLabel = (i) => (i === 0 ? "case" : "case".padEnd(0) + `.next`.repeat(i
 /** Front-ortho screen projection of a world point at scale S (px/unit), y-down,
     with a chosen screen origin. This is the exact mapping the parity check uses
     to compare against the 2D viewer (S = 140). Pure math, exported for tests. */
-export function frontOrtho(worldPt, S, originX, originY) {
+function frontOrtho(worldPt, S, originX, originY) {
   return { x: worldPt.x * S + originX, y: -worldPt.y * S + originY };
 }
 
 /** World position of a terminal on the ACTIVE deck (deckZ = 0) — for the
     editor's wiring ghost and terminal drags. idx: op index, or -1 (params bar) /
     -2 (return bar). which: "in" | "out". Returns {x,y,z} | null. */
-export function terminalWorld(c, idx, which, term) {
+function terminalWorld(c, idx, which, term) {
   return terminalPos(c, idx, which, term, barGeometry(c), 0);
 }
 
@@ -262,7 +274,7 @@ export function terminalWorld(c, idx, which, term) {
     the stage builds its tubes from (§3.2: tangent magnitude 0.4·length,
     clamped 0.5–2), replicated as pure math so execution tokens (3D-5) ride
     exactly the rendered tube. Keep in lockstep with stage._curveVertical. */
-export function wireCurvePoint(from, to, t) {
+function wireCurvePoint(from, to, t) {
   const len = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
   const m = Math.max(0.5, Math.min(2, 0.4 * len));
   const p1 = { x: from.x, y: from.y - m, z: from.z };
@@ -371,7 +383,7 @@ function opSceneNode(op, i, deckId, prefix, active, editable, push) {
  * state-shaped flow view. Same signature family as project().
  * @returns {{specs: object[], bounds: object, deckCount: number}}
  */
-export function toScene(rootCase, opts = {}) {
+function toScene(rootCase, opts = {}) {
   const activeDeck = opts.activeDeck ?? 0;
   const editable = opts.editable ?? true;
   const specs = [];
@@ -471,3 +483,7 @@ export function toScene(rootCase, opts = {}) {
   });
   return { specs, bounds, deckCount: chain.length };
 }
+
+    return { GEO, halfH, project, frontOrtho, terminalWorld, wireCurvePoint, toScene };
+  })();
+};

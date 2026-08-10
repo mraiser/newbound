@@ -70,6 +70,22 @@ function lookupID(lib, name, cb){
   }
 }
 
+// Invoke a command by NAMES (lib, control, command): resolves the control id
+// via lookupID, reads its record for the command id, execs. cb receives the
+// command's envelope ({status, data/msg} — FLAT returns carry their fields
+// top-level). Relative paths throughout, so tunneled pages stay in-tunnel.
+function invokeCommand(lib, ctl, cmd, args, cb){
+  lookupID(lib, ctl, function(id){
+    json('../app/read', 'lib='+encodeURIComponent(lib)+'&id='+encodeURIComponent(id), function(result){
+      if (result.status != 'ok') { cb(result); return; }
+      var entry = getByProperty(result.data.cmd, 'name', cmd);
+      if (!entry) { cb({ status: 'err', msg: 'no command '+cmd+' on '+lib+'.'+ctl }); return; }
+      json('../app/exec', 'lib='+encodeURIComponent(lib)+'&id='+encodeURIComponent(entry.id)
+        +'&args='+encodeURIComponent(JSON.stringify(args)), cb);
+    });
+  });
+}
+
 function fetchNextData(lib, data, whendone){
   if (DATACACHE[lib] && DATACACHE[lib][data.id] && DATACACHE[lib][data.id].data) whendone(JSON.parse(JSON.stringify(DATACACHE[lib][data.id].data)));
   else{
@@ -126,115 +142,8 @@ function getjsapi(lib, id, cb){
   }
 }
     
-// ── ES-module controls ──────────────────────────────────────────────────────
-// A control whose record carries `module: true` is a MODULE CONTROL: headless.
-// Installing it (a data-control div, a cluster control's html, or a direct
-// installControl call — el may be null) registers its js facet as a named ES
-// module on this page and calls back with the imported namespace. The
-// registry holds promises: concurrent installs single-flight, and a module
-// that imports "./x.js" awaits x's registration even when x's own install is
-// still in flight — so install ORDER never matters, only presence. A module
-// nobody installs fails its dependents with a clear error after a timeout.
-var NB_MODULES = {};          // name -> {promise, resolve, reject, state, url, ns}
-var NB_MODULE_TIMEOUT = 15000;
-
-function moduleSlot(name){
-  var s = NB_MODULES[name];
-  if (!s){
-    s = NB_MODULES[name] = { state: 'waiting' };
-    s.promise = new Promise(function(res, rej){ s.resolve = res; s.reject = rej; });
-  }
-  return s;
-}
-
-// Await a module something on this page installs (or will): returns a promise
-// of its namespace. forWhom (optional) names the dependent in the timeout.
-function requireModule(name, forWhom){
-  var s = moduleSlot(name);
-  if (s.state == 'waiting' && !s.timer){
-    s.timer = setTimeout(function(){
-      if (s.state == 'waiting'){
-        s.state = 'failed';
-        s.reject(new Error("module '"+name+"'"+(forWhom ? " (required by '"+forWhom+"')" : "")+
-          " is not installed on this page — install its control"));
-      }
-    }, NB_MODULE_TIMEOUT);
-  }
-  return s.promise;
-}
-
-function scanModuleImports(js){
-  // static import/export-from specifiers (enough for well-formed modules)
-  var out = [];
-  var re = /(?:^|[\r\n;])\s*(?:import|export)\s+(?:[^'"()]*?from\s+)?['"]([^'"]+)['"]/g;
-  var m;
-  while ((m = re.exec(js)) != null) out.push(m[1]);
-  return out;
-}
-
-function installModule(lib, name, meta, cb){
-  var slot = moduleSlot(name);
-  if (slot.state == 'installing' || slot.state == 'ready'){
-    slot.promise.then(function(ns){ if (cb) cb(ns); });
-    return;
-  }
-  slot.state = 'installing';
-  if (slot.timer){ clearTimeout(slot.timer); slot.timer = null; }
-  if (meta.css && !document.querySelector('style[data-module="'+name+'"]')){
-    var st = document.createElement('style');
-    st.setAttribute('data-module', name);
-    st.textContent = meta.css;
-    document.head.appendChild(st);
-  }
-  var js = meta.js || '';
-  var deps = [];
-  var names = [];
-  var specs = scanModuleImports(js);
-  for (var i = 0; i < specs.length; i++){
-    var sp = specs[i];
-    if (sp.indexOf('./') == 0 && sp.slice(-3) == '.js'){
-      var dep = sp.substring(sp.lastIndexOf('/') + 1).replace(/\.js$/, '');
-      if (dep != name && names.indexOf(dep) == -1){
-        names.push(dep);
-        deps.push(requireModule(dep, name));
-      }
-    }
-  }
-  Promise.all(deps).then(function(){
-    for (var i = 0; i < names.length; i++){
-      var url = NB_MODULES[names[i]].url;
-      js = js.split('"./' + names[i] + '.js"').join('"' + url + '"')
-             .split("'./" + names[i] + ".js'").join("'" + url + "'");
-    }
-    slot.url = URL.createObjectURL(new Blob([js], { type: 'text/javascript' }));
-    return import(slot.url);
-  }).then(function(ns){
-    slot.ns = ns;
-    slot.state = 'ready';
-    slot.resolve(ns);
-    if (cb) cb(ns);
-  }).catch(function(e){
-    slot.state = 'failed';
-    console.log("module '" + name + "' failed to install: " + (e && e.message ? e.message : e));
-    try { slot.reject(e); } catch (x) {}
-    if (cb) cb(null);
-  });
-}
-
-function moduleNameFor(lib, id, requested){
-  // prefer the NAME: the requested arg when it isn't the resolved id, else
-  // a reverse lookup through the controls-index cache
-  if (requested && requested != id) return requested;
-  var x = CTLCACHE[lib];
-  if (x && x.list){
-    var y = getByProperty(x.list, 'id', id);
-    if (y) return y.name;
-  }
-  return requested || id;
-}
 
 function installControl(el, lib, id, cb, data) {
-  var requested = id;
   var oldhtml = $(el).children();
   
   if (!data){
@@ -276,11 +185,6 @@ function installControl(el, lib, id, cb, data) {
 	  }
 
 	  function handlectlmeta(lib, id, result){
-	    if (result.data && result.data.module){
-	      // a MODULE CONTROL: headless — register, don't mount
-	      installModule(lib, moduleNameFor(lib, id, requested), result.data, cb);
-	      return;
-	    }
 	    $(el)[0].meta = result.data;
 		if (!$(el)[0].id) $(el)[0].id = guid();
 

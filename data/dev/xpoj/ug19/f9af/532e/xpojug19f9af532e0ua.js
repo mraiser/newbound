@@ -210,24 +210,15 @@ async function run() {
     return;
   }
 
-  const { store } = await requireModule("store", "session");
-  try {
-    await store.ensureConnected();
-  } catch (e) {
-    toast.show(e.message);
-    return;
-  }
-
   if (!isReadListed(target.cmd)) {
-    if (!store.writable()) {
-      toast.show(`"${target.cmd}" isn't read-listed — needs a writable connection`);
-      return;
-    }
     const confirmed = await askConfirm(target.cmd);
     if (!confirmed) return;
   }
 
-  const result = await store.invoke(target.lib, target.ctl, target.cmd, args);
+  const t0 = performance.now();
+  const envelope = await new Promise((res) =>
+    invokeCommand(target.lib, target.ctl, target.cmd, args, res));
+  const result = { envelope, ms: Math.round(performance.now() - t0) };
   const entryBase = { call: callText, args: JSON.stringify(args) };
   let entry;
   if (result instanceof Error) {

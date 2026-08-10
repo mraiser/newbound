@@ -6,10 +6,14 @@
 var me = this;
 var ME = document.getElementById(me.UUID);
 
-var readyP = (async () => {
-  const { store } = await requireModule("store", "frame");
-  const { hasWebGL } = await requireModule("webgl", "frame");
-  const { viewctx } = await requireModule("viewctx", "frame");
+var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
+  const { hasWebGL } = window.NB_WEBGL;
+  const { viewctx } = window.NB_VIEWCTX;
+  const jsonP = (c2, v2) => new Promise((res2) => json(c2, v2, res2));
+  const readRec = async (l2, id2) => {
+    const r2 = await jsonP("../app/read", "lib=" + encodeURIComponent(l2) + "&id=" + encodeURIComponent(id2));
+    return r2.status === "ok" ? r2.data : new Error(r2.msg || "read failed");
+  };
   // mount a child control and resolve with its api once it is ready —
   // installControl is the platform's own mounter; waitReady is the
   // convention converted controls expose when their setup is async
@@ -33,7 +37,6 @@ async function init(host) {
     ctl: host.querySelector(".seg-ctl"),
   };
   const connBtn = host.querySelector(".fr-conn");
-  const dialog = host.querySelector(".fr-connect");
 
   const toast = await mount("toast", host.querySelector(".fr-toast-slot"));
 
@@ -86,7 +89,6 @@ async function init(host) {
   let stageApi = null;
 
   async function route() {
-    if (!store.connected()) return;
     if (stageApi) { stageApi.dispose?.(); stageApi = null; }
     viewctx.unregister("flow");   // re-registered below when a flow mounts
     const [, screen, lib, ctlId] = location.hash.split("/");
@@ -132,7 +134,7 @@ async function init(host) {
       // stays exactly there; flow3d-design: 3D replaces 2D *editing*). Keeping
       // mock on 2D keeps the fixture demo light (no 684KB THREE load) and the
       // existing mock regression untouched.
-      const flowControl = (hasWebGL() && store.mode() !== "mock") ? "floweditor3d" : "floweditor";
+      const flowControl = hasWebGL() ? "floweditor3d" : "floweditor";
       // #/flow/sample — the bundled specimen; #/flow/<lib>/<ctl>/<cmd> when
       // real flow commands exist (none in this store yet).
       shelfApi = null;
@@ -163,11 +165,11 @@ async function init(host) {
       } else {
         // real flow command: cmd record -> flow body record -> .flow attachment
         const [, , , ctlIdF, cmdIdF] = location.hash.split("/");
-        const cmdRec = await store.control(lib, cmdIdF);
+        const cmdRec = await readRec(lib, cmdIdF);
         const bodyId = cmdRec instanceof Error ? null : cmdRec.flow;
-        const bodyRec = bodyId ? await store.control(lib, bodyId) : null;
+        const bodyRec = bodyId ? await readRec(lib, bodyId) : null;
         const raw = bodyRec && !(bodyRec instanceof Error) ? bodyRec.flow : null;
-        const ctlRecF = await store.control(lib, ctlIdF);
+        const ctlRecF = await readRec(lib, ctlIdF);
         const ctlName = ctlRecF instanceof Error ? "…" : ctlRecF.name;
         const cmdName = cmdRec instanceof Error ? "…" : cmdRec.name;
         setCrumb(lib, `${ctlName} ▸ ${cmdName}`);
@@ -221,118 +223,23 @@ async function init(host) {
 
   window.addEventListener("hashchange", route);
 
-  // ── connection ────────────────────────────────────────────
-  function setConnChip() {
-    const mode = store.mode();
-    const writableTag = store.writable() ? " · writable" : "";
-    connBtn.classList.toggle("ok", store.connected());
-    connBtn.querySelector(".conn-text").textContent = mode
-      ? (mode === "mock" ? "mock" : `live${writableTag}`)
-      : "not connected";
-    if (mode === "live") {
-      store.user().then((user) => {
-        if (user) {
-          connBtn.querySelector(".conn-text").textContent =
-            `live · ${user.id}${writableTag}`;
-        }
-      });
-    }
-  }
-
-  async function connect(cfg) {
-    const result = await store.connect(cfg);
-    if (result instanceof Error) return result;
-    setConnChip();
-    store.prefetchControls();
-    if (!location.hash.startsWith("#/")) location.hash = "#/shelf";
-    shelfApi = null;
-    await route();
-    toast.show(`connected — ${result.mode} · ${result.libCount} libraries`);
-    return result;
-  }
-
-  // connect dialog wiring
-  const modeBtns = [...dialog.querySelectorAll(".cn-mode")];
-  const liveFields = dialog.querySelector(".cn-live");
-  const urlInput = dialog.querySelector(".cn-url");
-  const sidInput = dialog.querySelector(".cn-sid");
-  const writableBtn = dialog.querySelector(".cn-writable");
-  const warnEl = dialog.querySelector(".cn-warn");
-  const errEl = dialog.querySelector(".cn-err");
-  let pickedMode = "mock";
-  let pickedWritable = false;
-
-  function setWritable(on) {
-    pickedWritable = on;
-    writableBtn.classList.toggle("on", on);
-    writableBtn.setAttribute("aria-pressed", String(on));
-    writableBtn.textContent = on
-      ? "saves ON — disposable instance only"
-      : "saves off — read-only connection";
-    warnEl.hidden = !on;
-  }
-  writableBtn.addEventListener("click", () => setWritable(!pickedWritable));
-
-  function pickMode(mode) {
-    pickedMode = mode;
-    for (const btn of modeBtns) {
-      btn.classList.toggle("on", btn.dataset.mode === mode);
-    }
-    liveFields.hidden = mode !== "live";
-  }
-  for (const btn of modeBtns) {
-    btn.addEventListener("click", () => pickMode(btn.dataset.mode));
-  }
-
-  connBtn.addEventListener("click", () => {
-    const saved = store.savedConfig();
-    pickMode(saved?.mode ?? "mock");
-    setWritable(Boolean(saved?.writable));
-    urlInput.value = saved?.baseUrl ?? "http://localhost:33181";
-    sidInput.value = saved?.sessionid ?? "";
-    errEl.hidden = true;
-    dialog.showModal();
-  });
-
-  dialog.querySelector(".cn-go").addEventListener("click", async () => {
-    const cfg = pickedMode === "mock"
-      ? { mode: "mock" }
-      : { mode: "live", baseUrl: urlInput.value.trim(),
-          sessionid: sidInput.value.trim(), writable: pickedWritable };
-    const result = await connect(cfg);
-    if (result instanceof Error) {
-      errEl.hidden = false;
-      errEl.textContent = result.message;
-    } else {
-      dialog.close();
+  // ── the identity chip (a readout — the platform serves this page) ──
+  jsonP("../security/current_user", null).then((r2) => {
+    if (r2.status === "ok" && r2.data) {
+      connBtn.querySelector(".conn-text").textContent = r2.data.id;
+      connBtn.classList.add("ok");
     }
   });
 
   // ── startup ───────────────────────────────────────────────
-  if (!store.connected()) {
-    // same-origin connect — a saved same-origin live config wins, so the
-    // "saves ON" toggle survives reloads; failure falls to the dialog below
-    try { await store.ensureConnected(); } catch (e) { /* the connect dialog remains */ }
-  }
-  if (store.connected()) {
-    setConnChip();
-    store.prefetchControls();
-    if (!location.hash.startsWith("#/")) location.hash = "#/shelf";
-    await route();
-  } else {
-    // static boot: saved config, else mock
-    const initial = await connect(store.savedConfig() ?? { mode: "mock" });
-    if (initial instanceof Error) {
-      toast.show(`connect failed (${initial.message}) — falling back to mock`);
-      await connect({ mode: "mock" });
-    }
-  }
+  if (!location.hash.startsWith("#/")) location.hash = "#/shelf";
+  await route();
 
   return {};
 }
 
   return init(ME, ME.DATA || {});
-})().catch(function (e) {
+}).catch(function (e) {
   console.log("frame failed to start: " + (e && e.message ? e.message : e));
   return null;
 });

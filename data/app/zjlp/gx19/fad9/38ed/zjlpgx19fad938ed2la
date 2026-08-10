@@ -1,1 +1,0 @@
-{"data":{"attachmentkeynames":["html","css","js"],"cmd":[],"desc":"MODULE and capability brick: mounts a bench-dialect control (default sceneplayer) inside any stock page via the bridge. api = waitReady/setState/stateOf/onstate/dispose. The peer app's viewer rides it.","id":"zjlpgx19fad938ed2la","name":"player","tags":"dest-app"},"time":1785937307738}

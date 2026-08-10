@@ -7,10 +7,21 @@
 // authoring default — terminals are editable in the op popover after creation,
 // and the registry (Primitive::list()) can replace this table when a live
 // catalog command exists. Every primitive emits on the single output `a`.
+//
+// LIBRARY control — headless: defines window.NB_FLOWPRIMS once (idempotent across
+// installs). Consumers list this control as a hidden data-control child
+// div and use the global from their ready.
+
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+me.ready = function () {
+  if (window.NB_FLOWPRIMS) return;
+  window.NB_FLOWPRIMS = (function () {
 
 const P = (family, name, ins) => ({ family, name, ins, outs: ["a"] });
 
-export const PRIMS = [
+const PRIMS = [
   // math (7) — all {a,b} → {a}
   ...["+", "-", "*", "/", "<", ">", "or"].map((n) => P("math", n, ["a", "b"])),
   // string (9)
@@ -82,8 +93,12 @@ export const PRIMS = [
   P("http", "http_websocket_write", ["stream_id", "msg"]),
 ];
 
-export const FAMILIES = [...new Set(PRIMS.map((p) => p.family))];
+const FAMILIES = [...new Set(PRIMS.map((p) => p.family))];
 
-export function signature(prim) {
+function signature(prim) {
   return `(${prim.ins.join(", ")}) → a`;
 }
+
+    return { PRIMS, FAMILIES, signature };
+  })();
+};

@@ -20,6 +20,17 @@
 //
 // The sim runs in the XZ plane (y stays whatever the item carries).
 // Units: world units and seconds; forces are accelerations (unit mass).
+//
+// LIBRARY control — headless: defines window.NB_FORCELAYOUT once (idempotent across
+// installs). Consumers list this control as a hidden data-control child
+// div and use the global from their ready.
+
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+me.ready = function () {
+  if (window.NB_FORCELAYOUT) return;
+  window.NB_FORCELAYOUT = (function () {
 
 const DEFAULTS = {
   repel: 4.0,        // pairwise repulsion strength (repel/d²)
@@ -42,7 +53,7 @@ const DEFAULTS = {
     time this step covers, in seconds (the host's push interval). Unplaced
     items get deterministic ring seeds (no randomness — resume safety and
     testability). */
-export function step(items, connections, dt = 0.1, opts = {}) {
+function step(items, connections, dt = 0.1, opts = {}) {
   const o = { ...DEFAULTS, ...opts };
   const n = items.length;
   const out = items.map((it, i) => {
@@ -127,8 +138,12 @@ export function step(items, connections, dt = 0.1, opts = {}) {
 
 /** Total kinetic energy — the settle detector (stop stepping under epsilon
     and let the constellation truly rest; wake on membership changes). */
-export function energy(items) {
+function energy(items) {
   let e = 0;
   for (const it of items) e += (it.vx ?? 0) ** 2 + (it.vz ?? 0) ** 2;
   return e;
 }
+
+    return { step, energy };
+  })();
+};

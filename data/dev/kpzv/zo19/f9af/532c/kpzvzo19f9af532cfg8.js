@@ -14,12 +14,31 @@ var pop = ME.querySelector(".j-pop");
 var results = [];
 var selected = 0;
 
+// Everything jump can search — libraries and controls — built once from
+// the platform's own reads (relative paths: tunnel-correct).
+var INDEX = null;
+async function searchIndex() {
+  if (INDEX) return INDEX;
+  const jsonP = (c2, v2) => new Promise((res2) => json(c2, v2, res2));
+  const libsR = await jsonP("../app/libs", null);
+  const libs = libsR.status === "ok" ? (libsR.data ?? []) : [];
+  const rows = libs.map((l2) => ({ kind: "lib", name: l2.id, lib: l2.id }));
+  await Promise.all(libs.map(async (l2) => {
+    const r2 = await jsonP("../app/read", "lib=" + encodeURIComponent(l2.id) + "&id=controls");
+    if (r2.status === "ok") {
+      for (const c2 of (r2.data.list ?? [])) {
+        rows.push({ kind: "ctl", name: c2.name, lib: l2.id, id: c2.id });
+      }
+    }
+  }));
+  INDEX = rows;
+  return rows;
+}
+
 async function search(query) {
   const q = query.trim().toLowerCase();
   if (!q) return close();
-  const { store } = await requireModule("store", "jump");
-  await store.ensureConnected();
-  const index = await store.searchIndex();
+  const index = await searchIndex();
   results = index
     .filter((row) => row.name.toLowerCase().includes(q))
     .sort((a, b) =>

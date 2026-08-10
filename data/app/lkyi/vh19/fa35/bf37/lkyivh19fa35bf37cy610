@@ -1,1 +1,1 @@
-{"data":{"attachmentkeynames":["js"],"cmd":[],"desc":"MODULE: the scene facet's document model — parse, byte-stable round-trip, mutations with precise inverses.","id":"lkyivh19fa35bf37cy610","module":true,"name":"scenedoc","tags":"dest-app"},"time":1785937307740}
+{"data":{"attachmentkeynames":["js","html"],"cmd":[],"desc":"MODULE: the scene facet's document model — parse, byte-stable round-trip, mutations with precise inverses.","id":"lkyivh19fa35bf37cy610","name":"scenedoc","tags":"dest-app"},"time":1786402684678}

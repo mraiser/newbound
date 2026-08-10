@@ -6,8 +6,19 @@
 // Spec fields: color "#rrggbb" · opacity (0–1, omit = opaque) · flat (bool,
 // flat-shaded) · emissive (bool, unlit — labels/glows). scenestage maps these
 // onto real materials; nothing else interprets them.
+//
+// LIBRARY control — headless: defines window.NB_SCENETOKENS once (idempotent across
+// installs). Consumers list this control as a hidden data-control child
+// div and use the global from their ready.
 
-export const TOKENS = {
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+me.ready = function () {
+  if (window.NB_SCENETOKENS) return;
+  window.NB_SCENETOKENS = (function () {
+
+const TOKENS = {
   light: {
     surface: { color: "#9aa1a9", flat: true },
     paper:   { color: "#e8e4dc", flat: true },
@@ -34,12 +45,12 @@ export const TOKENS = {
   },
 };
 
-export const TOKEN_NAMES = Object.keys(TOKENS.light);
+const TOKEN_NAMES = Object.keys(TOKENS.light);
 
 /** Resolve a node's material spec: token (theme-resolved) overlaid with any
     literal fields ({color, opacity} escape hatch — scene-facet-design §2.2).
     Unknown token → the `surface` spec (SD-4 warned at validate time). */
-export function resolveMaterial(material, theme = "light") {
+function resolveMaterial(material, theme = "light") {
   const table = TOKENS[theme] || TOKENS.light;
   const base = material && material.token
     ? (table[material.token] || table.surface)
@@ -51,3 +62,7 @@ export function resolveMaterial(material, theme = "light") {
   }
   return out;
 }
+
+    return { TOKENS, TOKEN_NAMES, resolveMaterial };
+  })();
+};

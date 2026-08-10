@@ -24,16 +24,42 @@
 var me = this;
 var ME = document.getElementById(me.UUID);
 
-var readyP = (async () => {
-  const { store } = await requireModule("store", "floweditor3d");
-  const { parse, propagationRounds, diffFlow } = await requireModule("flowdoc", "floweditor3d");
-  const { toScene, terminalWorld, GEO } = await requireModule("flowproject", "floweditor3d");
-  const { PRIMS, FAMILIES, signature } = await requireModule("flowprims", "floweditor3d");
-  const { tidy, untangle } = await requireModule("flowlayout", "floweditor3d");
-  const { hasWebGL } = await requireModule("webgl", "floweditor3d");
+var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
+  const { parse, propagationRounds, diffFlow } = window.NB_FLOWDOC;
+  const { toScene, terminalWorld, GEO } = window.NB_FLOWPROJECT;
+  const { PRIMS, FAMILIES, signature } = window.NB_FLOWPRIMS;
+  const { tidy, untangle } = window.NB_FLOWLAYOUT;
+  const { hasWebGL } = window.NB_WEBGL;
   // the vendored stage off its real asset URL — page-relative for tunneling
   const { mountScene } = await import("../app/asset/app/vendor/nb_three/scenestage.js");
-  try { await store.ensureConnected(); } catch (e) { /* reads surface it */ }
+  const jsonP = (c2, v2) => new Promise((res2) => json(c2, v2, res2));
+  const invokeP = (l2, c2, m2, a2) => new Promise((res2) => invokeCommand(l2, c2, m2, a2, res2));
+  const code = (m2, a2) => invokeP("dev", "code", m2, a2);
+  let AUTHOR = "dev";
+  jsonP("../security/current_user", null).then((r2) => {
+    if (r2.status === "ok" && r2.data) AUTHOR = r2.data.displayname || r2.data.id || "dev";
+  });
+  const readRec = async (l2, id2) => {
+    const r2 = await jsonP("../app/read", "lib=" + encodeURIComponent(l2) + "&id=" + encodeURIComponent(id2));
+    return r2.status === "ok" ? r2.data : new Error(r2.msg || "read failed");
+  };
+  const controlsOf = async (l2) => {
+    const d2 = await readRec(l2, "controls");
+    return d2 instanceof Error ? d2 : (d2.list ?? []);
+  };
+  const libsOf = async () => {
+    const r2 = await jsonP("../app/libs", null);
+    return r2.status === "ok" ? (r2.data ?? []) : new Error(r2.msg || "libs failed");
+  };
+  const readFlowBody = (l2, c2, m2) => code("read_flow_body", { lib: l2, ctl: c2, cmd: m2 });
+  const writeFlowBody = (l2, c2, m2, b2, { base = "", label = "" } = {}) =>
+    code("write_flow_body", { lib: l2, ctl: c2, cmd: m2, body: b2, base, label, author: AUTHOR });
+  const listPatches = (l2, c2, n2) => code("list_control_patches", { lib: l2, ctl: c2, limit: n2 ?? 0 });
+  const readCommand = async (l2, c2, m2) => {
+    const r2 = await code("read_command", { lib: l2, ctl: c2, cmd: m2 });
+    if (r2.status !== "ok") return r2;
+    return { status: "ok", ...(r2.data && typeof r2.data === "object" ? r2.data : {}) };
+  };
 
 const KIND_GLYPH = { primitive: "⚙", command: "▤", local: "▣", constant: "◇", match: "◇", persistent: "⛃", undefined: "▢" };
 const SNAP = 0.05;
@@ -708,18 +734,18 @@ function init(host, { title, graph, source, onBack }) {
       sel.replaceChildren(...rows.map((r) => { const o = document.createElement("option"); o.value = r.value; o.textContent = r.text; return o; }));
       if (value) sel.value = value;
     };
-    const libs = await store.libs();
+    const libs = await libsOf();
     if (libs instanceof Error) { setStatus("cannot list libraries", "bad"); closePicker(); return; }
     fill(libSel, libs.map((l) => ({ value: l.id, text: l.id })));
     let ctlRows = [];
     const loadCtls = async () => {
-      const ctls = await store.controls(libSel.value);
+      const ctls = await controlsOf(libSel.value);
       ctlRows = ctls instanceof Error ? [] : ctls;
       fill(ctlSel, ctlRows.map((cr) => ({ value: cr.id, text: cr.name })));
       await loadCmds();
     };
     const loadCmds = async () => {
-      const rec = ctlSel.value ? await store.control(libSel.value, ctlSel.value) : null;
+      const rec = ctlSel.value ? await readRec(libSel.value, ctlSel.value) : null;
       const cmds = rec && !(rec instanceof Error) ? (rec.cmd ?? []) : [];
       fill(cmdSel, cmds.map((cm) => ({ value: cm.id, text: cm.name })));
     };
@@ -734,11 +760,11 @@ function init(host, { title, graph, source, onBack }) {
       closePicker();
       // terminals from the callee's signature; outputs map by position, so
       // non-flow callees expose the single key `a` (design §1.3 / I-7).
-      const rc = await store.readCommand(lib, ctlName, cmdName);
+      const rc = await readCommand(lib, ctlName, cmdName);
       const ins = rc.status === "ok" && Array.isArray(rc.params) ? rc.params.map((p) => p.name) : [];
       let outs = ["a"];
       if (rc.status === "ok" && rc.type === "flow") {
-        const fb = await store.readFlowBody(lib, ctlName, cmdName);
+        const fb = await readFlowBody(lib, ctlName, cmdName);
         if (fb.status === "ok" && fb.exists && fb.body?.output) outs = Object.keys(fb.body.output);
       }
       const width = Math.max(1.75, cmdName.length * 0.12 + 0.8);
@@ -983,7 +1009,7 @@ function init(host, { title, graph, source, onBack }) {
     running = true;
     runBtn.disabled = true; runBtn.classList.add("running"); runBtn.textContent = "running…";
     const started = performance.now();
-    const resP = store.invokeCommand(source.lib, source.ctl, source.cmd, args);
+    const resP = invokeP(source.lib, source.ctl, source.cmd, args);
     // the schedule is local (design §3.5: deliveries in propagation order —
     // the platform returns only the result); animate while the call flies.
     if (stack.length === 1 && activeDeck === 0) {
@@ -1056,7 +1082,7 @@ function init(host, { title, graph, source, onBack }) {
   // ── the in-editor journal (facet "flow" on the control's _patches) ─────────
   async function refreshJournal() {
     if (!editable || !source) { journalBox.hidden = true; return; }
-    const r = await store.listPatches(source.lib, source.ctl, 30);
+    const r = await listPatches(source.lib, source.ctl, 30);
     if (r.status !== "ok") { journalBox.hidden = true; return; }
     const rows = (r.patches || []).filter((p) => p.facet === "flow" && p.cmd === source.cmd).slice(0, 12);
     journalBox.hidden = rows.length === 0;
@@ -1141,8 +1167,8 @@ function init(host, { title, graph, source, onBack }) {
     let body;
     try { body = typeof p.old === "string" ? JSON.parse(p.old) : p.old; }
     catch { setStatus("journal entry has no readable body", "bad"); return; }
-    const cur = await store.readFlowBody(source.lib, source.ctl, source.cmd);
-    const w = await store.writeFlowBody(source.lib, source.ctl, source.cmd, body,
+    const cur = await readFlowBody(source.lib, source.ctl, source.cmd);
+    const w = await writeFlowBody(source.lib, source.ctl, source.cmd, body,
       { base: cur.status === "ok" ? (cur.hash || "") : "", label: `revert: ${p.label || p.patch_id}` });
     if (w.status !== "ok") { setStatus(`revert failed: ${w.msg}`, "bad"); return; }
     doc = parse(body); baseHash = w.hash || "";
@@ -1173,7 +1199,7 @@ function init(host, { title, graph, source, onBack }) {
     if (!editable || !dirty || saving) return;
     saving = true; updateEditUi();
     const label = pendingLabels.slice(-8).join("; ") || "flow edit";
-    const r = await store.writeFlowBody(source.lib, source.ctl, source.cmd, doc.serialize(), { base: baseHash, label });
+    const r = await writeFlowBody(source.lib, source.ctl, source.cmd, doc.serialize(), { base: baseHash, label });
     saving = false;
     if (r.status === "ok") { baseHash = r.hash || baseHash; dirty = false; pendingLabels = []; setStatus(`saved · ${r.patch_id || "ok"}`, "ok"); refreshJournal(); }
     else if (r.msg === "stale_base") { showConflict(); }
@@ -1185,7 +1211,7 @@ function init(host, { title, graph, source, onBack }) {
     conflictEl.hidden = false;
     conflictEl.querySelector(".fx-conflict-msg").textContent = "this flow changed on the server since you loaded it";
     conflictEl.querySelector(".fx-conflict-theirs").onclick = async () => {
-      const r = await store.readFlowBody(source.lib, source.ctl, source.cmd);
+      const r = await readFlowBody(source.lib, source.ctl, source.cmd);
       if (r.status === "ok" && r.exists) {
         doc = parse(r.body); baseHash = r.hash || "";
         stack = [{ label: "case 1", case: doc.root, path: "case" }]; activeDeck = 0;
@@ -1194,9 +1220,9 @@ function init(host, { title, graph, source, onBack }) {
       }
     };
     conflictEl.querySelector(".fx-conflict-mine").onclick = async () => {
-      const r = await store.readFlowBody(source.lib, source.ctl, source.cmd);
+      const r = await readFlowBody(source.lib, source.ctl, source.cmd);
       const base = r.status === "ok" ? (r.hash || "") : "";
-      const w = await store.writeFlowBody(source.lib, source.ctl, source.cmd, doc.serialize(), { base, label: (pendingLabels.slice(-8).join("; ") || "flow edit") + " (overwrite)" });
+      const w = await writeFlowBody(source.lib, source.ctl, source.cmd, doc.serialize(), { base, label: (pendingLabels.slice(-8).join("; ") || "flow edit") + " (overwrite)" });
       conflictEl.hidden = true;
       if (w.status === "ok") { baseHash = w.hash || baseHash; dirty = false; pendingLabels = []; setStatus("overwrote — mine saved", "ok"); refreshJournal(); }
       else setStatus(`overwrite failed: ${w.msg}`, "bad");
@@ -1514,9 +1540,8 @@ function init(host, { title, graph, source, onBack }) {
 
   // ── enable editing on a writable live connection with the flow-body API ─────
   async function enableEditing() {
-    if (!source || !store.writable()) return updateEditUi();
-    if (!(await store.flowApi())) return updateEditUi();
-    const r = await store.readFlowBody(source.lib, source.ctl, source.cmd);
+    if (!source) return updateEditUi();
+    const r = await readFlowBody(source.lib, source.ctl, source.cmd);
     if (r.status === "ok" && r.exists && r.body) {
       doc = parse(r.body); baseHash = r.hash || ""; editable = true;
       stack = [{ label: "case 1", case: doc.root, path: "case" }]; activeDeck = 0;
@@ -1537,7 +1562,7 @@ function init(host, { title, graph, source, onBack }) {
 function escape(s) { return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
 
   return init(ME, ME.DATA || {});
-})().catch(function (e) {
+}).catch(function (e) {
   console.log("floweditor3d failed to start: " + (e && e.message ? e.message : e));
   return null;
 });

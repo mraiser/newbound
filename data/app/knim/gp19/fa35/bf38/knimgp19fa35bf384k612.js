@@ -15,9 +15,20 @@
 // instanceSpec) or emits a ghost gizmo (`templates: "gizmo"`, the editor's
 // build view). instanceSpec() builds one instance's spec from the template
 // plus a per-instance override map (the runtime's evaluated `props`).
+//
+// LIBRARY control — headless: defines window.NB_SCENEPROJECT once (idempotent across
+// installs). Consumers list this control as a hidden data-control child
+// div and use the global from their ready.
 
-import { readProp, KINDS, MATERIAL_KINDS } from "./scenedoc.js";
-import { resolveMaterial } from "./scenetokens.js";
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+me.ready = function () {
+  if (window.NB_SCENEPROJECT) return;
+  // sibling libraries — child divs in this control's html, ready first
+  const { readProp, KINDS, MATERIAL_KINDS } = window.NB_SCENEDOC;
+  const { resolveMaterial } = window.NB_SCENETOKENS;
+  window.NB_SCENEPROJECT = (function () {
 
 const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
 
@@ -111,7 +122,7 @@ function mountSpec(m, opts) {
 /** Project one doc into stage specs.
     opts: { computed?: Map, theme?: "light"|"dark", prefix?: string,
             parent?: string|null, templates?: "skip"|"gizmo" } */
-export function project(doc, opts = {}) {
+function project(doc, opts = {}) {
   const o = {
     computed: opts.computed,
     theme: opts.theme || "light",
@@ -154,7 +165,7 @@ export function project(doc, opts = {}) {
     "<templateId>.<path>" → evaluated props value; the instance id is
     "<templateId>:<key>". Mount templates yield a mountpoint spec (the
     runtime hangs the child scene off it). */
-export function instanceSpec(doc, entry, type, instKey, overrides, opts = {}) {
+function instanceSpec(doc, entry, type, instKey, overrides, opts = {}) {
   const o = {
     computed: overrides,
     theme: opts.theme || "light",
@@ -167,7 +178,7 @@ export function instanceSpec(doc, entry, type, instKey, overrides, opts = {}) {
 
 /** Doc-level environment, defaults applied (design §2.8). Child-mounted docs'
     env is ignored — the root owns the environment. */
-export function envOf(doc) {
+function envOf(doc) {
   const env = doc.env();
   return {
     lights: env.lights === "none" ? "none" : "default",
@@ -181,7 +192,7 @@ export function envOf(doc) {
     whole material; kind params re-emit the params/text block. Returns
     {path, value} for stage.applyDelta, or null when the whole entry needs
     re-projection. */
-export function deltaFor(doc, id, path, computed, theme) {
+function deltaFor(doc, id, path, computed, theme) {
   const hit = doc.byId(id);
   if (!hit) return null;
   const kind = hit.type === "node" ? hit.entry.kind : "mountpoint";
@@ -217,3 +228,7 @@ export function deltaFor(doc, id, path, computed, theme) {
   }
   return null;
 }
+
+    return { project, instanceSpec, envOf, deltaFor };
+  })();
+};

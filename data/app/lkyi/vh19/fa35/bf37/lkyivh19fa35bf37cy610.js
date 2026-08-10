@@ -9,11 +9,22 @@
 // serializes back byte-identical, unknown keys and key order included (SD-10,
 // design acceptance 3). Mutations restore prior absence exactly (created
 // containers are deleted again on undo).
+//
+// LIBRARY control — headless: defines window.NB_SCENEDOC once (idempotent across
+// installs). Consumers list this control as a hidden data-control child
+// div and use the global from their ready.
 
-import { parse as parseExpr } from "./sceneexpr.js";
-import { TOKEN_NAMES } from "./scenetokens.js";
+var me = this;
+var ME = document.getElementById(me.UUID);
 
-export const DIAG = {
+me.ready = function () {
+  if (window.NB_SCENEDOC) return;
+  // sibling libraries — child divs in this control's html, ready first
+  const { parse: parseExpr } = window.NB_SCENEEXPR;
+  const { TOKEN_NAMES } = window.NB_SCENETOKENS;
+  window.NB_SCENEDOC = (function () {
+
+const DIAG = {
   SD1: "SD-1",   // duplicate / malformed ids (nodes + mounts share one space)
   SD2: "SD-2",   // parent/at refs missing, or a node-parent cycle
   SD3: "SD-3",   // non-numeric transform / malformed value
@@ -28,16 +39,16 @@ export const DIAG = {
   SD12: "SD-12", // static link endpoints unresolvable
 };
 
-export const NAME_RE = /^[a-z][a-z0-9_]*$/;
-export const STATE_TYPES = ["number", "string", "boolean", "json"];
-export const NODE_EVENTS = ["tap", "dragstart", "dragmove", "dragend", "hoverin", "hoverout"];
-export const DRAG_LOCALS = ["x", "y", "z", "dx", "dy", "dz"];
+const NAME_RE = /^[a-z][a-z0-9_]*$/;
+const STATE_TYPES = ["number", "string", "boolean", "json"];
+const NODE_EVENTS = ["tap", "dragstart", "dragmove", "dragend", "hoverin", "hoverout"];
+const DRAG_LOCALS = ["x", "y", "z", "dx", "dy", "dz"];
 const AFFORDANCE_FOR = { tap: "tap", dragstart: "drag", dragmove: "drag",
   dragend: "drag", hoverin: "hover", hoverout: "hover" };
 
 /** Kind vocabulary (design §2.2): extra param paths + their defaults. The
     param paths are also the kind's extra bindable properties. */
-export const KINDS = {
+const KINDS = {
   group:    { params: {} },
   box:      { params: { "size.x": 1, "size.y": 1, "size.z": 1 } },
   sphere:   { params: { radius: 0.5 } },
@@ -52,18 +63,18 @@ export const KINDS = {
   // endpoints' positions each frame; its own transforms are ignored.
   link:     { params: {} },
 };
-export const MATERIAL_KINDS = new Set(["box", "sphere", "ico", "cylinder", "cone", "plane", "link"]);
-export const LIGHT_MODES = ["ambient", "directional", "point"];
+const MATERIAL_KINDS = new Set(["box", "sphere", "ico", "cylinder", "cone", "plane", "link"]);
+const LIGHT_MODES = ["ambient", "directional", "point"];
 
 const XFORM_BIND = ["pos.x", "pos.y", "pos.z", "rot.x", "rot.y", "rot.z",
   "scale.x", "scale.y", "scale.z"];
-export const MOUNT_BIND = [...XFORM_BIND, "visible"];
+const MOUNT_BIND = [...XFORM_BIND, "visible"];
 
 const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
 const isNum = (v) => typeof v === "number" && isFinite(v);
 
 /** Bindable property paths for a node of `kind` / for a mount. */
-export function bindablePaths(kind) {
+function bindablePaths(kind) {
   const out = [...XFORM_BIND, "visible"];
   if (MATERIAL_KINDS.has(kind)) out.push("material.opacity", "material.token");
   out.push(...Object.keys((KINDS[kind] || { params: {} }).params));
@@ -101,7 +112,7 @@ function propType(path, kind) {
 }
 
 /** "<id>.<prop.path>" → {id, path} (path may contain dots). */
-export function parseTarget(target) {
+function parseTarget(target) {
   if (typeof target !== "string") return null;
   const i = target.indexOf(".");
   if (i <= 0 || i === target.length - 1) return null;
@@ -109,13 +120,13 @@ export function parseTarget(target) {
 }
 
 /** "<id>.<event>" → {id, event}. */
-export const parseOn = parseTarget && ((on) => {
+const parseOn = parseTarget && ((on) => {
   const p = parseTarget(on);
   return p ? { id: p.id, event: p.path } : null;
 });
 
 /** Read a (possibly absent) dotted path off an entry, defaulted per kind. */
-export function readProp(entry, path, kind) {
+function readProp(entry, path, kind) {
   const parts = path.split(".");
   let cur = entry;
   for (const p of parts) {
@@ -156,7 +167,7 @@ function ensureArr(root, key) {
 
 const KNOWN_TOP = new Set(["v", "state", "nodes", "mounts", "bindings", "wires", "env"]);
 
-export class SceneDoc {
+class SceneDoc {
   constructor(root, parseDiags) {
     this.root = root;
     this._parseDiags = parseDiags || [];
@@ -814,7 +825,7 @@ export class SceneDoc {
 
 /** Parse a scene facet (object or string) into a SceneDoc. Never throws;
     a broken document arrives with diagnostics (design §2.9). */
-export function parse(input) {
+function parse(input) {
   let raw = input;
   if (typeof input === "string") {
     try { raw = JSON.parse(input); } catch (e) {
@@ -826,3 +837,7 @@ export function parse(input) {
   }
   return new SceneDoc(raw, []);
 }
+
+    return { DIAG, NAME_RE, STATE_TYPES, NODE_EVENTS, DRAG_LOCALS, KINDS, MATERIAL_KINDS, LIGHT_MODES, MOUNT_BIND, bindablePaths, parseTarget, parseOn, readProp, SceneDoc, parse };
+  })();
+};

@@ -14,8 +14,19 @@
 // This module is the read-only viewer's model (3D-1). Mutations-with-inverses
 // and the journaled save path are 3D-2 (gated on read_flow_body/
 // write_flow_body being [live] — CONTRACT §6).
+//
+// LIBRARY control — headless: defines window.NB_FLOWDOC once (idempotent across
+// installs). Consumers list this control as a hidden data-control child
+// div and use the global from their ready.
 
-export const DIAG = {
+var me = this;
+var ME = document.getElementById(me.UUID);
+
+me.ready = function () {
+  if (window.NB_FLOWDOC) return;
+  window.NB_FLOWDOC = (function () {
+
+const DIAG = {
   STRUCT: "struct",       // a from_data-required field was absent
   I1_UNWIRED: "I-1",      // input terminal without exactly one incoming wire
   I2_CYCLE: "I-2",        // a wire cycle (the propagation loop would hang)
@@ -179,7 +190,7 @@ function walkCases(root, cb) {
   visit(root, "case", !!root.nextcase);
 }
 
-export class FlowDoc {
+class FlowDoc {
   constructor(root, structDiags) {
     this.root = root;
     this._struct = structDiags;
@@ -610,7 +621,7 @@ function wireLabel(c, w) {
     WIRED input has been delivered (ops with none evaluate up front). Wires
     that can never fire (broken flows — I-1/I-2 states) are returned in
     `unreached` rather than animated; the real interpreter would hang on them. */
-export function propagationRounds(c) {
+function propagationRounds(c) {
   const N = c.cmds.length;
   // §1.5 step 3, exactly: a terminal is pre-marked done iff its NAME appears
   // as no connection's dest name — the match is GLOBAL and name-only (the
@@ -687,7 +698,7 @@ function emitCase(c) {
 
 /** Parse a Case JSON (object or string) into a FlowDoc. Strict on Part I
     requireds (diagnostics, never throws for a structurally-off document). */
-export function parse(input) {
+function parse(input) {
   let raw = input;
   if (typeof input === "string") {
     try { raw = JSON.parse(input); } catch (e) { raw = {}; return new FlowDoc(normCase({}, [], "case"), [{ code: DIAG.STRUCT, severity: "error", path: "case", message: `body is not valid JSON: ${e.message}` }]); }
@@ -796,7 +807,7 @@ function diffCase(A, B, deck, out) {
 /** Diff two flow bodies (objects or JSON strings) into a flat change list.
     Returns {changes:[{deck, kind, text}], counts:{added, removed, changed}}.
     `kind` is one of op+/op-/op~/wire+/wire-/sig/deck+/deck-. */
-export function diffFlow(oldBody, newBody) {
+function diffFlow(oldBody, newBody) {
   const A = parse(oldBody).root, B = parse(newBody).root;
   const chain = (c) => { const out = []; while (c) { out.push(c); c = c.nextcase; } return out; };
   const ca = chain(A), cb = chain(B);
@@ -814,3 +825,7 @@ export function diffFlow(oldBody, newBody) {
   }
   return { changes, counts };
 }
+
+    return { DIAG, FlowDoc, propagationRounds, parse, diffFlow };
+  })();
+};
