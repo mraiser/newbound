@@ -1,7 +1,1 @@
 .nb-bench-boot { height: 100vh; }
-.nb-bench-boot .nb-boot-msg,
-.nb-bench-boot .nb-boot-err {
-  font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
-  padding: 2rem;
-}
-.nb-bench-boot .nb-boot-err { color: #c15a5a; white-space: pre-wrap; }
