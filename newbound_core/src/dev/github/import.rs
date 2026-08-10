@@ -4,12 +4,8 @@ use flowlang::flowlang::system::system_call::system_call;
 use flowlang::flowlang::system::unique_session_id::unique_session_id;
 use std::path::Path;
 use std::os::unix::fs::symlink;
-use crate::dev::dev::rebuild_lib::rebuild_lib;
+use crate::dev::dev::activate_lib::activate_lib;
 use flowlang::appserver::load_library;
-use flowlang::buildrust::build_all;
-use flowlang::buildrust::rebuild_rust_api;
-use crate::dev::dev::compile::build_compile_command;
-use crate::dev::dev::compile::execute_compile_command;
 
 pub fn execute(o: DataObject) -> DataObject {
     use std::panic;
@@ -94,11 +90,9 @@ for datadirx in std::fs::read_dir(&datadirxx).unwrap() {
       
       load_library(&libid);
 
-      // An FFI library roots its own hot-reload crate. Link the repo's
-      // tracked crate dir (its Cargo.toml carries the feature wiring the
-      // builder's default lacks) and teach the initializer about the new
-      // crate - that regeneration is what the one restart activates.
-      let mut ffi_root = "".to_string();
+      // For an FFI library the repo may carry its tracked crate dir
+      // (reviewable src, manifest with the feature wiring) - link it
+      // before activation so the build uses it.
       let meta_path = repodir.join("data").join(libid.clone()).join("meta.json");
       if let Ok(s) = std::fs::read_to_string(&meta_path) {
         let meta = DataObject::from_string(&s);
@@ -111,31 +105,18 @@ for datadirx in std::fs::read_dir(&datadirxx).unwrap() {
             if cratesrc.exists() && !cratedst.exists() {
               let _x = symlink(cratesrc.canonicalize().unwrap(), cratedst);
             }
-            build_all();
-            rebuild_rust_api();
-            ffi_root = root;
           }
         }
       }
 
-      let _x = rebuild_lib(libid.to_owned());
-      println!("UPDATED LIBRARY {:?}", libid);      
-      
-      if ffi_root != "" {
-        // Build the crate dylib unconditionally: rebuild_lib skips the build
-        // when the repo's tracked generated src already matches the store,
-        // which on a fresh install means no artifact was ever built.
-        let ja = build_compile_command();
-        let (bad, err) = execute_compile_command(ja, ffi_root.to_owned());
-        if bad { return "ERROR: crate build failed: ".to_string()+&err; }
-
-        // Rebuild the host so the next start loads the new crate.
-        let ja = build_compile_command();
-        let (bad, err) = execute_compile_command(ja, ".".to_string());
-        if bad { return "ERROR: host rebuild failed: ".to_string()+&err; }
+      // Shared activation: rebuild for static libs, initializer + crate +
+      // host build for FFI libs (dev.dev.activate_lib).
+      let r = activate_lib(libid.to_owned());
+      println!("UPDATED LIBRARY {:?}", libid);
+      if r.starts_with("ERROR") { return r; }
+      if r.starts_with("RESTART") {
         return "OK: ".to_string()+&libid+" - restart Newbound once to activate the new hot-reload crate";
       }
-
       return "OK: ".to_string()+&libid;
     }
   }

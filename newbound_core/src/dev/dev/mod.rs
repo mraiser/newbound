@@ -1,5 +1,6 @@
 // This file is auto-generated and managed by the flowlang build script.
 use flowlang::rustcmd::Transform;
+pub mod activate_lib;
 pub mod rebuild_lib;
 pub mod lib_info;
 pub mod lib_archive;
@@ -15,4 +16,5 @@ pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
     cmds.push(("uykmrm183dbd15cdeu7b".to_string(), lib_archive::execute, "".to_string()));
     cmds.push(("knwozu1840a764abcu135".to_string(), lib_info::execute, "".to_string()));
     cmds.push(("yypums1847731c7fap5".to_string(), rebuild_lib::execute, "".to_string()));
+    cmds.push(("lrgoyo19fe9049accu1".to_string(), activate_lib::execute, "".to_string()));
 }
