@@ -1,0 +1,17 @@
+[package]
+name = "cmd"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+flowlang = { version="0.3.31" }
+ndata = "0.3.17"
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+
+[features]
+reload = []
+default = []
