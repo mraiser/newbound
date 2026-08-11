@@ -661,10 +661,16 @@ async function init(host, { lib, ctlId, toast }) {
     const data = mi?.status === "ok" && mi.exists ? mi : null;
     edit.hidden = !writable || !data;
     if (data) {
-      view.classList.remove("warn");
-      view.textContent = `publishing as ${data.displayname ?? "?"}` +
-        (data.organization ? ` · ${data.organization}` : "");
-      form.hidden = true;
+      // dev.code.init auto-seeds a fresh instance with the platform default
+      // identity, so the missing-record warning below can no longer nudge the
+      // owner to personalize — nudge on the untouched default instead.
+      const isDefault = data.displayname === "Some Dev" && !data.organization;
+      view.classList.toggle("warn", isDefault);
+      view.textContent = isDefault
+        ? 'publishing as "Some Dev" — the default identity; set yours before publishing:'
+        : `publishing as ${data.displayname ?? "?"}` +
+          (data.organization ? ` · ${data.organization}` : "");
+      form.hidden = isDefault ? !writable : true;
     } else {
       view.classList.add("warn");
       view.textContent =
