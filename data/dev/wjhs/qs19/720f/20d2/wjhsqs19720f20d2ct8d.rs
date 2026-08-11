@@ -24,6 +24,16 @@ let library_root_input = if data.has("library_root") { // This is the "library_r
     eprintln!("WARN: Input 'library_root' is present but not a string for id '{}'. Defaulting.", library_id);
     String::default()
   }
+} else if data.has("root") {
+  // get_library_config returns this value under "root" - accept it back so a
+  // get -> edit -> save round-trip is lossless.
+  let prop = data.get_property("root");
+  if prop.is_string() {
+    data.get_string("root")
+  } else {
+    eprintln!("WARN: Input 'root' is present but not a string for id '{}'. Defaulting.", library_id);
+    String::default()
+  }
 } else {
   String::default()
 };
@@ -60,8 +70,12 @@ let mut meta_do = match fs::read_to_string(&meta_json_path) {
 };
 
 // 5. Modify meta_do:
-// Save the library root to the top-level "root" field
-meta_do.put_string("root", &library_root_input);
+// Save the library root to the top-level "root" field. An empty input never
+// clobbers a non-empty stored root: root drives activate_lib's build cwd, so
+// blanking it breaks activation ("Unable to execute system call cargo").
+if !library_root_input.is_empty() || !meta_do.has("root") {
+  meta_do.put_string("root", &library_root_input);
+}
 
 // Get or create the 'cargo' object within meta_do for other settings
 let mut cargo_do = if meta_do.has("cargo") {

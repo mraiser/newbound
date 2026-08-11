@@ -83,9 +83,20 @@ rebuild_rust_api();
 // place - idempotent, keyed on the missing feature name.
 let manifest = Path::new(&root).join("Cargo.toml");
 if let Ok(s) = std::fs::read_to_string(&manifest) {
+  let mut s = s;
+  let mut mended = false;
   if !s.contains("serde_support") {
-    let s = s.replace("[features]", "[features]\nserde_support = [\"serde\", \"serde_json\", \"flowlang/serde_support\", \"ndata/serde_support\"]\npython_runtime = [\"flowlang/python_runtime\"]\njavascript_runtime = [\"flowlang/javascript_runtime\"]");
-    let s = if s.contains("[workspace]") { s } else { s + "\n# Self-contained: not a member of the host checkout's cargo workspace\n[workspace]\n" };
+    s = s.replace("[features]", "[features]\nserde_support = [\"serde\", \"serde_json\", \"flowlang/serde_support\", \"ndata/serde_support\"]\npython_runtime = [\"flowlang/python_runtime\"]\njavascript_runtime = [\"flowlang/javascript_runtime\"]");
+    mended = true;
+  }
+  // The [workspace] opt-out is load-bearing on its own: a git-imported crate
+  // really lives at repositories/<lib>/<root>, which the workspace exclude
+  // (written by symlink name) never matches once cargo canonicalizes paths.
+  if !s.contains("[workspace]") {
+    s.push_str("\n# Self-contained: not a member of the host checkout's cargo workspace\n[workspace]\n");
+    mended = true;
+  }
+  if mended {
     let _x = std::fs::write(&manifest, &s);
   }
 }

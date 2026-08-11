@@ -54,6 +54,10 @@ pub fn execute(o: DataObject) -> DataObject {
 }
 
 pub fn import(url: String) -> String {
+// The bare `exec` path does not initialize globals, and load_library needs
+// them; init_globals is safe to rerun (same posture as dev.dev.install_lib).
+flowlang::appserver::init_globals();
+
 // FIXME - assumes Newbound folder is in working directory
 
 let repodirx = Path::new("repositories");

@@ -9,7 +9,7 @@ edition = "2021"
 
 [features]
 reload = ["dep:hot-lib-reloader"] # Add subcrates to reload here
-serde_support = ["serde","serde_json","flowlang/serde_support","ndata/serde_support","newbound_core/serde_support"]
+serde_support = ["serde","serde_json","flowlang/serde_support","ndata/serde_support","newbound_core/serde_support","cmd/serde_support"]
 webview = ["wry"]
 java_runtime = ["flowlang/java_runtime"]
 python_runtime = ["flowlang/python_runtime"]
