@@ -1,5 +1,6 @@
 // This file is auto-generated and managed by the flowlang build script.
 use flowlang::rustcmd::Transform;
+pub mod init;
 pub mod set_command_imports;
 pub mod set_groups;
 pub mod set_tags;
@@ -83,4 +84,5 @@ pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
     cmds.push(("vsxqpy19fb84a1ba4m1".to_string(), set_tags::execute, "".to_string()));
     cmds.push(("ywwgiq19fb84a4e57h3".to_string(), set_groups::execute, "".to_string()));
     cmds.push(("opoush19fbdfbfefbn1".to_string(), set_command_imports::execute, "".to_string()));
+    cmds.push(("ioyipx19feee23f1bq1".to_string(), init::execute, "".to_string()));
 }

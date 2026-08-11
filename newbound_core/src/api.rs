@@ -1101,6 +1101,11 @@ pub mod dev {
             ::flowlang::rustcmd::RustCmd::new("opoush19fbdfbfefbn1").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
+        pub fn init() -> DataObject {
+            let d = DataObject::new();
+            ::flowlang::rustcmd::RustCmd::new("ioyipx19feee23f1bq1").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
     }
     pub mod viewctx {
         use ::ndata::dataobject::DataObject;
@@ -1931,6 +1936,10 @@ impl old_dev_code {
     #[deprecated(note = "use api::dev::code::set_command_imports instead")]
     pub fn set_command_imports(&self, lib: String, ctl: String, cmd: String, imports: String) -> DataObject {
         self::dev::code::set_command_imports(lib, ctl, cmd, imports)
+    }
+    #[deprecated(note = "use api::dev::code::init instead")]
+    pub fn init(&self) -> DataObject {
+        self::dev::code::init()
     }
 }
 impl old_peer_peer {
