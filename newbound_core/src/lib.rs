@@ -4,7 +4,6 @@ pub mod peer;
 pub mod dev;
 pub mod security;
 pub mod app;
-pub mod flow;
 
 // Each flowlang library within this crate will be added as a module here.
 
