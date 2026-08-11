@@ -143,6 +143,62 @@ function getjsapi(lib, id, cb){
 }
     
 
+// ── THE PLUGIN PASS ─────────────────────────────────────────────────────────
+// The registry (runtime/dev/plugins.json, read once per page through
+// dev.plugins.list_plugins) names PLUGINS and the controls they TARGET.
+// After any control finishes activating, entries targeting it install —
+// into el.querySelector(selector), or into a hidden div appended to the
+// control when the entry has no selector (a headless payload riding the
+// target's lifecycle). Hosts carry no plugin knowledge; the mechanism
+// lives here, in the platform's one mounter. Plugins are controls, so
+// they get their own pass (grafts on grafts work); the nesting cap stops
+// a cyclic registry.
+var NB_PLUGINS = null;
+function pluginRegistry(cb){
+  if (NB_PLUGINS){
+	if (Array.isArray(NB_PLUGINS)) NB_PLUGINS.push(cb);
+	else cb(NB_PLUGINS);
+	return;
+  }
+  NB_PLUGINS = [cb];
+  invokeCommand('dev', 'plugins', 'list_plugins', {}, function(result){
+	var reg = (result && result.status == 'ok' && result.data) ? result.data : {};
+	var waiting = NB_PLUGINS;
+	NB_PLUGINS = reg;
+	for (var i = 0; i < waiting.length; i++) waiting[i](reg);
+  });
+}
+
+function installPlugins(el){
+  if (!el || !el.meta || !el.meta.name || !el.nblib) return;
+  var depth = 0;
+  var up = el;
+  while (up){
+	if (up.getAttribute && up.getAttribute('data-nb-plugin')) depth++;
+	up = up.parentElement;
+  }
+  if (depth > 4) return;
+  pluginRegistry(function(reg){
+	for (var key in reg){
+	  var p = reg[key];
+	  if (!p || p.target_lib != el.nblib || p.target_ctl != el.meta.name) continue;
+	  var slot;
+	  if (p.selector){
+		slot = $(el).find(p.selector)[0];
+		if (!slot || slot.getAttribute('data-nb-plugin')) continue;
+	  }
+	  else {
+		slot = document.createElement('div');
+		slot.hidden = true;
+		el.appendChild(slot);
+	  }
+	  slot.setAttribute('data-nb-plugin', key);
+	  installControl(slot, p.plugin_lib, p.plugin_ctl, null,
+		{ lib: el.nblib, name: el.meta.name, id: el.meta.id });
+	}
+  });
+}
+
 function installControl(el, lib, id, cb, data) {
   var oldhtml = $(el).children();
   
@@ -186,6 +242,7 @@ function installControl(el, lib, id, cb, data) {
 
 	  function handlectlmeta(lib, id, result){
 	    $(el)[0].meta = result.data;
+	    $(el)[0].nblib = lib;
 		if (!$(el)[0].id) $(el)[0].id = guid();
 
 		if (cb){
@@ -265,6 +322,7 @@ function activateControls(element, cb){
 	setTimeout(function(){
 	  if (cb) cb($(element)[0].api);
 	  if ($(element)[0].api && $(element)[0].api.ready) $(element)[0].api.ready(element);
+	  installPlugins($(element)[0]);
 	},0);
   }
     
