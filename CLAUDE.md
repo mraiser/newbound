@@ -18,6 +18,10 @@ an LLM-ready system prompt for writing code against it).
   (`lib-control-command`; every declared param required).
 - Mutating experiments run against a disposable copy of the checkout,
   never a live instance.
+- **This repo never references libraries outside `newbound_core`.** The
+  workspace `exclude` line naming overlay/FFI crates (`agent`, `kb`,
+  `scratch`, `hollis`, …) is builder-written local state — `newbound
+  rebuild` creates it when absent — and must never be committed.
 
 ## Layout
 

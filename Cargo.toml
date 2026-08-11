@@ -1,5 +1,4 @@
 [workspace]
-exclude = ["agent", "hollis", "kb", "scratch"]
 resolver = "2"
 
 [package]
