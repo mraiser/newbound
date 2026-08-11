@@ -291,13 +291,6 @@ pub mod app {
         }
 
     }
-    pub mod player {
-        use ::ndata::dataobject::DataObject;
-        use ::ndata::dataarray::DataArray;
-        use ::ndata::databytes::DataBytes;
-        use ::ndata::data::Data;
-
-    }
     pub mod sceneplayer {
         use ::ndata::dataobject::DataObject;
         use ::ndata::dataarray::DataArray;
@@ -347,20 +340,6 @@ pub mod app {
         use ::ndata::data::Data;
 
     }
-    pub mod store {
-        use ::ndata::dataobject::DataObject;
-        use ::ndata::dataarray::DataArray;
-        use ::ndata::databytes::DataBytes;
-        use ::ndata::data::Data;
-
-    }
-    pub mod nb {
-        use ::ndata::dataobject::DataObject;
-        use ::ndata::dataarray::DataArray;
-        use ::ndata::databytes::DataBytes;
-        use ::ndata::data::Data;
-
-    }
     pub mod tokens {
         use ::ndata::dataobject::DataObject;
         use ::ndata::dataarray::DataArray;
@@ -369,27 +348,6 @@ pub mod app {
 
     }
     pub mod webgl {
-        use ::ndata::dataobject::DataObject;
-        use ::ndata::dataarray::DataArray;
-        use ::ndata::databytes::DataBytes;
-        use ::ndata::data::Data;
-
-    }
-    pub mod loader {
-        use ::ndata::dataobject::DataObject;
-        use ::ndata::dataarray::DataArray;
-        use ::ndata::databytes::DataBytes;
-        use ::ndata::data::Data;
-
-    }
-    pub mod bridge {
-        use ::ndata::dataobject::DataObject;
-        use ::ndata::dataarray::DataArray;
-        use ::ndata::databytes::DataBytes;
-        use ::ndata::data::Data;
-
-    }
-    pub mod modules {
         use ::ndata::dataobject::DataObject;
         use ::ndata::dataarray::DataArray;
         use ::ndata::databytes::DataBytes;
@@ -762,13 +720,6 @@ pub mod dev {
         use ::ndata::data::Data;
 
     }
-    pub mod devmodules {
-        use ::ndata::dataobject::DataObject;
-        use ::ndata::dataarray::DataArray;
-        use ::ndata::databytes::DataBytes;
-        use ::ndata::data::Data;
-
-    }
     pub mod code {
         use ::ndata::dataobject::DataObject;
         use ::ndata::dataarray::DataArray;
@@ -837,12 +788,13 @@ pub mod dev {
             ::flowlang::rustcmd::RustCmd::new("krpzxz19ed5b4aed9v2cad").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn delete_command(lib: String, ctl: String, cmd: String, author: String) -> DataObject {
+        pub fn delete_command(lib: String, ctl: String, cmd: String, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("lib", &lib);
             d.put_string("ctl", &ctl);
             d.put_string("cmd", &cmd);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("xqjpyg19ed5c0337dy2cca").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
@@ -878,7 +830,7 @@ pub mod dev {
             ::flowlang::rustcmd::RustCmd::new("vwswvs19f95a61d29j3943").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn patch_control_facet(lib: String, ctl: String, facet: String, old_snippet: String, new_snippet: String, base: String, label: String, author: String) -> DataObject {
+        pub fn patch_control_facet(lib: String, ctl: String, facet: String, old_snippet: String, new_snippet: String, base: String, label: String, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("lib", &lib);
             d.put_string("ctl", &ctl);
@@ -888,6 +840,7 @@ pub mod dev {
             d.put_string("base", &base);
             d.put_string("label", &label);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("uyonls19f95a61d2cp3945").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
@@ -964,7 +917,7 @@ pub mod dev {
             ::flowlang::rustcmd::RustCmd::new("nprqom19f9925517fn789d").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn write_flow_body(lib: String, ctl: String, cmd: String, body: DataObject, base: String, label: String, author: String) -> DataObject {
+        pub fn write_flow_body(lib: String, ctl: String, cmd: String, body: DataObject, base: String, label: String, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("lib", &lib);
             d.put_string("ctl", &ctl);
@@ -973,10 +926,11 @@ pub mod dev {
             d.put_string("base", &base);
             d.put_string("label", &label);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("vksvyz19f99255185j789f").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn set_timer(lib: String, ctl: String, name: String, cmd: String, start: i64, startunit: String, interval: i64, intervalunit: String, repeat: bool, author: String) -> DataObject {
+        pub fn set_timer(lib: String, ctl: String, name: String, cmd: String, start: i64, startunit: String, interval: i64, intervalunit: String, repeat: bool, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("lib", &lib);
             d.put_string("ctl", &ctl);
@@ -988,19 +942,21 @@ pub mod dev {
             d.put_string("intervalunit", &intervalunit);
             d.put_boolean("repeat", repeat);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("kxtnil19f99e8b05bj9cfd").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn remove_timer(lib: String, ctl: String, name: String, author: String) -> DataObject {
+        pub fn remove_timer(lib: String, ctl: String, name: String, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("lib", &lib);
             d.put_string("ctl", &ctl);
             d.put_string("name", &name);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("ppjvhg19f99e8b05fv9cff").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn set_event_handler(lib: String, ctl: String, name: String, bot: String, event: String, cmd: String, author: String) -> DataObject {
+        pub fn set_event_handler(lib: String, ctl: String, name: String, bot: String, event: String, cmd: String, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("lib", &lib);
             d.put_string("ctl", &ctl);
@@ -1009,15 +965,17 @@ pub mod dev {
             d.put_string("event", &event);
             d.put_string("cmd", &cmd);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("slwolg19f99e8b060l9d01").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn remove_event_handler(lib: String, ctl: String, name: String, author: String) -> DataObject {
+        pub fn remove_event_handler(lib: String, ctl: String, name: String, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("lib", &lib);
             d.put_string("ctl", &ctl);
             d.put_string("name", &name);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("lyqmyx19f99e8b061q9d03").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
@@ -1028,7 +986,7 @@ pub mod dev {
             ::flowlang::rustcmd::RustCmd::new("vtynpg19fa345cd8eyb2ff").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn write_control_scene(lib: String, ctl: String, scene: DataObject, base: String, label: String, author: String) -> DataObject {
+        pub fn write_control_scene(lib: String, ctl: String, scene: DataObject, base: String, label: String, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("lib", &lib);
             d.put_string("ctl", &ctl);
@@ -1036,38 +994,43 @@ pub mod dev {
             d.put_string("base", &base);
             d.put_string("label", &label);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("ltwuws19fa345cd8erb301").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn delete_library(lib: String, author: String) -> DataObject {
+        pub fn delete_library(lib: String, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("lib", &lib);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("juhgqn19faf571a9az1").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn delete_control(lib: String, ctl: String, author: String) -> DataObject {
+        pub fn delete_control(lib: String, ctl: String, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("lib", &lib);
             d.put_string("ctl", &ctl);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("tjhhxj19faf577471h1").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn move_control(lib: String, ctl: String, to_lib: String, author: String) -> DataObject {
+        pub fn move_control(lib: String, ctl: String, to_lib: String, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("lib", &lib);
             d.put_string("ctl", &ctl);
             d.put_string("to_lib", &to_lib);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("pyjtgq19fb05aeb0cm1").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn set_meta_identity(displayname: String, organization: String, author: String) -> DataObject {
+        pub fn set_meta_identity(displayname: String, organization: String, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("displayname", &displayname);
             d.put_string("organization", &organization);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("pxilgw19fb08d4430k1").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
@@ -1076,24 +1039,17 @@ pub mod dev {
             ::flowlang::rustcmd::RustCmd::new("lgiozw19fb094fdfau1").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn unpublish_app(lib: String, app: String, remove_runtime: bool, author: String) -> DataObject {
+        pub fn unpublish_app(lib: String, app: String, remove_runtime: bool, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("lib", &lib);
             d.put_string("app", &app);
             d.put_boolean("remove_runtime", remove_runtime);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("ijyuys19fb09ff451g1").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn set_module_flag(lib: String, ctl: String, module: String) -> DataObject {
-            let mut d = DataObject::new();
-            d.put_string("lib", &lib);
-            d.put_string("ctl", &ctl);
-            d.put_string("module", &module);
-            ::flowlang::rustcmd::RustCmd::new("mmtgzg19fb2da96a9g1").execute(d).expect("Rust command execution failed").get_object("a")
-        }
-
-        pub fn set_plugin(name: String, target_lib: String, target_ctl: String, plugin_lib: String, plugin_ctl: String, selector: String, author: String) -> DataObject {
+        pub fn set_plugin(name: String, target_lib: String, target_ctl: String, plugin_lib: String, plugin_ctl: String, selector: String, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("name", &name);
             d.put_string("target_lib", &target_lib);
@@ -1102,33 +1058,37 @@ pub mod dev {
             d.put_string("plugin_ctl", &plugin_ctl);
             d.put_string("selector", &selector);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("owxtlg19fb3b6cfd6v1").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn remove_plugin(name: String, author: String) -> DataObject {
+        pub fn remove_plugin(name: String, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("name", &name);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("znpnwu19fb3b71711u3").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn set_tags(lib: String, ctl: String, cmd: String, tags: String, author: String) -> DataObject {
+        pub fn set_tags(lib: String, ctl: String, cmd: String, tags: String, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("lib", &lib);
             d.put_string("ctl", &ctl);
             d.put_string("cmd", &cmd);
             d.put_string("tags", &tags);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("vsxqpy19fb84a1ba4m1").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
-        pub fn set_groups(lib: String, ctl: String, cmd: String, groups: String, author: String) -> DataObject {
+        pub fn set_groups(lib: String, ctl: String, cmd: String, groups: String, author: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("lib", &lib);
             d.put_string("ctl", &ctl);
             d.put_string("cmd", &cmd);
             d.put_string("groups", &groups);
             d.put_string("author", &author);
+            d.put_string("nn_sessionid", &nn_sessionid);
             ::flowlang::rustcmd::RustCmd::new("ywwgiq19fb84a4e57h3").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
@@ -1392,7 +1352,6 @@ pub struct old_app_shape {}
 pub struct old_app_ui {}
 pub struct old_app_ui_reference {}
 pub struct old_app_util {}
-pub struct old_app_player {}
 pub struct old_app_sceneplayer {}
 pub struct old_app_sceneexpr {}
 pub struct old_app_scenetokens {}
@@ -1400,13 +1359,8 @@ pub struct old_app_scenedoc {}
 pub struct old_app_sceneproject {}
 pub struct old_app_scenerun {}
 pub struct old_app_forcelayout {}
-pub struct old_app_store {}
-pub struct old_app_nb {}
 pub struct old_app_tokens {}
 pub struct old_app_webgl {}
-pub struct old_app_loader {}
-pub struct old_app_bridge {}
-pub struct old_app_modules {}
 pub struct old_dev_dev {}
 pub struct old_dev_editcommand {}
 pub struct old_dev_editcontrol {}
@@ -1430,7 +1384,6 @@ pub struct old_dev_flowproject {}
 pub struct old_dev_flowprims {}
 pub struct old_dev_flowlayout {}
 pub struct old_dev_facets {}
-pub struct old_dev_devmodules {}
 pub struct old_dev_code {}
 pub struct old_dev_viewctx {}
 pub struct old_peer_headsup {}
@@ -1456,7 +1409,6 @@ pub struct old_app {
     pub ui: old_app_ui,
     pub ui_reference: old_app_ui_reference,
     pub util: old_app_util,
-    pub player: old_app_player,
     pub sceneplayer: old_app_sceneplayer,
     pub sceneexpr: old_app_sceneexpr,
     pub scenetokens: old_app_scenetokens,
@@ -1464,13 +1416,8 @@ pub struct old_app {
     pub sceneproject: old_app_sceneproject,
     pub scenerun: old_app_scenerun,
     pub forcelayout: old_app_forcelayout,
-    pub store: old_app_store,
-    pub nb: old_app_nb,
     pub tokens: old_app_tokens,
     pub webgl: old_app_webgl,
-    pub loader: old_app_loader,
-    pub bridge: old_app_bridge,
-    pub modules: old_app_modules,
 }
 pub struct old_dev {
     pub dev: old_dev_dev,
@@ -1496,7 +1443,6 @@ pub struct old_dev {
     pub flowprims: old_dev_flowprims,
     pub flowlayout: old_dev_flowlayout,
     pub facets: old_dev_facets,
-    pub devmodules: old_dev_devmodules,
     pub code: old_dev_code,
     pub viewctx: old_dev_viewctx,
 }
@@ -1536,7 +1482,6 @@ pub const fn new() -> api {
             ui: old_app_ui {},
             ui_reference: old_app_ui_reference {},
             util: old_app_util {},
-            player: old_app_player {},
             sceneplayer: old_app_sceneplayer {},
             sceneexpr: old_app_sceneexpr {},
             scenetokens: old_app_scenetokens {},
@@ -1544,13 +1489,8 @@ pub const fn new() -> api {
             sceneproject: old_app_sceneproject {},
             scenerun: old_app_scenerun {},
             forcelayout: old_app_forcelayout {},
-            store: old_app_store {},
-            nb: old_app_nb {},
             tokens: old_app_tokens {},
             webgl: old_app_webgl {},
-            loader: old_app_loader {},
-            bridge: old_app_bridge {},
-            modules: old_app_modules {},
         },
         dev: old_dev {
             dev: old_dev_dev {},
@@ -1576,7 +1516,6 @@ pub const fn new() -> api {
             flowprims: old_dev_flowprims {},
             flowlayout: old_dev_flowlayout {},
             facets: old_dev_facets {},
-            devmodules: old_dev_devmodules {},
             code: old_dev_code {},
             viewctx: old_dev_viewctx {},
         },
@@ -1862,8 +1801,8 @@ impl old_dev_code {
         self::dev::code::read_command(lib, ctl, cmd)
     }
     #[deprecated(note = "use api::dev::code::delete_command instead")]
-    pub fn delete_command(&self, lib: String, ctl: String, cmd: String, author: String) -> DataObject {
-        self::dev::code::delete_command(lib, ctl, cmd, author)
+    pub fn delete_command(&self, lib: String, ctl: String, cmd: String, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::delete_command(lib, ctl, cmd, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::search_commands instead")]
     pub fn search_commands(&self, lib: String, ctl: String, query: String) -> DataArray {
@@ -1882,8 +1821,8 @@ impl old_dev_code {
         self::dev::code::read_control_facet(lib, ctl, facet)
     }
     #[deprecated(note = "use api::dev::code::patch_control_facet instead")]
-    pub fn patch_control_facet(&self, lib: String, ctl: String, facet: String, old_snippet: String, new_snippet: String, base: String, label: String, author: String) -> DataObject {
-        self::dev::code::patch_control_facet(lib, ctl, facet, old_snippet, new_snippet, base, label, author)
+    pub fn patch_control_facet(&self, lib: String, ctl: String, facet: String, old_snippet: String, new_snippet: String, base: String, label: String, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::patch_control_facet(lib, ctl, facet, old_snippet, new_snippet, base, label, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::list_control_patches instead")]
     pub fn list_control_patches(&self, lib: String, ctl: String, limit: i64) -> DataObject {
@@ -1922,76 +1861,72 @@ impl old_dev_code {
         self::dev::code::read_flow_body(lib, ctl, cmd)
     }
     #[deprecated(note = "use api::dev::code::write_flow_body instead")]
-    pub fn write_flow_body(&self, lib: String, ctl: String, cmd: String, body: DataObject, base: String, label: String, author: String) -> DataObject {
-        self::dev::code::write_flow_body(lib, ctl, cmd, body, base, label, author)
+    pub fn write_flow_body(&self, lib: String, ctl: String, cmd: String, body: DataObject, base: String, label: String, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::write_flow_body(lib, ctl, cmd, body, base, label, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::set_timer instead")]
-    pub fn set_timer(&self, lib: String, ctl: String, name: String, cmd: String, start: i64, startunit: String, interval: i64, intervalunit: String, repeat: bool, author: String) -> DataObject {
-        self::dev::code::set_timer(lib, ctl, name, cmd, start, startunit, interval, intervalunit, repeat, author)
+    pub fn set_timer(&self, lib: String, ctl: String, name: String, cmd: String, start: i64, startunit: String, interval: i64, intervalunit: String, repeat: bool, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::set_timer(lib, ctl, name, cmd, start, startunit, interval, intervalunit, repeat, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::remove_timer instead")]
-    pub fn remove_timer(&self, lib: String, ctl: String, name: String, author: String) -> DataObject {
-        self::dev::code::remove_timer(lib, ctl, name, author)
+    pub fn remove_timer(&self, lib: String, ctl: String, name: String, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::remove_timer(lib, ctl, name, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::set_event_handler instead")]
-    pub fn set_event_handler(&self, lib: String, ctl: String, name: String, bot: String, event: String, cmd: String, author: String) -> DataObject {
-        self::dev::code::set_event_handler(lib, ctl, name, bot, event, cmd, author)
+    pub fn set_event_handler(&self, lib: String, ctl: String, name: String, bot: String, event: String, cmd: String, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::set_event_handler(lib, ctl, name, bot, event, cmd, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::remove_event_handler instead")]
-    pub fn remove_event_handler(&self, lib: String, ctl: String, name: String, author: String) -> DataObject {
-        self::dev::code::remove_event_handler(lib, ctl, name, author)
+    pub fn remove_event_handler(&self, lib: String, ctl: String, name: String, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::remove_event_handler(lib, ctl, name, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::read_control_scene instead")]
     pub fn read_control_scene(&self, lib: String, ctl: String) -> DataObject {
         self::dev::code::read_control_scene(lib, ctl)
     }
     #[deprecated(note = "use api::dev::code::write_control_scene instead")]
-    pub fn write_control_scene(&self, lib: String, ctl: String, scene: DataObject, base: String, label: String, author: String) -> DataObject {
-        self::dev::code::write_control_scene(lib, ctl, scene, base, label, author)
+    pub fn write_control_scene(&self, lib: String, ctl: String, scene: DataObject, base: String, label: String, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::write_control_scene(lib, ctl, scene, base, label, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::delete_library instead")]
-    pub fn delete_library(&self, lib: String, author: String) -> DataObject {
-        self::dev::code::delete_library(lib, author)
+    pub fn delete_library(&self, lib: String, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::delete_library(lib, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::delete_control instead")]
-    pub fn delete_control(&self, lib: String, ctl: String, author: String) -> DataObject {
-        self::dev::code::delete_control(lib, ctl, author)
+    pub fn delete_control(&self, lib: String, ctl: String, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::delete_control(lib, ctl, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::move_control instead")]
-    pub fn move_control(&self, lib: String, ctl: String, to_lib: String, author: String) -> DataObject {
-        self::dev::code::move_control(lib, ctl, to_lib, author)
+    pub fn move_control(&self, lib: String, ctl: String, to_lib: String, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::move_control(lib, ctl, to_lib, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::set_meta_identity instead")]
-    pub fn set_meta_identity(&self, displayname: String, organization: String, author: String) -> DataObject {
-        self::dev::code::set_meta_identity(displayname, organization, author)
+    pub fn set_meta_identity(&self, displayname: String, organization: String, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::set_meta_identity(displayname, organization, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::get_meta_identity instead")]
     pub fn get_meta_identity(&self) -> DataObject {
         self::dev::code::get_meta_identity()
     }
     #[deprecated(note = "use api::dev::code::unpublish_app instead")]
-    pub fn unpublish_app(&self, lib: String, app: String, remove_runtime: bool, author: String) -> DataObject {
-        self::dev::code::unpublish_app(lib, app, remove_runtime, author)
-    }
-    #[deprecated(note = "use api::dev::code::set_module_flag instead")]
-    pub fn set_module_flag(&self, lib: String, ctl: String, module: String) -> DataObject {
-        self::dev::code::set_module_flag(lib, ctl, module)
+    pub fn unpublish_app(&self, lib: String, app: String, remove_runtime: bool, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::unpublish_app(lib, app, remove_runtime, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::set_plugin instead")]
-    pub fn set_plugin(&self, name: String, target_lib: String, target_ctl: String, plugin_lib: String, plugin_ctl: String, selector: String, author: String) -> DataObject {
-        self::dev::code::set_plugin(name, target_lib, target_ctl, plugin_lib, plugin_ctl, selector, author)
+    pub fn set_plugin(&self, name: String, target_lib: String, target_ctl: String, plugin_lib: String, plugin_ctl: String, selector: String, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::set_plugin(name, target_lib, target_ctl, plugin_lib, plugin_ctl, selector, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::remove_plugin instead")]
-    pub fn remove_plugin(&self, name: String, author: String) -> DataObject {
-        self::dev::code::remove_plugin(name, author)
+    pub fn remove_plugin(&self, name: String, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::remove_plugin(name, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::set_tags instead")]
-    pub fn set_tags(&self, lib: String, ctl: String, cmd: String, tags: String, author: String) -> DataObject {
-        self::dev::code::set_tags(lib, ctl, cmd, tags, author)
+    pub fn set_tags(&self, lib: String, ctl: String, cmd: String, tags: String, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::set_tags(lib, ctl, cmd, tags, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::set_groups instead")]
-    pub fn set_groups(&self, lib: String, ctl: String, cmd: String, groups: String, author: String) -> DataObject {
-        self::dev::code::set_groups(lib, ctl, cmd, groups, author)
+    pub fn set_groups(&self, lib: String, ctl: String, cmd: String, groups: String, author: String, nn_sessionid: String) -> DataObject {
+        self::dev::code::set_groups(lib, ctl, cmd, groups, author, nn_sessionid)
     }
     #[deprecated(note = "use api::dev::code::set_command_imports instead")]
     pub fn set_command_imports(&self, lib: String, ctl: String, cmd: String, imports: String) -> DataObject {

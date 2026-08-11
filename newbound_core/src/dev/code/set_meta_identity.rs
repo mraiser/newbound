@@ -4,7 +4,7 @@ use ndata::dataobject::DataObject;
 use ndata::dataarray::DataArray;
 pub fn execute(o: DataObject) -> DataObject {
     use std::panic;
-    for p in ["displayname", "organization", "author"] {
+    for p in ["displayname", "organization", "author", "nn_sessionid"] {
         if !o.has(p) {
             let mut e = DataObject::new();
             e.put_string("status", "err");
@@ -18,7 +18,8 @@ pub fn execute(o: DataObject) -> DataObject {
         let arg_0: String = o.get_string("displayname");
         let arg_1: String = o.get_string("organization");
         let arg_2: String = o.get_string("author");
-        set_meta_identity(arg_0, arg_1, arg_2)
+        let arg_3: String = o.get_string("nn_sessionid");
+        set_meta_identity(arg_0, arg_1, arg_2, arg_3)
     }));
     match ax {
         Ok(ax) => {
@@ -50,7 +51,33 @@ pub fn execute(o: DataObject) -> DataObject {
     }
 }
 
-pub fn set_meta_identity(displayname: String, organization: String, author: String) -> DataObject {
+pub fn set_meta_identity(displayname: String, organization: String, author: String, nn_sessionid: String) -> DataObject {
+// An empty author defaults to the calling session's user — the platform
+// injects nn_sessionid into params on every web call (HTTP and websocket
+// alike); CLI/MCP callers that want a specific provenance name pass author.
+let author = {
+    let a = author.trim().to_string();
+    if !a.is_empty() { a } else {
+        let mut who = String::new();
+        if !nn_sessionid.is_empty() {
+            let system = flowlang::datastore::DataStore::globals().get_object("system");
+            if system.has("sessions") {
+                let sessions = system.get_object("sessions");
+                if sessions.has(&nn_sessionid) {
+                    let session = sessions.get_object(&nn_sessionid);
+                    if session.has("user") {
+                        who = session.get_object("user").try_get_string("displayname").unwrap_or_default();
+                    }
+                    if who.trim().is_empty() {
+                        who = session.try_get_string("username").unwrap_or_default();
+                    }
+                }
+            }
+        }
+        if who.trim().is_empty() { "anonymous".to_string() } else { who }
+    }
+};
+
 // Publishing signs libraries with the instance's meta identity — the
 // runtime/metaidentity record publishapp reads (and, on its known FIXME,
 // panics without). This setter creates or wholly replaces the record, so

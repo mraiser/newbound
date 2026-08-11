@@ -5,7 +5,7 @@ use ndata::dataarray::DataArray;
 
 pub fn execute(o: DataObject) -> DataObject {
     use std::panic;
-    for p in ["name", "author"] {
+    for p in ["name", "author", "nn_sessionid"] {
         if !o.has(p) {
             let mut e = DataObject::new();
             e.put_string("status", "err");
@@ -18,7 +18,8 @@ pub fn execute(o: DataObject) -> DataObject {
     let ax = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         let arg_0: String = o.get_string("name");
         let arg_1: String = o.get_string("author");
-        remove_plugin(arg_0, arg_1)
+        let arg_2: String = o.get_string("nn_sessionid");
+        remove_plugin(arg_0, arg_1, arg_2)
     }));
     match ax {
         Ok(ax) => {
@@ -50,7 +51,33 @@ pub fn execute(o: DataObject) -> DataObject {
     }
 }
 
-pub fn remove_plugin(name: String, author: String) -> DataObject {
+pub fn remove_plugin(name: String, author: String, nn_sessionid: String) -> DataObject {
+// An empty author defaults to the calling session's user — the platform
+// injects nn_sessionid into params on every web call (HTTP and websocket
+// alike); CLI/MCP callers that want a specific provenance name pass author.
+let author = {
+    let a = author.trim().to_string();
+    if !a.is_empty() { a } else {
+        let mut who = String::new();
+        if !nn_sessionid.is_empty() {
+            let system = flowlang::datastore::DataStore::globals().get_object("system");
+            if system.has("sessions") {
+                let sessions = system.get_object("sessions");
+                if sessions.has(&nn_sessionid) {
+                    let session = sessions.get_object(&nn_sessionid);
+                    if session.has("user") {
+                        who = session.get_object("user").try_get_string("displayname").unwrap_or_default();
+                    }
+                    if who.trim().is_empty() {
+                        who = session.try_get_string("username").unwrap_or_default();
+                    }
+                }
+            }
+        }
+        if who.trim().is_empty() { "anonymous".to_string() } else { who }
+    }
+};
+
 // The set_plugin pair's other half (the Q7 setter idiom): removes the named
 // registration entry from runtime/dev/plugins.json. Unjournaled runtime
 // state, like set_plugin — the canonical repo's git history is the record.

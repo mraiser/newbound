@@ -27,10 +27,6 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   const jsonP = (c2, v2) => new Promise((res2) => json(c2, v2, res2));
   const invokeP = (l2, c2, m2, a2) => new Promise((res2) => invokeCommand(l2, c2, m2, a2, res2));
   const code = (m2, a2) => invokeP("dev", "code", m2, a2);
-  let AUTHOR = "dev";
-  jsonP("../security/current_user", null).then((r2) => {
-    if (r2.status === "ok" && r2.data) AUTHOR = r2.data.displayname || r2.data.id || "dev";
-  });
   const readRec = async (l2, id2) => {
     const r2 = await jsonP("../app/read", "lib=" + encodeURIComponent(l2) + "&id=" + encodeURIComponent(id2));
     return r2.status === "ok" ? r2.data : new Error(r2.msg || "read failed");
@@ -45,7 +41,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   };
   const readControlScene = (l2, c2) => code("read_control_scene", { lib: l2, ctl: c2 });
   const writeControlScene = (l2, c2, sc2, { base = "", label = "" } = {}) =>
-    code("write_control_scene", { lib: l2, ctl: c2, scene: sc2, base, label, author: AUTHOR });
+    code("write_control_scene", { lib: l2, ctl: c2, scene: sc2, base, label, author: "" });
 
 const dark = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: dark)").matches;
 const reducedMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;

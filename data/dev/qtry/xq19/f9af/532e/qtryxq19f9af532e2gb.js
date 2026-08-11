@@ -17,10 +17,6 @@ var readyP = (async () => {
     return { envelope, ms: Math.round(performance.now() - t0) };
   };
   const code = (m2, a2) => invokeP("dev", "code", m2, a2);
-  let AUTHOR = "dev";
-  jsonP("../security/current_user", null).then((r2) => {
-    if (r2.status === "ok" && r2.data) AUTHOR = r2.data.displayname || r2.data.id || "dev";
-  });
   const readRec = async (l2, id2) => {
     const r2 = await jsonP("../app/read", "lib=" + encodeURIComponent(l2) + "&id=" + encodeURIComponent(id2));
     return r2.status === "ok" ? r2.data : new Error(r2.msg || "read failed");
@@ -34,14 +30,14 @@ var readyP = (async () => {
     return r2.status === "ok" ? (r2.data ?? []) : new Error(r2.msg || "libs failed");
   };
   const setLibraryMeta = (l2, d2, g2) => code("set_library_meta", { lib: l2, desc: d2, groups: g2 });
-  const setTags = (l2, c2, m2, t2) => code("set_tags", { lib: l2, ctl: c2, cmd: m2, tags: t2, author: AUTHOR });
-  const setGroups = (l2, c2, m2, g2) => code("set_groups", { lib: l2, ctl: c2, cmd: m2, groups: g2, author: AUTHOR });
+  const setTags = (l2, c2, m2, t2) => code("set_tags", { lib: l2, ctl: c2, cmd: m2, tags: t2, author: "" });
+  const setGroups = (l2, c2, m2, g2) => code("set_groups", { lib: l2, ctl: c2, cmd: m2, groups: g2, author: "" });
   const securityGroups = async () => {
     const r2 = await jsonP("../security/groups", null);
     return r2 && r2.status === "ok" && Array.isArray(r2.data) ? r2.data : [];
   };
-  const deleteLibrary = (l2) => code("delete_library", { lib: l2, author: AUTHOR });
-  const deleteControl = (l2, c2) => code("delete_control", { lib: l2, ctl: c2, author: AUTHOR });
+  const deleteLibrary = (l2) => code("delete_library", { lib: l2, author: "" });
+  const deleteControl = (l2, c2) => code("delete_control", { lib: l2, ctl: c2, author: "" });
   const addControl = (l2, c2) => code("add_control", { lib: l2, ctl: c2 });
   const addLibrary = (l2) => code("add_library", { lib: l2 });
   const listAssets = (l2) => code("list_assets", { lib: l2 });
@@ -50,8 +46,8 @@ var readyP = (async () => {
   const deleteAsset = (l2, n2) => code("delete_asset", { lib: l2, name: n2 });
   const setPlugin = (n2, e2) => code("set_plugin", { name: n2, target_lib: e2.target_lib,
     target_ctl: e2.target_ctl, plugin_lib: e2.plugin_lib, plugin_ctl: e2.plugin_ctl,
-    selector: e2.selector, author: AUTHOR });
-  const removePlugin = (n2) => code("remove_plugin", { name: n2, author: AUTHOR });
+    selector: e2.selector, author: "" });
+  const removePlugin = (n2) => code("remove_plugin", { name: n2, author: "" });
   const listPlugins = async () => {
     const got = await invoke("dev", "plugins", "list_plugins", {});
     if (got.envelope.status !== "ok") return new Error(got.envelope.msg ?? "list_plugins failed");

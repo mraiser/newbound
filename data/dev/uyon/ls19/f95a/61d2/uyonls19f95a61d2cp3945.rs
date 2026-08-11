@@ -1,3 +1,29 @@
+// An empty author defaults to the calling session's user — the platform
+// injects nn_sessionid into params on every web call (HTTP and websocket
+// alike); CLI/MCP callers that want a specific provenance name pass author.
+let author = {
+    let a = author.trim().to_string();
+    if !a.is_empty() { a } else {
+        let mut who = String::new();
+        if !nn_sessionid.is_empty() {
+            let system = flowlang::datastore::DataStore::globals().get_object("system");
+            if system.has("sessions") {
+                let sessions = system.get_object("sessions");
+                if sessions.has(&nn_sessionid) {
+                    let session = sessions.get_object(&nn_sessionid);
+                    if session.has("user") {
+                        who = session.get_object("user").try_get_string("displayname").unwrap_or_default();
+                    }
+                    if who.trim().is_empty() {
+                        who = session.try_get_string("username").unwrap_or_default();
+                    }
+                }
+            }
+        }
+        if who.trim().is_empty() { "anonymous".to_string() } else { who }
+    }
+};
+
 // Facet-agnostic (the owner's rule, 2026-08-10): a facet is any named
 // text on a control record. Only the record's STRUCTURAL keys are
 // refused - the platform enforces no vocabulary of facet names and no

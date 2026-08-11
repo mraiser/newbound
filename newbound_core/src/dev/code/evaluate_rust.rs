@@ -60,7 +60,7 @@ let cmd_name = format!("eval_{}", unique_session_id());
 // plus the generated source file and its mod.rs references (delete_command leaves
 // those behind, and stale broken files poison every subsequent build of this crate).
 fn cleanup_temp(lib: &str, ctl: &str, cmd_name: &str) {
-    let _ = delete_command(lib.to_string(), ctl.to_string(), cmd_name.to_string(), "admin".to_string());
+    let _ = delete_command(lib.to_string(), ctl.to_string(), cmd_name.to_string(), "admin".to_string(), "".to_string());
 
     // Scrub generated artifacts
     let root = flowlang::datastore::DataStore::new().get_lib_root(lib);

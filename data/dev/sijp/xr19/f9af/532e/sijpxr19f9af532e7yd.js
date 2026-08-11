@@ -23,10 +23,6 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     return { envelope, ms: Math.round(performance.now() - t0) };
   };
   const code = (m2, a2) => invokeP("dev", "code", m2, a2);
-  let AUTHOR = "dev";
-  jsonP("../security/current_user", null).then((r2) => {
-    if (r2.status === "ok" && r2.data) AUTHOR = r2.data.displayname || r2.data.id || "dev";
-  });
   const readRec = async (l2, id2) => {
     const r2 = await jsonP("../app/read", "lib=" + encodeURIComponent(l2) + "&id=" + encodeURIComponent(id2));
     return r2.status === "ok" ? r2.data : new Error(r2.msg || "read failed");
@@ -38,18 +34,18 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   const readFacet = (l2, c2, f2) => code("read_control_facet", { lib: l2, ctl: c2, facet: f2 });
   const patchFacet = (l2, c2, f2, { oldSnippet, newSnippet, base = "", label = "" }) =>
     code("patch_control_facet", { lib: l2, ctl: c2, facet: f2, old_snippet: oldSnippet,
-      new_snippet: newSnippet, base, label, author: AUTHOR });
+      new_snippet: newSnippet, base, label, author: "" });
   const listPatches = (l2, c2, n2) => code("list_control_patches", { lib: l2, ctl: c2, limit: n2 ?? 0 });
   const setControlMeta = (l2, c2, d2, g2) => code("set_control_meta", { lib: l2, ctl: c2, desc: d2, groups: g2 });
   const setCommandMeta = (l2, c2, m2, d2, g2) => code("set_command_meta", { lib: l2, ctl: c2, cmd: m2, desc: d2, groups: g2 });
-  const setTags = (l2, c2, m2, t2) => code("set_tags", { lib: l2, ctl: c2, cmd: m2, tags: t2, author: AUTHOR });
-  const setGroups = (l2, c2, m2, g2) => code("set_groups", { lib: l2, ctl: c2, cmd: m2, groups: g2, author: AUTHOR });
+  const setTags = (l2, c2, m2, t2) => code("set_tags", { lib: l2, ctl: c2, cmd: m2, tags: t2, author: "" });
+  const setGroups = (l2, c2, m2, g2) => code("set_groups", { lib: l2, ctl: c2, cmd: m2, groups: g2, author: "" });
   const securityGroups = async () => {
     const r2 = await jsonP("../security/groups", null);
     return r2 && r2.status === "ok" && Array.isArray(r2.data) ? r2.data : [];
   };
   const writeControlScene = (l2, c2, sc2, { base = "", label = "" } = {}) =>
-    code("write_control_scene", { lib: l2, ctl: c2, scene: sc2, base, label, author: AUTHOR });
+    code("write_control_scene", { lib: l2, ctl: c2, scene: sc2, base, label, author: "" });
   const readCommand = async (l2, c2, m2) => {
     const r2 = await code("read_command", { lib: l2, ctl: c2, cmd: m2 });
     if (r2.status !== "ok") return r2;
@@ -61,14 +57,14 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   const upsertCommand = (l2, c2, m2, { lang, returnType, params = [], imports = "", codeBody = "" }) =>
     code("upsert_command", { lib: l2, ctl: c2, cmd: m2, lang, return_type: returnType, params, imports, code_body: codeBody });
   const writeFlowBody = (l2, c2, m2, b2, { base = "", label = "" } = {}) =>
-    code("write_flow_body", { lib: l2, ctl: c2, cmd: m2, body: b2, base, label, author: AUTHOR });
-  const deleteCommand = (l2, c2, m2) => code("delete_command", { lib: l2, ctl: c2, cmd: m2, author: AUTHOR });
-  const setTimer = (l2, c2, t2) => code("set_timer", { lib: l2, ctl: c2, ...t2, author: AUTHOR });
-  const removeTimer = (l2, c2, n2) => code("remove_timer", { lib: l2, ctl: c2, name: n2, author: AUTHOR });
-  const setEventHandler = (l2, c2, e2) => code("set_event_handler", { lib: l2, ctl: c2, ...e2, author: AUTHOR });
-  const removeEventHandler = (l2, c2, n2) => code("remove_event_handler", { lib: l2, ctl: c2, name: n2, author: AUTHOR });
+    code("write_flow_body", { lib: l2, ctl: c2, cmd: m2, body: b2, base, label, author: "" });
+  const deleteCommand = (l2, c2, m2) => code("delete_command", { lib: l2, ctl: c2, cmd: m2, author: "" });
+  const setTimer = (l2, c2, t2) => code("set_timer", { lib: l2, ctl: c2, ...t2, author: "" });
+  const removeTimer = (l2, c2, n2) => code("remove_timer", { lib: l2, ctl: c2, name: n2, author: "" });
+  const setEventHandler = (l2, c2, e2) => code("set_event_handler", { lib: l2, ctl: c2, ...e2, author: "" });
+  const removeEventHandler = (l2, c2, n2) => code("remove_event_handler", { lib: l2, ctl: c2, name: n2, author: "" });
   const metaIdentity = () => code("get_meta_identity", {});
-  const setMetaIdentity = (d2, o2) => code("set_meta_identity", { displayname: d2, organization: o2, author: AUTHOR });
+  const setMetaIdentity = (d2, o2) => code("set_meta_identity", { displayname: d2, organization: o2, author: "" });
   // mount a child control and resolve with its api once it is ready —
   // installControl is the platform's own mounter; waitReady is the
   // convention converted controls expose when their setup is async

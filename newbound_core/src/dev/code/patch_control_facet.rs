@@ -5,7 +5,7 @@ use ndata::dataarray::DataArray;
 
 pub fn execute(o: DataObject) -> DataObject {
     use std::panic;
-    for p in ["lib", "ctl", "facet", "old_snippet", "new_snippet", "base", "label", "author"] {
+    for p in ["lib", "ctl", "facet", "old_snippet", "new_snippet", "base", "label", "author", "nn_sessionid"] {
         if !o.has(p) {
             let mut e = DataObject::new();
             e.put_string("status", "err");
@@ -24,7 +24,8 @@ pub fn execute(o: DataObject) -> DataObject {
         let arg_5: String = o.get_string("base");
         let arg_6: String = o.get_string("label");
         let arg_7: String = o.get_string("author");
-        patch_control_facet(arg_0, arg_1, arg_2, arg_3, arg_4, arg_5, arg_6, arg_7)
+        let arg_8: String = o.get_string("nn_sessionid");
+        patch_control_facet(arg_0, arg_1, arg_2, arg_3, arg_4, arg_5, arg_6, arg_7, arg_8)
     }));
     match ax {
         Ok(ax) => {
@@ -56,7 +57,33 @@ pub fn execute(o: DataObject) -> DataObject {
     }
 }
 
-pub fn patch_control_facet(lib: String, ctl: String, facet: String, old_snippet: String, new_snippet: String, base: String, label: String, author: String) -> DataObject {
+pub fn patch_control_facet(lib: String, ctl: String, facet: String, old_snippet: String, new_snippet: String, base: String, label: String, author: String, nn_sessionid: String) -> DataObject {
+// An empty author defaults to the calling session's user — the platform
+// injects nn_sessionid into params on every web call (HTTP and websocket
+// alike); CLI/MCP callers that want a specific provenance name pass author.
+let author = {
+    let a = author.trim().to_string();
+    if !a.is_empty() { a } else {
+        let mut who = String::new();
+        if !nn_sessionid.is_empty() {
+            let system = flowlang::datastore::DataStore::globals().get_object("system");
+            if system.has("sessions") {
+                let sessions = system.get_object("sessions");
+                if sessions.has(&nn_sessionid) {
+                    let session = sessions.get_object(&nn_sessionid);
+                    if session.has("user") {
+                        who = session.get_object("user").try_get_string("displayname").unwrap_or_default();
+                    }
+                    if who.trim().is_empty() {
+                        who = session.try_get_string("username").unwrap_or_default();
+                    }
+                }
+            }
+        }
+        if who.trim().is_empty() { "anonymous".to_string() } else { who }
+    }
+};
+
 // Facet-agnostic (the owner's rule, 2026-08-10): a facet is any named
 // text on a control record. Only the record's STRUCTURAL keys are
 // refused - the platform enforces no vocabulary of facet names and no

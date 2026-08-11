@@ -5,7 +5,6 @@ pub mod set_groups;
 pub mod set_tags;
 pub mod remove_plugin;
 pub mod set_plugin;
-pub mod set_module_flag;
 pub mod unpublish_app;
 pub mod get_meta_identity;
 pub mod set_meta_identity;
@@ -79,7 +78,6 @@ pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
     cmds.push(("pxilgw19fb08d4430k1".to_string(), set_meta_identity::execute, "".to_string()));
     cmds.push(("lgiozw19fb094fdfau1".to_string(), get_meta_identity::execute, "".to_string()));
     cmds.push(("ijyuys19fb09ff451g1".to_string(), unpublish_app::execute, "".to_string()));
-    cmds.push(("mmtgzg19fb2da96a9g1".to_string(), set_module_flag::execute, "".to_string()));
     cmds.push(("owxtlg19fb3b6cfd6v1".to_string(), set_plugin::execute, "".to_string()));
     cmds.push(("znpnwu19fb3b71711u3".to_string(), remove_plugin::execute, "".to_string()));
     cmds.push(("vsxqpy19fb84a1ba4m1".to_string(), set_tags::execute, "".to_string()));
