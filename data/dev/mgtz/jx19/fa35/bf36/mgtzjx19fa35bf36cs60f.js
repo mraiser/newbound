@@ -1,11 +1,9 @@
-// sceneeditor — the scene facet's pane in the workbench (scene-facet-design
-// Part V). Canvas (scenestage) + right rail (nodes/state/bind/wires/mounts),
-// BUILD mode (gestures + forms mutate the doc through scenedoc's inverse-
-// carrying mutations; composed undo) and PLAY mode (scenerun goes live
-// in-pane — safe because the facet contains no code). Saves are whole-object
-// writes through write_control_scene with the base hash; there is NO
-// fallback path, so without the pair (or on read-only connections) the pane
-// is view/play with the caption saying why.
+// sceneeditor — the scene facet's pane in the workbench. Canvas
+// (scenestage) + right rail (nodes/state/bind/wires/mounts), BUILD mode
+// (gestures + forms mutate the doc through scenedoc's inverse-carrying
+// mutations; composed undo) and PLAY mode (scenerun goes live in-pane —
+// safe because the facet contains no code). Saves are whole-object
+// writes through write_control_scene with the base hash.
 
 
 var me = this;
@@ -70,9 +68,7 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   }
 
   // ── the doc + the save gate ───────────────────────────────────────────────
-  const sceneApi = true;
-  const writable = true;
-  const canSave = sceneApi && writable;
+  const canSave = true;
   let hash = "";
   let doc, absent;
 
@@ -92,11 +88,7 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   await loadDoc();
   let baseline = JSON.stringify(doc.serialize());
 
-  capEl.textContent = absent && !canSave
-    ? "no scene facet — " + (writable ? "the write API here predates write_control_scene" : "read-only connection")
-    : canSave ? "" : (false
-      ? "mock mode — view & play only"
-      : writable ? "saves need write_control_scene (CONTRACT §6) on this instance" : "read-only — view & play");
+  capEl.textContent = "";
   saveBtn.hidden = labelIn.hidden = !canSave;
 
   // ── stage ─────────────────────────────────────────────────────────────────
@@ -244,8 +236,8 @@ async function init(host, { lib, name, record, toast, onSaved }) {
         if (rec instanceof Error || rec.scene === undefined) return null;
         return parseScene(rec.scene);
       },
-      // The run ▸ posture (design §3.5): command invocation only on a
-      // writable live connection — a disposable-instance activity.
+      // The run ▸ posture: scene-driven command invocation is a
+      // disposable-instance activity.
       invoke: true
         ? async (ilib, ictl, icmd, args) => {
             const r = await invokeP(ilib, ictl, icmd, args);

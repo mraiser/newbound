@@ -10,9 +10,9 @@
 // previews, run tokens (riding stage.linkCurvePoint — the 3D-5 lockstep
 // contract), undo/redo, and journaled saves through the flow-body pair.
 //
-// Editing engages only on a WRITABLE live connection whose write API
-// (dev.code) carries read_flow_body/write_flow_body; otherwise this is the viewer (mock,
-// the bundled specimen, and read-only live all stay read-only).
+// Editing engages once the flow body reads back from dev.code
+// (read_flow_body/write_flow_body); without a source command this is
+// the read-only viewer (the bundled specimen).
 //
 // The ONLY THREE.js touchpoint is nb_three's scenestage (ids + plain-JSON
 // specs); this file names no THREE type (grep-checkable, acceptance 5). The
@@ -358,7 +358,7 @@ function init(host, { title, graph, source, onBack }) {
   // The stage owns the pointer (affordance-declared planes, orbit otherwise)
   // and emits start/move/end with plane points + client coords; the editor
   // routes by the spec's meta role. Drag affordances only exist when the
-  // projection ran editable, so read-only connections orbit as before.
+  // projection ran editable, so the read-only viewer orbits as before.
   function routeDrag(e) {
     if (e.type === "start") { gesture = editable ? beginGesture(e) : null; return; }
     if (!gesture) return;
@@ -1534,7 +1534,7 @@ function init(host, { title, graph, source, onBack }) {
   });
   host.querySelector(".fx-back").addEventListener("click", () => { if (stack.length > 1) { stack.pop(); activeDeck = 0; render(); } else onBack?.(); });
 
-  // ── enable editing on a writable live connection with the flow-body API ─────
+  // ── enable editing once the flow body reads back ───────────────────
   async function enableEditing() {
     if (!source) return updateEditUi();
     const r = await readFlowBody(source.lib, source.ctl, source.cmd);

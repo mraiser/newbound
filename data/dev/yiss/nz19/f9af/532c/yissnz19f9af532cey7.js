@@ -94,12 +94,11 @@ async function init(host) {
     const [, screen, lib, ctlId] = location.hash.split("/");
 
     if (location.hash.startsWith("#/player/")) {
-      // #/player/<lib>/<ctl> — a scene facet running standalone (design
-      // Part X): the sceneplayer full-screen, chrome-free. Made for
-      // EMBEDDING — a non-bench app iframes the published bench at this
-      // route instead of carrying its own boot shim, and drives live
-      // state via postMessage {sceneSet: {field, value}} (the peer app's
-      // layout loop). The bench UI stays out of the way.
+      // #/player/<lib>/<ctl> — a scene facet running standalone: the
+      // sceneplayer full-screen, chrome-free. Made for EMBEDDING — another
+      // app iframes /dev/ at this route and drives live state via
+      // postMessage {sceneSet: {field, value}} (the peer app's layout
+      // loop). The IDE chrome stays out of the way.
       shelfApi = null;
       stage.replaceChildren();
       const slot = document.createElement("div");
@@ -128,12 +127,9 @@ async function init(host) {
     }
 
     if (location.hash.startsWith("#/flow")) {
-      // The 3D editor (floweditor3d) is the flow surface in live/platform mode
-      // when WebGL is available; the read-only 2D viewer (floweditor) is the
-      // no-WebGL / mock-mode / quick-glance fallback (DESIGN: the 2D viewer
-      // stays exactly there; flow3d-design: 3D replaces 2D *editing*). Keeping
-      // mock on 2D keeps the fixture demo light (no 684KB THREE load) and the
-      // existing mock regression untouched.
+      // The 3D editor (floweditor3d) is the flow surface when WebGL is
+      // available; the read-only 2D viewer (floweditor) is the no-WebGL
+      // fallback.
       const flowControl = hasWebGL() ? "floweditor3d" : "floweditor";
       // #/flow/sample — the bundled specimen; #/flow/<lib>/<ctl>/<cmd> when
       // real flow commands exist (none in this store yet).
@@ -188,9 +184,9 @@ async function init(host) {
         stageApi = await mount(flowControl, slot, {
           title: { prefix: `${lib} ▸ ${ctlName} ▸`, name: cmdName, suffix: "(flowlang)" },
           graph: typeof raw === "string" ? JSON.parse(raw) : raw,
-          // names (not ids) — the flow-body pair resolves ctl/cmd by name, like
-          // the rest of the write API. Editing engages when the connection is writable
-          // and the flow-body API is present (floweditor3d checks).
+          // names (not ids) — the flow-body pair resolves ctl/cmd by name,
+          // like the rest of dev.code. floweditor3d enables editing once it
+          // reads the body back.
           source: { lib, ctl: ctlName, cmd: cmdName },
           onBack: () => { location.hash = `#/bench/${lib}/${ctlIdF}`; },
         });

@@ -1,11 +1,9 @@
-// workbench — the bench screen. M4: when the CONTRACT §6 write API
-// (dev.code) is present, every save is a patch through patch_control_facet —
-// minimal exact-match snippet (whole-facet replace as the fallback shape),
-// base-hash concurrency, and the shared per-control journal rendered as the
-// timeline with inverse-patch revert. Absent ui facets are creatable (empty
-// old_snippet). Where the write API isn't built (or in mock mode) the M2
-// dev.save_control adapter and localStorage history remain as the fallback,
-// and the strip's caption says which door is in use.
+// workbench — one control's facets, editors, commands, wiring and preview.
+// Every save is a patch through dev.code.patch_control_facet — minimal
+// exact-match snippet (whole-facet replace as the fallback shape),
+// base-hash concurrency — and the shared per-control journal renders as
+// the timeline strip with inverse-patch revert. Absent ui facets are
+// creatable (empty old_snippet).
 
 
 var me = this;
@@ -105,8 +103,6 @@ async function init(host, { lib, ctlId, toast }) {
   }
   const name = record.name ?? entry?.name ?? "unnamed";
   const writable = true;
-  // journalMode: the CONTRACT §6 write API answers here (journal readable
-  // even on a read-only live connection). patchMode: saves go through it.
   const journalMode = true;
   const patchMode = writable && journalMode;
   const hashes = new Map();       // facet -> base hash from read_control_facet
@@ -176,16 +172,10 @@ async function init(host, { lib, ctlId, toast }) {
 
   const actions = document.createElement("div");
   actions.className = "wb-actions";
-  if (writable) {
-    actions.innerHTML = patchMode
-      ? `<input class="wb-label" placeholder="label this patch" title="short label for the journal entry (optional)">
-         <button class="wb-save" disabled>save ⌘s</button>`
-      : `<button class="wb-save" disabled>save ⌘s</button>`;
-    actions.querySelector(".wb-save").addEventListener("click", () => save());
-  } else {
-    actions.innerHTML = `<span class="wb-rostate">read-only — enable saves in the
-      connection dialog (point it at a disposable instance)</span>`;
-  }
+  actions.innerHTML =
+    `<input class="wb-label" placeholder="label this patch" title="short label for the journal entry (optional)">
+     <button class="wb-save" disabled>save ⌘s</button>`;
+  actions.querySelector(".wb-save").addEventListener("click", () => save());
   chipsEl.appendChild(actions);
   const labelInput = actions.querySelector(".wb-label");
 
@@ -259,9 +249,8 @@ async function init(host, { lib, ctlId, toast }) {
       await renderScene();
     } else if (!facetPresent(facet) && !(patchMode && UI_FACETS.has(facet))) {
       absentEl.hidden = false;
-      absentEl.textContent = UI_FACETS.has(facet)
-        ? `this control has no ${facet} facet — creating one needs the write API (CONTRACT §6)`
-        : `this control has no ${facet} facet — creating one is not wired up yet`;
+      absentEl.textContent =
+        `this control has no ${facet} facet — creating one is not wired up yet`;
     } else if (!facetPresent(facet) && patchMode && UI_FACETS.has(facet)) {
       // Facet absence is a normal state: open an empty editor; saving
       // creates the facet (empty old_snippet = create/replace).
@@ -293,7 +282,7 @@ async function init(host, { lib, ctlId, toast }) {
     return savePatch(facet, source, overwrite);
   }
 
-  // The patch path (CONTRACT §6): compute the minimal exact-match snippet
+  // The patch path: compute the minimal exact-match snippet
   // between the last-known server state and the editor; widen it until it is
   // unique, or fall back to a whole-facet replace. Returns null on no change.
   function computePatch(oldText, newText) {
@@ -766,12 +755,11 @@ async function init(host, { lib, ctlId, toast }) {
     toast.show(`publishapp → published · ${data.id ?? name}`);
   });
 
-  // ── timers/events (G-7, the P2 setters — CONTRACT §6) ─────
+  // ── timers/events (set_timer / set_event_handler) ─────────
   // The control record's timer/event arrays link component records by
   // {id, name}; details live in the components. Sets are replace-only by
-  // name and register LIVE (the dev editor's timeron/eventon — no restart),
-  // so a short-interval timer fires for real: editing stays behind
-  // patchMode, i.e. saves ON against a disposable instance.
+  // name and register LIVE (no restart) — a short-interval timer fires
+  // for real, so edit wiring on a disposable instance.
   const wiringEl = host.querySelector(".wb-wiring");
 
   function cmdNameById(id) {
@@ -873,15 +861,11 @@ async function init(host, { lib, ctlId, toast }) {
 
   function renderWiring() {
     const cap = wiringEl.querySelector(".ww-cap");
-    cap.innerHTML = patchMode
-      ? `The control's wiring: timers and event handlers run this control's
+    cap.innerHTML = `The control's wiring: timers and event handlers run this control's
          commands without a browser. Sets are <span class="hi">replace-only</span>
          by name and register <span class="hi">live immediately</span> — a
          short-interval timer fires for real on this instance. Changes are
-         journaled in the strip (facets <code>timer</code>/<code>event</code>).`
-      : `The control's wiring: timers and event handlers run this control's
-         commands without a browser. Editing needs the write API on a
-         live connection with saves ON (CONTRACT §6).`;
+         journaled in the strip (facets <code>timer</code>/<code>event</code>).`;
     for (const kind of ["timer", "event"]) {
       const rows = wiringEl.querySelector(kind === "timer" ? ".ww-timer-rows" : ".ww-event-rows");
       const entries = record[kind] ?? [];
@@ -991,7 +975,7 @@ async function init(host, { lib, ctlId, toast }) {
   }
 
   async function commandMeta(cmdEntry) {
-    // desc/tags/groups live on the command's implementation record (CONTRACT §6).
+    // desc/tags/groups live on the command's implementation record.
     const cmdRec = await readRec(lib, cmdEntry.id);
     if (cmdRec instanceof Error) return null;
     const lang = cmdRec.type ?? commandLang(cmdEntry);
@@ -1002,9 +986,9 @@ async function init(host, { lib, ctlId, toast }) {
     return { desc: impl.desc ?? "", tags: impl.tags ?? "", groups: impl.groups ?? "", implId };
   }
 
-  // ── command code pane (DESIGN §4.2.4: text-language commands open a
-  // code pane in place of the table) ────────────────────────
-  // read_command / patch_command_body ride the write API; the snippet is
+  // ── command code pane: text-language commands open a code
+  // pane in place of the table ──────────────────────────────
+  // read_command / patch_command_body; the snippet is
   // computed like facet saves. patch_command_body recompiles on success
   // and has no base hash — exact-match is the only concurrency guard, so
   // a server-side change surfaces as "snippet not found" with a re-read.
@@ -1036,8 +1020,7 @@ async function init(host, { lib, ctlId, toast }) {
     if (r.status !== "ok") {
       codeEl.querySelector(".wcc-sig").textContent = "";
       errEl.hidden = false;
-      errEl.textContent = `could not read this command's body: ${r.msg}` +
-        (journalMode ? "" : " — command bodies need the write API (live connection)");
+      errEl.textContent = `could not read this command's body: ${r.msg}`;
       return;
     }
     const ext = (r.type ?? lang) === "rust" ? "rs" : (r.type ?? lang);
@@ -1452,11 +1435,10 @@ async function init(host, { lib, ctlId, toast }) {
     });
   }
 
-  // ── preview: static (shadow root, html+css) or LIVE (R-2 gap bar) ─
+  // ── preview: static (shadow root, html+css) or LIVE ───────
   // Live = the platform's own /dev/preview.html in an iframe — a real
-  // stock mount, js on, the old dev UI's preview capability. Saves reload
-  // it (every save path ends in refreshPreview). Bench-dialect (ES module)
-  // controls don't run under the stock mount — static covers those.
+  // stock mount, js on. Saves reload it (every save path ends in
+  // refreshPreview).
   const previewSlot = host.querySelector(".wb-left");
   const PREVIEW_MODE_KEY = "bench.preview.mode";
 
@@ -1565,7 +1547,7 @@ async function init(host, { lib, ctlId, toast }) {
     };
     bar.append(
       mk("static", "static", "html+css in a shadow root — safe everywhere, with source picking"),
-      mk("live", "live ▸", "a real stock mount (js runs) via the platform's /dev/preview.html — needs a live connection"),
+      mk("live", "live ▸", "a real stock mount (js runs) via the platform's /dev/preview.html"),
     );
     const full = document.createElement("button");
     full.className = "wb-pv-full";

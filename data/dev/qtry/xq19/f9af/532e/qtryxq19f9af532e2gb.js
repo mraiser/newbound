@@ -151,7 +151,7 @@ async function init(host, { openLib, openControl, toast }) {
     host.querySelector(".fh-archive-btn").hidden = false;
   }
 
-  // ── library delete (delete_library, CONTRACT §6.1) ────────
+  // ── library delete (delete_library) ───────────────────────
   // rmdir semantics live on the platform side: the command refuses while
   // any control remains, so this button mostly RELAYS that refusal — the
   // deliberate path is delete each control, then the emptied library.
@@ -281,7 +281,7 @@ async function init(host, { openLib, openControl, toast }) {
     async function refresh() {
       const r = await listAssets(lib.id);
       if (r.status !== "ok") {
-        rowsEl.textContent = `assets need the write API on a live connection — ${r.msg}`;
+        rowsEl.textContent = `could not list assets — ${r.msg}`;
         rowsEl.className = "fa-rows fa-empty";
         return;
       }
@@ -414,9 +414,9 @@ async function init(host, { openLib, openControl, toast }) {
   }
 
   // ── rebuild (dev.dev.rebuild_lib — the old dev UI's build button) ─
-  // Regenerates + recompiles the library's commands from the store. The
-  // R-2 gap bar: store edits leave compiled code behind the records until
-  // a rebuild or restart, and the bench had no way to ask for one.
+  // Regenerates + recompiles the library's commands from the store —
+  // store edits leave compiled code behind the records until a rebuild
+  // or restart.
   function wireRebuild(lib) {
     const panel = host.querySelector(".fh-rebuild");
     host.querySelector(".fh-rebuild-btn").onclick = () => {
@@ -490,11 +490,9 @@ async function init(host, { openLib, openControl, toast }) {
     };
   }
 
-  // ── creating controls + libraries (DESIGN's ghost card) ───
-  // Same posture as every other bench-initiated write: a writable live
-  // connection with saves ON (patchApi), no typed confirm — creating an
-  // empty record is additive. add_control/add_library are pre-existing
-  // dev.code commands (the installer's own bootstrap path).
+  // ── creating controls + libraries (the ghost card) ────────
+  // No typed confirm — creating an empty record is additive.
+  // add_control/add_library are pre-existing dev.code commands.
   const NAME_RE = /^[a-z][a-z0-9_]*$/;
 
   function nameComplaint(name, kind) {
@@ -536,7 +534,7 @@ async function init(host, { openLib, openControl, toast }) {
       ? null : controls.find((c) => c.name === name);
     toast.show(`add_control → ${fanLib} ▸ ${name} — its facets are empty; type and save to create them`);
     if (made) {
-      openControl(fanLib, made.id);   // straight into the new control's bench
+      openControl(fanLib, made.id);   // straight into the new control's workbench
     } else {
       await showFan(fanLib);
     }
@@ -626,7 +624,7 @@ async function init(host, { openLib, openControl, toast }) {
     toast.show("github.import → " + (url.split("/").pop() || url));
   });
 
-  // ── plugin registrations (dev.plugins + the CONTRACT §6.7 setters) ──
+  // ── plugin registrations (dev.plugins + set_plugin/remove_plugin) ──
   // The per-instance plugins.json edited in place: when TARGET is on a
   // page, PLUGIN mounts at SELECTOR. Instance-level like git import, so
   // it lives on the shelf header; entries apply on the next reload.

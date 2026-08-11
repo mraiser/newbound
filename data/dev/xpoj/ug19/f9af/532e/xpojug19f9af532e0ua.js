@@ -1,7 +1,6 @@
 // session — the notebook drawer: every cell is a command call, outputs stay
-// put. Read-listed commands run directly; anything else needs a writable
-// connection AND a typed confirmation (DESIGN §5.6's inline pattern).
-// Non-modal (DESIGN §5.7): the screen behind stays interactive.
+// put. Read-listed commands run directly; anything else asks for a typed
+// confirmation first. Non-modal: the screen behind stays interactive.
 //
 // The notebook knows exactly two cell shapes of its own — command cells
 // and dividers. A plugin may write cells with a custom `kind` and register

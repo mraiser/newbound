@@ -1,6 +1,6 @@
 // jump — global search over libraries and controls. ⌘K focuses, arrows move,
-// Enter opens, Escape closes. Controls appear once their library's index is
-// loaded (connect prefetches all of them).
+// Enter opens, Escape closes. The index builds on first use from the
+// platform's own reads.
 //
 // DATA: {openLib, openControl}.
 
