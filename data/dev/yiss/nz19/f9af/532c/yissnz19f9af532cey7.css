@@ -11,17 +11,16 @@
   z-index: 40;
 }
 .nb-frame .fr-wordmark {
-  color: inherit;
+  color: var(--text-dim);
   text-decoration: none;
-  font-family: var(--disp);
-  font-size: 17px;
-  letter-spacing: 0.22em;
-  display: flex;
-  align-items: center;
-  gap: 9px;
+  font-size: 18px;
 }
 .nb-frame .fr-wordmark:hover { color: var(--accent); }
-.nb-frame .fr-wordmark .hex { color: var(--accent); font-size: 13px; }
+.nb-frame .fr-appname {
+  font-family: var(--disp);
+  font-size: 16px;
+  letter-spacing: 0.06em;
+}
 .nb-frame .fr-crumb {
   display: flex;
   align-items: center;
