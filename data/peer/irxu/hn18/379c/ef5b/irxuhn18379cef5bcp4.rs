@@ -919,12 +919,48 @@ pub fn handle_next_message(conn: &mut P2PConnection) -> bool {
         if decrypted_payload.len() < 14 + data_chunk_len { return false; }
         let data_chunk = &decrypted_payload[14 .. 14 + data_chunk_len];
 
-        let streamreaders_map_guard = STREAMREADERS.get().read();
-        if let Some(databytes_handle) = streamreaders_map_guard.get(&reader_downstream_id) {
-            if databytes_handle.is_write_open() {
-                databytes_handle.write(data_chunk);
+        let mut dead_reader = false;
+        {
+            let streamreaders_map_guard = STREAMREADERS.get().read();
+            if let Some(databytes_handle) = streamreaders_map_guard.get(&reader_downstream_id) {
+                // write() returns false once the local consumer has closed
+                // its side (the appserver does that when its client goes
+                // away) - report back so an open-ended stream stops sending
+                if !databytes_handle.is_write_open() || !databytes_handle.write(data_chunk) {
+                    dead_reader = true;
+                }
+            }
+            else {
+                dead_reader = true;
             }
         }
+        if dead_reader {
+            {
+                let mut streamreaders_map_guard = STREAMREADERS.get().lock();
+                streamreaders_map_guard.remove(&reader_downstream_id);
+            }
+            let mut message_bytes = "s_4 ".as_bytes().to_vec();
+            message_bytes.extend_from_slice(&reader_downstream_id.to_be_bytes());
+            let encrypted_message = encrypt(&conn.cipher, &message_bytes);
+            let len = encrypted_message.len() as i16;
+            let mut final_bytes_to_send = len.to_be_bytes().to_vec();
+            final_bytes_to_send.extend_from_slice(&encrypted_message);
+            let session_id_for_write = conn.sessionid.clone();
+            let _x = conn.stream.write(&final_bytes_to_send, session_id_for_write);
+        }
+
+    } else if method_str == "s_4 " {
+        if decrypted_payload.len() < 12 { return false; }
+        let reader_downstream_id = i64::from_be_bytes(decrypted_payload[4..12].try_into().unwrap());
+
+        // the remote consumer is gone: retire the matching writer so the
+        // next write_stream returns false and the sending pump stops
+        let mut streamwriters_map_guard = STREAMWRITERS.get().lock();
+        let mut dead_upstream: Option<i64> = None;
+        for (k, v) in streamwriters_map_guard.iter() {
+            if *v == reader_downstream_id { dead_upstream = Some(*k); break; }
+        }
+        if let Some(k) = dead_upstream { streamwriters_map_guard.remove(&k); }
 
     } else if method_str == "s_3 " {
         if decrypted_payload.len() < 12 { return false; }
