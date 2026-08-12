@@ -76,3 +76,8 @@ data/xoxo
 /agent
 /kb
 /scratch
+
+# The generated typed API (one per crate src/): builder-written and
+# overlay-aware - it absorbs whatever libraries the local checkout
+# carries, so it must never be tracked anywhere.
+**/src/api.rs
