@@ -36,7 +36,12 @@
   max-width: 90%;
   width:0px;
   background-color:#202020D0;
-  position:fixed;
+  /* absolute, not fixed: position:fixed creates a stacking context in
+     Blink, so any modal opened from a control hosted in the HUD (e.g.
+     the camera tile's settings) gets its z-index trapped below the
+     body-level popup backdrop and cannot be clicked. The peer page is
+     full-viewport and unscrolled - absolute anchors identically. */
+  position:absolute;
   top:0px;
   right:0px;
   height:100%;
