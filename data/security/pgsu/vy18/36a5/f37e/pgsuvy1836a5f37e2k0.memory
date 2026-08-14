@@ -1,0 +1,31 @@
+[
+  {
+    "claim": "Command exposure model (check_security): with security on, a command executes anonymously only if BOTH the library meta's readers and the command record's readers contain 'anonymous'; otherwise the session user's groups must intersect the command's readers, and the 'admin' group always passes. Empty readers on a command record therefore means admin-only — the right default for commands that shell out to sudo.",
+    "tags": "platform-api,security,readers,groups",
+    "source": {
+      "doc": "newbound_core/src/security/security/init.rs check_security, verified 2026-08-09"
+    },
+    "confidence": "high",
+    "time": 1786292476517
+  },
+  {
+    "claim": "check_security's group loop passes when the library readers contain 'anonymous' OR the caller's group, so library=anonymous plus per-command groups is the fine-grained convention; check_auth (app.read/write/delete and app.exec-by-id) has NO anonymous pass-through - the group must appear in BOTH the library readers and the record readers, so group-gating a control's records for non-admin readers also requires that group at the library level.",
+    "detail": "Verified live: /dev/lib_info gated to 'testers' executed for a testers user and denied anonymous/other; app.read of a testers-gated control in the anonymous-readers dev library denied the testers user (admin passed). Command::new reads readers from the command META record, not the impl record.",
+    "tags": "security,check_security,check_auth,enforcement",
+    "source": {
+      "doc": "authored+verified on a disposable, session 2026-08-09 (branch claude/dev-ui-security-integration-lnonp5)"
+    },
+    "confidence": "high",
+    "time": 1786309390471
+  },
+  {
+    "claim": "An uninstalled library fails closed and clearly: check_auth and check_security return false when system.libraries lacks the lib, and app.read/app.exec answer {status:err, msg:'NO SUCH LIBRARY: <lib>'} before auth - previously a read/exec against a missing lib (the agent add-on on a plain install) panicked in check_auth with ndata's cryptic \"Key 'agent' not found\".",
+    "detail": "Verified on a disposable with security=on: /app/read?lib=agent&id=controls and /app/exec?lib=agent answer the clean err envelope with zero panics in the log; anonymous read of dev/controls unaffected. Bench side: the dev.dev boot filters its [lib, app, agent] controls-index sweep through /app/libs first, and app.store's controls() checks the cached library list before any wire call, so store.invoke/agentLibCall against an absent agent answer 'library \"agent\" is not installed on this instance' without touching the server. Gotcha found en route: config.properties security expects the string 'on'/'off' - security=true parses as OFF (flowlang appserver.rs ~236/256).",
+    "tags": "security,check_auth,check_security,missing-library,agent-optional,bench,plugin",
+    "source": {
+      "doc": "authored+verified on a disposable, session 2026-08-10, branch claude/newbound-missing-library-fixes-bx9bs0 (newbound: security.security.init, app.app.read, app.app.exec, dev.dev js, app.store js)"
+    },
+    "confidence": "high",
+    "time": 1786365273284
+  }
+]

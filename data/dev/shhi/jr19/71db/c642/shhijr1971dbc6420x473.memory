@@ -1,0 +1,9 @@
+[
+  {
+    "claim": "flowb rewrites an FFI crate's Cargo.toml dependencies from the store meta.json cargo config at activation - local manifest edits are reverted; the durable dependency fix goes through dev-libsettings-save_library_config.",
+    "detail": "save_library_config expects 'library_root' as the input key while get_library_config returns the same value as 'root'; passing 'root' silently writes root:\"\" into meta.json, which then breaks activate_lib's crate build cwd (empty dir, 'Unable to execute system call cargo'). Round-trip of get -> save is NOT safe field-for-field.",
+    "tags": "libsettings,meta.json,cargo,flowb",
+    "confidence": "high",
+    "time": 1786479035346
+  }
+]

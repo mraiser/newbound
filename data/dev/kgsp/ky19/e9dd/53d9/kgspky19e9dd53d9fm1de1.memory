@@ -1,0 +1,78 @@
+[
+  {
+    "claim": "list_control_patches returns newest-FIRST — two probe harnesses have failed by reading the wrong end",
+    "tags": "dev.code,journal",
+    "source": {
+      "doc": "CONTRACT.md §6"
+    },
+    "confidence": "high",
+    "time": 1785504820517
+  },
+  {
+    "claim": "/app/read answers 500 for the runtime library (store-only, never app-loaded) — read runtime state through dedicated commands (get_meta_identity, dev.plugins.list_plugins)",
+    "tags": "runtime,dev.code",
+    "source": {
+      "doc": "CONTRACT.md §6.3"
+    },
+    "confidence": "high",
+    "time": 1785504820517
+  },
+  {
+    "claim": "groups is SECURITY groups; categorization lives in the tags field via set_tags — never write tags into groups",
+    "tags": "security,tags,dev.code",
+    "source": {
+      "doc": "CONTRACT.md §6.8"
+    },
+    "confidence": "high",
+    "time": 1785504820517
+  },
+  {
+    "claim": "New dev.code commands are upsert → cargo build → restart (no dylib). Agent-lib commands keep the dylib hot-swap, which can abort mid-request over HTTP — author those over MCP",
+    "tags": "dev.code,upsert_command,mcp",
+    "source": {
+      "doc": "CONTRACT.md §6.6"
+    },
+    "confidence": "high",
+    "time": 1785504820517
+  },
+  {
+    "claim": "dev.code.set_groups derives the ENFORCED readers arrays from the groups string at save time, at all three levels: library meta.json; control record plus its inline data records (app.read's gate); command META record (the array check_security reads via lookup_command_id) plus impl record. Empty groups derives [] = admin-only. Returns changed/groups/readers.",
+    "detail": "Restores the retired editcontrol/editcommand derivation (readers = groups.split(',')). Library-level readers refresh into system.libraries on restart. writers is never touched (only app.delete consults it).",
+    "tags": "security,set_groups,readers,dev.code",
+    "source": {
+      "doc": "authored+verified on a disposable, session 2026-08-09 (branch claude/dev-ui-security-integration-lnonp5)"
+    },
+    "confidence": "high",
+    "time": 1786309390464
+  },
+  {
+    "claim": "patch_command_body, set_command_imports, and upsert_command preserve existing readers/writers on the records they rewrite; before 2026-08-09 every code edit reset a gated command to admin-only, because flowlang's data::write::write stamps whatever arrays it is passed.",
+    "tags": "security,readers,dev.code,preservation",
+    "source": {
+      "doc": "authored+verified on a disposable, session 2026-08-09 (branch claude/dev-ui-security-integration-lnonp5)"
+    },
+    "confidence": "high",
+    "time": 1786309390468
+  },
+  {
+    "claim": "The 17 author-taking dev.code commands declare nn_sessionid (platform-injected on all web calls) and default an empty author to the session user; set_module_flag no longer exists.",
+    "detail": "Browser clients pass author:\"\" — journals record the real session displayname. CLI/MCP callers pass author explicitly (provenance names like \"claude\") AND nn_sessionid:\"\" — every declared param required. The builder does not garbage-collect deleted commands: prune the generated .rs and its mod.rs registration by hand after delete_command on a static lib. Clean generated-src commits come from a de-overlay + newbound rebuild + re-overlay cycle (the de-overlayed binary loses the agent commands until re-regenerated — rebuild again after re-overlaying before any archivist call); the regenerated initializer may drop the cmd-scaffold block when data/cmd is absent — restore it rather than committing that noise.",
+    "tags": "bench-collapse",
+    "confidence": "high",
+    "time": 1786406673052
+  },
+  {
+    "claim": "dev.code.set_timer fails under `newbound exec` (add_timer needs the `system` globals that only init_globals creates) - run it through `newbound mcp` instead.",
+    "detail": "The failure is late: the timer component record and the control's timer entry are already written when add_timer panics, and the _patches journal entry is skipped. Re-running the same set_timer over mcp replaces the record and journals normally (replace-only semantics heal the partial write). Observed 2026-08-11 wiring dev.code.init.",
+    "tags": "set_timer, exec, mcp, globals",
+    "confidence": "high",
+    "time": 1786419691108
+  },
+  {
+    "claim": "dev.code.init (boot timer, start 0, once) seeds runtime/metaidentity with the default identity \"Some Dev\" when the record is absent, so fresh clones publish without hand-seeding.",
+    "detail": "Same pattern as security.security.init: an init timer on the dev.code control. No-op when an identity exists; edit via the workbench publish pane or dev.code.set_meta_identity. Landed on branch claude/metaidentity-startup-init-euh44x (newbound 6018c09); the scratch-instance recipes no longer seed by hand. Timers only fire under `newbound` (run mode) - exec and mcp modes never start timer_loop.",
+    "tags": "metaidentity, publishapp, boot, dev.code",
+    "confidence": "high",
+    "time": 1786419738826
+  }
+]

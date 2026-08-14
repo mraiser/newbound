@@ -1,0 +1,16 @@
+[
+  {
+    "claim": "Vendored ES bundles live at /app/asset/<lib>/vendor/... — nb_codemirror/cm6.js under dev, nb_three (scenestage.js, three.module.js) under app — and stock controls import them with page-relative dynamic import('../app/asset/...').",
+    "detail": "A module loaded from its real URL resolves its own internal relative imports natively, so no rewriting machinery is needed; blob-URL modules were the only reason the loader rewrote specifiers. The nb.js/store client still fetches against location.origin (tunnel-blind) — a known follow-up now fixable in one place.",
+    "tags": "bench-collapse",
+    "confidence": "high",
+    "time": 1786401039423
+  },
+  {
+    "claim": "A github-imported FFI library whose crate manifest lacks a [workspace] opt-out fails activate_lib's crate build with 'current package believes it's in a workspace' - build_all writes the lib name into the host workspace exclude, but cargo canonicalizes the crate's real path to repositories/<lib>/<root>, which the exclude does not match.",
+    "detail": "activate_lib's manifest mend (which would append [workspace]) is keyed on the string 'serde_support' being absent; hollis's tracked manifest already contained it, so the mend was skipped. Fix candidates: exclude 'repositories' wholesale, or make the [workspace] append unconditional. agent/kb only dodge this because their symlinks resolve outside the checkout.",
+    "tags": "dev.github,activate_lib,workspace,ffi",
+    "confidence": "high",
+    "time": 1786479035116
+  }
+]

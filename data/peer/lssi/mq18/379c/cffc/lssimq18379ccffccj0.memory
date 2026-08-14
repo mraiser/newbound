@@ -1,0 +1,29 @@
+[
+  {
+    "claim": "COMMAND IDS ARE THE PEER-TO-PEER WIRE CONTRACT. The jsapi send_* wrappers resolve a command name to the CALLING instance's command id and ship the id to the remote (app.app.exec takes lib + id; the remote does Command::new(db, id) and panics 'Missing file data/...' when the id is absent). Signature compatibility is irrelevant if ids differ. Consequences: (1) NEVER delete_command + re-upsert a command that remote peers call - upsert_command alone already preserves BOTH the command record id and the rust source id for an existing name, so plain upsert is always the id-safe edit; delete-first is only for genuinely retiring a command; (2) dev.code.patch_command_body with an empty old_snippet is BROKEN - it ballooned a 1.8KB source record to 3.7MB of nested content (fold2, 2026-08-11) - use upsert_command for full-body rewrites; (3) save_command requires a live HTTP session (its app_read fails with Key 'data' not found over MCP). This id contract is what broke the owner's first v52 rollout against v51 peers, and retroactively explains the original v44-lineage 'incompatibility' too.",
+    "tags": "platform-api,p2p,exec,ids,wire,upsert,patch_command_body,bug",
+    "source": {
+      "doc": "live v51 peer panic log from the owner + app.app.exec source + fold2/fold3 verification, 2026-08-11"
+    },
+    "confidence": "high",
+    "time": 1786447774149
+  },
+  {
+    "claim": "The peer proxy cannot stream InputStream command results: peer.local (newbound_core) creates a peer stream (begin_stream/write_stream pump) ONLY for `file` responses - a bytes `body` (an InputStream return like camera live) is a process-local DataBytes ref that cannot cross the wire, so the viewer-side peer.remote finds neither stream_id nor usable body and returns its 404 sentinel. Symptom: remote live view falls back to JPEG polling instantly (File-returning commands - snapshot, last_keyframe, play - stream fine over peers, which is why everything else works in the HUD). Fix sketch (platform, owner blessing required per the boundary doctrine): a third branch in peer.local mirroring the file branch - when body is bytes, begin_stream and pump DataBytes.read into write_stream until close, carrying the mime type; peer.remote already join_streams. Found 2026-08-12 diagnosing the owner HUD report.",
+    "tags": "peer,streaming,inputstream,proxy,live,platform-gap",
+    "source": {
+      "doc": "newbound_core/src/peer/peer/local.rs + remote.rs read, owner HUD report, 2026-08-12"
+    },
+    "confidence": "high",
+    "time": 1786542476727
+  },
+  {
+    "claim": "InputStream-over-peers landed on newbound branch claude/peer-stream-bytes-bodies (2026-08-12, standalone off master, awaiting owner review): peer.peer.local gained a bytes-body branch (begin_stream + DataBytes pump, 16KB chunks, mime carried, 30s starvation cap) and peer.service.listen gained the s_4 close-back - s_2 detects a dead local reader (write false / entry gone) and answers s_4, whose handler retires the matching STREAMWRITERS entry so the senders write_stream fails and its pump stops ~1s after viewer disconnect. Wire-compatible with old peers in both directions. Two-instance lab verification: same-host peering works via discovery master/slave + setuser with keepalive (maintenance auto-connects; peer users must be in a group check_security accepts - production uses admin; a non-admin group 404s every proxied command instantly, which is also the diagnostic signature of an unauthorized peer). Remote status/file/live all green; live delivers ffprobe-clean fMP4 into an in-page Chromium fetch with correct avc1 codec parse. CRITICAL build gotcha: dev.code patches on a STATIC library regenerate src and build the rlib but do NOT relink the host binary - test runs silently exercise the old code until a cargo build relinks (~2s); check strings <binary> for a new literal before trusting a static-lib test.",
+    "tags": "peer,streaming,s4,close-back,inputstream,lab,static-lib-relink",
+    "source": {
+      "doc": "two-disposable peer lab, newbound claude/peer-stream-bytes-bodies, 2026-08-12"
+    },
+    "confidence": "high",
+    "time": 1786546269385
+  }
+]

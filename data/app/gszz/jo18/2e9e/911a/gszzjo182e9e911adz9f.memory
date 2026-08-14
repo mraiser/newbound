@@ -1,0 +1,19 @@
+[
+  {
+    "claim": "A File return streams only on the app-command route /<app>/<cmd>?k=v; /app/exec answers the file PATH as JSON",
+    "detail": "store.appCmdUrl builds such links; the archive panel's zip download depends on this.",
+    "tags": "app,archive,envelope",
+    "source": {
+      "doc": "CONTRACT.md §6.3"
+    },
+    "confidence": "high",
+    "time": 1785504820517
+  },
+  {
+    "claim": "app.store exports ensureConnected(): a single-flight same-origin connect (saved same-origin live config wins) that store-consuming controls call before store use.",
+    "detail": "Moved from app.loader's mount path during the bench collapse so controls carry no ambient boot-environment dependency. dev.jump (search), dev.session (run) and app.sceneplayer call it. Throws when the platform is unreachable.",
+    "tags": "bench-collapse",
+    "confidence": "high",
+    "time": 1786399738682
+  }
+]
