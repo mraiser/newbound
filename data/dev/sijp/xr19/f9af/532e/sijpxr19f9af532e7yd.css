@@ -365,6 +365,16 @@
   border-radius: 6px; padding: 4px 6px; resize: vertical;
   /* keep the resize grip clear of the page scrollbar */
   margin-right: 50px; }
+.nb-workbench .wcc-sig-row { display: flex; gap: 8px; align-items: center;
+  padding: 4px 0; }
+.nb-workbench .wcc-sig-row[hidden] { display: none; }
+.nb-workbench .wcc-params { flex: 1; font: 12px var(--mono);
+  background: var(--panel); color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 6px; }
+.nb-workbench .wcc-ret { font: 12px var(--mono);
+  background: var(--panel); color: var(--text); border: 1px solid var(--line);
+  /* the imports textarea's scrollbar clearance, so right edges align */
+  border-radius: 6px; padding: 4px 6px; margin-right: 50px; }
 .nb-workbench .wcc-err {
   font: 11px var(--mono);
   color: var(--danger);

@@ -115,6 +115,15 @@
             <span class="wcc-sig"></span>
             <button class="wcc-save" hidden disabled>save ⌘s</button>
           </div>
+          <div class="wcc-sig-row" hidden>
+            <span class="lbl">params</span>
+            <input class="wcc-params" spellcheck="false" aria-label="Parameters"
+              placeholder="a: String, n: Integer"
+              title="the command's parameters — a signature change saves through upsert_command (a whole-body write)">
+            <span class="lbl">returns</span>
+            <select class="wcc-ret" aria-label="Return type"
+              title="the command's return type — a signature change saves through upsert_command (a whole-body write)"></select>
+          </div>
           <label class="wcc-imports-row" hidden>
             <span class="lbl">imports</span>
             <textarea class="wcc-imports" rows="2" spellcheck="false"

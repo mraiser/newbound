@@ -1001,6 +1001,7 @@ async function init(host, { lib, ctlId, toast }) {
   const codeEl = host.querySelector(".wb-cmd-code");
   let codeApi = null;
   let codeState = null;   // {cmdName, ext, baseline, dirty}
+  const paramsText = (ps) => (ps ?? []).map((p) => `${p.name}: ${p.type}`).join(", ");
 
   function closeCommandPane() {
     codeEl.hidden = true;
@@ -1031,7 +1032,7 @@ async function init(host, { lib, ctlId, toast }) {
     }
     const ext = (r.type ?? lang) === "rust" ? "rs" : (r.type ?? lang);
     const source = typeof r[ext] === "string" ? r[ext] : "";
-    const sig = `(${(r.params ?? []).map((p) => `${p.name}: ${p.type}`).join(", ")}) → ${r.returntype ?? "?"}`;
+    const sig = `(${paramsText(r.params)}) → ${r.returntype ?? "?"}`;
     codeEl.querySelector(".wcc-sig").textContent = sig;
 
     if (!codeApi) {
@@ -1047,8 +1048,33 @@ async function init(host, { lib, ctlId, toast }) {
     codeEl.querySelector(".wcc-imports-row").hidden = false;
     impEl.value = r.import ?? "";
     impEl.readOnly = !patchMode;
+    // the signature is editable in patch mode: returntype/params live on
+    // the impl record and only upsert_command writes them, so the save
+    // routes there when they change. An off-list returntype (InputStream,
+    // …) keeps its own option — shown faithfully; upsert_command rejects
+    // it, so retyping such a command fails visibly, never silently.
+    const sigRow = codeEl.querySelector(".wcc-sig-row");
+    sigRow.hidden = !patchMode;
+    codeEl.querySelector(".wcc-sig").hidden = patchMode;
+    const retSel = codeEl.querySelector(".wcc-ret");
+    retSel.replaceChildren(...RETURN_TYPES.map((t) => {
+      const o2 = document.createElement("option");
+      o2.value = o2.textContent = t;
+      return o2;
+    }));
+    const rt = r.returntype ?? "";
+    if (rt && !RETURN_TYPES.includes(rt)) {
+      const o2 = document.createElement("option");
+      o2.value = o2.textContent = rt;
+      retSel.appendChild(o2);
+    }
+    retSel.value = rt || "String";
+    const parEl = codeEl.querySelector(".wcc-params");
+    parEl.value = paramsText(r.params);
+    parEl.readOnly = !patchMode;
     codeState = { cmdName: cmdEntry.name, ext, lang: r.type ?? lang,
                   params: r.params ?? [], returntype: r.returntype ?? "",
+                  retBaseline: retSel.value, paramsBaseline: parEl.value,
                   baseline: source, importsBaseline: r.import ?? "", dirty: false };
     const saveBtn = codeEl.querySelector(".wcc-save");
     saveBtn.hidden = !patchMode;
@@ -1056,12 +1082,21 @@ async function init(host, { lib, ctlId, toast }) {
   }
   host.querySelector(".wcc-save").addEventListener("click", () => saveCommandBody());
   host.querySelector(".wcc-imports").addEventListener("input", () => updateCodeDirty());
+  host.querySelector(".wcc-params").addEventListener("input", () => updateCodeDirty());
+  host.querySelector(".wcc-ret").addEventListener("change", () => updateCodeDirty());
+
+  function sigDirty() {
+    if (!codeState) return false;
+    return codeEl.querySelector(".wcc-ret").value !== codeState.retBaseline
+      || codeEl.querySelector(".wcc-params").value.trim() !== codeState.paramsBaseline;
+  }
 
   function updateCodeDirty() {
     if (!codeState) return;
     const impEl = codeEl.querySelector(".wcc-imports");
     codeState.dirty = codeApi.getValue() !== codeState.baseline
-      || impEl.value !== (codeState.importsBaseline ?? "");
+      || impEl.value !== (codeState.importsBaseline ?? "")
+      || sigDirty();
     codeEl.querySelector(".wcc-save").disabled = !codeState.dirty;
   }
 
@@ -1072,6 +1107,43 @@ async function init(host, { lib, ctlId, toast }) {
     const source = codeApi.getValue();
     const notes = [];
     errEl.hidden = true;
+
+    // a signature change can't travel as a body patch: returntype/params
+    // are written only by upsert_command, which stores the whole body and
+    // imports and recompiles — one call carries everything. The trade-off
+    // is concurrency: no exact-match guard here, the editor's copy wins.
+    if (sigDirty()) {
+      const parsed = parseParams(codeEl.querySelector(".wcc-params").value);
+      if (parsed.error) {
+        errEl.hidden = false;
+        errEl.textContent = parsed.error;
+        return;
+      }
+      const ret = codeEl.querySelector(".wcc-ret").value;
+      const r = await upsertCommand(lib, name, codeState.cmdName,
+        { lang: codeState.lang, returnType: ret, params: parsed.params,
+          imports: impEl.value, codeBody: source });
+      if (r.status !== "ok" && r.kind !== "compile_error") {
+        errEl.hidden = false;
+        errEl.textContent = `upsert_command failed: ${r.msg}`;
+        return;
+      }
+      codeState.baseline = source;
+      codeState.importsBaseline = impEl.value;
+      codeState.params = parsed.params;
+      codeState.returntype = ret;
+      codeState.retBaseline = ret;
+      codeState.paramsBaseline = paramsText(parsed.params);
+      codeEl.querySelector(".wcc-params").value = codeState.paramsBaseline;
+      codeEl.querySelector(".wcc-sig").textContent = `(${codeState.paramsBaseline}) → ${ret}`;
+      if (r.status !== "ok") {
+        errEl.hidden = false;
+        errEl.textContent = `compile failed (the signature, imports and body were stored):\n${r.msg}`;
+      }
+      updateCodeDirty();
+      toast.show(`upsert_command → signature ${r.status === "ok" ? "· compiled" : "· compile FAILED"} · ${codeState.cmdName}`);
+      return;
+    }
 
     // imports first (set_command_imports recompiles): a body edit that
     // needs a new `use` compiles on the second call, not on ordering luck
