@@ -247,6 +247,13 @@ async function init(host, { lib, ctlId, toast }) {
       // creates the facet on first save when the pair is present).
       sceneEl.hidden = false;
       await renderScene();
+    } else if (facet === "cmd" && (facetPresent("cmd") || patchMode)) {
+      // zero commands is a normal state in patch mode: the pane's
+      // new-command form IS the create affordance — same spirit as the
+      // html/css/js create-on-save editors, so it must not sit behind
+      // the absent gate
+      cmdsEl.hidden = false;
+      renderCommands();
     } else if (!facetPresent(facet) && !(patchMode && UI_FACETS.has(facet))) {
       absentEl.hidden = false;
       absentEl.textContent =
@@ -260,9 +267,6 @@ async function init(host, { lib, ctlId, toast }) {
       const { slot } = await ensureEditor(facet);
       editorsEl.hidden = false;
       slot.hidden = false;
-    } else if (facet === "cmd") {
-      cmdsEl.hidden = false;
-      renderCommands();
     } else if (facet === "three") {
       threeEl.hidden = false;
       await renderThree();
