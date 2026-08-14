@@ -245,6 +245,48 @@ if !vec.contains(&appid.as_ref()) {
   write_properties(configfile.into_os_string().into_string().unwrap(), config);
 }
 
+// warn-if-unpromoted (docs/one-memory-cycle.md A3, owner's call): publish
+// never promotes on its own, but says what it is leaving behind. Purely
+// procedural, and silent when no kb library is present (the agent overlay
+// is optional and the platform never depends on it).
+{
+  let mut libs_published: Vec<String> = Vec::new();
+  for i in 0..out.len() {
+    if let Data::DString(s) = out.get_property(i) { libs_published.push(s); }
+  }
+  if !libs_published.is_empty() && store.exists("kb", "controls") {
+    let mut unpromoted: i64 = 0;
+    let klist = store.get_data("kb", "controls").get_object("data").get_array("list");
+    for ci in 0..klist.len() {
+      let item = klist.get_object(ci);
+      if !item.has("id") { continue; }
+      let cid = item.get_string("id");
+      if !store.exists("kb", &cid) { continue; }
+      let dd = store.get_data("kb", &cid).get_object("data");
+      if !dd.has("memory") { continue; }
+      let src = dd.get_string("memory");
+      if src.trim().is_empty() { continue; }
+      if let Ok(w) = DataObject::try_from_string(&format!("{{\"a\":{}}}", src.replace("\r", ""))) {
+        if let Ok(a) = w.try_get_array("a") {
+          for i in 0..a.len() {
+            if let Ok(e) = a.try_get_object(i) {
+              if !e.has("subject") || e.has("promoted") { continue; }
+              let subject = e.get_string("subject");
+              let slib = match subject.find('.') {
+                Some(p) => subject[..p].to_string(),
+                None => subject.clone(),
+              };
+              if libs_published.iter().any(|l| l == &slib) { unpromoted += 1; }
+            }
+          }
+        }
+      }
+    }
+    if unpromoted > 0 {
+      out.push_string(&format!("WARNING: {} unpromoted kb claim(s) name the published libraries - run agent-archivist-promote (publish never promotes on its own)", unpromoted));
+    }
+  }
+}
 init_globals();
 out
 }
