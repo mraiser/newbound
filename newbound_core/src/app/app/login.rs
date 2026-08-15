@@ -1,5 +1,5 @@
 use ndata::dataobject::DataObject;
-use crate::security::security::init::log_in;
+use crate::security::security::init::log_in; 
 
 pub fn execute(o: DataObject) -> DataObject {
     use std::panic;
@@ -22,7 +22,7 @@ pub fn execute(o: DataObject) -> DataObject {
     match ax {
         Ok(ax) => {
             let mut result_obj = DataObject::new();
-    result_obj.put_string("a", &ax);
+    result_obj.put_object("a", ax);
             result_obj
         }
         Err(err) => {
@@ -49,7 +49,17 @@ pub fn execute(o: DataObject) -> DataObject {
     }
 }
 
-pub fn login(user: String, pass: String, nn_sessionid: String) -> String {
-if !log_in(&nn_sessionid, &user, &pass) { panic!("UNAUTHORIZED: {}", user); }
-format!("You are now logged in\", \"sessionid\": \"{}", nn_sessionid)
+pub fn login(user: String, pass: String, nn_sessionid: String) -> DataObject {
+let mut res = DataObject::new();
+
+let (status, msg) = if log_in(&nn_sessionid, &user, &pass) { 
+  ("ok".to_string(), format!("You are now logged in\", \"sessionid\": \"{}", nn_sessionid)) 
+} else { 
+  ("err".to_string(), format!("UNAUTHORIZED: {}", user)) 
+};
+
+res.put_string("status", &status);
+res.put_string("msg", &msg);
+
+res
 }
