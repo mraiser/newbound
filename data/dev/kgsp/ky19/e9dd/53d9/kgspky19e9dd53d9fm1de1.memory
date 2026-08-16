@@ -74,5 +74,17 @@
     "tags": "metaidentity, publishapp, boot, dev.code",
     "confidence": "high",
     "time": 1786419738826
+  },
+  {
+    "claim": "Library static assets pattern (owner idiom): plain files under data/<lib>/_ASSETS/ may be placed directly (the no-hand-edit rule covers store records, not _ASSETS) and compiled into command dylibs via include_str with a ../../../../data/<lib>/_ASSETS/... relative path - resolves correctly through both the overlay symlink and the real checkout. system_call (flowlang::flowlang::system::system_call) runs bash -c strings; nohup ... & inside detaches services cleanly.",
+    "tags": "assets",
+    "confidence": "high",
+    "time": 1786840042173
+  },
+  {
+    "claim": "Dylib-authoring gotcha: a command upserted mid-session is invisible to the ALREADY-RUNNING process that authored it - Command::lookup resolves against the dylib loaded at startup, so calling a just-authored command requires a fresh process. Author first, then start the process that exercises it.",
+    "tags": "phase3,gotcha",
+    "confidence": "high",
+    "time": 1786815200799
   }
 ]
