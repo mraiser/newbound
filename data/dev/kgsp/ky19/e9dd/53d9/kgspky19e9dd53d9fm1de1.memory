@@ -86,5 +86,11 @@
     "tags": "phase3,gotcha",
     "confidence": "high",
     "time": 1786815200799
+  },
+  {
+    "claim": "Running the newbound SERVER in a disposable (2026-08-16): http only comes up if runtime/<app>/app.properties exists for EVERY app in config.properties apps= (stage each from data/<lib>/_APPS/<app>/) - init_globals loads libraries and registers the boot timers (incl app:service:init which binds HTTP) from those files; missing = silent no-listener. Also set http_port to a real port (0 = disabled). At boot the server auto-logs-in admin and prints http://localhost:<port>/<app>/index.html?sessionid=... to stdout - use that session for browser automation (admin password persists in users/admin.properties). curl needs --noproxy in the container.",
+    "tags": "testing",
+    "confidence": "high",
+    "time": 1786899133310
   }
 ]
