@@ -92,5 +92,11 @@
     "tags": "testing",
     "confidence": "high",
     "time": 1786899133310
+  },
+  {
+    "claim": "Disposable-testing gotcha (cost an hour, 2026-08-17): a command upserted via dev.code in an MCP session is compiled into the dylib on disk but NOT loaded into that same process - hot reload only runs in server mode. Calling it in the same session yields No-such-command (and paths that swallow errors, like the executives catch_unwind around ask_llm, go silently dead - escalations read 0 with no error anywhere). Batteries must upsert stubs in one MCP session, kill it, and run assertions in a FRESH session.",
+    "tags": "testing",
+    "confidence": "high",
+    "time": 1786973023250
   }
 ]
