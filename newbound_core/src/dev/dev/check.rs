@@ -114,11 +114,6 @@ pub fn build_check_command() -> DataArray {
     features += ",serde_support";
   }
 
-  #[cfg(feature="reload")]
-  {
-    features += ",reload";
-  }
-
   #[cfg(feature="python_runtime")]
   {
     features += ",python_runtime";
