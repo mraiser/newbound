@@ -98,5 +98,14 @@
     "tags": "testing",
     "confidence": "high",
     "time": 1786973023250
+  },
+  {
+    "claim": "dev.code.upsert_command compiles internally (it invokes dev.dev.compile itself and returns its verdict), so a separate compile call right after an upsert is a result-cache no-op; for an FFI-rooted library the upsert's OK already means the new code is live.",
+    "tags": "upsert,compile",
+    "source": {
+      "doc": "newbound-agent docs/ffi-dynamic-loading.md"
+    },
+    "confidence": "high",
+    "time": 1787152443064
   }
 ]

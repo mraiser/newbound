@@ -100,6 +100,25 @@ if failed {
     }
 }
 
+// PRONG 4: an FFI-rooted build goes live before we answer - OK means the
+// new code is executable NOW, not after a watcher tick. flowlang::hotswap
+// owns loading (there is no file watcher anymore); this is the compile
+// path's synchronous reload. Static (rlib) crates keep their
+// host-rebuild-and-restart rhythm.
+let outcome = if outcome == "OK" {
+    let (root_name, is_ffi) = store.lib_crate_info(&lib);
+    if is_ffi {
+        match flowlang::hotswap::reload(&root_name) {
+            Ok(_) => outcome,
+            Err(e) => format!("error: build succeeded but hot-load failed: {}", e),
+        }
+    } else {
+        outcome
+    }
+} else {
+    outcome
+};
+
 let mut c = result_cache();
 c.put_string(&key, &outcome);
 package(&outcome)
@@ -290,11 +309,6 @@ pub fn build_compile_command() -> DataArray {
   #[cfg(feature="serde_support")]
   {
     features += ",serde_support";
-  }
-
-  #[cfg(feature="reload")]
-  {
-    features += ",reload";
   }
 
   #[cfg(feature="python_runtime")]

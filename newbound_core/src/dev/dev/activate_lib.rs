@@ -102,14 +102,15 @@ if let Ok(s) = std::fs::read_to_string(&manifest) {
 }
 
 // Build the crate unconditionally (rebuild_lib would skip when generated
-// src already matches the store), then the host so a restart loads it.
+// src already matches the store), then load it live. The initializer no
+// longer bakes in FFI crates - flowlang::hotswap loads them from store
+// metadata - so activation needs no host rebuild and no restart.
 let ja = build_compile_command();
 let (bad, err) = execute_compile_command(ja, root.to_owned());
 if bad { return "ERROR: crate build failed: ".to_string()+&err; }
 
-let ja = build_compile_command();
-let (bad, err) = execute_compile_command(ja, ".".to_string());
-if bad { return "ERROR: host rebuild failed: ".to_string()+&err; }
-
-"RESTART: ".to_string()+&lib+" roots a hot-reload crate - restart Newbound once to activate it"
+match flowlang::hotswap::load(&root) {
+  Ok(_) => "OK: ".to_string()+&lib+" is live - its commands are loaded and will hot-reload on rebuild",
+  Err(e) => "ERROR: crate built but hot-load failed: ".to_string()+&e,
+}
 }
