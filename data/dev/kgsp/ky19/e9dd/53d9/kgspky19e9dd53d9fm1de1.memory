@@ -124,5 +124,12 @@
     "tags": "evaluate_rust,scratch,testing",
     "confidence": "high",
     "time": 1787140461927
+  },
+  {
+    "claim": "CORRECTION (2026-08-19, five-run instrumented investigation): the same-session dylib gotcha's MECHANISM was misdiagnosed - the hot-reload watcher IS armed under `newbound mcp` (initialize_all_commands starts it before the subcommand dispatch; its startup banner and inotify watches confirmed by strace). What actually fails is the reload-register seam: on a new-command upsert the watcher detects the change and dlopens the fresh temp copy, yet the command never appears in RUST_COMMANDS (5/5 reproductions, 15-25s waits), and in one run the debouncer thread died mid-println with no panic message. Related known bug (owner): hot-swapping while code from that same library runs in another thread crashes the whole process in server mode. The FACT stands - a command upserted in a live process is not callable in that process - but for new commands in EXISTING libraries too, not only new crates, and not because the watcher is absent",
+    "detail": "Consequences unchanged: author in one process, execute in a fresh one (each nb-call IS a fresh process, so the driver idiom is naturally safe); evaluate_rust cannot succeed in ANY single mcp process until the reload-register seam is fixed. interim-process.md section 2 claims this path verified working 2026-08-09 (flowlang 0.3.31 era) - either it regressed by 0.3.33 or that verification measured something else; worth an owner look at FlowLangLibrary::reload (call_mirror's Result is silently discarded - a diagnosability fix regardless). Also: every process start copies each dylib to /tmp/lib<name>_<ts>.so and cleanup rides Drop, so kill/terminate leaks them - 142 accumulated in one session of fresh-process calls.",
+    "tags": "hot-reload,mcp,dylib,gotcha",
+    "confidence": "high",
+    "time": 1787141356049
   }
 ]
