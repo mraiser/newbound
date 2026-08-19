@@ -100,6 +100,7 @@
     "time": 1786973023250
   },
   {
+<<<<<<< origin/master
     "claim": "dev.code.upsert_command compiles internally (it invokes dev.dev.compile itself and returns its verdict), so a separate compile call right after an upsert is a result-cache no-op; for an FFI-rooted library the upsert's OK already means the new code is live.",
     "tags": "upsert,compile",
     "source": {
@@ -107,5 +108,38 @@
     },
     "confidence": "high",
     "time": 1787152443064
+=======
+    "claim": "upsert_command has no desc parameter: a new command compiles and is callable immediately but stays INVISIBLE to tools/list until set_command_meta fills its desc - authoring and publishing to discovery are two separate steps",
+    "detail": "Bit during H1: all three agent.msg commands worked but --list showed nothing until their descs were set. desc is also the curation lever for what the model sees.",
+    "tags": "dev.code,desc,discovery",
+    "confidence": "high",
+    "time": 1787139770609
+  },
+  {
+    "claim": "Content-addressed storage is a CHOICE the store permits, not a property it has: set_data shards purely by id (flowlang datastore.rs get_data_file), ids are system-minted unless the caller supplies one, and supplying id = hash-of-content gives structural dedup (owner, 2026-08-19). Hash a whole record and nothing ever dedupes - split content (id=hash of text) from occurrence (minted or chained id) when occurrences carry their own facts",
+    "detail": "agent.msg is the working example: mc<fnv128-of-text> content records, mo... occurrence records pointing at them. Two speakers saying the same word = one content record, two occurrences.",
+    "tags": "datastore,content-addressing,dedup",
+    "confidence": "high",
+    "time": 1787139770694
+  },
+  {
+    "claim": "Facets are ATTACHMENTS: a control record's data carries attachmentkeynames and the content lives in sibling files (<id>.js etc.); get_data resolves them into data on read (both serde and non-serde paths), so d.has(facet)/get_string(facet) work after get_data - but raw record JSON on disk does NOT contain facet text",
+    "tags": "datastore,facets,attachments",
+    "confidence": "high",
+    "time": 1787140461633
+  },
+  {
+    "claim": "dev-code-evaluate_rust cannot work through per-call `newbound mcp` processes: it waits for hot reload, which only runs in server mode. The fresh-process driver's equivalent: upsert a scratch command in one call, execute it in the next (each nb-call IS a fresh process, so the same-session dylib gotcha never bites), delete it and prune the generated rs after",
+    "tags": "evaluate_rust,scratch,testing",
+    "confidence": "high",
+    "time": 1787140461927
+  },
+  {
+    "claim": "CORRECTION (2026-08-19, five-run instrumented investigation): the same-session dylib gotcha's MECHANISM was misdiagnosed - the hot-reload watcher IS armed under `newbound mcp` (initialize_all_commands starts it before the subcommand dispatch; its startup banner and inotify watches confirmed by strace). What actually fails is the reload-register seam: on a new-command upsert the watcher detects the change and dlopens the fresh temp copy, yet the command never appears in RUST_COMMANDS (5/5 reproductions, 15-25s waits), and in one run the debouncer thread died mid-println with no panic message. Related known bug (owner): hot-swapping while code from that same library runs in another thread crashes the whole process in server mode. The FACT stands - a command upserted in a live process is not callable in that process - but for new commands in EXISTING libraries too, not only new crates, and not because the watcher is absent",
+    "detail": "Consequences unchanged: author in one process, execute in a fresh one (each nb-call IS a fresh process, so the driver idiom is naturally safe); evaluate_rust cannot succeed in ANY single mcp process until the reload-register seam is fixed. interim-process.md section 2 claims this path verified working 2026-08-09 (flowlang 0.3.31 era) - either it regressed by 0.3.33 or that verification measured something else; worth an owner look at FlowLangLibrary::reload (call_mirror's Result is silently discarded - a diagnosability fix regardless). Also: every process start copies each dylib to /tmp/lib<name>_<ts>.so and cleanup rides Drop, so kill/terminate leaks them - 142 accumulated in one session of fresh-process calls.",
+    "tags": "hot-reload,mcp,dylib,gotcha",
+    "confidence": "high",
+    "time": 1787141356049
+>>>>>>> claude/harvest-h1-devcode-manual
   }
 ]
