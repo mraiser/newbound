@@ -96,12 +96,12 @@ pub mod app {
             ::flowlang::rustcmd::RustCmd::new("vtnluk1834262fb3fl137e").execute(d).expect("Rust command execution failed").get_array("a")
         }
 
-        pub fn login(user: String, pass: String, nn_sessionid: String) -> String {
+        pub fn login(user: String, pass: String, nn_sessionid: String) -> DataObject {
             let mut d = DataObject::new();
             d.put_string("user", &user);
             d.put_string("pass", &pass);
             d.put_string("nn_sessionid", &nn_sessionid);
-            ::flowlang::rustcmd::RustCmd::new("ztizvj182ee99186cp2d2").execute(d).expect("Rust command execution failed").get_string("a")
+            ::flowlang::rustcmd::RustCmd::new("ztizvj182ee99186cp2d2").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
         pub fn newlib(lib: String, readers: DataArray, writers: DataArray) -> String {
@@ -1588,7 +1588,7 @@ impl old_app_app {
         self::app::app::libs()
     }
     #[deprecated(note = "use api::app::app::login instead")]
-    pub fn login(&self, user: String, pass: String, nn_sessionid: String) -> String {
+    pub fn login(&self, user: String, pass: String, nn_sessionid: String) -> DataObject {
         self::app::app::login(user, pass, nn_sessionid)
     }
     #[deprecated(note = "use api::app::app::newlib instead")]
