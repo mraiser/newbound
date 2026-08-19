@@ -112,5 +112,17 @@
     "tags": "datastore,content-addressing,dedup",
     "confidence": "high",
     "time": 1787139770694
+  },
+  {
+    "claim": "Facets are ATTACHMENTS: a control record's data carries attachmentkeynames and the content lives in sibling files (<id>.js etc.); get_data resolves them into data on read (both serde and non-serde paths), so d.has(facet)/get_string(facet) work after get_data - but raw record JSON on disk does NOT contain facet text",
+    "tags": "datastore,facets,attachments",
+    "confidence": "high",
+    "time": 1787140461633
+  },
+  {
+    "claim": "dev-code-evaluate_rust cannot work through per-call `newbound mcp` processes: it waits for hot reload, which only runs in server mode. The fresh-process driver's equivalent: upsert a scratch command in one call, execute it in the next (each nb-call IS a fresh process, so the same-session dylib gotcha never bites), delete it and prune the generated rs after",
+    "tags": "evaluate_rust,scratch,testing",
+    "confidence": "high",
+    "time": 1787140461927
   }
 ]
