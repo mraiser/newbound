@@ -98,5 +98,19 @@
     "tags": "testing",
     "confidence": "high",
     "time": 1786973023250
+  },
+  {
+    "claim": "upsert_command has no desc parameter: a new command compiles and is callable immediately but stays INVISIBLE to tools/list until set_command_meta fills its desc - authoring and publishing to discovery are two separate steps",
+    "detail": "Bit during H1: all three agent.msg commands worked but --list showed nothing until their descs were set. desc is also the curation lever for what the model sees.",
+    "tags": "dev.code,desc,discovery",
+    "confidence": "high",
+    "time": 1787139770609
+  },
+  {
+    "claim": "Content-addressed storage is a CHOICE the store permits, not a property it has: set_data shards purely by id (flowlang datastore.rs get_data_file), ids are system-minted unless the caller supplies one, and supplying id = hash-of-content gives structural dedup (owner, 2026-08-19). Hash a whole record and nothing ever dedupes - split content (id=hash of text) from occurrence (minted or chained id) when occurrences carry their own facts",
+    "detail": "agent.msg is the working example: mc<fnv128-of-text> content records, mo... occurrence records pointing at them. Two speakers saying the same word = one content record, two occurrences.",
+    "tags": "datastore,content-addressing,dedup",
+    "confidence": "high",
+    "time": 1787139770694
   }
 ]
