@@ -12,5 +12,23 @@
     "tags": "dev.github,activate_lib,workspace,ffi",
     "confidence": "high",
     "time": 1786479035116
+  },
+  {
+    "claim": "dev.dev.compile of an FFI-rooted library hot-reloads the dylib synchronously (flowlang::hotswap::reload) before answering: OK means the new code is executable immediately, and a hot-load failure IS the compile outcome, never a false OK. Static newbound_core-rooted libraries keep the host-rebuild-and-restart rhythm.",
+    "tags": "ffi,compile,hot-reload",
+    "source": {
+      "doc": "newbound-agent docs/ffi-dynamic-loading.md"
+    },
+    "confidence": "high",
+    "time": 1787152443049
+  },
+  {
+    "claim": "dev.dev.activate_lib loads an FFI crate live (flowlang::hotswap::load) after building it and answers 'OK: <lib> is live - its commands are loaded and will hot-reload on rebuild'; the RESTART sentinel and the host rebuild step are gone.",
+    "tags": "ffi,activate_lib",
+    "source": {
+      "doc": "newbound-agent docs/ffi-dynamic-loading.md"
+    },
+    "confidence": "high",
+    "time": 1787152443055
   }
 ]
