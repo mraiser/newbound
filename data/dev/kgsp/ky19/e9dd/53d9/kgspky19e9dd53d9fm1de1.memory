@@ -149,5 +149,14 @@
     },
     "confidence": "high",
     "time": 1787227760089
+  },
+  {
+    "claim": "CORRECTION to the 2026-08-20 direct-calls claim: a same-crate direct call must preserve the callee's OBSERVABLE result shape. Command::execute returns the generated wrapper's {\"a\": inner} envelope verbatim (flowlang 0.3.34 command.rs/rustcmd.rs - Rust commands never return Err), so replacing it with a direct inner-fn call strips one envelope level; any caller that received that object verbatim breaks. evaluate_rust hit this: its invoke result flows to callers unchanged, so it now re-wraps the direct invoke_command() result in the {\"a\": ...} envelope - external shape is byte-identical to the pre-refactor Command path (verified over MCP). The earlier claim's final sentence ('lost one nesting level') is superseded: NO caller-visible shape changed in the direct-call refactor. upsert_command/patch_command_body/set_command_imports were never affected - they unwrapped and repackaged the compile result, so their outputs were already identical.",
+    "tags": "dev.code,newbound_core,direct-calls,correction",
+    "source": {
+      "doc": "newbound branch claude/newbound-core-direct-calls-qo26xm (envelope restoration)"
+    },
+    "confidence": "high",
+    "time": 1787242782329
   }
 ]
