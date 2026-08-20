@@ -2,8 +2,7 @@ use flowlang::datastore::DataStore;
 use flowlang::flowlang::data;
 use ndata::dataobject::DataObject;
 use ndata::dataarray::DataArray;
-use flowlang::command::Command;
-
+use crate::dev::dev::compile::compile;
 pub fn execute(o: DataObject) -> DataObject {
     use std::panic;
     for p in ["lib", "ctl", "cmd", "old_snippet", "new_snippet"] {
@@ -160,27 +159,16 @@ data::write::write(lib.clone(), impl_id.clone(), impl_doc, ex_readers, ex_writer
 // wrong branch: it reports the edit as rejected and leaves its baseline
 // stale, so the NEXT save computes its snippet against text the server no
 // longer has and fails with "snippet not found".
-// Command::lookup rather than the api struct: name resolution against the
-// store survives any regeneration of api.rs (the upsert_command posture).
-let compile_cmd = Command::lookup("dev", "dev", "compile");
-let mut cargs = DataObject::new();
-cargs.put_string("lib", &lib);
-cargs.put_string("ctl", &ctl);
-cargs.put_string("cmd", &cmd);
+// Direct call: dev.dev.compile lives in this same crate, so no Command
+// indirection is needed. catch_unwind keeps a compile panic reporting as a
+// compile_error, as the indirect path did.
+let cres = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| compile(lib.clone(), ctl.clone(), cmd.clone())));
 
 let mut out = DataObject::new();
-match compile_cmd.execute(cargs) {
+match cres {
     Ok(r) => {
-        let r = match r.try_get_object("a") { Ok(inner) => inner, _ => r };
-        let txt = if r.has("status") && r.get_string("status") == "err" {
-            if r.has("msg") { r.get_string("msg") } else { r.to_string() }
-        } else if r.has("a") {
-            r.get_string("a")
-        } else if r.has("msg") {
-            r.get_string("msg")
-        } else {
-            r.to_string()
-        };
+        // compile returns {status:"ok"|"err", msg} - msg is "OK" on success
+        let txt = if r.has("msg") { r.get_string("msg") } else { r.to_string() };
         if txt == "OK" {
             out.put_string("status", "ok");
             out.put_string("msg", "OK");
@@ -191,9 +179,16 @@ match compile_cmd.execute(cargs) {
         }
     },
     Err(e) => {
+        let msg = if let Some(s) = e.downcast_ref::<&str>() {
+            s.to_string()
+        } else if let Some(s) = e.downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "Unknown panic occurred".to_string()
+        };
         out.put_string("status", "err");
         out.put_string("kind", "compile_error");
-        out.put_string("msg", &format!("{:?}", e));
+        out.put_string("msg", &msg);
     }
 }
 out

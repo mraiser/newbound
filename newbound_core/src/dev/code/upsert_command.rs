@@ -3,8 +3,7 @@ use flowlang::datastore::DataStore;
 use flowlang::flowlang::system::unique_session_id::unique_session_id;
 use flowlang::flowlang::data;
 use ndata::dataarray::DataArray;
-use flowlang::command::Command; 
-
+use crate::dev::dev::compile::compile;
 pub fn execute(o: DataObject) -> DataObject {
     use std::panic;
     for p in ["lib", "ctl", "cmd", "lang", "return_type", "params", "imports", "code_body"] {
@@ -206,35 +205,16 @@ if store.exists(&lib, &ctlid) {
   }
   data::write::write(lib.clone(), rustid.clone(), nurust, imp_readers, imp_writers);
   
-  // Compile via Command rather than the typed api: survives regeneration of the
-  // dev library under any wrapper template, and reads the result defensively.
-  let compile_cmd = Command::lookup("dev", "dev", "compile");
-  let mut cargs = DataObject::new();
-  cargs.put_string("lib", &lib);
-  cargs.put_string("ctl", &ctl);
-  cargs.put_string("cmd", &cmd);
+  // Compile via a direct call: dev.dev.compile lives in this same crate, so
+  // no Command indirection is needed. catch_unwind keeps a compile panic
+  // reporting as a compile_error, as the indirect path did.
+  let cres = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| compile(lib.clone(), ctl.clone(), cmd.clone())));
 
   let mut o = DataObject::new();
-  match compile_cmd.execute(cargs) {
+  match cres {
     Ok(r) => {
-      let r = match r.try_get_object("a") {
-        Ok(inner) => inner,
-        _ => r
-      };
-      
-      // Possible shapes, in order of likelihood:
-      //  - wrapper-caught panic (current dev template after regen): {"status":"err","msg":<errors>}
-      //  - plain String packaging: {"a": "OK"} or {"a": <error text>}  (new compile body returns errors as text)
-      //  - anything else: serialize and inspect
-      let txt = if r.has("status") && r.get_string("status") == "err" {
-        if r.has("msg") { r.get_string("msg") } else { r.to_string() }
-      } else if r.has("a") {
-        r.get_string("a")
-      } else if r.has("msg") {
-        r.get_string("msg")
-      } else {
-        r.to_string()
-      };
+      // compile returns {status:"ok"|"err", msg} - msg is "OK" on success
+      let txt = if r.has("msg") { r.get_string("msg") } else { r.to_string() };
       if txt == "OK" {
         o.put_string("status", "ok");
         o.put_string("msg", "OK");
@@ -245,9 +225,16 @@ if store.exists(&lib, &ctlid) {
       }
     },
     Err(e) => {
+      let msg = if let Some(s) = e.downcast_ref::<&str>() {
+        s.to_string()
+      } else if let Some(s) = e.downcast_ref::<String>() {
+        s.clone()
+      } else {
+        "Unknown panic occurred".to_string()
+      };
       o.put_string("status", "err");
       o.put_string("kind", "compile_error");
-      o.put_string("msg", &format!("{:?}", e));
+      o.put_string("msg", &msg);
     }
   }
   return o;

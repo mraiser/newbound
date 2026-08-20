@@ -140,5 +140,14 @@
     "tags": "hot-reload,mcp,dylib,gotcha",
     "confidence": "high",
     "time": 1787141356049
+  },
+  {
+    "claim": "newbound_core commands call same-crate commands DIRECTLY (use crate::...::<fn> import + plain function call), never via Command::lookup - the owner's rule, 2026-08-20: indirect invocation is unnecessary inside one crate. Applied to upsert_command/patch_command_body/set_command_imports (-> dev.dev.compile's compile()) and evaluate_rust (-> upsert_command(), invoke_command()), each direct call wrapped in catch_unwind to preserve the {status, kind:\"compile_error\", msg} error shape. Command indirection remains only where the target is runtime-resolved: dev.code.invoke_command, app.app.exec, peer.service.exec, app.service.init. Direct calls return the inner result UNWRAPPED - no Command \"a\" envelope (evaluate_rust's invoke result lost one nesting level).",
+    "tags": "dev.code,newbound_core,style,direct-calls",
+    "source": {
+      "doc": "newbound branch claude/newbound-core-direct-calls-qo26xm (dev.code direct-call refactor)"
+    },
+    "confidence": "high",
+    "time": 1787227760089
   }
 ]

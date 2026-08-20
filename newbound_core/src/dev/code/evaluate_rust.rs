@@ -1,9 +1,10 @@
-use flowlang::command::Command;
 use ndata::dataobject::DataObject;
 use ndata::dataarray::DataArray;
 use flowlang::flowlang::system::unique_session_id::unique_session_id;
 use flowlang::rustcmd::RustCmd;
 use crate::dev::code::delete_command::delete_command;
+use crate::dev::code::upsert_command::upsert_command;
+use crate::dev::code::invoke_command::invoke_command;
 pub fn execute(o: DataObject) -> DataObject {
     use std::panic;
     for p in ["imports", "code"] {
@@ -79,34 +80,28 @@ fn cleanup_temp(lib: &str, ctl: &str, cmd_name: &str) {
     }
 }
 
-// 1. Create the temporary command
-let mut upsert_args = DataObject::new();
-upsert_args.put_string("lib", &lib);
-upsert_args.put_string("ctl", &ctl);
-upsert_args.put_string("cmd", &cmd_name);
-upsert_args.put_string("lang", "rust");
-upsert_args.put_string("return_type", "FLAT");
-upsert_args.put_array("params", DataArray::new());
-upsert_args.put_string("imports", &imports); 
-upsert_args.put_string("code_body", &code);
-
-let upsert_cmd = Command::lookup("dev", "code", "upsert_command");
-let upsert_res = match upsert_cmd.execute(upsert_args) {
+// 1. Create the temporary command - a direct call into
+// dev.code.upsert_command (same crate). It returns its result unwrapped;
+// catch_unwind so a panic can't skip cleanup.
+let ax = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| upsert_command(
+    lib.clone(), ctl.clone(), cmd_name.clone(), "rust".to_string(),
+    "FLAT".to_string(), DataArray::new(), imports.clone(), code.clone())));
+let upsert_res = match ax {
     Ok(res) => res,
     Err(e) => {
         cleanup_temp(&lib, &ctl, &cmd_name);
+        let msg = if let Some(s) = e.downcast_ref::<&str>() {
+            s.to_string()
+        } else if let Some(s) = e.downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "Unknown panic occurred".to_string()
+        };
         let mut err_obj = DataObject::new();
         err_obj.put_string("status", "err");
-        err_obj.put_string("msg", &format!("Failed to execute upsert_command: {:?}", e));
+        err_obj.put_string("msg", &format!("Failed to execute upsert_command: {}", msg));
         return err_obj;
     }
-};
-
-// Command::execute returns the raw wrapper packaging: normal returns are nested
-// under "a"; wrapper-caught panics are top-level. Unwrap to normalize.
-let upsert_res = match upsert_res.try_get_object("a") {
-    Ok(inner) => inner,
-    _ => upsert_res
 };
 
 // Return immediately if compilation fails — but clean up FIRST, so the broken
@@ -152,20 +147,25 @@ if !registered {
     return err_obj;
 }
 
-// 4. Invoke the temporary command
-let mut invoke_args = DataObject::new();
-invoke_args.put_string("lib", &lib);
-invoke_args.put_string("ctl", &ctl);
-invoke_args.put_string("cmd", &cmd_name);
-invoke_args.put_object("args", DataObject::new());
-
-let invoke_cmd = Command::lookup("dev", "code", "invoke_command");
-let exec_res = match invoke_cmd.execute(invoke_args) {
+// 4. Invoke the temporary command - a direct call into
+// dev.code.invoke_command (same crate); it guards the target's execution
+// itself, catch_unwind covers the rest. The result comes back unwrapped:
+// {status, result|msg}.
+let ax = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| invoke_command(
+    lib.clone(), ctl.clone(), cmd_name.clone(), DataObject::new())));
+let exec_res = match ax {
     Ok(res) => res,
     Err(e) => {
+        let msg = if let Some(s) = e.downcast_ref::<&str>() {
+            s.to_string()
+        } else if let Some(s) = e.downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "Unknown panic occurred".to_string()
+        };
         let mut err_obj = DataObject::new();
         err_obj.put_string("status", "err");
-        err_obj.put_string("msg", &format!("Panic during execution: {:?}", e));
+        err_obj.put_string("msg", &format!("Panic during execution: {}", msg));
         err_obj
     }
 };
