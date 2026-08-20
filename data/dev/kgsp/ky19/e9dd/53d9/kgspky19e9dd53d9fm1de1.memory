@@ -158,5 +158,14 @@
     },
     "confidence": "high",
     "time": 1787242782329
+  },
+  {
+    "claim": "CONTRACT (owner, 2026-08-20, supersedes both earlier envelope claims): dev.code.invoke_command's `result` carries the invoked command's ACTUAL return value - the wrapper packaging ({\"a\": <value>}) is stripped inside invoke_command using format_result's convention (err objects pass through; a flow with multiple named outputs stays whole; otherwise the \"a\" value is moved as Data, so non-object returns like strings and arrays carry cleanly). evaluate_rust passes invoke_command's {status, result|msg} through verbatim, so an eval answers {status:\"ok\", result: <script's value>}; a script that panics answers status ok with result {status:\"err\", msg} - outer status is the invocation outcome, result is what the script produced. Nothing downstream should ever need res.result.a digging.",
+    "tags": "dev.code,invoke_command,evaluate_rust,contract",
+    "source": {
+      "doc": "newbound branch claude/newbound-core-direct-calls-qo26xm (invoke result unwrap)"
+    },
+    "confidence": "high",
+    "time": 1787248076194
   }
 ]
