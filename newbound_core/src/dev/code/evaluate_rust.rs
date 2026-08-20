@@ -149,11 +149,13 @@ if !registered {
 
 // 4. Invoke the temporary command - a direct call into
 // dev.code.invoke_command (same crate); it guards the target's execution
-// itself, catch_unwind covers the rest. The result comes back unwrapped:
-// {status, result|msg}.
+// itself, catch_unwind covers the rest. The invoke result is re-wrapped in
+// the {"a": ...} envelope the indirect Command path produced: evaluate_rust
+// returns this object verbatim, so its callers' expected shape must not
+// change.
 let ax = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| invoke_command(
     lib.clone(), ctl.clone(), cmd_name.clone(), DataObject::new())));
-let exec_res = match ax {
+let inner = match ax {
     Ok(res) => res,
     Err(e) => {
         let msg = if let Some(s) = e.downcast_ref::<&str>() {
@@ -165,10 +167,12 @@ let exec_res = match ax {
         };
         let mut err_obj = DataObject::new();
         err_obj.put_string("status", "err");
-        err_obj.put_string("msg", &format!("Panic during execution: {}", msg));
+        err_obj.put_string("msg", &msg);
         err_obj
     }
 };
+let mut exec_res = DataObject::new();
+exec_res.put_object("a", inner);
 
 // 5. Clean up the temporary command (datastore + generated artifacts)
 cleanup_temp(&lib, &ctl, &cmd_name);
