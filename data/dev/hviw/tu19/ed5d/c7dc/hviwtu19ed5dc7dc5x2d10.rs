@@ -24,8 +24,17 @@ let mut out = DataObject::new();
 match result {
     Ok(o) => {
         out.put_string("status", "ok");
-        // Inject the native flowlang Data return value into the result object
-        out.put_object("result", o);
+        // o is the wrapper's packaging ({"a": <value>} for generated code;
+        // a flow can return multiple named outputs). Unwrap it the way
+        // format_result does, so `result` carries the command's actual
+        // return value rather than the packaging.
+        if command.lang == "flow" && o.clone().keys().len() > 1 {
+            out.put_object("result", o);
+        } else if o.has("a") {
+            out.set_property("result", o.get_property("a"));
+        } else {
+            out.put_object("result", o);
+        }
     },
     Err(e) => {
         out.put_string("status", "err");
