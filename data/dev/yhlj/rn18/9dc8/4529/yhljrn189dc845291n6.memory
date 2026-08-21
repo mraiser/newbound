@@ -1,43 +1,8 @@
 [
-  {
-    "claim": "A String return rides the exec envelope's msg with status ok even for ERROR:-prefixed texts — branch on the prefix and relay it verbatim",
-    "tags": "dev.github,envelope",
-    "source": {
-      "doc": "CONTRACT.md §6.3"
-    },
-    "confidence": "high",
-    "time": 1785504820517
-  },
-  {
-    "claim": "dev.github.import is the drop-in library install path: given a git URL whose repo has data/<lib> and runtime/<lib> at its root, it clones into repositories/<lib>, symlinks both into the instance, calls load_library then rebuild_lib. dev.github has only import and list — no update or remove; update today is `git pull` in repositories/<lib> plus rebuild_lib by hand. A brand-new FFI root additionally needs `newbound rebuild` + host build + restart before the watcher and initializer know the crate.",
-    "tags": "platform-api,dev.github,install,ffi",
-    "source": {
-      "doc": "newbound_core/src/dev/github/import.rs, verified 2026-08-09"
-    },
-    "confidence": "high",
-    "time": 1786292476513
-  },
-  {
-    "claim": "dev.github.import (and anything reaching flowlang appserver load_library) cannot run via 'newbound exec' - the exec path skips init_globals(), so load_library panics with \"Key 'system' not found\"; route such commands through 'newbound mcp' tools/call, which inits globals first.",
-    "detail": "Observed 2026-08-11 installing mraiser/hollis. src/main.rs: exec branch calls Command::lookup directly; only the mcp branch calls init_globals().",
-    "tags": "dev.github,exec,mcp,init_globals",
-    "confidence": "high",
-    "time": 1786479034893
-  },
-  {
-    "claim": "FIXED (branch claude/hollis-repo-evaluation-85817i, commit ccc81ce): dev.github.import now calls init_globals() so it works under bare 'newbound exec'; dev.dev.activate_lib appends the [workspace] opt-out whenever absent (no longer keyed on serde_support); dev.libsettings.save_library_config accepts 'root' as fallback for 'library_root' and never clobbers a non-empty stored root - all three verified end-to-end on a disposable instance (single exec import of hollis: clone -> activate -> build -> OK).",
-    "detail": "Supersedes the failure-mode claims deposited earlier this session; those describe master behavior until the branch merges.",
-    "tags": "dev.github,activate_lib,libsettings,fixed",
-    "confidence": "high",
-    "time": 1786482273494
-  },
-  {
-    "claim": "dev.github.import must run inside a live appserver/MCP process: in one-shot `newbound exec` mode it panics at load_library (globals lack 'system' - init_globals only runs for the mcp/server paths) AFTER completing the clone to repositories/<lib> and the data/+runtime/ symlinks; recovery is just running dev.dev.activate_lib afterward. Import clones the repo's default branch, so a session working a designated branch checks it out in repositories/<lib> itself. The dev.github surface is import/list/ff-only-update/remove - no branch/commit/push - but the clone is a full ordinary git checkout, so the git CLI covers everything else; that layout, not the command surface, is what makes imported repos manageable.",
-    "tags": "workflow,github,import,exec-mode,globals,git",
-    "source": {
-      "doc": "live failure + recovery during camera import, 2026-08-11"
-    },
-    "confidence": "high",
-    "time": 1786463543767
-  }
-]
+{"claim": "A String return rides the exec envelope's msg with status ok even for ERROR:-prefixed texts — branch on the prefix and relay it verbatim", "tags": "dev.github,envelope", "source": {"doc": "CONTRACT.md §6.3"}, "confidence": "high", "time": 1785504820517},
+{"claim": "dev.github.import is the drop-in library install path: given a git URL whose repo has data/<lib> and runtime/<lib> at its root, it clones into repositories/<lib>, symlinks both into the instance, calls load_library then rebuild_lib. dev.github has only import and list — no update or remove; update today is `git pull` in repositories/<lib> plus rebuild_lib by hand. A brand-new FFI root additionally needs `newbound rebuild` + host build + restart before the watcher and initializer know the crate.", "tags": "platform-api,dev.github,install,ffi", "source": {"doc": "newbound_core/src/dev/github/import.rs, verified 2026-08-09"}, "confidence": "high", "time": 1786292476513},
+{"claim": "dev.github.import (and anything reaching flowlang appserver load_library) cannot run via 'newbound exec' - the exec path skips init_globals(), so load_library panics with \"Key 'system' not found\"; route such commands through 'newbound mcp' tools/call, which inits globals first.", "detail": "Observed 2026-08-11 installing mraiser/hollis. src/main.rs: exec branch calls Command::lookup directly; only the mcp branch calls init_globals().", "tags": "dev.github,exec,mcp,init_globals", "confidence": "high", "time": 1786479034893},
+{"claim": "FIXED (branch claude/hollis-repo-evaluation-85817i, commit ccc81ce): dev.github.import now calls init_globals() so it works under bare 'newbound exec'; dev.dev.activate_lib appends the [workspace] opt-out whenever absent (no longer keyed on serde_support); dev.libsettings.save_library_config accepts 'root' as fallback for 'library_root' and never clobbers a non-empty stored root - all three verified end-to-end on a disposable instance (single exec import of hollis: clone -> activate -> build -> OK).", "detail": "Supersedes the failure-mode claims deposited earlier this session; those describe master behavior until the branch merges.", "tags": "dev.github,activate_lib,libsettings,fixed", "confidence": "high", "time": 1786482273494},
+{"claim": "dev.github.import must run inside a live appserver/MCP process: in one-shot `newbound exec` mode it panics at load_library (globals lack 'system' - init_globals only runs for the mcp/server paths) AFTER completing the clone to repositories/<lib> and the data/+runtime/ symlinks; recovery is just running dev.dev.activate_lib afterward. Import clones the repo's default branch, so a session working a designated branch checks it out in repositories/<lib> itself. The dev.github surface is import/list/ff-only-update/remove - no branch/commit/push - but the clone is a full ordinary git checkout, so the git CLI covers everything else; that layout, not the command surface, is what makes imported repos manageable.", "tags": "workflow,github,import,exec-mode,globals,git", "source": {"doc": "live failure + recovery during camera import, 2026-08-11"}, "confidence": "high", "time": 1786463543767},
+{"claim": "dev.github.import cannot install the agent overlay repo, and structurally cannot install any multi-library repo", "detail": "import walks data/* and requires a matching runtime/<lib> for every candidate; in mraiser/newbound-agent none of agent, kb or scratch has a runtime/ dir, so the loop falls through and it returns 'ERROR: No Newbound Library found'. It also returns on the FIRST match, so a repo carrying several libraries is unsupported by construction. This is why the overlay install is tools/setup.sh in bash rather than the platform's own git-native install path - the one git install command cannot handle the flagship repo. Measured 2026-08-21.", "tags": "dev.github,git,install,overlay,defect,unreviewed", "confidence": "high", "time": 1787311811470},
+{"end": true}]

@@ -1,0 +1,1 @@
+crate::dev::git::gitrun::gitrun(repo, verb, args, "remote".to_string())
