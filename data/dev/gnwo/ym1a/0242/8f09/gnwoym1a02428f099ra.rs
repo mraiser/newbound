@@ -1,0 +1,1 @@
+crate::dev::git::gitrun::gitrun(repo, verb, args, "read".to_string())
