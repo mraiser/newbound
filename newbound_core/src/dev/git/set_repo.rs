@@ -4,7 +4,7 @@ use flowlang::flowlang::system::system_call::system_call;
 use ndata::dataarray::DataArray;
 pub fn execute(o: DataObject) -> DataObject {
     use std::panic;
-    for p in ["name", "path", "origin", "role", "author", "nn_sessionid"] {
+    for p in ["name", "path", "origin", "role", "autocommit", "author", "nn_sessionid"] {
         if !o.has(p) {
             let mut e = DataObject::new();
             e.put_string("status", "err");
@@ -19,9 +19,10 @@ pub fn execute(o: DataObject) -> DataObject {
         let arg_1: String = o.get_string("path");
         let arg_2: String = o.get_string("origin");
         let arg_3: String = o.get_string("role");
-        let arg_4: String = o.get_string("author");
-        let arg_5: String = o.get_string("nn_sessionid");
-        set_repo(arg_0, arg_1, arg_2, arg_3, arg_4, arg_5)
+        let arg_4: bool = o.get_boolean("autocommit");
+        let arg_5: String = o.get_string("author");
+        let arg_6: String = o.get_string("nn_sessionid");
+        set_repo(arg_0, arg_1, arg_2, arg_3, arg_4, arg_5, arg_6)
     }));
     match ax {
         Ok(ax) => {
@@ -53,11 +54,13 @@ pub fn execute(o: DataObject) -> DataObject {
     }
 }
 
-pub fn set_repo(name: String, path: String, origin: String, role: String, author: String, nn_sessionid: String) -> DataObject {
+pub fn set_repo(name: String, path: String, origin: String, role: String, autocommit: bool, author: String, nn_sessionid: String) -> DataObject {
 // Replace-only, keyed on name (the Q7 setter idiom, set_plugin precedent).
 // runtime/dev/repos.json is per-instance local state - unjournaled like
 // plugins.json; `author` rides for symmetry with every other mutation.
 // Deterministic sorted-name layout so hand edits and command writes diff cleanly.
+// autocommit=true marks the repo for the dev.git.autocommit_sweep timer
+// (imported/created library repos default on; canon and overlay stay off).
 fn fail(msg: &str) -> DataObject {
     let mut o = DataObject::new();
     o.put_string("status", "err");
@@ -96,6 +99,13 @@ fn repos_file(entries: &DataObject) -> String {
                 if !ffirst { out.push(','); }
                 ffirst = false;
                 out.push_str(&format!("\n    \"{}\": \"{}\"", f, esc(&e.get_string(f))));
+            }
+        }
+        // the one non-string field; stored only when on, absent means off
+        if e.has("autocommit") {
+            if let Ok(true) = e.try_get_boolean("autocommit") {
+                if !ffirst { out.push(','); }
+                out.push_str("\n    \"autocommit\": true");
             }
         }
         out.push_str("\n  }");
@@ -150,6 +160,7 @@ let mut e = DataObject::new();
 e.put_string("path", &path);
 e.put_string("origin", &origin);
 e.put_string("role", &role);
+if autocommit { e.put_boolean("autocommit", true); }
 entries.put_object(&name, e);
 std::fs::create_dir_all(regpath.parent().unwrap()).unwrap();
 std::fs::write(&regpath, repos_file(&entries)).unwrap();
@@ -161,5 +172,6 @@ o.put_string("name", &name);
 o.put_string("path", &path);
 o.put_string("origin", &origin);
 o.put_string("role", &role);
+o.put_boolean("autocommit", autocommit);
 o
 }

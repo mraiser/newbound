@@ -14,65 +14,30 @@ botd.properties
 /venv
 /requirements.txt
 /repositories
+/.claude/
 
-/data/camera
-/data/chuckme
-/data/ds18b20
-/data/flowlang
-/data/positioning
-/data/rfm96
-/data/runtime
-/data/truckbot
-/data/nebula
-/data/raspberry
-/data/growboxhill
-/data/microphone
-/data/rplidar
-/data/site
-/data/tekforge
-/data/threejs
-/data/ui
-/data/video
-/data/site
-/data/blog
-/data/blogdata
-/data/automatic1111
-/data/discord
-/data/quickjourney
-/data/imgproc
-/data/mp42lora
-/data/testflow
-data/xoxo
-
+# The store and the runtime tree are local-first state: nothing in them
+# ships except the core libraries, so ignore by RULE and re-include the
+# tracked ones. A new library (data/foo, runtime/foo) is invisible to
+# canon by construction - no per-library list to maintain.
+/data/*
+!/data/app
+!/data/dev
+!/data/peer
+!/data/security
+/runtime/*
+!/runtime/app
+!/runtime/dev
+!/runtime/peer
+!/runtime/security
+# per-instance local state inside the tracked runtime/dev
 /runtime/dev/libraries/
-/runtime/camera
-/runtime/ds18b20
-/runtime/positioning
-/runtime/rfm96
-/runtime/truckbot
-/runtime/nebula
-/runtime/raspberry
-/runtime/growboxhill
-/runtime/chuckme
-/runtime/microphone
-/runtime/rplidar
-/runtime/tekforge
-/runtime/video
-/runtime/site
-/runtime/blog
-/runtime/blogdata
-/runtime/automatic1111
-/runtime/discord
-/runtime/quickjourney
-/runtime/imgproc
-/runtime/testflow
-/runtime/xoxo
+/runtime/dev/repos.json
+/runtime/dev/plugins.json
 
 # The agent library set (mraiser/newbound-agent) overlays here via
-# symlinks (its tools/overlay.sh). Never tracked in this repo.
-/data/agent
-/data/kb
-/data/scratch
+# symlinks (its tools/overlay.sh). Its crate dirs land at the root.
+# (data/agent, data/kb, data/scratch are covered by the /data/* rule.)
 /agent
 /kb
 /scratch

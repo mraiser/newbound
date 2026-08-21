@@ -1,5 +1,6 @@
 // This file is auto-generated and managed by the flowlang build script.
 use flowlang::rustcmd::Transform;
+pub mod autocommit_sweep;
 pub mod repos;
 pub mod remove_repo;
 pub mod set_repo;
@@ -15,4 +16,5 @@ pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
     cmds.push(("ztnxkn1a0242976cdh10".to_string(), set_repo::execute, "".to_string()));
     cmds.push(("ohzpil1a02429afb3x12".to_string(), remove_repo::execute, "".to_string()));
     cmds.push(("qnmlxy1a02429d988k14".to_string(), repos::execute, "".to_string()));
+    cmds.push(("xlqhrg1a02521633dv7".to_string(), autocommit_sweep::execute, "".to_string()));
 }

@@ -62,6 +62,19 @@ fn fail(msg: &str) -> DataObject {
     o.put_string("msg", msg);
     o
 }
+// git availability: one cached PATH scan per process - no spawn, so a
+// git-less box gets a plain answer instead of a spawn failure. (Installing
+// git while the instance runs needs a restart to be noticed.)
+let mut globals = DataStore::globals();
+let gitok = if globals.has("GIT_AVAILABLE") { globals.get_boolean("GIT_AVAILABLE") } else {
+    let ok = std::env::var("PATH").unwrap_or_default().split(':')
+        .any(|d| !d.is_empty() && std::path::Path::new(d).join("git").is_file());
+    globals.put_boolean("GIT_AVAILABLE", ok);
+    ok
+};
+if !gitok {
+    return fail("git is not installed (no 'git' on PATH) - dev.git is inert without it");
+}
 let regpath = DataStore::new().root.parent().unwrap()
     .join("runtime").join("dev").join("repos.json");
 if !regpath.exists() {

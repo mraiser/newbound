@@ -2,6 +2,8 @@
 // runtime/dev/repos.json is per-instance local state - unjournaled like
 // plugins.json; `author` rides for symmetry with every other mutation.
 // Deterministic sorted-name layout so hand edits and command writes diff cleanly.
+// autocommit=true marks the repo for the dev.git.autocommit_sweep timer
+// (imported/created library repos default on; canon and overlay stay off).
 fn fail(msg: &str) -> DataObject {
     let mut o = DataObject::new();
     o.put_string("status", "err");
@@ -40,6 +42,13 @@ fn repos_file(entries: &DataObject) -> String {
                 if !ffirst { out.push(','); }
                 ffirst = false;
                 out.push_str(&format!("\n    \"{}\": \"{}\"", f, esc(&e.get_string(f))));
+            }
+        }
+        // the one non-string field; stored only when on, absent means off
+        if e.has("autocommit") {
+            if let Ok(true) = e.try_get_boolean("autocommit") {
+                if !ffirst { out.push(','); }
+                out.push_str("\n    \"autocommit\": true");
             }
         }
         out.push_str("\n  }");
@@ -94,6 +103,7 @@ let mut e = DataObject::new();
 e.put_string("path", &path);
 e.put_string("origin", &origin);
 e.put_string("role", &role);
+if autocommit { e.put_boolean("autocommit", true); }
 entries.put_object(&name, e);
 std::fs::create_dir_all(regpath.parent().unwrap()).unwrap();
 std::fs::write(&regpath, repos_file(&entries)).unwrap();
@@ -105,4 +115,5 @@ o.put_string("name", &name);
 o.put_string("path", &path);
 o.put_string("origin", &origin);
 o.put_string("role", &role);
+o.put_boolean("autocommit", autocommit);
 o
