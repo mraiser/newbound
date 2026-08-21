@@ -1,171 +1,25 @@
 [
-  {
-    "claim": "list_control_patches returns newest-FIRST — two probe harnesses have failed by reading the wrong end",
-    "tags": "dev.code,journal",
-    "source": {
-      "doc": "CONTRACT.md §6"
-    },
-    "confidence": "high",
-    "time": 1785504820517
-  },
-  {
-    "claim": "/app/read answers 500 for the runtime library (store-only, never app-loaded) — read runtime state through dedicated commands (get_meta_identity, dev.plugins.list_plugins)",
-    "tags": "runtime,dev.code",
-    "source": {
-      "doc": "CONTRACT.md §6.3"
-    },
-    "confidence": "high",
-    "time": 1785504820517
-  },
-  {
-    "claim": "groups is SECURITY groups; categorization lives in the tags field via set_tags — never write tags into groups",
-    "tags": "security,tags,dev.code",
-    "source": {
-      "doc": "CONTRACT.md §6.8"
-    },
-    "confidence": "high",
-    "time": 1785504820517
-  },
-  {
-    "claim": "New dev.code commands are upsert → cargo build → restart (no dylib). Agent-lib commands keep the dylib hot-swap, which can abort mid-request over HTTP — author those over MCP",
-    "tags": "dev.code,upsert_command,mcp",
-    "source": {
-      "doc": "CONTRACT.md §6.6"
-    },
-    "confidence": "high",
-    "time": 1785504820517
-  },
-  {
-    "claim": "dev.code.set_groups derives the ENFORCED readers arrays from the groups string at save time, at all three levels: library meta.json; control record plus its inline data records (app.read's gate); command META record (the array check_security reads via lookup_command_id) plus impl record. Empty groups derives [] = admin-only. Returns changed/groups/readers.",
-    "detail": "Restores the retired editcontrol/editcommand derivation (readers = groups.split(',')). Library-level readers refresh into system.libraries on restart. writers is never touched (only app.delete consults it).",
-    "tags": "security,set_groups,readers,dev.code",
-    "source": {
-      "doc": "authored+verified on a disposable, session 2026-08-09 (branch claude/dev-ui-security-integration-lnonp5)"
-    },
-    "confidence": "high",
-    "time": 1786309390464
-  },
-  {
-    "claim": "patch_command_body, set_command_imports, and upsert_command preserve existing readers/writers on the records they rewrite; before 2026-08-09 every code edit reset a gated command to admin-only, because flowlang's data::write::write stamps whatever arrays it is passed.",
-    "tags": "security,readers,dev.code,preservation",
-    "source": {
-      "doc": "authored+verified on a disposable, session 2026-08-09 (branch claude/dev-ui-security-integration-lnonp5)"
-    },
-    "confidence": "high",
-    "time": 1786309390468
-  },
-  {
-    "claim": "The 17 author-taking dev.code commands declare nn_sessionid (platform-injected on all web calls) and default an empty author to the session user; set_module_flag no longer exists.",
-    "detail": "Browser clients pass author:\"\" — journals record the real session displayname. CLI/MCP callers pass author explicitly (provenance names like \"claude\") AND nn_sessionid:\"\" — every declared param required. The builder does not garbage-collect deleted commands: prune the generated .rs and its mod.rs registration by hand after delete_command on a static lib. Clean generated-src commits come from a de-overlay + newbound rebuild + re-overlay cycle (the de-overlayed binary loses the agent commands until re-regenerated — rebuild again after re-overlaying before any archivist call); the regenerated initializer may drop the cmd-scaffold block when data/cmd is absent — restore it rather than committing that noise.",
-    "tags": "bench-collapse",
-    "confidence": "high",
-    "time": 1786406673052
-  },
-  {
-    "claim": "dev.code.set_timer fails under `newbound exec` (add_timer needs the `system` globals that only init_globals creates) - run it through `newbound mcp` instead.",
-    "detail": "The failure is late: the timer component record and the control's timer entry are already written when add_timer panics, and the _patches journal entry is skipped. Re-running the same set_timer over mcp replaces the record and journals normally (replace-only semantics heal the partial write). Observed 2026-08-11 wiring dev.code.init.",
-    "tags": "set_timer, exec, mcp, globals",
-    "confidence": "high",
-    "time": 1786419691108
-  },
-  {
-    "claim": "dev.code.init (boot timer, start 0, once) seeds runtime/metaidentity with the default identity \"Some Dev\" when the record is absent, so fresh clones publish without hand-seeding.",
-    "detail": "Same pattern as security.security.init: an init timer on the dev.code control. No-op when an identity exists; edit via the workbench publish pane or dev.code.set_meta_identity. Landed on branch claude/metaidentity-startup-init-euh44x (newbound 6018c09); the scratch-instance recipes no longer seed by hand. Timers only fire under `newbound` (run mode) - exec and mcp modes never start timer_loop.",
-    "tags": "metaidentity, publishapp, boot, dev.code",
-    "confidence": "high",
-    "time": 1786419738826
-  },
-  {
-    "claim": "Library static assets pattern (owner idiom): plain files under data/<lib>/_ASSETS/ may be placed directly (the no-hand-edit rule covers store records, not _ASSETS) and compiled into command dylibs via include_str with a ../../../../data/<lib>/_ASSETS/... relative path - resolves correctly through both the overlay symlink and the real checkout. system_call (flowlang::flowlang::system::system_call) runs bash -c strings; nohup ... & inside detaches services cleanly.",
-    "tags": "assets",
-    "confidence": "high",
-    "time": 1786840042173
-  },
-  {
-    "claim": "Dylib-authoring gotcha: a command upserted mid-session is invisible to the ALREADY-RUNNING process that authored it - Command::lookup resolves against the dylib loaded at startup, so calling a just-authored command requires a fresh process. Author first, then start the process that exercises it.",
-    "tags": "phase3,gotcha",
-    "confidence": "high",
-    "time": 1786815200799
-  },
-  {
-    "claim": "Running the newbound SERVER in a disposable (2026-08-16): http only comes up if runtime/<app>/app.properties exists for EVERY app in config.properties apps= (stage each from data/<lib>/_APPS/<app>/) - init_globals loads libraries and registers the boot timers (incl app:service:init which binds HTTP) from those files; missing = silent no-listener. Also set http_port to a real port (0 = disabled). At boot the server auto-logs-in admin and prints http://localhost:<port>/<app>/index.html?sessionid=... to stdout - use that session for browser automation (admin password persists in users/admin.properties). curl needs --noproxy in the container.",
-    "tags": "testing",
-    "confidence": "high",
-    "time": 1786899133310
-  },
-  {
-    "claim": "Disposable-testing gotcha (cost an hour, 2026-08-17): a command upserted via dev.code in an MCP session is compiled into the dylib on disk but NOT loaded into that same process - hot reload only runs in server mode. Calling it in the same session yields No-such-command (and paths that swallow errors, like the executives catch_unwind around ask_llm, go silently dead - escalations read 0 with no error anywhere). Batteries must upsert stubs in one MCP session, kill it, and run assertions in a FRESH session.",
-    "tags": "testing",
-    "confidence": "high",
-    "time": 1786973023250
-  },
-  {
-    "claim": "dev.code.upsert_command compiles internally (it invokes dev.dev.compile itself and returns its verdict), so a separate compile call right after an upsert is a result-cache no-op; for an FFI-rooted library the upsert's OK already means the new code is live.",
-    "tags": "upsert,compile",
-    "source": {
-      "doc": "newbound-agent docs/ffi-dynamic-loading.md"
-    },
-    "confidence": "high",
-    "time": 1787152443064
-  },
-  {
-    "claim": "upsert_command has no desc parameter: a new command compiles and is callable immediately but stays INVISIBLE to tools/list until set_command_meta fills its desc - authoring and publishing to discovery are two separate steps",
-    "detail": "Bit during H1: all three agent.msg commands worked but --list showed nothing until their descs were set. desc is also the curation lever for what the model sees.",
-    "tags": "dev.code,desc,discovery",
-    "confidence": "high",
-    "time": 1787139770609
-  },
-  {
-    "claim": "Content-addressed storage is a CHOICE the store permits, not a property it has: set_data shards purely by id (flowlang datastore.rs get_data_file), ids are system-minted unless the caller supplies one, and supplying id = hash-of-content gives structural dedup (owner, 2026-08-19). Hash a whole record and nothing ever dedupes - split content (id=hash of text) from occurrence (minted or chained id) when occurrences carry their own facts",
-    "detail": "agent.msg is the working example: mc<fnv128-of-text> content records, mo... occurrence records pointing at them. Two speakers saying the same word = one content record, two occurrences.",
-    "tags": "datastore,content-addressing,dedup",
-    "confidence": "high",
-    "time": 1787139770694
-  },
-  {
-    "claim": "Facets are ATTACHMENTS: a control record's data carries attachmentkeynames and the content lives in sibling files (<id>.js etc.); get_data resolves them into data on read (both serde and non-serde paths), so d.has(facet)/get_string(facet) work after get_data - but raw record JSON on disk does NOT contain facet text",
-    "tags": "datastore,facets,attachments",
-    "confidence": "high",
-    "time": 1787140461633
-  },
-  {
-    "claim": "dev-code-evaluate_rust cannot work through per-call `newbound mcp` processes: it waits for hot reload, which only runs in server mode. The fresh-process driver's equivalent: upsert a scratch command in one call, execute it in the next (each nb-call IS a fresh process, so the same-session dylib gotcha never bites), delete it and prune the generated rs after",
-    "tags": "evaluate_rust,scratch,testing",
-    "confidence": "high",
-    "time": 1787140461927
-  },
-  {
-    "claim": "CORRECTION (2026-08-19, five-run instrumented investigation): the same-session dylib gotcha's MECHANISM was misdiagnosed - the hot-reload watcher IS armed under `newbound mcp` (initialize_all_commands starts it before the subcommand dispatch; its startup banner and inotify watches confirmed by strace). What actually fails is the reload-register seam: on a new-command upsert the watcher detects the change and dlopens the fresh temp copy, yet the command never appears in RUST_COMMANDS (5/5 reproductions, 15-25s waits), and in one run the debouncer thread died mid-println with no panic message. Related known bug (owner): hot-swapping while code from that same library runs in another thread crashes the whole process in server mode. The FACT stands - a command upserted in a live process is not callable in that process - but for new commands in EXISTING libraries too, not only new crates, and not because the watcher is absent",
-    "detail": "Consequences unchanged: author in one process, execute in a fresh one (each nb-call IS a fresh process, so the driver idiom is naturally safe); evaluate_rust cannot succeed in ANY single mcp process until the reload-register seam is fixed. interim-process.md section 2 claims this path verified working 2026-08-09 (flowlang 0.3.31 era) - either it regressed by 0.3.33 or that verification measured something else; worth an owner look at FlowLangLibrary::reload (call_mirror's Result is silently discarded - a diagnosability fix regardless). Also: every process start copies each dylib to /tmp/lib<name>_<ts>.so and cleanup rides Drop, so kill/terminate leaks them - 142 accumulated in one session of fresh-process calls.",
-    "tags": "hot-reload,mcp,dylib,gotcha",
-    "confidence": "high",
-    "time": 1787141356049
-  },
-  {
-    "claim": "newbound_core commands call same-crate commands DIRECTLY (use crate::...::<fn> import + plain function call), never via Command::lookup - the owner's rule, 2026-08-20: indirect invocation is unnecessary inside one crate. Applied to upsert_command/patch_command_body/set_command_imports (-> dev.dev.compile's compile()) and evaluate_rust (-> upsert_command(), invoke_command()), each direct call wrapped in catch_unwind to preserve the {status, kind:\"compile_error\", msg} error shape. Command indirection remains only where the target is runtime-resolved: dev.code.invoke_command, app.app.exec, peer.service.exec, app.service.init. Direct calls return the inner result UNWRAPPED - no Command \"a\" envelope (evaluate_rust's invoke result lost one nesting level).",
-    "tags": "dev.code,newbound_core,style,direct-calls",
-    "source": {
-      "doc": "newbound branch claude/newbound-core-direct-calls-qo26xm (dev.code direct-call refactor)"
-    },
-    "confidence": "high",
-    "time": 1787227760089
-  },
-  {
-    "claim": "CORRECTION to the 2026-08-20 direct-calls claim: a same-crate direct call must preserve the callee's OBSERVABLE result shape. Command::execute returns the generated wrapper's {\"a\": inner} envelope verbatim (flowlang 0.3.34 command.rs/rustcmd.rs - Rust commands never return Err), so replacing it with a direct inner-fn call strips one envelope level; any caller that received that object verbatim breaks. evaluate_rust hit this: its invoke result flows to callers unchanged, so it now re-wraps the direct invoke_command() result in the {\"a\": ...} envelope - external shape is byte-identical to the pre-refactor Command path (verified over MCP). The earlier claim's final sentence ('lost one nesting level') is superseded: NO caller-visible shape changed in the direct-call refactor. upsert_command/patch_command_body/set_command_imports were never affected - they unwrapped and repackaged the compile result, so their outputs were already identical.",
-    "tags": "dev.code,newbound_core,direct-calls,correction",
-    "source": {
-      "doc": "newbound branch claude/newbound-core-direct-calls-qo26xm (envelope restoration)"
-    },
-    "confidence": "high",
-    "time": 1787242782329
-  },
-  {
-    "claim": "CONTRACT (owner, 2026-08-20, supersedes both earlier envelope claims): dev.code.invoke_command's `result` carries the invoked command's ACTUAL return value - the wrapper packaging ({\"a\": <value>}) is stripped inside invoke_command using format_result's convention (err objects pass through; a flow with multiple named outputs stays whole; otherwise the \"a\" value is moved as Data, so non-object returns like strings and arrays carry cleanly). evaluate_rust passes invoke_command's {status, result|msg} through verbatim, so an eval answers {status:\"ok\", result: <script's value>}; a script that panics answers status ok with result {status:\"err\", msg} - outer status is the invocation outcome, result is what the script produced. Nothing downstream should ever need res.result.a digging.",
-    "tags": "dev.code,invoke_command,evaluate_rust,contract",
-    "source": {
-      "doc": "newbound branch claude/newbound-core-direct-calls-qo26xm (invoke result unwrap)"
-    },
-    "confidence": "high",
-    "time": 1787248076194
-  }
-]
+{"claim": "list_control_patches returns newest-FIRST — two probe harnesses have failed by reading the wrong end", "tags": "dev.code,journal", "source": {"doc": "CONTRACT.md §6"}, "confidence": "high", "time": 1785504820517},
+{"claim": "/app/read answers 500 for the runtime library (store-only, never app-loaded) — read runtime state through dedicated commands (get_meta_identity, dev.plugins.list_plugins)", "tags": "runtime,dev.code", "source": {"doc": "CONTRACT.md §6.3"}, "confidence": "high", "time": 1785504820517},
+{"claim": "groups is SECURITY groups; categorization lives in the tags field via set_tags — never write tags into groups", "tags": "security,tags,dev.code", "source": {"doc": "CONTRACT.md §6.8"}, "confidence": "high", "time": 1785504820517},
+{"claim": "New dev.code commands are upsert → cargo build → restart (no dylib). Agent-lib commands keep the dylib hot-swap, which can abort mid-request over HTTP — author those over MCP", "tags": "dev.code,upsert_command,mcp", "source": {"doc": "CONTRACT.md §6.6"}, "confidence": "high", "time": 1785504820517},
+{"claim": "dev.code.set_groups derives the ENFORCED readers arrays from the groups string at save time, at all three levels: library meta.json; control record plus its inline data records (app.read's gate); command META record (the array check_security reads via lookup_command_id) plus impl record. Empty groups derives [] = admin-only. Returns changed/groups/readers.", "detail": "Restores the retired editcontrol/editcommand derivation (readers = groups.split(',')). Library-level readers refresh into system.libraries on restart. writers is never touched (only app.delete consults it).", "tags": "security,set_groups,readers,dev.code", "source": {"doc": "authored+verified on a disposable, session 2026-08-09 (branch claude/dev-ui-security-integration-lnonp5)"}, "confidence": "high", "time": 1786309390464},
+{"claim": "patch_command_body, set_command_imports, and upsert_command preserve existing readers/writers on the records they rewrite; before 2026-08-09 every code edit reset a gated command to admin-only, because flowlang's data::write::write stamps whatever arrays it is passed.", "tags": "security,readers,dev.code,preservation", "source": {"doc": "authored+verified on a disposable, session 2026-08-09 (branch claude/dev-ui-security-integration-lnonp5)"}, "confidence": "high", "time": 1786309390468},
+{"claim": "The 17 author-taking dev.code commands declare nn_sessionid (platform-injected on all web calls) and default an empty author to the session user; set_module_flag no longer exists.", "detail": "Browser clients pass author:\"\" — journals record the real session displayname. CLI/MCP callers pass author explicitly (provenance names like \"claude\") AND nn_sessionid:\"\" — every declared param required. The builder does not garbage-collect deleted commands: prune the generated .rs and its mod.rs registration by hand after delete_command on a static lib. Clean generated-src commits come from a de-overlay + newbound rebuild + re-overlay cycle (the de-overlayed binary loses the agent commands until re-regenerated — rebuild again after re-overlaying before any archivist call); the regenerated initializer may drop the cmd-scaffold block when data/cmd is absent — restore it rather than committing that noise.", "tags": "bench-collapse", "confidence": "high", "time": 1786406673052},
+{"claim": "dev.code.set_timer fails under `newbound exec` (add_timer needs the `system` globals that only init_globals creates) - run it through `newbound mcp` instead.", "detail": "The failure is late: the timer component record and the control's timer entry are already written when add_timer panics, and the _patches journal entry is skipped. Re-running the same set_timer over mcp replaces the record and journals normally (replace-only semantics heal the partial write). Observed 2026-08-11 wiring dev.code.init.", "tags": "set_timer, exec, mcp, globals", "confidence": "high", "time": 1786419691108},
+{"claim": "dev.code.init (boot timer, start 0, once) seeds runtime/metaidentity with the default identity \"Some Dev\" when the record is absent, so fresh clones publish without hand-seeding.", "detail": "Same pattern as security.security.init: an init timer on the dev.code control. No-op when an identity exists; edit via the workbench publish pane or dev.code.set_meta_identity. Landed on branch claude/metaidentity-startup-init-euh44x (newbound 6018c09); the scratch-instance recipes no longer seed by hand. Timers only fire under `newbound` (run mode) - exec and mcp modes never start timer_loop.", "tags": "metaidentity, publishapp, boot, dev.code", "confidence": "high", "time": 1786419738826},
+{"claim": "Library static assets pattern (owner idiom): plain files under data/<lib>/_ASSETS/ may be placed directly (the no-hand-edit rule covers store records, not _ASSETS) and compiled into command dylibs via include_str with a ../../../../data/<lib>/_ASSETS/... relative path - resolves correctly through both the overlay symlink and the real checkout. system_call (flowlang::flowlang::system::system_call) runs bash -c strings; nohup ... & inside detaches services cleanly.", "tags": "assets", "confidence": "high", "time": 1786840042173},
+{"claim": "Dylib-authoring gotcha: a command upserted mid-session is invisible to the ALREADY-RUNNING process that authored it - Command::lookup resolves against the dylib loaded at startup, so calling a just-authored command requires a fresh process. Author first, then start the process that exercises it.", "tags": "phase3,gotcha", "confidence": "high", "time": 1786815200799},
+{"claim": "Running the newbound SERVER in a disposable (2026-08-16): http only comes up if runtime/<app>/app.properties exists for EVERY app in config.properties apps= (stage each from data/<lib>/_APPS/<app>/) - init_globals loads libraries and registers the boot timers (incl app:service:init which binds HTTP) from those files; missing = silent no-listener. Also set http_port to a real port (0 = disabled). At boot the server auto-logs-in admin and prints http://localhost:<port>/<app>/index.html?sessionid=... to stdout - use that session for browser automation (admin password persists in users/admin.properties). curl needs --noproxy in the container.", "tags": "testing", "confidence": "high", "time": 1786899133310},
+{"claim": "Disposable-testing gotcha (cost an hour, 2026-08-17): a command upserted via dev.code in an MCP session is compiled into the dylib on disk but NOT loaded into that same process - hot reload only runs in server mode. Calling it in the same session yields No-such-command (and paths that swallow errors, like the executives catch_unwind around ask_llm, go silently dead - escalations read 0 with no error anywhere). Batteries must upsert stubs in one MCP session, kill it, and run assertions in a FRESH session.", "tags": "testing", "confidence": "high", "time": 1786973023250},
+{"claim": "dev.code.upsert_command compiles internally (it invokes dev.dev.compile itself and returns its verdict), so a separate compile call right after an upsert is a result-cache no-op; for an FFI-rooted library the upsert's OK already means the new code is live.", "tags": "upsert,compile", "source": {"doc": "newbound-agent docs/ffi-dynamic-loading.md"}, "confidence": "high", "time": 1787152443064},
+{"claim": "upsert_command has no desc parameter: a new command compiles and is callable immediately but stays INVISIBLE to tools/list until set_command_meta fills its desc - authoring and publishing to discovery are two separate steps", "detail": "Bit during H1: all three agent.msg commands worked but --list showed nothing until their descs were set. desc is also the curation lever for what the model sees.", "tags": "dev.code,desc,discovery", "confidence": "high", "time": 1787139770609},
+{"claim": "Content-addressed storage is a CHOICE the store permits, not a property it has: set_data shards purely by id (flowlang datastore.rs get_data_file), ids are system-minted unless the caller supplies one, and supplying id = hash-of-content gives structural dedup (owner, 2026-08-19). Hash a whole record and nothing ever dedupes - split content (id=hash of text) from occurrence (minted or chained id) when occurrences carry their own facts", "detail": "agent.msg is the working example: mc<fnv128-of-text> content records, mo... occurrence records pointing at them. Two speakers saying the same word = one content record, two occurrences.", "tags": "datastore,content-addressing,dedup", "confidence": "high", "time": 1787139770694},
+{"claim": "Facets are ATTACHMENTS: a control record's data carries attachmentkeynames and the content lives in sibling files (<id>.js etc.); get_data resolves them into data on read (both serde and non-serde paths), so d.has(facet)/get_string(facet) work after get_data - but raw record JSON on disk does NOT contain facet text", "tags": "datastore,facets,attachments", "confidence": "high", "time": 1787140461633},
+{"claim": "dev-code-evaluate_rust cannot work through per-call `newbound mcp` processes: it waits for hot reload, which only runs in server mode. The fresh-process driver's equivalent: upsert a scratch command in one call, execute it in the next (each nb-call IS a fresh process, so the same-session dylib gotcha never bites), delete it and prune the generated rs after", "tags": "evaluate_rust,scratch,testing", "confidence": "high", "time": 1787140461927},
+{"claim": "CORRECTION (2026-08-19, five-run instrumented investigation): the same-session dylib gotcha's MECHANISM was misdiagnosed - the hot-reload watcher IS armed under `newbound mcp` (initialize_all_commands starts it before the subcommand dispatch; its startup banner and inotify watches confirmed by strace). What actually fails is the reload-register seam: on a new-command upsert the watcher detects the change and dlopens the fresh temp copy, yet the command never appears in RUST_COMMANDS (5/5 reproductions, 15-25s waits), and in one run the debouncer thread died mid-println with no panic message. Related known bug (owner): hot-swapping while code from that same library runs in another thread crashes the whole process in server mode. The FACT stands - a command upserted in a live process is not callable in that process - but for new commands in EXISTING libraries too, not only new crates, and not because the watcher is absent", "detail": "Consequences unchanged: author in one process, execute in a fresh one (each nb-call IS a fresh process, so the driver idiom is naturally safe); evaluate_rust cannot succeed in ANY single mcp process until the reload-register seam is fixed. interim-process.md section 2 claims this path verified working 2026-08-09 (flowlang 0.3.31 era) - either it regressed by 0.3.33 or that verification measured something else; worth an owner look at FlowLangLibrary::reload (call_mirror's Result is silently discarded - a diagnosability fix regardless). Also: every process start copies each dylib to /tmp/lib<name>_<ts>.so and cleanup rides Drop, so kill/terminate leaks them - 142 accumulated in one session of fresh-process calls.", "tags": "hot-reload,mcp,dylib,gotcha", "confidence": "high", "time": 1787141356049},
+{"claim": "newbound_core commands call same-crate commands DIRECTLY (use crate::...::<fn> import + plain function call), never via Command::lookup - the owner's rule, 2026-08-20: indirect invocation is unnecessary inside one crate. Applied to upsert_command/patch_command_body/set_command_imports (-> dev.dev.compile's compile()) and evaluate_rust (-> upsert_command(), invoke_command()), each direct call wrapped in catch_unwind to preserve the {status, kind:\"compile_error\", msg} error shape. Command indirection remains only where the target is runtime-resolved: dev.code.invoke_command, app.app.exec, peer.service.exec, app.service.init. Direct calls return the inner result UNWRAPPED - no Command \"a\" envelope (evaluate_rust's invoke result lost one nesting level).", "tags": "dev.code,newbound_core,style,direct-calls", "source": {"doc": "newbound branch claude/newbound-core-direct-calls-qo26xm (dev.code direct-call refactor)"}, "confidence": "high", "time": 1787227760089},
+{"claim": "CORRECTION to the 2026-08-20 direct-calls claim: a same-crate direct call must preserve the callee's OBSERVABLE result shape. Command::execute returns the generated wrapper's {\"a\": inner} envelope verbatim (flowlang 0.3.34 command.rs/rustcmd.rs - Rust commands never return Err), so replacing it with a direct inner-fn call strips one envelope level; any caller that received that object verbatim breaks. evaluate_rust hit this: its invoke result flows to callers unchanged, so it now re-wraps the direct invoke_command() result in the {\"a\": ...} envelope - external shape is byte-identical to the pre-refactor Command path (verified over MCP). The earlier claim's final sentence ('lost one nesting level') is superseded: NO caller-visible shape changed in the direct-call refactor. upsert_command/patch_command_body/set_command_imports were never affected - they unwrapped and repackaged the compile result, so their outputs were already identical.", "tags": "dev.code,newbound_core,direct-calls,correction", "source": {"doc": "newbound branch claude/newbound-core-direct-calls-qo26xm (envelope restoration)"}, "confidence": "high", "time": 1787242782329},
+{"claim": "CONTRACT (owner, 2026-08-20, supersedes both earlier envelope claims): dev.code.invoke_command's `result` carries the invoked command's ACTUAL return value - the wrapper packaging ({\"a\": <value>}) is stripped inside invoke_command using format_result's convention (err objects pass through; a flow with multiple named outputs stays whole; otherwise the \"a\" value is moved as Data, so non-object returns like strings and arrays carry cleanly). evaluate_rust passes invoke_command's {status, result|msg} through verbatim, so an eval answers {status:\"ok\", result: <script's value>}; a script that panics answers status ok with result {status:\"err\", msg} - outer status is the invocation outcome, result is what the script produced. Nothing downstream should ever need res.result.a digging.", "tags": "dev.code,invoke_command,evaluate_rust,contract", "source": {"doc": "newbound branch claude/newbound-core-direct-calls-qo26xm (invoke result unwrap)"}, "confidence": "high", "time": 1787248076194},
+{"claim": "An evaluate_rust script can call platform commands in-process through the generated typed API - crate::api::new().app.app.libs() - rather than going back out through Command lookup or MCP.", "detail": "Verified live 2026-08-20: a scratch script returned the 7 library meta objects from a direct api call alongside ordinary arithmetic and DataArray construction. This makes evaluate_rust a real orchestration surface for the owner's 'prefer writing rust to derive an answer' rule - a one-shot script can query and combine platform state without a round trip per command. Ordinary imports wiring applies (DataObject is automatic; ndata::dataarray::DataArray must be imported).", "tags": "dev.code,evaluate_rust,api,orchestration,rust,unreviewed", "confidence": "high", "time": 1787254173159},
+{"end": true}]

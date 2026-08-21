@@ -1,7 +1,10 @@
-# Memory facets are JSONL from the one-memory-cycle on (B2): one
-# canonical JSON object per line, written only by promote. union merge
-# is sound for that line-oriented form - parallel branches' promotes
-# concatenate, and exact-claim dedupe erases any doubled line.
-# (_patches journals stay pretty-printed JSON and get NO union rule:
-# line-merging nested JSON corrupts it.)
+# Memory facets are line-oriented JSON (one-memory-cycle B2): a JSON
+# array with one canonical object per line, every entry line comma-
+# terminated, closed by a constant {"end": true}] terminator line -
+# valid single-document JSON for the store loader, written only by
+# promote. union merge is sound for that form: parallel branches'
+# appends insert before the terminator and never touch a shared line,
+# and exact-claim dedupe erases any doubled line. (_patches journals
+# stay pretty-printed nested JSON and get NO union rule: line-merging
+# nested JSON corrupts it.)
 *.memory merge=union
