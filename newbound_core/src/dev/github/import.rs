@@ -160,7 +160,18 @@ for libid in &libids {
 
     // Shared activation: rebuild for static libs, initializer + crate +
     // host build for FFI libs (dev.dev.activate_lib).
-    let r = activate_lib(libid.to_owned());
+    // Activation must never abort the loop: rebuild_lib now returns ERROR
+    // strings on compile failure, and any residual panic deeper in the
+    // build path is caught here and collected like any other error.
+    let r = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| activate_lib(libid.to_owned()))) {
+        Ok(r) => r,
+        Err(e) => {
+            let why = if let Some(s) = e.downcast_ref::<String>() { s.clone() }
+                else if let Some(s) = e.downcast_ref::<&str>() { s.to_string() }
+                else { "unknown panic".to_string() };
+            format!("ERROR: activation panicked: {}", why)
+        }
+    };
     println!("UPDATED LIBRARY {:?}", libid);
     if r.starts_with("ERROR") { errs.push(format!("{}: {}", libid, r)); }
     else {

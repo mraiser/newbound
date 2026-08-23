@@ -71,7 +71,7 @@ if build_lib(lib.to_owned()) {
   println!("{}", ja.to_string());
 
   let (b, s) = execute_compile_command(ja, base_path);
-  if b { panic!("{}",s); }
+  if b { return "ERROR: compile failed: ".to_string()+&s; }
 }
 "OK".to_string()
 }
