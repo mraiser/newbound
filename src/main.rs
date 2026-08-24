@@ -33,6 +33,12 @@ fn main() {
         return;
       }
 
+      if x == "recompile" {
+        let lib = if params.len() > 2 { Some(params[2].to_owned()) } else { None };
+        recompile(lib);
+        return;
+      }
+
       if x == "mcp" {
         init_globals();
         flowlang::mcp::mcp::mcp::run();
@@ -118,4 +124,52 @@ fn main() {
       }
     }
   }
+}
+
+// Compile the FFI crate roots in one go - no source regeneration, just the
+// same feature-matched cargo build the platform's compile path runs. With no
+// library named, every library whose meta.json declares cargo.ffi is built;
+// with one named, only that library's crate root is.
+fn recompile(only: Option<String>) {
+  use flowlang::datastore::DataStore;
+  use newbound_core::dev::dev::compile::build_compile_command;
+  use newbound_core::dev::dev::compile::execute_compile_command;
+
+  let store = DataStore::new();
+  let libs: Vec<String> = match only {
+    Some(lib) => {
+      if !store.root.join(&lib).join("meta.json").exists() {
+        println!("ERROR: no such library: {}", lib);
+        std::process::exit(1);
+      }
+      vec![lib]
+    },
+    None => {
+      let mut v = Vec::new();
+      if let Ok(entries) = std::fs::read_dir(&store.root) {
+        for e in entries.flatten() {
+          if let Some(name) = e.file_name().to_str() {
+            let (_root, ffi) = store.lib_crate_info(name);
+            if ffi { v.push(name.to_string()); }
+          }
+        }
+      }
+      v.sort();
+      v
+    }
+  };
+
+  let mut failed = Vec::new();
+  for lib in &libs {
+    let root = store.get_lib_root(lib).display().to_string();
+    println!("RECOMPILING {} ({})", lib, &root);
+    let (bad, err) = execute_compile_command(build_compile_command(), root);
+    if bad {
+      println!("{}", err);
+      failed.push(lib.to_owned());
+    }
+  }
+  println!("{} compiled, {} failed{}", libs.len() - failed.len(), failed.len(),
+    if failed.is_empty() { String::new() } else { format!(" ({})", failed.join(", ")) });
+  if !failed.is_empty() { std::process::exit(1); }
 }
