@@ -275,6 +275,8 @@ function pollRemoteCrates(){
   d.css('display','block');
   if (me.cratePoll) clearInterval(me.cratePoll);
   me.cratePoll = setInterval(function(){
+    // same liveness idiom as me.update: a torn-down panel stops polling
+    if (me.check != $(ME).find('.rp-uuid')[0]) { clearInterval(me.cratePoll); return; }
     json('../peer/remote/'+uuid+'/dev/update_crates_status', null, function(r){
       var s = r.state + ' — step ' + (r.step||0) + '/4 ' + (r.label||'');
       if (r.state == 'done') s += ' — verdict: ' + r.verdict;
