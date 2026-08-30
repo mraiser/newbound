@@ -29,6 +29,16 @@
     <div class='hud_address_list padme addressexpand hideme'></div>
     P2P Port: <span class='hud_port'></span><br>
     HTTP Port: <span class='hud_http_port'></span><br>
+    <div class='hudcrates adminonly' style='display:none;'>
+      Platform: <span class='hud_crates'><i>checking...</i></span><br>
+      <div class='hudcrateform'>
+        <input type='text' class='textinput hud_flowlang' placeholder='flowlang' style='width:90px; display:inline-block;'>
+        <input type='text' class='textinput hud_ndata' placeholder='ndata' style='width:90px; display:inline-block;'>
+        <button class='coloredbutton hudcrateupdate'>Update Crates</button>
+        <button class='accentbutton hudcraterestart hideme'>Restart Instance</button>
+      </div>
+      <div class='hudcratestatus hideme' style='white-space:pre-wrap; font-family:monospace; font-size:11px; max-height:120px; overflow:auto;'></div>
+    </div>
     
     <img src="../app/asset/app/key_icon-white.png" class="icon-small-white">&nbsp;<span class='rp-key'><i>checking...</i></span>
     <img src="../app/asset/app/lock_icon-white.png" class="icon-small-white">&nbsp;<span class='rp-lock'><i>checking...</i></span>

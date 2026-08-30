@@ -142,3 +142,74 @@ $(ME).find('.open-system-settings').click(function() {
     }
   });
 });
+
+// --- Platform crate versions & instance restart ---
+function waitForRestart() {
+  var d = $(ME).find('.crate-update-status');
+  d.show().text('Restarting instance...');
+  setTimeout(function() {
+    var t = setInterval(function() {
+      $.ajax({ url: '../app/deviceid', timeout: 2000 }).done(function() {
+        clearInterval(t);
+        location.reload();
+      });
+    }, 2000);
+  }, 4000);
+}
+
+function pollCrateUpdate() {
+  var d = $(ME).find('.crate-update-status');
+  d.show();
+  if (me.cratePoll) clearInterval(me.cratePoll);
+  me.cratePoll = setInterval(function() {
+    json('../dev/update_crates_status', null, function(r) {
+      var s = 'state: ' + r.state + '   step ' + (r.step || 0) + '/4   ' + (r.label || '');
+      if (r.state == 'done') s += '\nverdict: ' + r.verdict + (r.verdict == 'restart' ? ' — press Save and Restart to apply' : '');
+      if (r.log_tail) s += '\n---\n' + r.log_tail.split('\n').slice(-12).join('\n');
+      d.text(s);
+      if (r.state != 'running') clearInterval(me.cratePoll);
+    });
+  }, 3000);
+}
+
+$(ME).find('.open-system-settings').click(function() {
+  json('../dev/crate_versions', null, function(r) {
+    if (r.status == 'ok') {
+      $(ME).find('.crate-section').show();
+      $('#flowlangver').val(r.flowlang);
+      $('#ndataver').val(r.ndata);
+    } else {
+      $(ME).find('.crate-section').hide();
+    }
+  });
+  json('../dev/update_crates_status', null, function(r) {
+    if (r.state == 'running') pollCrateUpdate();
+  });
+});
+
+$(ME).find('.update-crates').click(function() {
+  var fl = $('#flowlangver').val().trim();
+  var nd = $('#ndataver').val().trim();
+  if (!fl || !nd) { alert('Enter both crate versions.'); return; }
+  if (!confirm('Pin flowlang ' + fl + ' / ndata ' + nd + ' and rebuild the whole platform? This takes several minutes.')) return;
+  json('../dev/update_crates', 'flowlang=' + encodeURIComponent(fl) + '&ndata=' + encodeURIComponent(nd), function(r) {
+    var d = $(ME).find('.crate-update-status');
+    d.show().text(r.msg || r.state || 'launched');
+    if (r.status == 'ok') pollCrateUpdate();
+  });
+});
+
+$(ME).find('.save-and-restart').click(function() {
+  var o = {
+    machineid: $('#devicename').val(),
+    http_address: $('#ipaddr').val(),
+    http_port: $('#portnum').val(),
+    default_app: $('#defaultbot').val()
+  };
+  send_settings(o, function(result) {
+    json('../dev/restart_instance', null, function(r) {
+      if (r.msg && r.msg.indexOf('ERROR') == 0) { alert(r.msg); return; }
+      waitForRestart();
+    });
+  });
+});

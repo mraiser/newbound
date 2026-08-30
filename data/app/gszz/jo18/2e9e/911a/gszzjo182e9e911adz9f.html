@@ -67,6 +67,17 @@
       <label class='textinputlabel' for='defaultbot'>Default App</label>
       <select name='defaultbot' class='textinput' id='defaultbot'></select>
       <br><br>
+      <div class='crate-section' style='display:none;'>
+        <label class='textinputlabel' for='flowlangver'>flowlang Crate Version</label>
+        <input type='text' class='textinput' placeholder='e.g. 0.3.35' id='flowlangver'>
+        <br><br>
+        <label class='textinputlabel' for='ndataver'>ndata Crate Version</label>
+        <input type='text' class='textinput' placeholder='e.g. 0.3.18' id='ndataver'>
+        <br><br>
+        <a class='regularbutton update-crates'>Update Crates</a>
+        <div class='crate-update-status' style='display:none; white-space:pre-wrap; font-family:monospace; font-size:12px; margin-top:8px; max-height:160px; overflow:auto;'></div>
+        <br>
+      </div>
       <i style='color:var(--text-color-light);'>Changes require restart</i>
     </div>
     <div class="card-button-wrap">

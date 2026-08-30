@@ -10,6 +10,7 @@ me.ready = function(){
   me.update();
   document.body.api.ui.initNavbar(ME);
   document.body.api.ui.initPopups(ME);
+  initCrates();
   
   var uuid = ME.DATA.id;
   json('../peer/remote/'+uuid+'/app/libs', null, function(result){
@@ -244,4 +245,66 @@ $(ME).find('.refreshhud').on("click", me.refresh);
 
 $(ME).find('.closeonclick').on("click", function(){
   $(ME).find('.control-settings-popup').css('display', 'none');
+});
+
+// --- Platform crate versions on the remote peer (crate-update feature) ---
+function initCrates(){
+  var uuid = ME.DATA.id;
+  json('../peer/remote/'+uuid+'/dev/crate_versions', null, function(r){
+    if (r.status != 'ok') { $(ME).find('.hudcrates').remove(); return; }
+    me.remotecrates = r;
+    var s = 'flowlang ' + r.flowlang + ' / ndata ' + r.ndata + (r.mismatch ? ' (MANIFESTS DISAGREE)' : '');
+    $(ME).find('.hud_crates').text(s);
+    json('../dev/crate_versions', null, function(mine){
+      if (mine.status != 'ok') return;
+      $(ME).find('.hud_flowlang').val(mine.flowlang);
+      $(ME).find('.hud_ndata').val(mine.ndata);
+      if (mine.flowlang != r.flowlang || mine.ndata != r.ndata) {
+        $(ME).find('.hud_crates').append(' <span class="chip ispos">local: flowlang '+mine.flowlang+' / ndata '+mine.ndata+'</span>');
+      }
+    });
+  });
+  json('../peer/remote/'+uuid+'/dev/update_crates_status', null, function(r){
+    if (r.state == 'running') pollRemoteCrates();
+  });
+}
+
+function pollRemoteCrates(){
+  var uuid = ME.DATA.id;
+  var d = $(ME).find('.hudcratestatus');
+  d.css('display','block');
+  if (me.cratePoll) clearInterval(me.cratePoll);
+  me.cratePoll = setInterval(function(){
+    json('../peer/remote/'+uuid+'/dev/update_crates_status', null, function(r){
+      var s = r.state + ' — step ' + (r.step||0) + '/4 ' + (r.label||'');
+      if (r.state == 'done') s += ' — verdict: ' + r.verdict;
+      d.text(s);
+      if (r.state != 'running') {
+        clearInterval(me.cratePoll);
+        if (r.state == 'done' && r.verdict == 'restart') $(ME).find('.hudcraterestart').css('display','inline-block');
+      }
+    });
+  }, 3000);
+}
+
+$(ME).find('.hudcrateupdate').click(function(){
+  var uuid = ME.DATA.id;
+  var fl = $(ME).find('.hud_flowlang').val().trim();
+  var nd = $(ME).find('.hud_ndata').val().trim();
+  if (!fl || !nd) { alert('Enter both crate versions.'); return; }
+  if (!confirm('Pin flowlang '+fl+' / ndata '+nd+' on '+ME.DATA.name+' and rebuild its whole platform? This takes several minutes.')) return;
+  json('../peer/remote/'+uuid+'/dev/update_crates', 'flowlang='+encodeURIComponent(fl)+'&ndata='+encodeURIComponent(nd), function(r){
+    var d = $(ME).find('.hudcratestatus');
+    d.css('display','block').text(r.msg || 'launched');
+    if (r.status == 'ok') pollRemoteCrates();
+  });
+});
+
+$(ME).find('.hudcraterestart').click(function(){
+  var uuid = ME.DATA.id;
+  if (!confirm('Restart the Newbound instance on '+ME.DATA.name+'?')) return;
+  json('../peer/remote/'+uuid+'/dev/restart_instance', null, function(r){
+    $(ME).find('.hudcratestatus').css('display','block').text(r.msg || 'restart requested');
+    $(ME).find('.hudcraterestart').css('display','none');
+  });
 });

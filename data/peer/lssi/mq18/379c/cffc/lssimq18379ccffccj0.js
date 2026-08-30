@@ -436,6 +436,11 @@ function wakeFeed(){
 }
 
 $(ME).find('.updateallpeersbutton').click(function(){
+  // local crate versions first: the rows' crate-diff chips compare against them
+  json('../dev/crate_versions', null, function(r){ me.localcrates = r; buildUpdateDialog(); });
+});
+
+function buildUpdateDialog(){
   var newhtml = '<table cellpadding="10px" class="updateablepeerstable"><thead><tr><th><label class="plaincheckbox"><input type="checkbox" class="toggleallupdates"><span></span></label></th><th style="text-align:left;">Peer</th><th style="text-align:left;">Available Updates</th></tr></thead><tbody>';
   for (var i in me.peers) {
     var p = me.peers[i];
@@ -456,7 +461,7 @@ $(ME).find('.updateallpeersbutton').click(function(){
     var b = $(this).prop("checked");
     el.find('.libupdate').prop('checked', b);
   });;
-});
+}
 
 function checkForUpdates(peer) {
   var uuid = peer.id;
@@ -482,14 +487,25 @@ function checkForUpdates(peer) {
           }
         }
       }
-      var el = $(ME).find('.r_'+uuid);
-      if (newhtml == '') el.remove();
-      else {
-        el.find('.rowstatus').html(newhtml);
-        el.find('.removeupdate').click(function(){
-          $(this).closest('.chip').remove();
-        });
-      }
+      // crate pins ride the same row: a peer lagging the local flowlang/ndata
+      // versions gets a distinct chip (clickcrates, NOT clickupdate - the lib
+      // installer must never treat it as a library)
+      json('../peer/remote/'+uuid+'/dev/crate_versions', null, function(cr){
+        var lc = me.localcrates;
+        if (cr && cr.status == 'ok' && lc && lc.status == 'ok' && (cr.flowlang != lc.flowlang || cr.ndata != lc.ndata)) {
+          newhtml += '<span class="chip clickcrates" data-flowlang="'+lc.flowlang+'" data-ndata="'+lc.ndata+'">crates: flowlang '
+            + cr.flowlang + ' ➤ ' + lc.flowlang + ' / ndata ' + cr.ndata + ' ➤ ' + lc.ndata
+            + '<img src="../app/asset/app/close-white.png" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
+        }
+        var el = $(ME).find('.r_'+uuid);
+        if (newhtml == '') el.remove();
+        else {
+          el.find('.rowstatus').html(newhtml);
+          el.find('.removeupdate').click(function(){
+            $(this).closest('.chip').remove();
+          });
+        }
+      });
     }
   });
 }
@@ -505,7 +521,7 @@ $(ME).find('#updateallpeersnow').click(function(){
         libs.push($(chip).data('lib'));
       });
 
-      if (libs.length > 0) {
+      if (libs.length > 0 || row.find('.clickcrates').length > 0) {
 
         var recompile = false;
 
@@ -532,7 +548,19 @@ $(ME).find('#updateallpeersnow').click(function(){
             });
           }
           else {
-            if (recompile) {
+            var cratechip = row.find('.clickcrates');
+            if (cratechip.length > 0) {
+              // the crate runner's own rebuild+recompile covers everything a
+              // compile_rust would have done, so it replaces that step
+              var fl = cratechip.data('flowlang');
+              var nd = cratechip.data('ndata');
+              row.find('.rowstatus').html("<i>Updating platform crates to flowlang "+fl+" / ndata "+nd+"...</i>");
+              json('../peer/remote/'+peer+'/dev/update_crates', 'flowlang='+encodeURIComponent(fl)+'&ndata='+encodeURIComponent(nd), function(result){
+                if (result.status == 'ok') row.find('.rowstatus').html("<i>crate update launched — open the peer's panel for progress and the restart verdict</i>");
+                else row.find('.rowstatus').html('<font color="red">Error: '+result.msg+'</font>');
+              });
+            }
+            else if (recompile) {
               row.find('.rowstatus').html("<i>Recompiling Rust...</i>");
               json('../peer/remote/'+peer+'/dev/compile_rust', null, function(result){
                 row.remove();
