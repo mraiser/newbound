@@ -278,7 +278,7 @@ function pollRemoteCrates(){
     // same liveness idiom as me.update: a torn-down panel stops polling
     if (me.check != $(ME).find('.rp-uuid')[0]) { clearInterval(me.cratePoll); return; }
     json('../peer/remote/'+uuid+'/dev/update_crates_status', null, function(r){
-      var s = r.state + ' — step ' + (r.step||0) + '/4 ' + (r.label||'');
+      var s = r.state + ' — step ' + (r.step||0) + '/' + (r.steps||4) + ' ' + (r.label||'');
       if (r.state == 'done') s += ' — verdict: ' + r.verdict;
       d.text(s);
       if (r.state != 'running') {
@@ -296,6 +296,16 @@ $(ME).find('.hudcrateupdate').click(function(){
   if (!fl || !nd) { alert('Enter both crate versions.'); return; }
   if (!confirm('Pin flowlang '+fl+' / ndata '+nd+' on '+ME.DATA.name+' and rebuild its whole platform? This takes several minutes.')) return;
   json('../peer/remote/'+uuid+'/dev/update_crates', 'flowlang='+encodeURIComponent(fl)+'&ndata='+encodeURIComponent(nd), function(r){
+    var d = $(ME).find('.hudcratestatus');
+    d.css('display','block').text(r.msg || 'launched');
+    if (r.status == 'ok') pollRemoteCrates();
+  });
+});
+
+$(ME).find('.hudcratehardreset').click(function(){
+  var uuid = ME.DATA.id;
+  if (!confirm('HARD RESET '+ME.DATA.name+': re-clone canon newbound from GitHub over that instance (platform sources and core store), rebuild everything, and restart it when done. Its local libraries are untouched. This takes several minutes. Continue?')) return;
+  json('../peer/remote/'+uuid+'/dev/hard_reset', 'url=', function(r){
     var d = $(ME).find('.hudcratestatus');
     d.css('display','block').text(r.msg || 'launched');
     if (r.status == 'ok') pollRemoteCrates();

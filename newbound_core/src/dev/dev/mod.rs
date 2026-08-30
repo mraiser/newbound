@@ -1,5 +1,6 @@
 // This file is auto-generated and managed by the flowlang build script.
 use flowlang::rustcmd::Transform;
+pub mod hard_reset;
 pub mod restart_instance;
 pub mod update_crates_status;
 pub mod update_crates;
@@ -25,4 +26,5 @@ pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
     cmds.push(("mzhpqp1a052c4c270sc".to_string(), update_crates::execute, "".to_string()));
     cmds.push(("nxnqxj1a052c503b6ke".to_string(), update_crates_status::execute, "".to_string()));
     cmds.push(("zosxwm1a052c55690j10".to_string(), restart_instance::execute, "".to_string()));
+    cmds.push(("lwnwig1a052f17ecdt4".to_string(), hard_reset::execute, "".to_string()));
 }

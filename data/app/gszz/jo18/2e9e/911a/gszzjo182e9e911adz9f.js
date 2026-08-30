@@ -163,7 +163,7 @@ function pollCrateUpdate() {
   if (me.cratePoll) clearInterval(me.cratePoll);
   me.cratePoll = setInterval(function() {
     json('../dev/update_crates_status', null, function(r) {
-      var s = 'state: ' + r.state + '   step ' + (r.step || 0) + '/4   ' + (r.label || '');
+      var s = 'state: ' + r.state + '   step ' + (r.step || 0) + '/' + (r.steps || 4) + '   ' + (r.label || '');
       if (r.state == 'done') s += '\nverdict: ' + r.verdict + (r.verdict == 'restart' ? ' — press Save and Restart to apply' : '');
       if (r.log_tail) s += '\n---\n' + r.log_tail.split('\n').slice(-12).join('\n');
       d.text(s);
@@ -195,6 +195,15 @@ $(ME).find('.update-crates').click(function() {
   json('../dev/update_crates', 'flowlang=' + encodeURIComponent(fl) + '&ndata=' + encodeURIComponent(nd), function(r) {
     var d = $(ME).find('.crate-update-status');
     d.show().text(r.msg || r.state || 'launched');
+    if (r.status == 'ok') pollCrateUpdate();
+  });
+});
+
+$(ME).find('.hard-reset').click(function() {
+  if (!confirm('HARD RESET: re-clone canon newbound from GitHub over this instance (platform sources and core store), rebuild everything, and restart when done. Local libraries are untouched. This takes several minutes. Continue?')) return;
+  json('../dev/hard_reset', 'url=', function(r) {
+    var d = $(ME).find('.crate-update-status');
+    d.show().text(r.msg || 'launched');
     if (r.status == 'ok') pollCrateUpdate();
   });
 });

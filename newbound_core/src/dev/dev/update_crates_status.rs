@@ -68,6 +68,10 @@ match fs::read_to_string(&status_path) {
           state = "stalled".to_string();
         }
         out.put_int("step", if o.has("step") { o.get_int("step") } else { 0 });
+        // hard_reset runs share this status file; it stamps its own step count
+        // and kind so pollers can label the run without knowing who launched it
+        if o.has("steps") { out.put_int("steps", o.get_int("steps")); }
+        if o.has("kind") { out.put_string("kind", &o.get_string("kind")); }
         out.put_string("label", &(if o.has("label") { o.get_string("label") } else { String::new() }));
         out.put_int("pid", pid);
         out.put_int("time", if o.has("time") { o.get_int("time") } else { 0 });
