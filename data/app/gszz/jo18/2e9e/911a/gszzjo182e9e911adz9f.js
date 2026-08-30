@@ -1,11 +1,7 @@
 var me = this;
 var ME = $('#' + me.UUID)[0];
 
-json('../app/newlib', 'lib=runtime&readers=[]&writers=[]', function(result) {
-  if (result.status != 'ok' && result.msg.indexOf("UNAUTHORIZED") != -1) {
-    window.location.href = '../app/login.html';
-  }
-});
+// The login check/redirect now rides the shared app:home control in the titlebar.
 
 me.uiReady = function(ui) {
   me.ui = ui;

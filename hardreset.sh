@@ -20,4 +20,4 @@ cargo build --release --features="serde_support"
 cd ../
 CHUCKTHIS/target/release/newbound rebuild
 rm -rf CHUCKTHIS
-cargo run --release --features="serde_support"
+cargo run --release --features="serde_support" recompile
