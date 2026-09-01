@@ -96,7 +96,7 @@ let path = match reg.get_object(&repo).try_get_string("path") {
 let verb = verb.trim().to_string();
 let allowed: &[&str] = match mode.as_str() {
     "read" => &["status","log","diff","show","rev-parse","rev-list","branch","ls-files","blame","describe","remote"],
-    "write" => &["add","commit","checkout","branch","merge","tag","stash"],
+    "write" => &["add","commit","checkout","branch","merge","tag","stash","reset","revert"],
     "remote" => &["fetch","pull","push"],
     _ => return fail(&format!("unknown mode '{}'", mode)),
 };
