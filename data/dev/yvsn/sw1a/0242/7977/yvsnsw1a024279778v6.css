@@ -1,0 +1,162 @@
+/* git panel — styled off the dev frame's variables, with fallbacks so the
+   control also reads standalone (outside /dev/ the vars are absent). */
+.nb-gitpanel {
+  height: 100%;
+  overflow: auto;
+  padding: 28px 34px 70px;
+  color: var(--text, #d7dae0);
+  background: var(--ground, #121419);
+}
+.nb-gitpanel h1 {
+  font-family: var(--disp, inherit);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.nb-gitpanel .gp-head p {
+  color: var(--text-dim, #9aa0aa);
+  max-width: 68ch;
+  line-height: 1.55;
+  font-size: 13px;
+}
+.nb-gitpanel code {
+  font-family: var(--mono, ui-monospace, monospace);
+  color: var(--text, #d7dae0);
+}
+.nb-gitpanel .gp-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 16px 0 10px;
+}
+.nb-gitpanel .gp-tools button {
+  font: 11px var(--mono, ui-monospace, monospace);
+  color: var(--accent, #f0a63c);
+  border: 1px dashed var(--accent-dim, #a97425);
+  border-radius: 7px;
+  padding: 6px 14px;
+  background: transparent;
+  cursor: pointer;
+}
+.nb-gitpanel .gp-tools button:hover { background: rgba(240, 166, 60, 0.08); }
+.nb-gitpanel .gp-tools button:disabled { color: var(--text-faint, #6b7280); border-color: var(--line, #2a2e35); cursor: default; }
+.nb-gitpanel .gp-note { font: 10.5px var(--mono, ui-monospace, monospace); color: var(--text-dim, #9aa0aa); }
+
+/* registry form (set_repo — also fed by each row's edit button) */
+.nb-gitpanel .gp-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: var(--panel, #17191d);
+  border: 1px solid var(--line, #2a2e35);
+  border-radius: 8px;
+}
+.nb-gitpanel .gp-add input,
+.nb-gitpanel .gp-add select {
+  background: var(--panel-2, #1e2126);
+  border: 1px solid var(--line, #2a2e35);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font: 11.5px var(--mono, ui-monospace, monospace);
+  color: var(--text, #d7dae0);
+  flex: 1 1 180px;
+}
+.nb-gitpanel .gp-add select { flex: 0 1 auto; }
+.nb-gitpanel .gp-a-auto-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font: 11px var(--mono, ui-monospace, monospace);
+  color: var(--text-dim, #9aa0aa);
+  flex: none;
+}
+.nb-gitpanel .gp-a-save {
+  font: 11px var(--mono, ui-monospace, monospace);
+  color: var(--ground, #101215);
+  background: var(--accent, #f0a63c);
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.nb-gitpanel .gp-a-note { font: 10.5px var(--mono, ui-monospace, monospace); color: var(--danger, #e05d5d); }
+
+/* repo rows */
+.nb-gitpanel .gp-rows { display: flex; flex-direction: column; gap: 10px; }
+.nb-gitpanel .gp-rows.gp-empty { font: 11.5px var(--mono, ui-monospace, monospace); color: var(--text-faint, #6b7280); }
+.nb-gitpanel .gp-row {
+  padding: 12px 14px;
+  background: var(--panel, #17191d);
+  border: 1px solid var(--line, #2a2e35);
+  border-radius: 10px;
+}
+.nb-gitpanel .gp-line { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.nb-gitpanel .r-name { font: 600 14px var(--mono, ui-monospace, monospace); }
+.nb-gitpanel .r-role {
+  font: 10px var(--mono, ui-monospace, monospace);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint, #6b7280);
+  border: 1px solid var(--line, #2a2e35);
+  border-radius: 5px;
+  padding: 1px 7px;
+}
+.nb-gitpanel .r-auto { font: 10px var(--mono, ui-monospace, monospace); color: var(--accent, #f0a63c); }
+.nb-gitpanel .r-branch { font: 12px var(--mono, ui-monospace, monospace); color: var(--text-dim, #9aa0aa); }
+.nb-gitpanel .r-branch:not(:empty)::before { content: "⎇ "; color: var(--text-faint, #6b7280); }
+.nb-gitpanel .r-ab {
+  font: 11px var(--mono, ui-monospace, monospace);
+  color: var(--accent, #f0a63c);
+  font-variant-numeric: tabular-nums;
+}
+.nb-gitpanel .r-dirty { font: 11px var(--mono, ui-monospace, monospace); }
+.nb-gitpanel .r-dirty.good { color: var(--ok, #69b076); }
+.nb-gitpanel .r-dirty.warn { color: var(--accent, #f0a63c); }
+.nb-gitpanel .r-dirty.bad { color: var(--danger, #e05d5d); }
+.nb-gitpanel .r-state { font: 10.5px var(--mono, ui-monospace, monospace); color: var(--danger, #e05d5d); }
+.nb-gitpanel .gp-path { font: 10.5px var(--mono, ui-monospace, monospace); color: var(--text-faint, #6b7280); margin-top: 3px; }
+.nb-gitpanel .gp-acts { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+.nb-gitpanel .gp-acts button {
+  font: 10.5px var(--mono, ui-monospace, monospace);
+  color: var(--accent, #f0a63c);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.nb-gitpanel .gp-acts button:hover { text-decoration: underline; }
+.nb-gitpanel .gp-acts button:disabled { color: var(--text-faint, #6b7280); cursor: default; text-decoration: none; }
+.nb-gitpanel .gp-acts .r-rm { color: var(--danger, #e05d5d); margin-left: auto; }
+
+/* shared output pane — last command's stdout/stderr, verbatim */
+.nb-gitpanel .gp-outwrap {
+  margin-top: 14px;
+  border: 1px solid var(--line, #2a2e35);
+  border-radius: 8px;
+  background: var(--panel, #17191d);
+}
+.nb-gitpanel .gp-out-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line-soft, #23262c);
+}
+.nb-gitpanel .gp-out-title { font: 10.5px var(--mono, ui-monospace, monospace); color: var(--text-dim, #9aa0aa); }
+.nb-gitpanel .gp-out-close { font: 11px var(--mono, ui-monospace, monospace); color: var(--text-faint, #6b7280); background: none; border: none; cursor: pointer; }
+.nb-gitpanel .gp-out {
+  font: 11px var(--mono, ui-monospace, monospace);
+  padding: 10px 12px;
+  margin: 0;
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: var(--text, #d7dae0);
+}
+.nb-gitpanel .gp-out.failed { color: var(--danger, #e05d5d); }
+.nb-gitpanel [hidden] { display: none !important; }

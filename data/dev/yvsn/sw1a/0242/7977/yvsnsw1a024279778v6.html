@@ -1,0 +1,42 @@
+<section class="nb-gitpanel">
+  <header class="gp-head">
+    <h1>Git</h1>
+    <p>The registered repos from <code>runtime/dev/repos.json</code> — status at
+    a glance, commit / fetch / pull / push per repo, and the autocommit sweeper
+    on demand. Every action runs through <code>dev.git</code>'s no-shell argv
+    engine; pull is fast-forward-only by mechanism.</p>
+  </header>
+  <div class="gp-tools">
+    <button type="button" class="gp-refresh">↻ refresh</button>
+    <button type="button" class="gp-sweep"
+      title="stage + commit every dirty repo flagged autocommit (dev.git.autocommit_sweep) — the 5-minute timer's sweep, on demand">⟳ autocommit sweep</button>
+    <button type="button" class="gp-add-open">+ register repo</button>
+    <span class="gp-note"></span>
+  </div>
+  <form class="gp-add" hidden>
+    <input class="gp-a-name" placeholder="name — the handle dev.git commands use"
+           aria-label="Repo registry name">
+    <input class="gp-a-path" placeholder="path — a git checkout on this instance"
+           aria-label="Repo path">
+    <input class="gp-a-origin" placeholder="origin url (empty = auto-fill from the remote)"
+           aria-label="Origin url">
+    <select class="gp-a-role" aria-label="Repo role">
+      <option value="library">library</option>
+      <option value="canon">canon</option>
+      <option value="overlay">overlay</option>
+      <option value="foreign">foreign</option>
+    </select>
+    <label class="gp-a-auto-row"><input type="checkbox" class="gp-a-auto">
+      autocommit</label>
+    <button type="submit" class="gp-a-save">set repo</button>
+    <span class="gp-a-note"></span>
+  </form>
+  <div class="gp-rows gp-empty">loading…</div>
+  <div class="gp-outwrap" hidden>
+    <div class="gp-out-head">
+      <span class="gp-out-title"></span>
+      <button type="button" class="gp-out-close">✕</button>
+    </div>
+    <pre class="gp-out"></pre>
+  </div>
+</section>
