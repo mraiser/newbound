@@ -158,7 +158,7 @@ async function init(host, props) {
         <button type="button" class="r-fetch">fetch</button>
         <button type="button" class="r-pull" title="fast-forward only — errors rather than merging on divergence">pull</button>
         <button type="button" class="r-push">push</button>
-        <button type="button" class="r-branch-new" title="create and switch to a new branch (checkout -b)">branch…</button>
+        <button type="button" class="r-branch-new" title="create and switch to a new branch (checkout -b), then publish it upstream (push -u origin) so pull works from the start">branch…</button>
         <button type="button" class="r-publish" title="publish the current branch upstream (push -u origin)">publish</button>
         <button type="button" class="r-merge" title="merge the current branch into master/main and push it upstream (dev.git.merge_to_master)">merge→master</button>
         <button type="button" class="r-abandon" title="abandon the current branch — back to master/main, delete the label; the working tree is kept (dev.git.abandon_branch)">abandon</button>
@@ -221,9 +221,30 @@ async function init(host, props) {
       return b;
     };
     row.querySelector(".r-branch-new").onclick = async (e) => {
-      const name = prompt(`new branch for ${repo.name} (checkout -b):`);
+      const name = prompt(`new branch for ${repo.name} (checkout -b, then push -u origin):`);
       if (!name || !name.trim()) return;
-      if (await act(e.target, "write", "checkout", ["-b", name.trim()])) refreshStatus(repo, row);
+      const b = name.trim();
+      const btn = e.target;
+      btn.disabled = true;
+      const co = await runGit("write", { repo: repo.name, verb: "checkout", args: ["-b", b] });
+      if (!co.ok) {
+        btn.disabled = false;
+        showOut(`${repo.name} · git checkout -b ${b}`,
+          [co.out, co.err].filter(Boolean).join("\n") || co.msg || "failed", true);
+        return;
+      }
+      // publish immediately so the branch tracks origin from birth — a bare
+      // pull on an untracked branch is refused by git (the owner's 2026-09-05
+      // failure), so tracking is set by mechanism, not by remembering to.
+      const pu = await runGit("remote_op", { repo: repo.name, verb: "push", args: ["-u", "origin", b] });
+      btn.disabled = false;
+      const lines = [`— checkout -b ${b} —`, co.out, co.err,
+        `— push -u origin ${b} —`, pu.out, pu.err, !pu.ok && !pu.out && !pu.err ? pu.msg : ""];
+      showOut(`${repo.name} · new branch ${b}`, lines.filter(Boolean).join("\n"), !pu.ok);
+      toast.show(pu.ok
+        ? `branch ${b} created and published (tracking origin/${b})`
+        : `branch ${b} created locally — publish failed; use publish once origin is reachable`);
+      refreshStatus(repo, row);
     };
     row.querySelector(".r-publish").onclick = async (e) => {
       const cur = curBranch();
