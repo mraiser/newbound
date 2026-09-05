@@ -46,3 +46,17 @@ botd.properties
 # overlay-aware - it absorbs whatever libraries the local checkout
 # carries, so it must never be tracked anywhere.
 **/src/api.rs
+
+# Local FFI crates and folders
+/REMOTE
+/fillmore
+/genmore
+/grabmore
+/gudrun
+/hollis
+/http_log/
+/models/
+/nebula
+/oneshot_base
+/trainmore
+

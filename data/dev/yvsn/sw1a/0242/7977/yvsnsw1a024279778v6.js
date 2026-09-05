@@ -122,6 +122,7 @@ async function init(host, props) {
       return;
     }
     const s = parseStatus(r.out);
+    row.dataset.branch = s.branch;
     branchEl.textContent = s.branch;
     const dirty = s.changes + s.untracked;
     dirtyEl.textContent = dirty
@@ -139,8 +140,8 @@ async function init(host, props) {
       <div class="gp-line">
         <span class="r-name"></span>
         <span class="r-role"></span>
-        <span class="r-auto" hidden
-          title="autocommit — the 5-minute sweeper stages and commits this repo when dirty">⟳ auto</span>
+        <button type="button" class="r-auto"
+          title="autocommit — the 5-minute sweeper stages and commits this repo when dirty; click to toggle">⟳ auto</button>
         <span class="r-branch"></span>
         <span class="r-ab"></span>
         <span class="r-dirty"></span>
@@ -149,19 +150,43 @@ async function init(host, props) {
       <div class="gp-path"></div>
       <div class="gp-acts">
         <button type="button" class="r-status" title="full porcelain status in the output pane">status</button>
+        <button type="button" class="r-store" title="store-aware status — data/ paths named as controls, facets, commands">store</button>
+        <button type="button" class="r-cunit" title="stage one control's full store closure (record, facets, commands, impls, journal, index, generated src) and commit it">commit unit…</button>
         <button type="button" class="r-log">log</button>
         <button type="button" class="r-diff">diff</button>
         <button type="button" class="r-commit" title="stages everything (add -A), then commits with your message">commit…</button>
         <button type="button" class="r-fetch">fetch</button>
         <button type="button" class="r-pull" title="fast-forward only — errors rather than merging on divergence">pull</button>
         <button type="button" class="r-push">push</button>
+        <button type="button" class="r-branch-new" title="create and switch to a new branch (checkout -b), then publish it upstream (push -u origin) so pull works from the start">branch…</button>
+        <button type="button" class="r-publish" title="publish the current branch upstream (push -u origin)">publish</button>
+        <button type="button" class="r-merge" title="merge the current branch into master/main and push it upstream (dev.git.merge_to_master)">merge→master</button>
+        <button type="button" class="r-abandon" title="abandon the current branch — back to master/main, delete the label; the working tree is kept (dev.git.abandon_branch)">abandon</button>
         <button type="button" class="r-edit" title="load this entry into the register form">edit</button>
         <button type="button" class="r-rm"
           title="unregister from repos.json — the working tree on disk is never touched">remove</button>
       </div>`;
     row.querySelector(".r-name").textContent = repo.name;
     row.querySelector(".r-role").textContent = repo.role ?? "";
-    row.querySelector(".r-auto").hidden = repo.autocommit !== true;
+    const autoBtn = row.querySelector(".r-auto");
+    function paintAuto() {
+      autoBtn.textContent = repo.autocommit === true ? "⟳ auto on" : "auto off";
+      autoBtn.classList.toggle("on", repo.autocommit === true);
+    }
+    paintAuto();
+    autoBtn.onclick = async () => {
+      autoBtn.disabled = true;
+      const env = await git("set_autocommit", { name: repo.name, autocommit: repo.autocommit !== true });
+      autoBtn.disabled = false;
+      const d = unwrap(env);
+      if (env.status !== "ok" || d.status === "err") {
+        toast.show(`set_autocommit failed: ${env.msg || d.msg || "?"}`);
+        return;
+      }
+      repo.autocommit = d.autocommit === true;
+      paintAuto();
+      toast.show(`autocommit ${repo.autocommit ? "on" : "off"} → ${repo.name}`);
+    };
     row.querySelector(".gp-path").textContent = repo.path ?? "";
 
     // run one git verb, show its output verbatim, report ok
@@ -189,6 +214,78 @@ async function init(host, props) {
     row.querySelector(".r-push").onclick = async (e) => {
       if (await act(e.target, "remote_op", "push", [])) refreshStatus(repo, row);
     };
+    // current branch as last painted by refreshStatus; "?" = status never parsed
+    const curBranch = () => {
+      const b = row.dataset.branch || "";
+      if (!b || b === "?") { toast.show("current branch unknown — refresh first"); return null; }
+      return b;
+    };
+    row.querySelector(".r-branch-new").onclick = async (e) => {
+      const name = prompt(`new branch for ${repo.name} (checkout -b, then push -u origin):`);
+      if (!name || !name.trim()) return;
+      const b = name.trim();
+      const btn = e.target;
+      btn.disabled = true;
+      const co = await runGit("write", { repo: repo.name, verb: "checkout", args: ["-b", b] });
+      if (!co.ok) {
+        btn.disabled = false;
+        showOut(`${repo.name} · git checkout -b ${b}`,
+          [co.out, co.err].filter(Boolean).join("\n") || co.msg || "failed", true);
+        return;
+      }
+      // publish immediately so the branch tracks origin from birth — a bare
+      // pull on an untracked branch is refused by git (the owner's 2026-09-05
+      // failure), so tracking is set by mechanism, not by remembering to.
+      const pu = await runGit("remote_op", { repo: repo.name, verb: "push", args: ["-u", "origin", b] });
+      btn.disabled = false;
+      const lines = [`— checkout -b ${b} —`, co.out, co.err,
+        `— push -u origin ${b} —`, pu.out, pu.err, !pu.ok && !pu.out && !pu.err ? pu.msg : ""];
+      showOut(`${repo.name} · new branch ${b}`, lines.filter(Boolean).join("\n"), !pu.ok);
+      toast.show(pu.ok
+        ? `branch ${b} created and published (tracking origin/${b})`
+        : `branch ${b} created locally — publish failed; use publish once origin is reachable`);
+      refreshStatus(repo, row);
+    };
+    row.querySelector(".r-publish").onclick = async (e) => {
+      const cur = curBranch();
+      if (!cur) return;
+      if (await act(e.target, "remote_op", "push", ["-u", "origin", cur])) refreshStatus(repo, row);
+    };
+    row.querySelector(".r-merge").onclick = async (e) => {
+      const cur = curBranch();
+      if (!cur) return;
+      const btn = e.target;
+      btn.disabled = true;
+      const env = await git("merge_to_master", { repo: repo.name, branch: cur });
+      btn.disabled = false;
+      const d = unwrap(env);
+      const failed = env.status !== "ok" || d.status === "err";
+      const lines = [d.msg || env.msg || ""].concat(Array.isArray(d.steps) ? d.steps : []);
+      showOut(`${repo.name} · merge ${cur} → default`,
+        lines.filter(Boolean).join("\n") || "(no output)", failed);
+      if (!failed) toast.show(`merged ${cur} → ${repo.name}'s default and pushed`);
+      refreshStatus(repo, row);
+    };
+    const ab = row.querySelector(".r-abandon");
+    ab.onclick = async () => {
+      const cur = curBranch();
+      if (!cur) return;
+      // two-click confirm, the remove button's idiom — this deletes the branch label
+      if (ab.textContent !== "really abandon?") {
+        ab.textContent = "really abandon?";
+        setTimeout(() => { ab.textContent = "abandon"; }, 2500);
+        return;
+      }
+      ab.textContent = "abandon";
+      ab.disabled = true;
+      const env = await git("abandon_branch", { repo: repo.name, branch: cur, discard: false });
+      ab.disabled = false;
+      const d = unwrap(env);
+      const failed = env.status !== "ok" || d.status === "err";
+      showOut(`${repo.name} · abandon ${cur}`, d.msg || env.msg || "(no output)", failed);
+      if (!failed) toast.show(`abandoned ${cur} → back on ${d.now_on || "default"}`);
+      refreshStatus(repo, row);
+    };
     row.querySelector(".r-commit").onclick = async (e) => {
       const msg = prompt(`commit message for ${repo.name} (stages everything first):`);
       if (!msg || !msg.trim()) return;
@@ -205,6 +302,35 @@ async function init(host, props) {
       showOut(`${repo.name} · git commit`,
         [com.out, com.err].filter(Boolean).join("\n") || com.msg || "(no output)", !com.ok);
       if (com.ok) { toast.show(`commit → ${repo.name}`); refreshStatus(repo, row); }
+    };
+    row.querySelector(".r-store").onclick = async (e) => {
+      const btn = e.target;
+      btn.disabled = true;
+      const env = await git("store_status", { repo: repo.name });
+      btn.disabled = false;
+      const d = unwrap(env);
+      if (env.status !== "ok") { showOut(`${repo.name} · store status`, env.msg || "failed", true); return; }
+      showOut(`${repo.name} · store status`, d.text || "(clean)", false);
+    };
+    row.querySelector(".r-cunit").onclick = async (e) => {
+      const unit = prompt(`commit unit in ${repo.name} — lib.control (e.g. dev.git):`);
+      if (!unit || !unit.includes(".")) return;
+      const dot = unit.indexOf(".");
+      const msg = prompt(`commit message for ${unit.trim()}:`);
+      if (!msg || !msg.trim()) return;
+      const btn = e.target;
+      btn.disabled = true;
+      const env = await git("commit_unit", {
+        repo: repo.name, lib: unit.slice(0, dot).trim(), ctl: unit.slice(dot + 1).trim(),
+        message: msg.trim(), author: ""
+      });
+      btn.disabled = false;
+      const d = unwrap(env);
+      if (env.status !== "ok") { showOut(`${repo.name} · commit unit`, env.msg || "failed", true); return; }
+      const lines = [`${d.unit} — staged ${(d.staged || []).length} path(s), committed: ${d.committed}`];
+      if (d.out) lines.push(d.out);
+      showOut(`${repo.name} · commit unit`, lines.join("\n"), false);
+      if (d.committed) { toast.show(`commit → ${d.unit}`); refreshStatus(repo, row); }
     };
     row.querySelector(".r-edit").onclick = () => openAdd(repo);
     const rm = row.querySelector(".r-rm");
