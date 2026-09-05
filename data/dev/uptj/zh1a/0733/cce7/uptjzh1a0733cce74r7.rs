@@ -2,7 +2,9 @@
 // against its upstream AND against origin/<default> - the number the owner
 // asked for ("do I have work master has never seen? has master moved?").
 // Read-only apart from the optional fetch --prune, which is what makes the
-// numbers real rather than as-of-the-last-click.
+// numbers real rather than as-of-the-last-click. `files` names every dirty
+// path so the panel's "N uncommitted" chip can say WHICH (Cargo.lock, forever
+// rewritten by the builder, is the standing case).
 fn fail(msg: &str) -> DataObject {
     let mut o = DataObject::new();
     o.put_string("status", "err");
@@ -23,6 +25,32 @@ fn errs(r: &DataObject) -> String {
 fn ref_exists(repo: &str, r: &str) -> bool {
     let x = crate::dev::git::read::read(repo.to_string(), "rev-parse".to_string(), sargs(&["--verify", "--quiet", r]));
     okr(&x) && !outs(&x).trim().is_empty()
+}
+// everything after the first n space-separated tokens (porcelain v2 paths may contain spaces)
+fn after_tokens(line: &str, n: usize) -> &str {
+    let mut rest = line;
+    for _ in 0..n {
+        match rest.find(' ') { Some(i) => rest = &rest[i + 1..], None => return "" }
+    }
+    rest
+}
+// porcelain v2's XY column as a word: "modified", "added (staged)", "modified (staged added)"...
+fn status_word(xy: &str) -> String {
+    fn word(c: char) -> &'static str {
+        match c { 'A' => "added", 'D' => "deleted", 'R' => "renamed", 'C' => "copied", 'T' => "typechange", 'M' => "modified", _ => "" }
+    }
+    let x = word(xy.chars().next().unwrap_or('.'));
+    let y = word(xy.chars().nth(1).unwrap_or('.'));
+    if !y.is_empty() && !x.is_empty() { format!("{} (staged {})", y, x) }
+    else if !y.is_empty() { y.to_string() }
+    else if !x.is_empty() { format!("{} (staged)", x) }
+    else { xy.to_string() }
+}
+fn push_file(files: &mut DataArray, path: &str, status: &str) {
+    let mut f = DataObject::new();
+    f.put_string("path", path);
+    f.put_string("status", status);
+    files.push_object(f);
 }
 
 let repo = repo.trim().to_string();
@@ -53,6 +81,7 @@ if !okr(&st) { return fail(&format!("status failed: {}", errs(&st))); }
 let mut branch = String::new();
 let mut upstream = String::new();
 let (mut ahead, mut behind, mut changes, mut untracked, mut conflicts) = (0i64, 0i64, 0i64, 0i64, 0i64);
+let mut files = DataArray::new();
 for line in outs(&st).lines() {
     if let Some(h) = line.strip_prefix("# branch.head ") { branch = h.trim().to_string(); }
     else if let Some(u) = line.strip_prefix("# branch.upstream ") { upstream = u.trim().to_string(); }
@@ -62,9 +91,20 @@ for line in outs(&st).lines() {
             else if let Some(n) = tok.strip_prefix('-') { behind = n.parse().unwrap_or(0); }
         }
     }
-    else if line.starts_with("? ") { untracked += 1; }
-    else if line.starts_with("u ") { conflicts += 1; changes += 1; }
-    else if line.starts_with("1 ") || line.starts_with("2 ") { changes += 1; }
+    else if line.starts_with("? ") { untracked += 1; push_file(&mut files, after_tokens(line, 1), "untracked"); }
+    else if line.starts_with("u ") { conflicts += 1; changes += 1; push_file(&mut files, after_tokens(line, 10), "conflicted"); }
+    else if line.starts_with("1 ") {
+        changes += 1;
+        let xy = line.split(' ').nth(1).unwrap_or("");
+        push_file(&mut files, after_tokens(line, 8), &status_word(xy));
+    }
+    else if line.starts_with("2 ") {
+        changes += 1;
+        let xy = line.split(' ').nth(1).unwrap_or("");
+        let p = after_tokens(line, 9);
+        let p = p.split('\t').next().unwrap_or(p);
+        push_file(&mut files, p, &status_word(xy));
+    }
 }
 let detached = branch == "(detached)" || branch.is_empty();
 
@@ -101,6 +141,10 @@ let on_default = !default.is_empty() && branch == default;
 let published = !upstream.is_empty();
 let dirty = changes + untracked;
 let clean = dirty == 0 && op.is_empty();
+// a dirty tree does not block the workflow verbs: git itself refuses a checkout
+// or merge that would overwrite an edit, and untouched edits ride along.
+// Conflicts and an operation in flight do block.
+let workable = !detached && op.is_empty() && conflicts == 0 && !on_default && !default.is_empty();
 
 // 6. the sentence
 let mut parts: Vec<String> = Vec::new();
@@ -137,13 +181,14 @@ o.put_int("untracked", untracked);
 o.put_int("conflicts", conflicts);
 o.put_int("dirty", dirty);
 o.put_boolean("clean", clean);
+o.put_array("files", files);
 o.put_string("op", op);
 o.put_string("default", &default);
 o.put_string("base", &base);
 o.put_boolean("on_default", on_default);
 o.put_int("ahead_base", ahead_base);
 o.put_int("behind_base", behind_base);
-o.put_boolean("needs_update", behind_base > 0 && !on_default);
-o.put_boolean("can_merge", ahead_base > 0 && clean && !on_default && !detached && !default.is_empty());
+o.put_boolean("needs_update", workable && behind_base > 0);
+o.put_boolean("can_merge", workable && ahead_base > 0);
 o.put_string("summary", &parts.join(" · "));
 o

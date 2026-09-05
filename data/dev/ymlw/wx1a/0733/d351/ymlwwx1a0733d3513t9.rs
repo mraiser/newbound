@@ -1,11 +1,12 @@
 // "Start a new working branch from master." Compound, transactional:
 // fetch -> checkout default -> fast-forward it to origin/<default> ->
 // checkout -b <branch> -> push -u origin <branch>. Cuts from the REMOTE's
-// master (never from wherever HEAD happens to be), so an abandoned branch
-// can never leak into the next one, and publishes at birth so the sweeper
-// can push from the first commit. Requires a clean tree unless you are ON
-// the default branch, in which case uncommitted edits ride into the new
-// branch (the "I edited on master by mistake" rescue).
+// master (never from wherever HEAD happens to be), so an abandoned branch's
+// COMMITS can never leak into the next one, and publishes at birth so the
+// sweeper can push from the first commit. Uncommitted edits are not a blocker:
+// git refuses a switch that would overwrite one (reported verbatim, nothing
+// changed), and the rest ride into the new branch untouched - reported as
+// carried (Cargo.lock, forever rewritten by the builder, is the standing case).
 fn fail(msg: &str) -> DataObject {
     let mut o = DataObject::new();
     o.put_string("status", "err");
@@ -48,16 +49,18 @@ if has_origin {
     steps.push_string(if fetched { "fetch --prune" } else { "fetch --prune (failed - cutting from the local default)" });
 }
 
-// where are we, and is the tree clean?
+// where are we, and what is the tree carrying?
 let st = crate::dev::git::read::read(repo.clone(), "status".to_string(), sargs(&["--porcelain=v2", "--branch"]));
 if !okr(&st) { return fail(&format!("status failed: {}", errs(&st))); }
 let mut cur = String::new();
-let mut dirty = 0i64;
+let (mut dirty, mut conflicts) = (0i64, 0i64);
 for line in outs(&st).lines() {
     if let Some(h) = line.strip_prefix("# branch.head ") { cur = h.trim().to_string(); }
-    else if line.starts_with("? ") || line.starts_with("1 ") || line.starts_with("2 ") || line.starts_with("u ") { dirty += 1; }
+    else if line.starts_with("u ") { conflicts += 1; dirty += 1; }
+    else if line.starts_with("? ") || line.starts_with("1 ") || line.starts_with("2 ") { dirty += 1; }
 }
 if ref_exists(&repo, "MERGE_HEAD") { return fail("a merge is in progress - finish it (commit) or abort it (merge --abort) first"); }
+if conflicts > 0 { return fail(&format!("{} conflicted path(s) - resolve them first", conflicts)); }
 
 let lb = crate::dev::git::read::read(repo.clone(), "branch".to_string(), sargs(&["--format=%(refname:short)"]));
 let locals: Vec<String> = outs(&lb).lines().map(|l| l.trim().to_string()).filter(|s| !s.is_empty()).collect();
@@ -67,14 +70,10 @@ let default = if locals.iter().any(|b| b == "master") { "master".to_string() }
     else { return fail("no local master or main branch to start from") };
 if branch == default { return fail("the default branch is not a working branch"); }
 
-if dirty > 0 && cur != default {
-    return fail(&format!("{} uncommitted change(s) on '{}' - let the sweep commit them (or commit / abandon with discard) before starting a new branch", dirty, cur));
-}
-
-// onto the default branch
+// onto the default branch (git refuses if an uncommitted edit would be overwritten; then nothing has changed)
 if cur != default {
     let r = crate::dev::git::write::write(repo.clone(), "checkout".to_string(), sargs(&[&default]));
-    if !okr(&r) { return fail(&format!("checkout {} failed: {}", default, errs(&r))); }
+    if !okr(&r) { return fail(&format!("checkout {} failed: {} - still on '{}'", default, errs(&r), cur)); }
     steps.push_string(&format!("checkout {}", default));
 }
 // fast-forward it to origin's (never merge: a diverged local default is an error to see, not to paper over)
@@ -83,7 +82,7 @@ if has_origin && ref_exists(&repo, &format!("refs/remotes/{}", remote_ref)) {
     let r = crate::dev::git::write::write(repo.clone(), "merge".to_string(), sargs(&["--ff-only", &remote_ref]));
     if !okr(&r) {
         if cur != default { let _ = crate::dev::git::write::write(repo.clone(), "checkout".to_string(), sargs(&[&cur])); }
-        return fail(&format!("local {} could not fast-forward to {}: {} - it has diverged; back on '{}'", default, remote_ref, errs(&r), cur));
+        return fail(&format!("local {} could not fast-forward to {}: {} - back on '{}'", default, remote_ref, errs(&r), cur));
     }
     steps.push_string(&format!("merge --ff-only {}", remote_ref));
 }
@@ -108,10 +107,10 @@ o.put_string("base", &outs(&head).trim().to_string());
 o.put_boolean("fetched", fetched);
 o.put_boolean("published", published);
 o.put_string("publish_err", &publish_err);
-o.put_int("carried", if cur == default { dirty } else { 0 });
+o.put_int("carried", dirty);
 o.put_array("steps", steps);
 o.put_string("msg", &format!("on {} from {}{}{}", branch,
     if fetched { remote_ref.clone() } else { default.clone() },
     if published { ", published" } else if has_origin { ", NOT published (publish once origin is reachable)" } else { "" },
-    if cur == default && dirty > 0 { format!(", {} uncommitted change(s) carried over", dirty) } else { String::new() }));
+    if dirty > 0 { format!(", {} uncommitted change(s) carried over untouched", dirty) } else { String::new() }));
 o

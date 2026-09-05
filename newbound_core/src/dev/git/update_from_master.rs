@@ -50,9 +50,11 @@ pub fn execute(o: DataObject) -> DataObject {
 pub fn update_from_master(repo: String, branch: String) -> DataObject {
 // "Master moved - bring my branch up to date." fetch -> merge origin/<default>
 // into the current branch -> push. The verb pull cannot do this (it targets
-// the branch's own upstream, which for a solo developer never moves). Requires
-// a clean tree and that you are ON the branch. A conflict is reported with the
-// tree left mid-merge so it can be resolved or aborted - never half-merged.
+// the branch's own upstream, which for a solo developer never moves). A dirty
+// tree is not a blocker: git refuses a merge that would overwrite an edit
+// (reported verbatim, nothing changed) and untouched edits ride along.
+// Conflicts and a merge in flight refuse. A conflict is reported with the tree
+// left mid-merge so it can be resolved or aborted - never half-merged.
 fn fail(msg: &str) -> DataObject {
     let mut o = DataObject::new();
     o.put_string("status", "err");
@@ -94,15 +96,16 @@ let st = crate::dev::git::read::read(repo.clone(), "status".to_string(), sargs(&
 if !okr(&st) { return fail(&format!("status failed: {}", errs(&st))); }
 let mut cur = String::new();
 let mut upstream = String::new();
-let mut dirty = 0i64;
+let (mut dirty, mut conflicts) = (0i64, 0i64);
 for line in outs(&st).lines() {
     if let Some(h) = line.strip_prefix("# branch.head ") { cur = h.trim().to_string(); }
     else if let Some(u) = line.strip_prefix("# branch.upstream ") { upstream = u.trim().to_string(); }
-    else if line.starts_with("? ") || line.starts_with("1 ") || line.starts_with("2 ") || line.starts_with("u ") { dirty += 1; }
+    else if line.starts_with("u ") { conflicts += 1; dirty += 1; }
+    else if line.starts_with("? ") || line.starts_with("1 ") || line.starts_with("2 ") { dirty += 1; }
 }
 if cur != branch { return fail(&format!("repo is on '{}', not '{}'", cur, branch)); }
 if ref_exists(&repo, "MERGE_HEAD") { return fail("a merge is already in progress - finish it (commit) or abort it (merge --abort) first"); }
-if dirty > 0 { return fail(&format!("{} uncommitted change(s) - let the sweep commit them first", dirty)); }
+if conflicts > 0 { return fail(&format!("{} conflicted path(s) - resolve them first", conflicts)); }
 
 let lb = crate::dev::git::read::read(repo.clone(), "branch".to_string(), sargs(&["--format=%(refname:short)"]));
 let locals: Vec<String> = outs(&lb).lines().map(|l| l.trim().to_string()).filter(|s| !s.is_empty()).collect();
@@ -124,13 +127,18 @@ if behind == 0 {
     o.put_string("base", &base);
     o.put_int("merged", 0);
     o.put_boolean("pushed", false);
+    o.put_int("carried", dirty);
     o.put_array("steps", steps);
     return o;
 }
 
 let r = crate::dev::git::write::write(repo.clone(), "merge".to_string(), sargs(&["-m", &format!("update {} from {}", branch, base), &base]));
 if !okr(&r) {
-    return fail(&format!("merge {} failed: {} - left mid-merge on '{}'; resolve then commit, or merge --abort", base, errs(&r), branch));
+    if ref_exists(&repo, "MERGE_HEAD") {
+        return fail(&format!("merge {} failed: {} - left mid-merge on '{}'; resolve then commit, or merge --abort", base, errs(&r), branch));
+    }
+    // git refused before starting (typically an uncommitted edit the merge would overwrite): nothing changed
+    return fail(&format!("merge {} refused: {} - nothing merged", base, errs(&r)));
 }
 steps.push_string(&format!("merge {}", base));
 
@@ -144,13 +152,15 @@ if !upstream.is_empty() {
 
 let mut o = DataObject::new();
 o.put_string("status", "ok");
-o.put_string("msg", &format!("merged {} commit(s) from {} into {}{}", behind, base, branch,
-    if pushed { ", pushed" } else if upstream.is_empty() { " (branch is unpublished)" } else { " - push failed" }));
+o.put_string("msg", &format!("merged {} commit(s) from {} into {}{}{}", behind, base, branch,
+    if pushed { ", pushed" } else if upstream.is_empty() { " (branch is unpublished)" } else { " - push failed" },
+    if dirty > 0 { format!(", {} uncommitted change(s) carried along untouched", dirty) } else { String::new() }));
 o.put_string("branch", &branch);
 o.put_string("base", &base);
 o.put_int("merged", behind);
 o.put_boolean("pushed", pushed);
 o.put_string("push_err", &push_err);
+o.put_int("carried", dirty);
 o.put_array("steps", steps);
 o
 }

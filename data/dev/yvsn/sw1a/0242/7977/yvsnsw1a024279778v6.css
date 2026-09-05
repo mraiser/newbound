@@ -134,6 +134,9 @@
 .nb-gitpanel .r-chip.warn { color: var(--accent, #f0a63c); border-color: var(--accent-dim, #a97425); }
 .nb-gitpanel .r-chip.bad { color: var(--danger, #e05d5d); border-color: rgba(224, 93, 93, 0.45); }
 .nb-gitpanel .r-chip.dim { color: var(--text-faint, #6b7280); }
+/* a chip with something behind its number opens it in the output pane */
+.nb-gitpanel .r-chip.click { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.nb-gitpanel .r-chip.click:hover { background: rgba(255, 255, 255, 0.06); }
 .nb-gitpanel .r-err { font: 10.5px var(--mono, ui-monospace, monospace); color: var(--danger, #e05d5d); }
 .nb-gitpanel .gp-path { font: 10.5px var(--mono, ui-monospace, monospace); color: var(--text-faint, #6b7280); margin-top: 3px; }
 

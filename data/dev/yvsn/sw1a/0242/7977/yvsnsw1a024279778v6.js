@@ -96,54 +96,74 @@ async function init(host, props) {
   };
 
   // ── the state line (dev.git.repo_state) ───────────────────
-  function chip(text, cls) {
+  // every chip with a number behind it opens that number: the dirty paths, or
+  // git log over the exact range the count came from
+  function chip(text, cls, onclick, title) {
     const s = document.createElement("span");
-    s.className = "r-chip " + (cls || "");
+    s.className = "r-chip " + (cls || "") + (onclick ? " click" : "");
     s.textContent = text;
+    if (title) s.title = title;
+    if (onclick) s.onclick = onclick;
     return s;
   }
-  function paintState(row, s) {
+  const fileLines = (s) => (Array.isArray(s.files) ? s.files : []).map((f) => `${f.status}\t${f.path}`);
+  function paintState(row, s, repo) {
     const stateEl = row.querySelector(".r-state");
+    const logChip = (text, cls, range, what) => chip(text, cls, async () => {
+      const r = await runGit("read", { repo: repo.name, verb: "log", args: ["--oneline", "--decorate", range] });
+      showOut(`${repo.name} · ${what} · git log ${range}`, r.out || r.err || r.msg || "(none)", !r.ok);
+    }, `${what} — click to list them`);
     const chips = [];
     if (s.detached) chips.push(chip("detached HEAD", "bad"));
     else chips.push(chip(s.branch, "branch"));
     if (s.op) chips.push(chip(`mid-${s.op}`, "bad"));
     if (s.conflicts > 0) chips.push(chip(`${s.conflicts} conflicted`, "bad"));
-    chips.push(s.dirty > 0 ? chip(`${s.dirty} uncommitted`, "warn") : chip("clean", "good"));
+    if (s.dirty > 0) {
+      const lines = fileLines(s);
+      chips.push(chip(`${s.dirty} uncommitted`, "warn",
+        () => showOut(`${repo.name} · uncommitted`, lines.join("\n") || "(no paths reported)", false),
+        lines.join("\n") || "click to list"));
+    } else chips.push(chip("clean", "good"));
     if (!s.detached) {
       if (!s.has_origin) chips.push(chip("no origin", "dim"));
-      else if (!s.published) chips.push(chip("unpublished", "warn"));
+      else if (!s.published) chips.push(chip("unpublished", "warn", null, "no upstream yet — publish (more ▾), or start branch publishes at birth"));
       else {
-        if (s.ahead > 0) chips.push(chip(`${s.ahead} to push`, "warn"));
-        if (s.behind > 0) chips.push(chip(`${s.behind} behind ${s.upstream}`, "warn"));
+        if (s.ahead > 0) chips.push(logChip(`${s.ahead} to push`, "warn", `${s.upstream}..HEAD`, `commits not yet on ${s.upstream}`));
+        if (s.behind > 0) chips.push(logChip(`${s.behind} behind ${s.upstream}`, "warn", `HEAD..${s.upstream}`, `commits on ${s.upstream} this checkout lacks`));
         if (!s.ahead && !s.behind) chips.push(chip("pushed", "good"));
       }
       if (s.on_default) chips.push(chip(`on ${s.default} — work belongs on a branch`, "warn"));
       else if (s.base) {
-        chips.push(s.ahead_base > 0 ? chip(`${s.ahead_base} not in ${s.default}`, "warn") : chip("nothing to merge", "dim"));
-        chips.push(s.behind_base > 0 ? chip(`${s.default} moved +${s.behind_base}`, "warn") : chip(`${s.default} unchanged`, "dim"));
+        chips.push(s.ahead_base > 0
+          ? logChip(`${s.ahead_base} not in ${s.default}`, "warn", `${s.base}..HEAD`, `commits ${s.default} has never seen`)
+          : chip("nothing to merge", "dim"));
+        chips.push(s.behind_base > 0
+          ? logChip(`${s.default} moved +${s.behind_base}`, "warn", `HEAD..${s.base}`, `commits on ${s.base} this branch lacks`)
+          : chip(`${s.default} unchanged`, "dim"));
       }
     }
-    if (s.has_origin && s.fetch_err) chips.push(chip("fetch failed — as of last fetch", "bad"));
+    if (s.has_origin && s.fetch_err) chips.push(chip("fetch failed — as of last fetch", "bad", null, s.fetch_err));
     stateEl.replaceChildren(...chips);
-    stateEl.title = s.fetch_err ? `fetch: ${s.fetch_err}` : (s.summary || "");
+    stateEl.title = s.summary || "";
 
-    // verbs follow the state
+    // verbs follow the state. A dirty tree does not block them: git itself
+    // refuses a checkout or merge that would overwrite an edit (reported
+    // verbatim), and untouched edits ride along - Cargo.lock is always dirty.
     const q = (c) => row.querySelector(c);
-    const usable = !s.detached && !s.op;
-    q(".r-start").disabled = !!s.op;
-    q(".r-start").title = s.op ? `finish the ${s.op} first`
-      : "start a new working branch from origin/master and publish it (dev.git.start_branch)";
-    q(".r-update").disabled = !(usable && s.needs_update && !s.on_default);
-    q(".r-update").title = s.on_default ? "you are on the default branch" : s.needs_update
+    const usable = !s.detached && !s.op && !(s.conflicts > 0);
+    const blocked = s.op ? `finish the ${s.op} first` : s.conflicts > 0 ? "resolve the conflicts first" : "";
+    q(".r-start").disabled = !usable;
+    q(".r-start").title = blocked
+      || "start a new working branch from origin/master and publish it (dev.git.start_branch)";
+    q(".r-update").disabled = !(usable && s.needs_update);
+    q(".r-update").title = blocked || (s.on_default ? "you are on the default branch" : s.needs_update
       ? `merge ${s.base} into ${s.branch} and push (dev.git.update_from_master)`
-      : `${s.default || "master"} has nothing new for this branch`;
+      : `${s.default || "master"} has nothing new for this branch`);
     q(".r-merge").disabled = !(usable && s.can_merge);
-    q(".r-merge").title = s.can_merge ? `merge ${s.branch} into ${s.default} and push it (dev.git.merge_to_master)`
+    q(".r-merge").title = blocked || (s.can_merge ? `merge ${s.branch} into ${s.default} and push it (dev.git.merge_to_master)`
       : s.on_default ? "you are on the default branch"
-      : s.dirty > 0 ? "uncommitted changes — let the sweep commit them first"
-      : "nothing to merge";
-    q(".r-abandon").disabled = !usable || s.on_default;
+      : "nothing to merge");
+    q(".r-abandon").disabled = s.detached || s.on_default;
     q(".r-abandon").title = s.on_default ? "you are on the default branch"
       : "drop this branch and start the next one from master (dev.git.abandon_branch)";
   }
@@ -160,7 +180,7 @@ async function init(host, props) {
       return;
     }
     row.state = r.d;
-    paintState(row, r.d);
+    paintState(row, r.d, repo);
   }
 
   // ── one repo row ──────────────────────────────────────────
@@ -248,6 +268,7 @@ async function init(host, props) {
       const s = row.state || {};
       const name = prompt(`new working branch for ${repo.name} — cut from origin/${s.default || "master"} and published:`);
       if (!name || !name.trim()) return;
+      if (s.dirty > 0 && !confirm([`${s.dirty} uncommitted change(s) in ${repo.name} ride into ${name.trim()} untouched (git refuses if the switch would overwrite one):`, ...fileLines(s), "", "Continue?"].join("\n"))) return;
       const r = await compound(e.target, "start_branch", { repo: repo.name, branch: name.trim() }, `start branch ${name.trim()}`);
       if (r.ok) toast.show(r.d.msg || `on ${name.trim()}`);
     };
@@ -261,7 +282,9 @@ async function init(host, props) {
       const cur = curBranch();
       if (!cur) return;
       const s = row.state || {};
-      if (!confirm(`Merge ${cur} into ${s.default || "master"} and push it to origin?\n\n${s.ahead_base ?? "?"} commit(s) not yet in ${s.default || "master"}.`)) return;
+      const ask = [`Merge ${cur} into ${s.default || "master"} and push it to origin?`, "", `${s.ahead_base ?? "?"} commit(s) not yet in ${s.default || "master"}.`];
+      if (s.dirty > 0) ask.push("", `${s.dirty} uncommitted change(s) stay in the working tree, untouched (git refuses if the merge would overwrite one):`, ...fileLines(s));
+      if (!confirm(ask.join("\n"))) return;
       const r = await compound(e.target, "merge_to_master", { repo: repo.name, branch: cur }, `merge ${cur} → ${s.default || "master"}`);
       if (r.ok) toast.show(r.d.msg || `merged ${cur}`);
     };
