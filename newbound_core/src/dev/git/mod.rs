@@ -1,5 +1,8 @@
 // This file is auto-generated and managed by the flowlang build script.
 use flowlang::rustcmd::Transform;
+pub mod update_from_master;
+pub mod start_branch;
+pub mod repo_state;
 pub mod commit_unit;
 pub mod store_status;
 pub mod set_autocommit;
@@ -27,4 +30,7 @@ pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
     cmds.push(("hzykqu1a05d00c1a3r124".to_string(), set_autocommit::execute, "".to_string()));
     cmds.push(("olzqvh1a05d34239fp1".to_string(), store_status::execute, "".to_string()));
     cmds.push(("rgkipv1a05d34ad79m3".to_string(), commit_unit::execute, "".to_string()));
+    cmds.push(("uptjzh1a0733cce74r7".to_string(), repo_state::execute, "".to_string()));
+    cmds.push(("ymlwwx1a0733d3513t9".to_string(), start_branch::execute, "".to_string()));
+    cmds.push(("wrwzmq1a0733d8548hb".to_string(), update_from_master::execute, "".to_string()));
 }

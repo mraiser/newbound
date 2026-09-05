@@ -1,7 +1,6 @@
 use ndata::dataobject::DataObject;
-use flowlang::datastore::DataStore;
-use flowlang::flowlang::system::system_call::system_call;
 use ndata::dataarray::DataArray;
+use flowlang::datastore::DataStore;
 use ndata::data::Data;
 pub fn execute(o: DataObject) -> DataObject {
     use std::panic;
@@ -54,8 +53,11 @@ pub fn execute(o: DataObject) -> DataObject {
 
 pub fn gitrun(repo: String, verb: String, args: DataArray, mode: String) -> DataObject {
 // Internal engine for dev.git.{read,write,remote_op}: registry resolve,
-// per-mode verb allowlist, argv build, one system_call. No shell, ever -
-// argv form only, so nothing is interpolated.
+// per-mode verb allowlist, argv build, one spawn. No shell, ever -
+// argv form only, so nothing is interpolated. The exit status is honored:
+// a nonzero git exit answers status err (code + the first fatal:/error: line
+// as msg), so compound commands and the panel can trust status. system_call
+// reported every exit as ok, which hid every git failure behind stderr.
 fn fail(msg: &str) -> DataObject {
     let mut o = DataObject::new();
     o.put_string("status", "err");
@@ -96,7 +98,7 @@ let path = match reg.get_object(&repo).try_get_string("path") {
 let verb = verb.trim().to_string();
 let allowed: &[&str] = match mode.as_str() {
     "read" => &["status","log","diff","show","rev-parse","rev-list","branch","ls-files","blame","describe","remote"],
-    "write" => &["add","commit","checkout","branch","merge","tag","stash","reset","revert","sparse-checkout"],
+    "write" => &["add","commit","checkout","branch","merge","tag","stash","reset","revert","sparse-checkout","clean"],
     "remote" => &["fetch","pull","push"],
     _ => return fail(&format!("unknown mode '{}'", mode)),
 };
@@ -139,10 +141,11 @@ let mut argv: Vec<String> = vec![
 // commit needs an identity; fall back to a neutral one when the repo has none,
 // rather than surfacing git's config lecture as a mystery failure.
 if verb == "commit" {
-    let mut ca = DataArray::new();
-    for s in ["git", "-C", path.as_str(), "config", "user.email"] { ca.push_string(s); }
-    let cr = system_call(ca);
-    if cr.try_get_string("out").unwrap_or_default().trim().is_empty() {
+    let has_id = std::process::Command::new("git")
+        .args(["-C", path.as_str(), "config", "user.email"]).output()
+        .map(|o| !String::from_utf8_lossy(&o.stdout).trim().is_empty())
+        .unwrap_or(false);
+    if !has_id {
         argv.push("-c".to_string()); argv.push("user.name=Newbound Agent".to_string());
         argv.push("-c".to_string()); argv.push("user.email=newbound-agent@localhost".to_string());
     }
@@ -151,9 +154,34 @@ if verb == "commit" {
 argv.push(verb.clone());
 argv.extend(extra);
 
-let mut a = DataArray::new();
-for s in &argv { a.push_string(s); }
-let mut r = system_call(a);
+let mut r = DataObject::new();
+match std::process::Command::new(&argv[0]).args(&argv[1..]).output() {
+    Ok(outp) => {
+        let so = String::from_utf8_lossy(&outp.stdout).to_string();
+        let se = String::from_utf8_lossy(&outp.stderr).to_string();
+        let code = outp.status.code().unwrap_or(-1) as i64;
+        r.put_string("out", &so);
+        r.put_string("err", &se);
+        r.put_int("code", code);
+        if outp.status.success() {
+            r.put_string("status", "ok");
+        } else {
+            r.put_string("status", "err");
+            let first = se.lines()
+                .find(|l| l.starts_with("fatal:") || l.starts_with("error:") || l.contains("CONFLICT"))
+                .or_else(|| se.lines().find(|l| !l.trim().is_empty()))
+                .unwrap_or("").trim().to_string();
+            r.put_string("msg", &if first.is_empty() { format!("git {} exited {}", verb, code) } else { first });
+        }
+    }
+    Err(e) => {
+        r.put_string("status", "err");
+        r.put_string("out", "");
+        r.put_string("err", &e.to_string());
+        r.put_int("code", -1);
+        r.put_string("msg", &format!("could not spawn git: {}", e));
+    }
+}
 r.put_string("repo", &repo);
 r.put_string("path", &path);
 r.put_string("argv", &argv.join(" "));

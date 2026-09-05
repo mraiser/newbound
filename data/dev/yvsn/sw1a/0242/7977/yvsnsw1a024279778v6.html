@@ -1,15 +1,16 @@
 <section class="nb-gitpanel">
   <header class="gp-head">
     <h1>Git</h1>
-    <p>The registered repos from <code>runtime/dev/repos.json</code> — status at
-    a glance, commit / fetch / pull / push per repo, and the autocommit sweeper
-    on demand. Every action runs through <code>dev.git</code>'s no-shell argv
-    engine; pull is fast-forward-only by mechanism.</p>
+    <p>One state line per registered repo (<code>runtime/dev/repos.json</code>):
+    what is uncommitted, what is not yet pushed, what master has never seen,
+    and whether master moved. Work happens on a branch; the sweeper commits
+    and pushes it. When it is good, merge it to master; when it is not,
+    abandon it and start the next one from master.</p>
   </header>
   <div class="gp-tools">
-    <button type="button" class="gp-refresh">↻ refresh</button>
+    <button type="button" class="gp-refresh" title="fetch every repo and re-read its state (dev.git.repo_state)">↻ refresh</button>
     <button type="button" class="gp-sweep"
-      title="stage + commit every dirty repo flagged autocommit (dev.git.autocommit_sweep) — the 5-minute timer's sweep, on demand">⟳ autocommit sweep</button>
+      title="the 5-minute sweep, now: fetch every repo; on autocommit repos stage + commit when dirty, then push (never on master/main) — dev.git.autocommit_sweep">⟳ sweep now</button>
     <button type="button" class="gp-add-open">+ register repo</button>
     <span class="gp-note"></span>
   </div>
