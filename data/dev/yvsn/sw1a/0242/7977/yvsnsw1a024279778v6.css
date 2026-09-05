@@ -117,20 +117,28 @@
 }
 .nb-gitpanel .r-auto.on { color: var(--accent, #f0a63c); border-color: var(--accent-dim, #a97425); }
 .nb-gitpanel .r-auto:disabled { color: var(--text-faint, #6b7280); cursor: default; }
-.nb-gitpanel .r-branch { font: 12px var(--mono, ui-monospace, monospace); color: var(--text-dim, #9aa0aa); }
-.nb-gitpanel .r-branch:not(:empty)::before { content: "⎇ "; color: var(--text-faint, #6b7280); }
-.nb-gitpanel .r-ab {
+/* the state line: one chip per fact from dev.git.repo_state */
+.nb-gitpanel .r-state { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; flex: 1 1 auto; }
+.nb-gitpanel .r-chip {
   font: 11px var(--mono, ui-monospace, monospace);
-  color: var(--accent, #f0a63c);
   font-variant-numeric: tabular-nums;
+  color: var(--text-dim, #9aa0aa);
+  border: 1px solid var(--line, #2a2e35);
+  border-radius: 5px;
+  padding: 1px 7px;
+  white-space: nowrap;
 }
-.nb-gitpanel .r-dirty { font: 11px var(--mono, ui-monospace, monospace); }
-.nb-gitpanel .r-dirty.good { color: var(--ok, #69b076); }
-.nb-gitpanel .r-dirty.warn { color: var(--accent, #f0a63c); }
-.nb-gitpanel .r-dirty.bad { color: var(--danger, #e05d5d); }
-.nb-gitpanel .r-state { font: 10.5px var(--mono, ui-monospace, monospace); color: var(--danger, #e05d5d); }
+.nb-gitpanel .r-chip.branch { color: var(--text, #d7dae0); }
+.nb-gitpanel .r-chip.branch::before { content: "⎇ "; color: var(--text-faint, #6b7280); }
+.nb-gitpanel .r-chip.good { color: var(--ok, #69b076); border-color: rgba(105, 176, 118, 0.35); }
+.nb-gitpanel .r-chip.warn { color: var(--accent, #f0a63c); border-color: var(--accent-dim, #a97425); }
+.nb-gitpanel .r-chip.bad { color: var(--danger, #e05d5d); border-color: rgba(224, 93, 93, 0.45); }
+.nb-gitpanel .r-chip.dim { color: var(--text-faint, #6b7280); }
+.nb-gitpanel .r-err { font: 10.5px var(--mono, ui-monospace, monospace); color: var(--danger, #e05d5d); }
 .nb-gitpanel .gp-path { font: 10.5px var(--mono, ui-monospace, monospace); color: var(--text-faint, #6b7280); margin-top: 3px; }
-.nb-gitpanel .gp-acts { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+
+/* the five verbs, then "more" for the atomic git surface */
+.nb-gitpanel .gp-acts { display: flex; gap: 14px; margin-top: 9px; flex-wrap: wrap; align-items: baseline; }
 .nb-gitpanel .gp-acts button {
   font: 10.5px var(--mono, ui-monospace, monospace);
   color: var(--accent, #f0a63c);
@@ -141,8 +149,21 @@
 }
 .nb-gitpanel .gp-acts button:hover { text-decoration: underline; }
 .nb-gitpanel .gp-acts button:disabled { color: var(--text-faint, #6b7280); cursor: default; text-decoration: none; }
+.nb-gitpanel .gp-acts .r-verb { font-weight: 600; }
 .nb-gitpanel .gp-acts .r-abandon { color: var(--danger, #e05d5d); }
-.nb-gitpanel .gp-acts .r-rm { color: var(--danger, #e05d5d); margin-left: auto; }
+.nb-gitpanel .gp-acts .r-more { color: var(--text-dim, #9aa0aa); }
+.nb-gitpanel .gp-more {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  flex: 1 1 100%;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line-soft, #23262c);
+}
+.nb-gitpanel .gp-more button { color: var(--text-dim, #9aa0aa); }
+.nb-gitpanel .gp-more .r-rm { color: var(--danger, #e05d5d); margin-left: auto; }
 
 /* shared output pane — last command's stdout/stderr, verbatim */
 .nb-gitpanel .gp-outwrap {
