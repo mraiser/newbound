@@ -132,7 +132,9 @@ async function init(host, props) {
         if (s.behind > 0) chips.push(logChip(`${s.behind} behind ${s.upstream}`, "warn", `HEAD..${s.upstream}`, `commits on ${s.upstream} this checkout lacks`));
         if (!s.ahead && !s.behind) chips.push(chip("pushed", "good"));
       }
-      if (s.on_default) chips.push(chip(`on ${s.default} — work belongs on a branch`, "warn"));
+      if (s.on_default) chips.push(s.ahead_base > 0
+        ? logChip(`on ${s.default} with ${s.ahead_base} commit(s) origin lacks — carry them to a branch`, "warn", `${s.base}..HEAD`, `commits on ${s.default} that ${s.base} has never seen (pre-'branches always' autocommits)`)
+        : chip(`on ${s.default} — work belongs on a branch`, "warn"));
       else if (s.base) {
         chips.push(s.ahead_base > 0
           ? logChip(`${s.ahead_base} not in ${s.default}`, "warn", `${s.base}..HEAD`, `commits ${s.default} has never seen`)
@@ -152,9 +154,14 @@ async function init(host, props) {
     const q = (c) => row.querySelector(c);
     const usable = !s.detached && !s.op && !(s.conflicts > 0);
     const blocked = s.op ? `finish the ${s.op} first` : s.conflicts > 0 ? "resolve the conflicts first" : "";
+    // on the default branch with commits origin lacks, the same button carries
+    // them onto the new branch instead of cutting from origin (carry_branch)
+    const carry = !!s.on_default && s.ahead_base > 0;
+    q(".r-start").textContent = carry ? "carry to branch…" : "start branch…";
     q(".r-start").disabled = !usable;
-    q(".r-start").title = blocked
-      || "start a new working branch from origin/master and publish it (dev.git.start_branch)";
+    q(".r-start").title = blocked || (carry
+      ? `move the ${s.ahead_base} commit(s) on ${s.default} onto a new branch and reset ${s.default} to ${s.base} (dev.git.carry_branch)`
+      : "start a new working branch from origin/master and publish it (dev.git.start_branch)");
     q(".r-update").disabled = !(usable && s.needs_update);
     q(".r-update").title = blocked || (s.on_default ? "you are on the default branch" : s.needs_update
       ? `merge ${s.base} into ${s.branch} and push (dev.git.update_from_master)`
@@ -210,6 +217,7 @@ async function init(host, props) {
           <button type="button" class="r-diff">diff</button>
           <button type="button" class="r-commit" title="stages everything (add -A), then commits with your message — the sweeper does this on autocommit repos">commit…</button>
           <button type="button" class="r-cunit" title="stage one control's full store closure and commit it (dev.git.commit_unit)">commit unit…</button>
+          <button type="button" class="r-untrack" title="library repos never track builder output: git rm --cached every Cargo.lock and src/api.rs, ignore each crate's pair, commit + push (dev.git.untrack_generated)">untrack generated</button>
           <button type="button" class="r-publish" title="publish the current branch upstream (push -u origin)">publish</button>
           <button type="button" class="r-push" title="push the current branch to its upstream">push</button>
           <button type="button" class="r-fetch" title="fetch --prune">fetch</button>
@@ -266,6 +274,14 @@ async function init(host, props) {
     // ── the five verbs ──
     row.querySelector(".r-start").onclick = async (e) => {
       const s = row.state || {};
+      if (s.on_default && s.ahead_base > 0) {
+        // carry: the commits on the default move onto the new branch, the default resets to origin's
+        const name = prompt([`${s.ahead_base} commit(s) on ${s.default} that ${s.base} lacks.`, `Move them onto a new branch (published) and reset ${s.default} to ${s.base} — nothing is rewritten.`, "", "branch name:"].join("\n"));
+        if (!name || !name.trim()) return;
+        const r = await compound(e.target, "carry_branch", { repo: repo.name, branch: name.trim() }, `carry ${s.default} → ${name.trim()}`);
+        if (r.ok) toast.show(r.d.msg || `on ${name.trim()}`);
+        return;
+      }
       const name = prompt(`new working branch for ${repo.name} — cut from origin/${s.default || "master"} and published:`);
       if (!name || !name.trim()) return;
       if (s.dirty > 0 && !confirm([`${s.dirty} uncommitted change(s) in ${repo.name} ride into ${name.trim()} untouched (git refuses if the switch would overwrite one):`, ...fileLines(s), "", "Continue?"].join("\n"))) return;
@@ -325,6 +341,12 @@ async function init(host, props) {
     };
     row.querySelector(".r-push").onclick = async (e) => {
       if (await act(e.target, "remote_op", "push", [])) refreshState(repo, row, false);
+    };
+    row.querySelector(".r-untrack").onclick = async (e) => {
+      const s = row.state || {};
+      if (!confirm([`Stop tracking builder-generated files in ${repo.name}?`, "", "Every tracked Cargo.lock and src/api.rs leaves the index (the files stay on disk), each crate's pair is added to .gitignore, and the change is committed on " + (s.branch || "the current branch") + " and pushed.", "Refused on master/main and on canon."].join("\n"))) return;
+      const r = await compound(e.target, "untrack_generated", { repo: repo.name, message: "" }, "untrack generated");
+      if (r.ok) toast.show(r.d.msg || "done");
     };
     row.querySelector(".r-publish").onclick = async (e) => {
       const cur = curBranch();

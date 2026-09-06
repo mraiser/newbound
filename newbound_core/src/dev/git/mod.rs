@@ -1,5 +1,7 @@
 // This file is auto-generated and managed by the flowlang build script.
 use flowlang::rustcmd::Transform;
+pub mod untrack_generated;
+pub mod carry_branch;
 pub mod update_from_master;
 pub mod start_branch;
 pub mod repo_state;
@@ -33,4 +35,6 @@ pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
     cmds.push(("uptjzh1a0733cce74r7".to_string(), repo_state::execute, "".to_string()));
     cmds.push(("ymlwwx1a0733d3513t9".to_string(), start_branch::execute, "".to_string()));
     cmds.push(("wrwzmq1a0733d8548hb".to_string(), update_from_master::execute, "".to_string()));
+    cmds.push(("ljkngp1a0740a1c47j1".to_string(), carry_branch::execute, "".to_string()));
+    cmds.push(("slhoyo1a0740a96d8s3".to_string(), untrack_generated::execute, "".to_string()));
 }
