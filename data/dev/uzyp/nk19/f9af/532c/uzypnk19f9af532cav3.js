@@ -14,7 +14,7 @@ root.addEventListener("click", ME.DATA.onOpen);
 // the dots wait on the facets library (a child div, ready before this
 // control's ready); setRecord queues behind them
 var dotsReady = new Promise(function (res) { me.ready = res; }).then(function () {
-  const { FACETS } = window.NB_FACETS;
+  const { FACETS } = ME.querySelector('[data-control="dev:facets"]').api;
   for (const facet of FACETS) {
     const dot = document.createElement("span");
     dot.className = "c-dot";

@@ -1,66 +1,80 @@
-var me = this; 
-var ME = $('#'+me.UUID)[0];
+var me = this;
+var ME = document.getElementById(me.UUID);
 
-me.ready = function(){
+me.ready = function() {
   var data = ME.DATA;
   var img = data.img.replace("botmanager/asset/", "app/asset/");
   loadImg(img);
-  $(ME).find(".card-title").text(data.name);
-  $(ME).find(".appcard").addClass(data.active ? "active" : "inactive").addClass(data.remote ? "remote" : "local").addClass("appcard-id-"+data.id);
+  ME.querySelector(".card-title").textContent = data.name;
+  var card = ME.querySelector(".appcard");
+  card.classList.add(data.active ? "active" : "inactive");
+  card.classList.add(data.remote ? "remote" : "local");
+  card.classList.add("appcard-id-" + data.id);
   me.updateFilters();
 };
 
-function loadImg(img){
-  var el = $("<img src='"+img+"' style='display:none;'>");
-  el.on('load', function(){
-    $(ME).find(".appcard").css("background-image", "url("+img+")");
+function loadImg(img) {
+  var el = document.createElement('img');
+  el.style.display = 'none';
+  el.addEventListener('load', function() {
+    ME.querySelector(".appcard").style.backgroundImage = "url(" + img + ")";
   });
-  $(ME).append(el);
+  el.src = img;
+  ME.appendChild(el);
 }
 
-me.updateFilters = function(){
+me.updateFilters = function() {
   var x = 0;
   var y = 0;
-  
+
   var b = false;
   if (ME.DATA.active) b = true;
   else {
     if (ME.DATA.remote) {
-      if ($("#appfilter-available").prop("checked")) b = true;
+      if (dget("appfilter-available").checked) b = true;
     }
     else {
-      if ($("#appfilter-inactive").prop("checked")) b = true;
+      if (dget("appfilter-inactive").checked) b = true;
     }
   }
-  
+
   if (b) {
     x = 228;
     y = 16;
   }
-  
-  $(ME).animate({width:x+'px',height:x+"px",margin:y+"px"},500);
+
+  var props = { width: x + 'px', height: x + 'px', margin: y + 'px' };
+  try {
+    // single-keyframe form animates from the current computed style
+    var anim = ME.animate([props], { duration: 500, easing: 'ease' });
+    anim.onfinish = function() { for (var k in props) ME.style[k] = props[k]; };
+  } catch (xx) {
+    for (var k in props) ME.style[k] = props[k];
+  }
 }
 
-$(ME).find('.appcard').click(function(e){
-  if (!e.isDefaultPrevented()) {
+ME.querySelector('.appcard').addEventListener('click', function(e) {
+  if (!e.defaultPrevented) {
     window.lastClick = e;
-    if (!ME.DATA.active) $(ME).find('.maximize-app-icon').click();
-    else window.location.href = "../"+ME.DATA.id+"/index.html";
+    if (!ME.DATA.active) ME.querySelector('.maximize-app-icon').click();
+    else window.location.href = "../" + ME.DATA.id + "/index.html";
   }
 });
 
-$(ME).find('.maximize-app-icon').click(function(e){
+ME.querySelector('.maximize-app-icon').addEventListener('click', function(e) {
   e.preventDefault();
   if (!e.clientX) e = window.lastClick;
   var d = {"selector":".app-settings", "closeselector":".close-app-settings", "modal":true};
   d.clientX = e.clientX;
   d.clientY = e.clientY;
   document.body.api.closedata = d;
-  document.body.api.ui.popup(d, function(){
-    $(d.selector).css("width","90vw").css("height","90vh").css("left","5vw");
+  document.body.api.ui.popup(d, function() {
+    var dlg = document.querySelector(d.selector);
+    dlg.style.width = "90vw";
+    dlg.style.height = "90vh";
+    dlg.style.left = "5vw";
   });
-  var el = $('#app-settings');
-  el.find('.appname').text(ME.DATA.name);
-  el = el.find('.appinfo');
-  installControl(el[0], 'app', 'appinfo', function(api){}, ME.DATA);
+  var el = dget('app-settings');
+  el.querySelector('.appname').textContent = ME.DATA.name;
+  installControl(el.querySelector('.appinfo'), 'app', 'appinfo', function(api) {}, ME.DATA);
 });
