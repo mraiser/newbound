@@ -1,5 +1,5 @@
 var me = this;
-var ME = $('#' + me.UUID)[0];
+var ME = document.getElementById(me.UUID);
 
 // --- Properties ---
 me.children = [];
@@ -33,6 +33,18 @@ me.destroy = function() {
     }
 };
 
+// classic-script injection: THREE's UMD builds attach to window when loaded
+// via a real script tag (fetch/eval would leave them module-scoped)
+function loadScript(src) {
+    return new Promise(function(resolve, reject) {
+        var s = document.createElement('script');
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+    });
+}
+
 // --- Initialization ---
 me.ready = function() {
     const scripts = [
@@ -44,7 +56,7 @@ me.ready = function() {
     ];
     scripts.reduce(function(p, script) {
         return p.then(function() {
-            return $.getScript(script);
+            return loadScript(script);
         });
     }, Promise.resolve())
     .then(loadFont)
@@ -66,17 +78,14 @@ function loadFont() {
 }
 
 function initScene() {
-    var el = $(ME).find('.matrixviewer');
-    if (el.length === 0) {
-        el = $(ME);
-    }
+    var el = ME.querySelector('.matrixviewer') || ME;
 
     me.scene = new THREE.Scene();
     me.scene.viewer = me;
 
     var getDimensions = function() {
-        var width = el.width();
-        var height = el.height();
+        var width = el.clientWidth;
+        var height = el.clientHeight;
         if (height === 0) height = window.innerHeight - 96;
         if (width === 0) width = window.innerWidth;
         return { width: width, height: height };
@@ -91,7 +100,7 @@ function initScene() {
     me.renderer = new THREE.WebGLRenderer({ alpha: true });
     me.renderer.setSize(dims.width, dims.height);
     me.renderer.setClearColor(0x000000, 0);
-    el.append(me.renderer.domElement);
+    el.appendChild(me.renderer.domElement);
     me.scene.renderer = me.renderer;
 
     me.onWindowResize = function() {
@@ -118,8 +127,9 @@ function initScene() {
     me.scene.add(me.spotLight);
     me.scene.add(me.spotLight.target);
 
-    $(me.renderer.domElement).on('click contextmenu', handleRaycastEvent); // contextmenu for right-click
-    $(me.renderer.domElement).dblclick(handleRaycastEvent);
+    me.renderer.domElement.addEventListener('click', handleRaycastEvent);
+    me.renderer.domElement.addEventListener('contextmenu', handleRaycastEvent); // right-click
+    me.renderer.domElement.addEventListener('dblclick', handleRaycastEvent);
 
     if (ME.DATA && ME.DATA.ready) {
         ME.DATA.ready(me);
@@ -257,9 +267,11 @@ function loadChildControls(parentApi, controls, parentEl, onAllChildrenLoaded) {
     var loadedCount = 0;
     var total = controls.length;
     controls.forEach(function(ctl) {
-        var el2 = $('<div id="' + guid() + '"/>').appendTo(parentEl);
+        var el2 = document.createElement('div');
+        el2.id = guid();
+        parentEl.appendChild(el2);
         var lib = ctl.lib || ctl.db;
-        me.add(el2[0], lib, ctl.id, function(loadedChildApi) {
+        me.add(el2, lib, ctl.id, function(loadedChildApi) {
             loadedCount++;
             if (loadedCount === total) {
                 if (onAllChildrenLoaded) onAllChildrenLoaded();
@@ -294,14 +306,14 @@ me.add = function(el, lib, id, cb, data, parent) {
             me.scene.add(group);
         }
 
-        var meta = $(el)[0].meta;
+        var meta = el.meta;
         var onChildrenReady = function() {
             if (meta && meta.three) {
                 processBehaviors(api, meta.three.behaviors);
             }
             finalizeControlSetup(api, group, cb);
         };
-        
+
         if (meta && meta.three && meta.three.controls && meta.three.controls.length > 0) {
             loadChildControls(api, meta.three.controls, el, onChildrenReady);
         } else {

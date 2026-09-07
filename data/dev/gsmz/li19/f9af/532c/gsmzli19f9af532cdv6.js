@@ -25,11 +25,11 @@ var me = this;
 var ME = document.getElementById(me.UUID);
 
 var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
-  const { parse, propagationRounds, diffFlow } = window.NB_FLOWDOC;
-  const { toScene, terminalWorld, GEO } = window.NB_FLOWPROJECT;
-  const { PRIMS, FAMILIES, signature } = window.NB_FLOWPRIMS;
-  const { tidy, untangle } = window.NB_FLOWLAYOUT;
-  const { hasWebGL } = window.NB_WEBGL;
+  const { parse, propagationRounds, diffFlow } = document.querySelector('[data-control="dev:flowdoc"]').api;
+  const { toScene, terminalWorld, GEO } = document.querySelector('[data-control="dev:flowproject"]').api;
+  const { PRIMS, FAMILIES, signature } = document.querySelector('[data-control="dev:flowprims"]').api;
+  const { tidy, untangle } = document.querySelector('[data-control="dev:flowlayout"]').api;
+  const { hasWebGL } = document.querySelector('[data-control="app:webgl"]').api;
   // the vendored stage off its real asset URL — page-relative for tunneling
   const { mountScene } = await import("../app/asset/app/vendor/nb_three/scenestage.js");
   const jsonP = (c2, v2) => new Promise((res2) => json(c2, v2, res2));

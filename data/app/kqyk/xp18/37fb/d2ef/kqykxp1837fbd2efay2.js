@@ -1,12 +1,12 @@
-var me = this; 
-var ME = $('#'+me.UUID)[0];
+var me = this;
+var ME = document.getElementById(me.UUID);
 
-me.uiReady = function(ui){
+me.uiReady = function(ui) {
   me.ui = ui;
   var check = getCookie('obj_placeholder');
   if (check) {
     var pair = JSON.parse(atob(check));
-    json('../app/login', "user="+encodeURIComponent(pair[0])+"&pass="+encodeURIComponent(pair[1]), function(result){
+    json('../app/login', "user="+encodeURIComponent(pair[0])+"&pass="+encodeURIComponent(pair[1]), function(result) {
         if (result.status == 'ok') {
           window.location.href='../';
         }
@@ -16,18 +16,18 @@ me.uiReady = function(ui){
   else showlogin();
 };
 
-function showlogin(){
-  $(ME).find('.wrap').css('display', 'block');
-  $(ME).find('.mydialog').css('display', 'block');
-  $(ME).find('#username').focus();
-  $(ME).find('.loginbutton').click(function(){
-    var username = $(ME).find('#username').val();
-    var password = $(ME).find('#password').val();
-    var remember = $(ME).find('#remember').prop('checked');
-    json('../app/login', 'user='+encodeURIComponent(username)+'&pass='+encodeURIComponent(password), function(result){
+function showlogin() {
+  ME.querySelector('.wrap').style.display = 'block';
+  ME.querySelector('.mydialog').style.display = 'block';
+  ME.querySelector('#username').focus();
+  ME.querySelector('.loginbutton').addEventListener('click', function() {
+    var username = ME.querySelector('#username').value;
+    var password = ME.querySelector('#password').value;
+    var remember = ME.querySelector('#remember').checked;
+    json('../app/login', 'user='+encodeURIComponent(username)+'&pass='+encodeURIComponent(password), function(result) {
       if (result.status == 'ok') {
         if (remember) {
-          savestring = btoa(JSON.stringify([username,password]));
+          var savestring = btoa(JSON.stringify([username,password]));
           setCookie("obj_placeholder",savestring,365);
         }
         else {
@@ -36,8 +36,8 @@ function showlogin(){
         window.location.href = document.referrer ? document.referrer : '../';
       }
       else {
-        ui.snackbar({message:"Invalid username or password"});
-        $(ME).find('.loginmsg').css('color', 'red');
+        me.ui.snackbar({message:"Invalid username or password"});
+        ME.querySelector('.loginmsg').style.color = 'red';
       }
     });
   });

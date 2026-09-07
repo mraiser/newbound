@@ -1,28 +1,30 @@
 var me = this;
-var ME = $('#'+me.UUID)[0];
+var ME = document.getElementById(me.UUID);
 
-var canvas = me.canvas = $(ME).find('canvas')[0];
+var canvas = me.canvas = ME.querySelector('canvas');
 var ctx = me.ctx = canvas.getContext('2d');
 
 me.ready = function(){
   me.title = 'Reboot Device';
   me.redraw();
-  $(canvas).hover(function(x){ 
-    me.hover = x.type == 'mouseenter';
-    me.redraw();
-  });
-  $(canvas).click(function(){ 
-    var el = $('<div class="popup999 wrap"/>');
-    $('body').append(el);
+  canvas.addEventListener('mouseenter', function(){ me.hover = true; me.redraw(); });
+  canvas.addEventListener('mouseleave', function(){ me.hover = false; me.redraw(); });
+  canvas.addEventListener('click', function(){
+    var el = document.createElement('div');
+    el.className = 'popup999 wrap';
+    document.body.appendChild(el);
     var data = {
       title:'Reboot Device',
       text:'Are you sure you want to reboot the device?',
       cb:function(){
         var peer = ME.DATA.peer;
-        var api = $('#peer_'+peer)[0].api;
-        api.sphere.rotation.speed = 0.05;
+        // the pre-scene constellation hung a THREE api (sphere) off the peer
+        // div; the stub divs no longer carry it, so the spin is best-effort
+        var pdiv = document.getElementById('peer_'+peer);
+        var api = pdiv ? pdiv.api : null;
+        if (api && api.sphere) api.sphere.rotation.speed = 0.05;
         json('../peer/remote/'+peer+'/app/exec', 'lib=peer&id=sqgqnm18434391301x302&args={}', function(result){
-          api.sphere.rotation.speed = null;
+          if (api && api.sphere) api.sphere.rotation.speed = null;
           if (result.status != 'ok') document.body.api.ui.snackbarMsg(result.msg, '600px');
         });
       }
@@ -32,13 +34,13 @@ me.ready = function(){
 };
 
 me.redraw = function(){
-  var w = $(ME).width();
-  var h = $(ME).height();
-  
+  var w = ME.clientWidth;
+  var h = ME.clientHeight;
+
   var L = Math.min(w,h);
   var offx = (w-L)/2;
   var offy = (h-L)/2;
-  
+
   var fontsize = 18*L/150;
   var stroke1 = 15*L/150;
   var stroke2 = 2*L/150;
@@ -47,11 +49,11 @@ me.redraw = function(){
 
   canvas.width = w;
   canvas.height = h;
-  
+
   ctx.lineWidth = stroke1;
   ctx.strokeStyle = me.hover ? '#4bff2a' : '#4b8c2a';
   ctx.fillStyle = me.hover ? '#4bff2a' : '#4b8c2a';
-  
+
   var delta = 0.14;
   var off = L * delta;
   var bw = L * (1-delta*2);
@@ -65,7 +67,7 @@ me.redraw = function(){
   ctx.lineWidth = stroke;
   ctx.stroke();
   ctx.fillRect(radius + (stroke/2)+off+offx, off/2, stroke, rs);
-  
+
   ctx.font = fontsize+"px Arial";
   ctx.fillStyle = '#fff';
   ctx.lineWidth = stroke2;
