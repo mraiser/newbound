@@ -17,13 +17,13 @@ me.uiReady = function(ui) {
         json('../app/settings', "settings=" + encodeURIComponent(JSON.stringify(result.data)), function(result) {
           if (result.status != 'ok') alert(result.msg);
           else {
-            ME.querySelector('.whenon').style.display = b ? 'block' : 'none';
+            ME.querySelectorAll('.whenon').forEach(function(el) { el.style.display = b ? 'block' : 'none'; });
             if (b) me.buildUsers();
           }
         });
       });
       if (b) {
-        ME.querySelector('.whenon').style.display = 'block';
+        ME.querySelectorAll('.whenon').forEach(function(el) { el.style.display = 'block'; });
         me.buildUsers();
       }
     }
