@@ -38,6 +38,15 @@
   margin-left: 4px;
 }
 .nb-frame .fr-spacer { flex: 1; }
+.nb-frame .fr-git {
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: 11px var(--mono);
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+.nb-frame .fr-git:hover { color: var(--text); border-color: var(--text-faint); }
 .nb-frame .fr-session {
   padding: 7px 12px;
   border: 1px solid var(--line);

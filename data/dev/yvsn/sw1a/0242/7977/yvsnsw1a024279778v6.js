@@ -78,7 +78,54 @@ async function init(host, props) {
     if (addForm.hidden) openAdd(null);
     else addForm.hidden = true;
   };
+  // ── import from git (dev.github — moved here from the shelf) ──
+  // A git url becomes a library: the platform clones and builds it. A
+  // DEVELOPMENT act — git is development-only; distribution to peers is
+  // the archive path on each library's fan (on the shelf).
+  const importForm = host.querySelector(".gp-import");
+  const importList = host.querySelector(".gp-i-list");
+  const iNote = host.querySelector(".gp-i-note");
+  host.querySelector(".gp-import-open").onclick = async () => {
+    importForm.hidden = !importForm.hidden;
+    iNote.textContent = "";
+    if (importForm.hidden) { importList.hidden = true; return; }
+    host.querySelector(".gp-i-url").focus();
+    const env = await invokeP("dev", "github", "list", {});
+    if (env && env.status === "ok") {
+      const data = env.data ?? {};
+      const names = Array.isArray(data) ? data
+        : Array.isArray(data.list) ? data.list : Object.keys(data);
+      importList.hidden = names.length === 0;
+      importList.textContent = names.length
+        ? "from git already: " + names.map((x) =>
+            typeof x === "string" ? x : x.id ?? x.name ?? JSON.stringify(x)).join(", ")
+        : "";
+    }
+  };
+  importForm.onsubmit = async (ev) => {
+    ev.preventDefault();
+    const url = host.querySelector(".gp-i-url").value.trim();
+    if (!url) { iNote.textContent = "paste a git url"; return; }
+    iNote.textContent = "cloning + building on the instance…";
+    const env = await invokeP("dev", "github", "import", { url });
+    if (!env || env.status !== "ok") {
+      iNote.textContent = `import failed: ${(env && env.msg) || "no response"}`;
+      return;
+    }
+    // String return: the result rides `msg`, ok status either way — the
+    // ERROR prefix is the honest failure signal to relay verbatim.
+    const text = env.msg ?? "";
+    if (/^ERROR/.test(text) || !text) {
+      iNote.textContent = text || "import returned nothing";
+      return;
+    }
+    iNote.textContent = text + " — reload to see it on the shelf";
+    toast.show("github.import → " + (url.split("/").pop() || url));
+  };
+
   addForm.onsubmit = async (ev) => {
+    ev.preventDefault();
+    const name = aName.value.trim();
     const path = aPath.value.trim();
     if (!name || !path) { aNote.textContent = "name and path are required"; return; }
     aNote.textContent = "validating (rev-parse) + writing…";
