@@ -86,6 +86,40 @@
 }
 .nb-gitpanel .gp-a-note { font: 10.5px var(--mono, ui-monospace, monospace); color: var(--danger, #e05d5d); }
 
+.nb-gitpanel .gp-import {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: var(--panel, #17191d);
+  border: 1px solid var(--line, #2a2e35);
+  border-radius: 8px;
+}
+.nb-gitpanel .gp-import[hidden] { display: none; }
+.nb-gitpanel .gp-import input {
+  background: var(--panel-2, #1e2126);
+  border: 1px solid var(--line, #2a2e35);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font: 11.5px var(--mono, ui-monospace, monospace);
+  color: var(--text, #d7dae0);
+  flex: 1 1 320px;
+}
+.nb-gitpanel .gp-i-go {
+  font: 11px var(--mono, ui-monospace, monospace);
+  color: var(--ground, #101215);
+  background: var(--accent, #f0a63c);
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.nb-gitpanel .gp-i-note { font: 10.5px var(--mono, ui-monospace, monospace); color: var(--text-dim, #9aa0aa); }
+.nb-gitpanel .gp-i-list { flex-basis: 100%; font-size: 11px; color: var(--text-faint, #6b7280); margin-top: 4px; }
+.nb-gitpanel .gp-i-list[hidden] { display: none; }
+
 /* repo rows */
 .nb-gitpanel .gp-rows { display: flex; flex-direction: column; gap: 10px; }
 .nb-gitpanel .gp-rows.gp-empty { font: 11.5px var(--mono, ui-monospace, monospace); color: var(--text-faint, #6b7280); }

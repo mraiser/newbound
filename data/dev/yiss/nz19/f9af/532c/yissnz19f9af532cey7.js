@@ -43,7 +43,10 @@ async function init(host) {
   const nav = {
     openLib: (lib) => { location.hash = `#/shelf/${lib}`; },
     openControl: (lib, id) => { location.hash = `#/bench/${lib}/${id}`; },
+    openGit: () => { location.hash = "#/git"; },
   };
+
+  host.querySelector(".fr-git").addEventListener("click", nav.openGit);
 
   await mount("jump", host.querySelector(".fr-jump-slot"), nav);
 
@@ -92,6 +95,19 @@ async function init(host) {
     if (stageApi) { stageApi.dispose?.(); stageApi = null; }
     viewctx.unregister("flow");   // re-registered below when a flow mounts
     const [, screen, lib, ctlId] = location.hash.split("/");
+
+    if (location.hash.startsWith("#/git")) {
+      // the instance's repos panel — registry, branch verbs, sweep, import
+      shelfApi = null;
+      stage.replaceChildren();
+      const slot = document.createElement("div");
+      slot.style.height = "100%";
+      slot.style.overflow = "auto";
+      stage.appendChild(slot);
+      setCrumb("git", "repos");
+      stageApi = await mount("git", slot, { toast });
+      return;
+    }
 
     if (location.hash.startsWith("#/player/")) {
       // #/player/<lib>/<ctl> — a scene facet running standalone: the

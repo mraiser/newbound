@@ -576,55 +576,7 @@ async function init(host, { openLib, openControl, toast }) {
     await showFan(name);
   });
 
-  // ── import from git (dev.github — the ported panel; R-2) ──
-  // A git url becomes a library: the platform clones and builds it. A
-  // DEVELOPMENT act — git is development-only; distribution to peers is
-  // the archive path on each library's fan.
-  const importForm = host.querySelector(".sh-import");
-  const importFields = host.querySelector(".sh-import-fields");
-  const importList = host.querySelector(".sh-import-list");
-  importForm.hidden = !(writable && patchApi);
-  host.querySelector(".sh-import-open").addEventListener("click", async () => {
-    importFields.hidden = !importFields.hidden;
-    host.querySelector(".sh-import-note").textContent = "";
-    if (importFields.hidden) { importList.hidden = true; return; }
-    host.querySelector(".sh-import-url").focus();
-    const got = await invoke("dev", "github", "list", {});
-    if (!(got instanceof Error) && got.envelope.status === "ok") {
-      const data = got.envelope.data ?? {};
-      const names = Array.isArray(data) ? data
-        : Array.isArray(data.list) ? data.list : Object.keys(data);
-      importList.hidden = names.length === 0;
-      importList.textContent = names.length
-        ? "from git already: " + names.map((x) =>
-            typeof x === "string" ? x : x.id ?? x.name ?? JSON.stringify(x)).join(", ")
-        : "";
-    }
-  });
-  importForm.addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-    const url = host.querySelector(".sh-import-url").value.trim();
-    const note = host.querySelector(".sh-import-note");
-    if (!url) { note.textContent = "paste a git url"; return; }
-    note.textContent = "cloning + building on the instance…";
-    const r = await invoke("dev", "github", "import", { url });
-    if (r instanceof Error || r.envelope.status !== "ok") {
-      note.textContent = `import failed: ${
-        r instanceof Error ? r.message : r.envelope.msg}`;
-      return;
-    }
-    // String return: the result rides `msg`, ok status either way — the
-    // ERROR prefix is the honest failure signal to relay verbatim.
-    const text = r.envelope.msg ?? "";
-    if (/^ERROR/.test(text) || !text) {
-      note.textContent = text || "import returned nothing";
-      return;
-    }
-    note.textContent = text + " — reload to see it on the shelf";
-    toast.show("github.import → " + (url.split("/").pop() || url));
-  });
 
-  // ── plugin registrations (dev.plugins + set_plugin/remove_plugin) ──
   // The per-instance plugins.json edited in place: when TARGET is on a
   // page, PLUGIN mounts at SELECTOR. Instance-level like git import, so
   // it lives on the shelf header; entries apply on the next reload.
