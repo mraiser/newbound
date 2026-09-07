@@ -261,11 +261,6 @@
 .nb-shelf .fk-rows { display: flex; align-items: center; gap: 12px; }
 .nb-shelf .fk-meta { font-size: 11.5px; color: var(--text-dim); }
 .nb-shelf .fk-dl { font: 11.5px var(--mono); }
-.nb-shelf .sh-import { margin: 0 0 10px; }
-.nb-shelf .sh-import[hidden] { display: none; }
-.nb-shelf .sh-import-fields[hidden] { display: none; }
-.nb-shelf .sh-import-url { min-width: 340px; }
-.nb-shelf .sh-import-list { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
 .nb-shelf .sh-plugins { margin: 0 0 10px; }
 .nb-shelf .sh-plugins[hidden] { display: none; }
 .nb-shelf .sh-plugins-panel[hidden] { display: none; }

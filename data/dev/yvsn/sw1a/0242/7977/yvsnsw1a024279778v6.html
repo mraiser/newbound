@@ -12,8 +12,17 @@
     <button type="button" class="gp-sweep"
       title="the 5-minute sweep, now: fetch every repo; on autocommit repos stage + commit when dirty, then push (never on master/main) — dev.git.autocommit_sweep">⟳ sweep now</button>
     <button type="button" class="gp-add-open">+ register repo</button>
+    <button type="button" class="gp-import-open" title="a git url becomes a library: the platform clones and builds it (dev.github.import)">⇩ import from git</button>
     <span class="gp-note"></span>
   </div>
+  <form class="gp-import" hidden>
+    <input class="gp-i-url"
+           placeholder="git url — the repo becomes a library (dev.github.import)"
+           aria-label="Git repository url to import">
+    <button type="submit" class="gp-i-go">import</button>
+    <span class="gp-i-note"></span>
+    <div class="gp-i-list" hidden></div>
+  </form>
   <form class="gp-add" hidden>
     <input class="gp-a-name" placeholder="name — the handle dev.git commands use"
            aria-label="Repo registry name">

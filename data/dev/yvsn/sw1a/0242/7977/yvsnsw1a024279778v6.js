@@ -79,8 +79,6 @@ async function init(host, props) {
     else addForm.hidden = true;
   };
   addForm.onsubmit = async (ev) => {
-    ev.preventDefault();
-    const name = aName.value.trim();
     const path = aPath.value.trim();
     if (!name || !path) { aNote.textContent = "name and path are required"; return; }
     aNote.textContent = "validating (rev-parse) + writing…";
