@@ -1,62 +1,66 @@
-/Cargo (copy).toml
-/cmd/Cargo (copy).toml
-/cmd (copy)
-/src (copy)
-/generated/
-version.txt
-botd.properties
-/html
-/cmd
-/target
-/users
-/config.properties
-/Cargo.lockx
-/venv
-/requirements.txt
-/repositories
-/.claude/
+# Canon policy: deny by default, allow only what ships.
+# A fresh clone must build the platform and boot with the core libraries;
+# everything else on a user's machine — local state, generated output,
+# overlaid repos — stays untracked by construction.
+*
 
-# The store and the runtime tree are local-first state: nothing in them
-# ships except the core libraries, so ignore by RULE and re-include the
-# tracked ones. A new library (data/foo, runtime/foo) is invisible to
-# canon by construction - no per-library list to maintain.
-/data/*
-!/data/app
-!/data/dev
-!/data/peer
-!/data/security
-/runtime/*
-!/runtime/app
-!/runtime/dev
-!/runtime/peer
-!/runtime/security
-# per-instance local state inside the tracked runtime/dev
-/runtime/dev/libraries/
-/runtime/dev/repos.json
-/runtime/dev/plugins.json
+# Root files
+!.gitignore
+!.gitattributes
+!.mcp.json
+!CLAUDE.md
+!README.md
+!license.md
+!Cargo.toml
+!Cargo.lock
+!build.sh
+!debug.sh
+!downgrade.sh
+!hardreset.sh
+!newbound.sh
+!default.nix
+!config.properties_example
 
-# The agent library set (mraiser/newbound-agent) overlays here via
-# symlinks (its tools/overlay.sh). Its crate dirs land at the root.
-# (data/agent, data/kb, data/scratch are covered by the /data/* rule.)
-/agent
-/kb
-/scratch
+# Core store libraries (the data/ tree is the product)
+!data/
+!data/app/
+!data/app/**
+!data/dev/
+!data/dev/**
+!data/peer/
+!data/peer/**
+!data/security/
+!data/security/**
 
-# The generated typed API (one per crate src/): builder-written and
-# overlay-aware - it absorbs whatever libraries the local checkout
-# carries, so it must never be tracked anywhere.
+# Core runtime crates
+!runtime/
+!runtime/app/
+!runtime/app/**
+!runtime/dev/
+!runtime/dev/**
+!runtime/peer/
+!runtime/peer/**
+!runtime/security/
+!runtime/security/**
+
+# Build trees
+!html/
+!html/**
+!newbound_core/
+!newbound_core/**
+!src/
+!src/**
+
+# --- Re-exclusions inside allowed trees ---
+# Generated typed API, one per crate src/ (builder-written, overlay-aware)
 **/src/api.rs
+# Per-instance local state inside tracked runtime/dev
+runtime/dev/libraries/
+runtime/dev/repos.json
+runtime/dev/plugins.json
 
-# Local FFI crates and folders
-/REMOTE
-/fillmore
-/genmore
-/grabmore
-/gudrun
-/hollis
-/http_log/
-/models/
-/nebula
-/oneshot_base
-/trainmore
-
+#Per-instance botd.properties files
+runtime/app/botd.properties
+runtime/dev/botd.properties
+runtime/peer/botd.properties
+runtime/security/botd.properties
