@@ -8,26 +8,7 @@ me.uiReady = function(ui) {
   ui.initPopups(ME);
   ME.querySelector('.wrap').style.display = 'block';
 
-  // --- Dark Mode Logic ---
-  const darkModePref = localStorage.getItem('darkMode');
-  const toggle = ME.querySelector('#dark-mode-switch-app');
-
-  if (darkModePref === 'enabled') {
-    document.body.classList.add('dark');
-    toggle.checked = true;
-  }
-
-  toggle.addEventListener('change', function() {
-    if (this.checked) {
-      document.body.classList.add('dark');
-      localStorage.setItem('darkMode', 'enabled');
-    } else {
-      document.body.classList.remove('dark');
-      localStorage.setItem('darkMode', 'disabled');
-    }
-  });
-  // --- End Dark Mode Logic ---
-
+  // Dark-mode toggle retired: graphite is the one theme (ui doctrine, 2026-09).
   json('../app/read', 'lib=runtime&id=metabot_applist_filters', function(result) {
     if (result.data) {
       ME.querySelector('#appfilter-inactive').checked = !!result.data.inactive;
