@@ -38,6 +38,13 @@
   vertical-align:top;
 }
 
+.userrow img,
+img.adduserbutton,
+img.addgroupbutton{
+  /* legacy light-theme glyphs — force to a light silhouette on graphite */
+  filter: brightness(0) invert(0.85);
+}
+
 .usertitle {
   font-size:x-large;
   font-weight:900;
