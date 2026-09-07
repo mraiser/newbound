@@ -203,21 +203,20 @@ function installControl(el, lib, id, cb, data) {
 
   var oldhtml = Array.from(el.children);
 
+  // A data-control attribute is the mount DECLARATION — the record the
+  // store, siblings, and selectors read. It is never rewritten here: a
+  // declared element keeps its declared value verbatim; only a bare
+  // programmatic mount gets one recorded ({lib,id}, never props — props
+  // can hold functions and cycles that don't survive stringify).
   if (!data) {
     var d2 = el.dataset.control ? el.dataset.control : null;
     if (d2 && d2[0] == '{') { try { d2 = JSON.parse(d2); } catch (x) { d2 = null; } }
     else d2 = null;
-    if (!d2) {
-      data = { lib:lib, id:id };
-      el.dataset.control = JSON.stringify(data);
-    }
-    else data = d2;
+    data = d2 ? d2 : { lib:lib, id:id };
   }
-  else el.dataset.control = JSON.stringify(data);
   el.ctl = data;
 
-  if (!data) data = { lib:lib, id:id };
-  if (!el.dataset.control) el.dataset.control = JSON.stringify(data);
+  if (!el.dataset.control) el.dataset.control = JSON.stringify({ lib:lib, id:id });
   el.DATA = data;
 
   lookupID(lib, id, function(id2) {
