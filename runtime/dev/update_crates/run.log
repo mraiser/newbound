@@ -1,0 +1,449 @@
+== STEP 1: cargo build --release --features=serde_support,python_runtime
+   Compiling ring v0.17.14
+warning: unused import: `crate::peer::service::listen::relay`
+  --> newbound_core/src/peer/service/maintenance.rs:12:5
+   |
+12 | use crate::peer::service::listen::relay;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused doc comment
+   --> newbound_core/src/peer/service/maintenance.rs:146:11
+    |
+146 | /           /**
+147 | |           * Disabled relay
+148 | |           *
+149 | |           if get_tcp(user.clone()).is_some() {
+...   |
+159 | |           */
+    | |____________^
+...
+162 |             fire_event("peer", "UPDATE", user_to_peer(user, uuid));
+    |             ------------------------------------------------------ rustdoc does not generate documentation for expressions
+    |
+    = help: use `/* */` for a plain comment
+    = note: `#[warn(unused_doc_comments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crate::peer::service::listen::P2PConnection`
+  --> newbound_core/src/peer/service/exec.rs:11:5
+   |
+11 | use crate::peer::service::listen::P2PConnection;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ndata::data::Data`
+ --> newbound_core/src/dev/code/search_commands.rs:4:5
+  |
+4 | use ndata::data::Data;
+  |     ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `flowlang::datastore::DataStore`
+ --> newbound_core/src/dev/editcontrol/save_control.rs:3:5
+  |
+3 | use flowlang::datastore::DataStore;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::app::app::write::write as app_write`
+ --> newbound_core/src/dev/editcontrol/get_publish_context.rs:3:5
+  |
+3 | use crate::app::app::write::write as app_write;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ndata::Data::DString`
+ --> newbound_core/src/dev/editcontrol/get_publish_context.rs:4:5
+  |
+4 | use ndata::Data::DString;
+  |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ndata::Data::DArray`
+ --> newbound_core/src/dev/editcontrol/get_publish_context.rs:5:5
+  |
+5 | use ndata::Data::DArray;
+  |     ^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ndata::Data::DNull`
+ --> newbound_core/src/dev/editcontrol/get_publish_context.rs:6:5
+  |
+6 | use ndata::Data::DNull;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ndata::Data::DArray`
+ --> newbound_core/src/dev/editcontrol/add_component.rs:6:5
+  |
+6 | use ndata::Data::DArray;
+  |     ^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/set_command_imports.rs:62:33
+   |
+62 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                 ^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+   --> newbound_core/src/dev/code/set_groups.rs:185:33
+    |
+185 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+    |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+   --> newbound_core/src/dev/code/set_tags.rs:132:33
+    |
+132 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+    |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+   --> newbound_core/src/dev/code/move_control.rs:125:33
+    |
+125 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+    |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+   --> newbound_core/src/dev/code/delete_control.rs:100:33
+    |
+100 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+    |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/write_control_scene.rs:86:33
+   |
+86 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/read_control_scene.rs:53:33
+   |
+53 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/remove_event_handler.rs:85:33
+   |
+85 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/set_event_handler.rs:93:33
+   |
+93 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/remove_timer.rs:84:33
+   |
+84 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+   --> newbound_core/src/dev/code/set_timer.rs:105:33
+    |
+105 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+    |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/write_flow_body.rs:88:33
+   |
+88 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/read_flow_body.rs:55:33
+   |
+55 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/set_command_meta.rs:58:33
+   |
+58 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/set_control_meta.rs:56:33
+   |
+56 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/list_control_patches.rs:55:33
+   |
+55 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+   --> newbound_core/src/dev/code/patch_control_facet.rs:102:33
+    |
+102 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+    |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/read_control_facet.rs:68:33
+   |
+68 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_app_app::libs`: use api::app::app::libs instead
+  --> newbound_core/src/dev/code/search_commands.rs:61:30
+   |
+61 | let libs_array = api.app.app.libs();
+   |                              ^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+   --> newbound_core/src/dev/code/delete_command.rs:101:33
+    |
+101 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+    |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/read_command.rs:55:33
+   |
+55 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/patch_command_body.rs:58:33
+   |
+58 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/upsert_command.rs:62:33
+   |
+62 | let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                 ^^^^^^^^^
+
+warning: use of deprecated method `api::old_app_app::newlib`: use api::app::app::newlib instead
+  --> newbound_core/src/dev/code/add_library.rs:58:37
+   |
+58 | let msg = crate::api::new().app.app.newlib(lib.clone(), DataArray::new(), DataArray::new());
+   |                                     ^^^^^^
+
+warning: use of deprecated method `api::old_app_app::libs`: use api::app::app::libs instead
+  --> newbound_core/src/dev/code/list_libraries.rs:40:27
+   |
+40 | crate::api::new().app.app.libs()
+   |                           ^^^^
+
+warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
+  --> newbound_core/src/dev/code/list_commands.rs:55:49
+   |
+55 | let real_id = crate::api::new().dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
+   |                                                 ^^^^^^^^^
+
+warning: unused variable: `system`
+   --> newbound_core/src/peer/service/maintenance.rs:118:13
+    |
+118 |         let system = DataStore::globals().get_object("system");
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_system`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unreachable pattern
+   --> newbound_core/src/peer/service/discovery.rs:181:11
+    |
+178 |           Ok(received_data) => {
+    |           ----------------- matches all the relevant values
+...
+181 |           Ok(_) => {
+    |           ^^^^^ no value can reach this
+    |
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `published` is never read
+   --> newbound_core/src/dev/git/carry_branch.rs:147:21
+    |
+147 | let mut published = false;
+    |                     ^^^^^ this value is reassigned later and never used
+...
+150 | published = okr(&r);
+    | ------------------- `published` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> newbound_core/src/dev/code/set_command_imports.rs:72:5
+   |
+72 | let mut o = store.get_data(&lib, &ctlid);
+   |     ----^
+   |     |
+   |     help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> newbound_core/src/dev/code/read_command.rs:65:5
+   |
+65 | let mut o = store.get_data(&lib, &ctlid);
+   |     ----^
+   |     |
+   |     help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> newbound_core/src/dev/code/patch_command_body.rs:68:5
+   |
+68 | let mut o = store.get_data(&lib, &ctlid);
+   |     ----^
+   |     |
+   |     help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> newbound_core/src/dev/code/list_commands.rs:62:7
+   |
+62 |   let mut o = o.object();
+   |       ----^
+   |       |
+   |       help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> newbound_core/src/dev/editcontrol/save_control.rs:89:5
+   |
+89 | let mut nowriters = DataArray::new();
+   |     ----^^^^^^^^^
+   |     |
+   |     help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> newbound_core/src/dev/dev/hard_reset.rs:96:5
+   |
+96 | let mut g = DataStore::globals();
+   |     ----^
+   |     |
+   |     help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> newbound_core/src/dev/dev/update_crates_status.rs:98:5
+   |
+98 | let mut g = DataStore::globals();
+   |     ----^
+   |     |
+   |     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> newbound_core/src/dev/dev/update_crates.rs:138:5
+    |
+138 | let mut g = DataStore::globals();
+    |     ----^
+    |     |
+    |     help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> newbound_core/src/dev/dev/compile_rust.rs:45:5
+   |
+45 | let mut base_path = base_path.parent().unwrap();
+   |     ----^^^^^^^^^
+   |     |
+   |     help: remove this `mut`
+
+warning: `newbound_core` (lib) generated 48 warnings (run `cargo fix --lib -p newbound_core` to apply 19 suggestions)
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling ureq v2.12.1
+   Compiling hf-hub v0.3.2
+   Compiling cmd v0.1.0 (/newbound/cmd)
+warning: unused import: `Transform`
+ --> cmd/src/lib.rs:2:25
+  |
+2 | use flowlang::rustcmd::{Transform};
+  |                         ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `cmds`
+ --> cmd/src/oneshot_jobs/mod.rs:3:16
+  |
+3 | pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
+  |                ^^^^ help: if this is intentional, prefix it with an underscore: `_cmds`
+  |
+  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `cmds`
+ --> cmd/src/oneshot_msgs/mod.rs:3:16
+  |
+3 | pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
+  |                ^^^^ help: if this is intentional, prefix it with an underscore: `_cmds`
+
+warning: `cmd` (lib) generated 3 warnings (run `cargo fix --lib -p cmd` to apply 3 suggestions)
+   Compiling newbound v0.1.0 (/newbound)
+    Finished `release` profile [optimized] target(s) in 18.21s
+== STEP 2: target/release/newbound rebuild
+hotswap: loaded 'grabmore' generation 1 (39 commands)
+hotswap: loaded 'trainmore' generation 2 (45 commands)
+hotswap: loaded 'scratch' generation 3 (2 commands)
+hotswap: library 'nebula' predates the ABI contract symbol; loading unchecked
+hotswap: loaded 'nebula' generation 4 (21 commands)
+hotswap: loaded 'fillmore' generation 5 (25 commands)
+hotswap: loaded 'hollis' generation 6 (9 commands)
+hotswap: loaded 'runtime' generation 7 (0 commands)
+hotswap: loaded 'oneshot_base' generation 8 (18 commands)
+hotswap: loaded 'kb' generation 9 (0 commands)
+hotswap: loaded 'genmore' generation 10 (75 commands)
+hotswap: loaded 'gudrun' generation 11 (76 commands)
+hotswap: loaded 'agent' generation 12 (102 commands)
+REBUILDING ALL
+NOTE: flowlang version for library "app" is builder-managed (the core pair comes from the root Cargo.lock); ignoring the value in meta.json.
+NOTE: ndata version for library "app" is builder-managed (the core pair comes from the root Cargo.lock); ignoring the value in meta.json.
+== STEP 3: target/release/newbound recompile
+hotswap: loaded 'grabmore' generation 1 (39 commands)
+hotswap: loaded 'trainmore' generation 2 (45 commands)
+hotswap: loaded 'scratch' generation 3 (2 commands)
+hotswap: library 'nebula' predates the ABI contract symbol; loading unchecked
+hotswap: loaded 'nebula' generation 4 (21 commands)
+hotswap: loaded 'fillmore' generation 5 (25 commands)
+hotswap: loaded 'hollis' generation 6 (9 commands)
+hotswap: loaded 'runtime' generation 7 (0 commands)
+hotswap: loaded 'oneshot_base' generation 8 (18 commands)
+hotswap: loaded 'kb' generation 9 (0 commands)
+hotswap: loaded 'genmore' generation 10 (75 commands)
+hotswap: loaded 'gudrun' generation 11 (76 commands)
+hotswap: loaded 'agent' generation 12 (102 commands)
+RECOMPILING agent (agent)
+executing command in directory agent
+RECOMPILING fillmore (fillmore)
+executing command in directory fillmore
+hotswap: 'agent' dylib changed or appeared; loading
+hotswap: loaded 'agent' generation 13 (102 commands)
+RECOMPILING genmore (genmore)
+executing command in directory genmore
+hotswap: 'fillmore' dylib changed or appeared; loading
+hotswap: loaded 'fillmore' generation 14 (25 commands)
+RECOMPILING grabmore (grabmore)
+executing command in directory grabmore
+hotswap: 'genmore' dylib changed or appeared; loading
+hotswap: loaded 'genmore' generation 15 (75 commands)
+RECOMPILING gudrun (gudrun)
+executing command in directory gudrun
+hotswap: 'grabmore' dylib changed or appeared; loading
+hotswap: loaded 'grabmore' generation 16 (39 commands)
+RECOMPILING hollis (hollis)
+executing command in directory hollis
+hotswap: 'gudrun' dylib changed or appeared; loading
+hotswap: loaded 'gudrun' generation 17 (76 commands)
+RECOMPILING kb (kb)
+executing command in directory kb
+RECOMPILING minifig (oneshot_base)
+executing command in directory oneshot_base
+hotswap: 'hollis' dylib changed or appeared; loading
+hotswap: loaded 'hollis' generation 18 (9 commands)
+RECOMPILING nebula (nebula)
+executing command in directory nebula
+hotswap: 'kb' dylib changed or appeared; loading
+hotswap: loaded 'kb' generation 19 (0 commands)
+hotswap: 'oneshot_base' dylib changed or appeared; loading
+hotswap: loaded 'oneshot_base' generation 20 (18 commands)
+RECOMPILING runtime (runtime)
+executing command in directory runtime
+error: the package 'runtime' does not contain these features: python_runtime, serde_support
+
+RECOMPILING scratch (scratch)
+executing command in directory scratch
+RECOMPILING storage (oneshot_base)
+executing command in directory oneshot_base
+RECOMPILING trainmore (trainmore)
+executing command in directory trainmore
+hotswap: 'nebula' dylib changed or appeared; loading
+hotswap: library 'nebula' predates the ABI contract symbol; loading unchecked
+hotswap: loaded 'nebula' generation 21 (21 commands)
+hotswap: 'scratch' dylib changed or appeared; loading
+hotswap: loaded 'scratch' generation 22 (2 commands)
+12 compiled, 1 failed (runtime)
