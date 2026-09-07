@@ -8,16 +8,14 @@
 
 // ── geometry constants (versioned with the editor, never persisted) ─────────
 //
-// LIBRARY control — headless: defines window.NB_FLOWPROJECT once (idempotent across
-// installs). Consumers list this control as a hidden data-control child
-// div and use the global from their ready.
+// LIBRARY control — headless: the api rides this control's own element
+// (zero-globals doctrine). Consumers mount it as a hidden data-control
+// child div and read the element's api.
 
 var me = this;
 var ME = document.getElementById(me.UUID);
 
-me.ready = function () {
-  if (window.NB_FLOWPROJECT) return;
-  window.NB_FLOWPROJECT = (function () {
+(function () {
 
 const GEO = {
   deckPitch: 8,          // nextcase decks recede in −Z at this pitch (§2.4)
@@ -484,6 +482,5 @@ function toScene(rootCase, opts = {}) {
   return { specs, bounds, deckCount: chain.length };
 }
 
-    return { GEO, halfH, project, frontOrtho, terminalWorld, wireCurvePoint, toScene };
+    Object.assign(me, { GEO, halfH, project, frontOrtho, terminalWorld, wireCurvePoint, toScene });
   })();
-};

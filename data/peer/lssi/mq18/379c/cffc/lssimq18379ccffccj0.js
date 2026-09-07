@@ -1,5 +1,5 @@
 var me = this;
-var ME = $('#'+me.UUID)[0];
+var ME = document.getElementById(me.UUID);
 
 // The 3D constellation is the SCENE FACET on peer.peer, run IN THIS PAGE
 // by the stock-mountable bench 'player' control (the app.scenegraph
@@ -14,7 +14,7 @@ me.layout = {};       // id -> {x, z, vx, vz}
 
 me.uiReady = function(ui){
   me.ui = ui;
-  $(ME).find('.wrap').css('display', 'block');
+  ME.querySelector('.wrap').style.display = 'block';
   ui.initNavbar(ME);
   ui.initPopups(ME);
 };
@@ -92,8 +92,9 @@ function peerList(){
 }
 
 // The legacy data-bus contract, kept: headsup (and anything else) reads a
-// peer's live record from $('#peer_'+id)[0].DATA. The divs are hidden
-// stubs now — the 3D that used to hang off them lives in the scene facet.
+// peer's live record from document.getElementById('peer_'+id).DATA. The divs
+// are hidden stubs now — the 3D that used to hang off them lives in the
+// scene facet.
 function upsertPeerDiv(p){
   var d = document.getElementById('peer_' + p.id);
   if (!d) {
@@ -285,20 +286,32 @@ function pushScene(){
 // orb underneath it cannot be tapped until you drag the view to bring that
 // orb clear. Tap-to-close and switching peers work on any orb you can see.
 
+function animateWidth(el, target, ms, cb){
+  try {
+    var anim = el.animate([{ width: target + 'px' }], { duration: ms, easing: 'ease' });
+    anim.onfinish = function(){ el.style.width = target + 'px'; if (cb) cb(); };
+  } catch (x) {
+    el.style.width = target + 'px';
+    if (cb) cb();
+  }
+}
+
 // focus flows back from the scene (tap toggles): open/close the headsup panel
 function onSceneFocus(value){
-  var el = $('#headsupdisplay');
+  var el = document.getElementById('headsupdisplay');
   if (!value) {
     stopHudWatch();
-    el.animate({width: 0}, 300, function(){ el.css('display', 'none'); });
+    animateWidth(el, 0, 300, function(){ el.style.display = 'none'; });
     return;
   }
   var p = null;
   var list = peerList();
   for (var i in list) if (list[i].id == value) p = list[i];
   if (!p) return;
-  el.width(0).css('display', 'block').animate({width: 680}, 300);
-  installControl(el[0], 'peer', 'headsup', function(api){}, p);
+  el.style.width = '0px';
+  el.style.display = 'block';
+  animateWidth(el, 680, 300);
+  installControl(el, 'peer', 'headsup', function(api){}, p);
   watchHud();
 }
 
@@ -312,9 +325,9 @@ var hudWatch = null;
 function watchHud(){
   if (hudWatch) return;
   hudWatch = setInterval(function(){
-    var el = $('#headsupdisplay');
-    if (el.is(':animated')) return;
-    if (el.css('display') == 'none' || el.width() < 40) {
+    var el = document.getElementById('headsupdisplay');
+    if (el.getAnimations && el.getAnimations().length > 0) return;
+    if (getComputedStyle(el).display == 'none' || el.offsetWidth < 40) {
       stopHudWatch();
       sceneSet('focus', '');
     }
@@ -325,8 +338,7 @@ function stopHudWatch(){
 }
 
 me.ready = function(){
-  var el = $(ME).find('.viewer');
-  installControl(el[0], 'app', 'sceneplayer', function(api){
+  installControl(ME.querySelector('.viewer'), 'app', 'sceneplayer', function(api){
     me.player = api;
     api.waitReady(startFeed);
   }, {lib: 'peer', ctl: 'peer', onState: function(prefix, field, value){
@@ -351,10 +363,10 @@ me.ready = function(){
     }
     send_info(null, null, null, function(result){
       me.info = result.data;
-      $(ME).find('.localpeername').text(result.data.name);
-      $(ME).find('.localpeerid').text(result.data.uuid);
-      $(ME).find('.localpeerport').text("P2P Port: "+result.data.p2p_port);
-      $(ME).find('.localhttpport').text("HTTP Port: "+result.data.http_port);
+      ME.querySelector('.localpeername').textContent = result.data.name;
+      ME.querySelector('.localpeerid').textContent = result.data.uuid;
+      ME.querySelector('.localpeerport').textContent = "P2P Port: "+result.data.p2p_port;
+      ME.querySelector('.localhttpport').textContent = "HTTP Port: "+result.data.http_port;
 
       json('../app/libs', null, function(result) {
         document.body.locallibraries = result.data;
@@ -369,7 +381,9 @@ me.ready = function(){
           for (var i in result.data) {
             newhtml += '<option>'+result.data[i]+'</option>';
           }
-          $(ME).find('.groupselect').html(newhtml).val('anonymous');
+          var sel = ME.querySelector('.groupselect');
+          sel.innerHTML = newhtml;
+          sel.value = 'anonymous';
         }
       });
 
@@ -435,7 +449,7 @@ function wakeFeed(){
   startFeed();
 }
 
-$(ME).find('.updateallpeersbutton').click(function(){
+ME.querySelector('.updateallpeersbutton').addEventListener('click', function(){
   // local crate versions first: the rows' crate-diff chips compare against them
   json('../dev/crate_versions', null, function(r){ me.localcrates = r; buildUpdateDialog(); });
 });
@@ -454,13 +468,14 @@ function buildUpdateDialog(){
       checkForUpdates(p);
     }
   }
-  newhtml += '</tbody></table>';;
+  newhtml += '</tbody></table>';
 
-  var el = $(ME).find('.peerupdatelist');
-  el.html(newhtml).find('.toggleallupdates').click(function(){
-    var b = $(this).prop("checked");
-    el.find('.libupdate').prop('checked', b);
-  });;
+  var el = ME.querySelector('.peerupdatelist');
+  el.innerHTML = newhtml;
+  el.querySelector('.toggleallupdates').addEventListener('click', function(){
+    var b = this.checked;
+    el.querySelectorAll('.libupdate').forEach(function(box){ box.checked = b; });
+  });
 }
 
 function checkForUpdates(peer) {
@@ -497,12 +512,15 @@ function checkForUpdates(peer) {
             + cr.flowlang + ' ➤ ' + lc.flowlang + ' / ndata ' + cr.ndata + ' ➤ ' + lc.ndata
             + '<img src="../app/asset/app/close-white.png" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
         }
-        var el = $(ME).find('.r_'+uuid);
+        var el = ME.querySelector('.r_'+uuid);
+        if (!el) return;
         if (newhtml == '') el.remove();
         else {
-          el.find('.rowstatus').html(newhtml);
-          el.find('.removeupdate').click(function(){
-            $(this).closest('.chip').remove();
+          el.querySelector('.rowstatus').innerHTML = newhtml;
+          el.querySelectorAll('.removeupdate').forEach(function(x){
+            x.addEventListener('click', function(){
+              this.closest('.chip').remove();
+            });
           });
         }
       });
@@ -510,18 +528,18 @@ function checkForUpdates(peer) {
   });
 }
 
-$(ME).find('#updateallpeersnow').click(function(){
-  var myuuid = $('.localpeerid').text();
-  $(ME).find('.libupdate').each(function(i, el){
-    if ($(el).prop('checked')) {
-      var row = $(el.closest('.uprow'));
-      var peer = row.data('peer');
+ME.querySelector('#updateallpeersnow').addEventListener('click', function(){
+  var myuuid = document.querySelector('.localpeerid').textContent;
+  ME.querySelectorAll('.libupdate').forEach(function(el){
+    if (el.checked) {
+      var row = el.closest('.uprow');
+      var peer = row.dataset.peer;
       var libs = [];
-      row.find('.clickupdate').each(function(j, chip){
-        libs.push($(chip).data('lib'));
+      row.querySelectorAll('.clickupdate').forEach(function(chip){
+        libs.push(chip.dataset.lib);
       });
 
-      if (libs.length > 0 || row.find('.clickcrates').length > 0) {
+      if (libs.length > 0 || row.querySelector('.clickcrates')) {
 
         var recompile = false;
 
@@ -529,9 +547,9 @@ $(ME).find('#updateallpeersnow').click(function(){
           if (libs.length > 0) {
             var lib = libs.pop();
             console.log(peer+"/"+lib);
-            var x = $(row.find('.removeupdate')[0]);
-            var chip = x.parent();
-            chip.css('color', 'rgba(0,0,0,0.5)');
+            var x = row.querySelector('.removeupdate');
+            var chip = x.parentElement;
+            chip.style.color = 'rgba(0,0,0,0.5)';
             x.remove();
 
             var d = 'uuid='+myuuid+'&lib='+lib;
@@ -542,26 +560,26 @@ $(ME).find('#updateallpeersnow').click(function(){
                 fetchNext();
               }
               else {
-                chip.css('color', 'rgba(255,0,0,0.5)');
-                chip.append('<br>Error: '+result.msg);
+                chip.style.color = 'rgba(255,0,0,0.5)';
+                chip.insertAdjacentHTML('beforeend', '<br>Error: '+result.msg);
               }
             });
           }
           else {
-            var cratechip = row.find('.clickcrates');
-            if (cratechip.length > 0) {
+            var cratechip = row.querySelector('.clickcrates');
+            if (cratechip) {
               // the crate runner's own rebuild+recompile covers everything a
               // compile_rust would have done, so it replaces that step
-              var fl = cratechip.data('flowlang');
-              var nd = cratechip.data('ndata');
-              row.find('.rowstatus').html("<i>Updating platform crates to flowlang "+fl+" / ndata "+nd+"...</i>");
+              var fl = cratechip.dataset.flowlang;
+              var nd = cratechip.dataset.ndata;
+              row.querySelector('.rowstatus').innerHTML = "<i>Updating platform crates to flowlang "+fl+" / ndata "+nd+"...</i>";
               json('../peer/remote/'+peer+'/dev/update_crates', 'flowlang='+encodeURIComponent(fl)+'&ndata='+encodeURIComponent(nd), function(result){
-                if (result.status == 'ok') row.find('.rowstatus').html("<i>crate update launched — open the peer's panel for progress and the restart verdict</i>");
-                else row.find('.rowstatus').html('<font color="red">Error: '+result.msg+'</font>');
+                if (result.status == 'ok') row.querySelector('.rowstatus').innerHTML = "<i>crate update launched — open the peer's panel for progress and the restart verdict</i>";
+                else row.querySelector('.rowstatus').innerHTML = '<font color="red">Error: '+result.msg+'</font>';
               });
             }
             else if (recompile) {
-              row.find('.rowstatus').html("<i>Recompiling Rust...</i>");
+              row.querySelector('.rowstatus').innerHTML = "<i>Recompiling Rust...</i>";
               json('../peer/remote/'+peer+'/dev/compile_rust', null, function(result){
                 row.remove();
               });
@@ -575,7 +593,7 @@ $(ME).find('#updateallpeersnow').click(function(){
   });
 });
 
-$(ME).find('.addpeerbutton').click(function(){
+ME.querySelector('.addpeerbutton').addEventListener('click', function(){
   json('../peer/discovery', null, function(result){
     me.discovery = result.data;
     var newhtml = '';
@@ -588,39 +606,43 @@ $(ME).find('.addpeerbutton').click(function(){
     }
     if (newhtml == '') newhtml = '<div class="padme"><i>No new devices found on LAN</i></div>';
     else newhtml = '<table class="lantable" border="0" cellpadding="0" cellspacing="20">' + newhtml + '</table>';
-    $(ME).find('.discovered').html(newhtml).find('.clickme').click(function(){
-      var sip = $(this).data('sip');
-      var rds = me.discovery[sip];
-      $(ME).find('.autab2').click();
-      $(ME).find('.addusername').val(rds.name);
-      $(ME).find('.adduseruuid').val(rds.uuid);
-      $(ME).find('.adduseripaddr').val(rds.address);
-      $(ME).find('.adduserport').val(rds.p2pport);
+    var disc = ME.querySelector('.discovered');
+    disc.innerHTML = newhtml;
+    disc.querySelectorAll('.clickme').forEach(function(rowEl){
+      rowEl.addEventListener('click', function(){
+        var sip = this.dataset.sip;
+        var rds = me.discovery[sip];
+        ME.querySelector('.autab2').click();
+        ME.querySelector('.addusername').value = rds.name;
+        ME.querySelector('.adduseruuid').value = rds.uuid;
+        ME.querySelector('.adduseripaddr').value = rds.address;
+        ME.querySelector('.adduserport').value = rds.p2pport;
+      });
     });
   });
 });
 
-$(ME).find('#addconnection').click(function(){
-  var el_uuid = $(ME).find('.adduseruuid');
-  el_uuid.parent().css('border', 'none');
-  var uuid = el_uuid.val();
+ME.querySelector('#addconnection').addEventListener('click', function(){
+  var el_uuid = ME.querySelector('.adduseruuid');
+  el_uuid.parentElement.style.border = 'none';
+  var uuid = el_uuid.value;
   const regexExp = /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/gi;
   if (!regexExp.test(uuid)) {
-    el_uuid.parent().css('border', 'thin red solid');
+    el_uuid.parentElement.style.border = 'thin red solid';
     document.body.api.ui.snackbar({"message":"A valid device ID is required"});
   }
   else if (uuid == me.info.uuid) {
-    el_uuid.parent().css('border', 'thin red solid');
+    el_uuid.parentElement.style.border = 'thin red solid';
     document.body.api.ui.snackbar({"message":"You cannot connect to yourself"});
   }
   else {
-    $(ME).find('.close-add-user').click();
+    ME.querySelector('.close-add-user').click();
     var rando = guid();
-    var display = $(ME).find('.addusername').val();
-    var keepalive = $(ME).find('#useraddkeepalive').prop('checked');
-    var group = JSON.stringify([$(ME).find('.addusergroup').val()]);
-    var address = $(ME).find('.adduseripaddr').val();
-    var port = $(ME).find('.adduserport').val();
+    var display = ME.querySelector('.addusername').value;
+    var keepalive = ME.querySelector('#useraddkeepalive').checked;
+    var group = JSON.stringify([ME.querySelector('.addusergroup').value]);
+    var address = ME.querySelector('.adduseripaddr').value;
+    var port = ME.querySelector('.adduserport').value;
     var params = "id="+encodeURIComponent(uuid)
       + "&displayname="+encodeURIComponent(display)
       + "&password="+encodeURIComponent(rando)

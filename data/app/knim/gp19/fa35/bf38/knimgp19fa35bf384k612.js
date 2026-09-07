@@ -16,19 +16,18 @@
 // build view). instanceSpec() builds one instance's spec from the template
 // plus a per-instance override map (the runtime's evaluated `props`).
 //
-// LIBRARY control — headless: defines window.NB_SCENEPROJECT once (idempotent across
-// installs). Consumers list this control as a hidden data-control child
-// div and use the global from their ready.
+// LIBRARY control — headless: the api rides this control's own element
+// (zero-globals doctrine). Consumers mount it as a hidden data-control
+// child div and read the element's api.
 
 var me = this;
 var ME = document.getElementById(me.UUID);
 
 me.ready = function () {
-  if (window.NB_SCENEPROJECT) return;
   // sibling libraries — child divs in this control's html, ready first
-  const { readProp, KINDS, MATERIAL_KINDS } = window.NB_SCENEDOC;
-  const { resolveMaterial } = window.NB_SCENETOKENS;
-  window.NB_SCENEPROJECT = (function () {
+  const { readProp, KINDS, MATERIAL_KINDS } = document.querySelector('[data-control="app:scenedoc"]').api;
+  const { resolveMaterial } = document.querySelector('[data-control="app:scenetokens"]').api;
+  Object.assign(me, (function () {
 
 const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
 
@@ -230,5 +229,5 @@ function deltaFor(doc, id, path, computed, theme) {
 }
 
     return { project, instanceSpec, envOf, deltaFor };
-  })();
+  })());
 };

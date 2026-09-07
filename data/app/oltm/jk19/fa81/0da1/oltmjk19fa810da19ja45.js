@@ -37,9 +37,9 @@ var readyP = new Promise(function (res2) { me.ready = res2; }).then(async () => 
   const capEl = ME.querySelector(".sp-cap");
   const diagEl = ME.querySelector(".sp-diag");
 
-  const { hasWebGL } = window.NB_WEBGL;
-  const { parse: parseScene } = window.NB_SCENEDOC;
-  const { createRuntime } = window.NB_SCENERUN;
+  const { hasWebGL } = document.querySelector('[data-control="app:webgl"]').api;
+  const { parse: parseScene } = document.querySelector('[data-control="app:scenedoc"]').api;
+  const { createRuntime } = document.querySelector('[data-control="app:scenerun"]').api;
   const jsonP = (c2, v2) => new Promise((res2) => json(c2, v2, res2));
   const invokeP = (l2, c2, m2, a2) => new Promise((res2) => invokeCommand(l2, c2, m2, a2, res2));
   const code = (m2, a2) => invokeP("dev", "code", m2, a2);

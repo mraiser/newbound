@@ -7,19 +7,16 @@
 // one, the workbench appends a read-only "three · legacy" chip, and the
 // shelf's 3d dot lights on either (SC-Q2).
 //
-// LIBRARY control — headless: defines window.NB_FACETS once (idempotent across
-// installs). Consumers list this control as a hidden data-control child
-// div and use the global from their ready.
+// LIBRARY control — headless: the api rides this control's own element
+// (zero-globals doctrine). Consumers mount it as a hidden data-control
+// child div and read the element's api.
 
 var me = this;
 var ME = document.getElementById(me.UUID);
 
-me.ready = function () {
-  if (window.NB_FACETS) return;
-  window.NB_FACETS = (function () {
+(function () {
 
 const FACETS = ["html", "css", "js", "data", "scene", "cmd"];
 
-    return { FACETS };
+    me.FACETS = FACETS;
   })();
-};
