@@ -56,7 +56,7 @@
   transition: box-shadow 0.3s ease;
 }
 .appcard-wrap:hover {
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 0 0 2px var(--accent); /* flat accent ring — shadows are gone */
 }
 .card.appcard {
   width: 100%;
@@ -86,22 +86,12 @@
   transition: background-color .3s ease;
 }
 
-/* Dark mode overrides for card titles */
-body.dark .inactive .card-title, 
-body.dark .card-title {
-  background: rgba(0, 0, 0, 0.533);
-  color: #FFF;
-}
-body.dark .remote .card-title {
-  background: rgba(131, 188, 0, 0.5);
-}
-
 
 .inactive .card-title {
   background: rgba(0, 0, 0, 0.533);
 }
 .remote .card-title {
-  background: rgba(132, 189, 0, 0.6);
+  background: rgba(240, 166, 60, 0.6);
 }
 .maximize-app-icon {
   position: absolute;
@@ -125,23 +115,15 @@ body.dark .remote .card-title {
 }
 
 .appinfo-header {
-  background-color: var(--accent-color);
-  color: white;
+  background-color: var(--panel-2);
+  color: var(--text);
+  border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   z-index: 2; /* Ensure it stays above content in its own container */
-  transition: background-color 0.3s ease;
-}
-body.dark .appinfo-header {
-    background-color: var(--surface-color);
-    color: var(--text-color);
-    border-bottom: 1px solid var(--border-color);
-}
-body.dark .appinfo-header .popupcard-close svg {
-    stroke: var(--text-color);
 }
 
 .appinfo-image {

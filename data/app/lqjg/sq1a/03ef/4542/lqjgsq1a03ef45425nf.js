@@ -1,5 +1,5 @@
 var me = this;
-var ME = $('#' + me.UUID)[0];
+var ME = document.getElementById(me.UUID);
 
 // The wrapper div a data-control mounts into stays in the DOM; erase it
 // from layout so the anchor participates in the host header exactly where
@@ -8,7 +8,10 @@ ME.style.display = 'contents';
 
 // Hosts with their own header styling pass it in:
 // data-control='app:home:{"cls":"fr-wordmark"}'
-if (ME.DATA && ME.DATA.cls) $(ME).find('.nb-home').addClass(ME.DATA.cls);
+if (ME.DATA && ME.DATA.cls) {
+  var home = ME.querySelector('.nb-home');
+  if (home) home.classList.add(ME.DATA.cls);
+}
 
 // Login check (moved here from app:app): the probe is admin-gated, so an
 // expired or absent session answers UNAUTHORIZED and we go to the login page.

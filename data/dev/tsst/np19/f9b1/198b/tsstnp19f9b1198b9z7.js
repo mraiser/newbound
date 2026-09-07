@@ -15,16 +15,14 @@
 // and the journaled save path are 3D-2 (gated on read_flow_body/
 // write_flow_body being [live] — CONTRACT §6).
 //
-// LIBRARY control — headless: defines window.NB_FLOWDOC once (idempotent across
-// installs). Consumers list this control as a hidden data-control child
-// div and use the global from their ready.
+// LIBRARY control — headless: the api rides this control's own element
+// (zero-globals doctrine). Consumers mount it as a hidden data-control
+// child div and read the element's api.
 
 var me = this;
 var ME = document.getElementById(me.UUID);
 
-me.ready = function () {
-  if (window.NB_FLOWDOC) return;
-  window.NB_FLOWDOC = (function () {
+(function () {
 
 const DIAG = {
   STRUCT: "struct",       // a from_data-required field was absent
@@ -826,6 +824,5 @@ function diffFlow(oldBody, newBody) {
   return { changes, counts };
 }
 
-    return { DIAG, FlowDoc, propagationRounds, parse, diffFlow };
+    Object.assign(me, { DIAG, FlowDoc, propagationRounds, parse, diffFlow });
   })();
-};

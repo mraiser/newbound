@@ -1,8 +1,50 @@
 var me = document.body.ui = this;
-var ME = $('#' + me.UUID)[0];
+var ME = document.getElementById(me.UUID);
+
+// data-* attributes are strings; JSON-looking values parse (what jQuery's
+// .data() did for the popup/tooltip payloads).
+function readData(el, name) {
+  var v = el.dataset[name];
+  if (v == null) return null;
+  if (v[0] == '{' || v[0] == '[') { try { return JSON.parse(v); } catch (x) {} }
+  return v;
+}
+
+// Popup data carries selector as a string OR an element (prompt passes elements).
+function resolveEl(sel) {
+  return typeof sel === 'string' ? document.querySelector(sel) : sel;
+}
+
+function setStyles(el, styles) { for (var k in styles) el.style[k] = styles[k]; }
+
+function animateTo(el, props, ms, cb) {
+  var done = function() { setStyles(el, props); if (cb) cb(); };
+  try {
+    var from = {}, cs = getComputedStyle(el);
+    for (var k in props) from[k] = cs[k];
+    var anim = el.animate([from, props], { duration: ms, easing: 'ease' });
+    anim.onfinish = done;
+  } catch (x) { done(); }
+}
+
+function fadeIn(el, ms, cb) {
+  el.style.opacity = '0';
+  el.style.display = 'block';
+  animateTo(el, { opacity: '1' }, ms, cb);
+}
+
+function fadeOut(el, ms, cb) {
+  animateTo(el, { opacity: '0' }, ms, function() { el.style.display = 'none'; if (cb) cb(); });
+}
+
+function fromHTML(html) {
+  var tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+  return tempDiv.firstElementChild;
+}
 
 me.ready = function() {
-  var el = $(ME).parent()[0];
+  var el = ME.parentElement;
   me.snacks = [];
   // When the core UI is ready, it looks for a uiReady function on its parent control's API and calls it.
   // This is how ui_reference.js gets its 'ui' object.
@@ -10,7 +52,7 @@ me.ready = function() {
     el.api.uiReady(me);
 };
 
-$(document).click(function(event) {
+document.addEventListener('click', function(event) {
   window.lastElementClicked = event.target;
   window.lastClick = event;
 });
@@ -26,26 +68,27 @@ me.snackbar = function(data) {
     me.snacks.push(data);
   } else {
     me.snacking = true;
-    var bar = $('<div class="snackbar"><div class="snackbar-inner">' + data.message + '</div></div>');
-    bar.css('font-family', 'var(--font-family)');
+    var bar = fromHTML('<div class="snackbar"><div class="snackbar-inner">' + data.message + '</div></div>');
+    bar.style.fontFamily = 'var(--font-family)';
+    var inner = bar.querySelector('.snackbar-inner');
 
     if (data.actionHandler) {
-      var action = $('<div class="snackbar-action">' + data.actionText + '</div>');
-      action.click(function(e) {
-        $(this).css('display', 'none');
+      var action = fromHTML('<div class="snackbar-action">' + data.actionText + '</div>');
+      action.addEventListener('click', function(e) {
+        this.style.display = 'none';
         data.actionHandler(e);
       });
-      bar.find('.snackbar-inner').append(action);
+      inner.appendChild(action);
     }
-    if (data.width) bar.find('.snackbar-inner').css('width', data.width);
-    
-    $(document.body).append(bar);
+    if (data.width) inner.style.width = data.width;
 
-    bar.animate({ bottom: '20px' }, 500);
+    document.body.appendChild(bar);
+
+    animateTo(bar, { bottom: '20px' }, 500);
     var timeout = data.timeout ? data.timeout : 3500;
 
     setTimeout(function() {
-      bar.animate({ bottom: '-100px' }, 500, function() {
+      animateTo(bar, { bottom: '-100px' }, 500, function() {
         bar.remove();
         me.snacking = false;
         if (me.snacks.length > 0)
@@ -56,168 +99,177 @@ me.snackbar = function(data) {
 };
 
 
-me.initSliders = function(el){
-    $(el).find('.plainslider').on('input', function() {
-        var value = (this.value - this.min) / (this.max - this.min) * 100;
-        this.style.background = 'linear-gradient(to right, var(--primary-color) 0%, var(--primary-color) ' + value + '%, var(--border-color-light) ' + value + '%, var(--border-color-light) 100%)';
-    }).trigger("input");
+me.initSliders = function(el) {
+  el.querySelectorAll('.plainslider').forEach(function(s) {
+    function paint() {
+      var value = (s.value - s.min) / (s.max - s.min) * 100;
+      s.style.background = 'linear-gradient(to right, var(--primary-color) 0%, var(--primary-color) ' + value + '%, var(--border-color-light) ' + value + '%, var(--border-color-light) 100%)';
+    }
+    s.addEventListener('input', paint);
+    paint();
+  });
 };
 
 
 me.initNavbar = function(el) {
-  $(el).find('.navbar-tab').click(function() {
-    var which = $(this).data('id');
-    $(el).find('.navbar-tab').removeClass('selected');
-    $(el).find('.tab-content').removeClass('selected');
-    $(this).addClass('selected');
-    $(el).find('.' + which).addClass('selected');
+  var tabs = el.querySelectorAll('.navbar-tab');
+  tabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      var which = this.dataset.id;
+      tabs.forEach(function(t) { t.classList.remove('selected'); });
+      el.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('selected'); });
+      this.classList.add('selected');
+      el.querySelectorAll('.' + which).forEach(function(t) { t.classList.add('selected'); });
+    });
   });
 };
 
 me.initTooltips = function(el) {
-  $(el).find('.tooltip').on('mouseover', function(event) {
-    if (!this.tooltip) {
-      var data = $(this).data('tooltip');
-      if (!data || !data.message) return;
+  el.querySelectorAll('.tooltip').forEach(function(t) {
+    t.addEventListener('mouseover', function() {
+      if (!this.tooltip) {
+        var data = readData(this, 'tooltip');
+        if (!data || !data.message) return;
 
-      var el2 = $('<div class="tooltip-wrap">' + data.message + '</div>');
-      $(document.body).append(el2); // Append to body to avoid parent clipping issues
-      this.tooltip = el2;
+        var tip = fromHTML('<div class="tooltip-wrap">' + data.message + '</div>');
+        document.body.appendChild(tip); // Append to body to avoid parent clipping issues
+        this.tooltip = tip;
 
-      var triggerRect = this.getBoundingClientRect();
-      var tipRect = el2[0].getBoundingClientRect();
-      var scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-      var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        var triggerRect = this.getBoundingClientRect();
+        var tipRect = tip.getBoundingClientRect();
+        var scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+        var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
 
-      // Position tooltip centered above the element
-      var x = triggerRect.left + (triggerRect.width / 2) - (tipRect.width / 2);
-      var y = triggerRect.top - tipRect.height - 8; // 8px spacing
+        // Position tooltip centered above the element
+        var x = triggerRect.left + (triggerRect.width / 2) - (tipRect.width / 2);
+        var y = triggerRect.top - tipRect.height - 8; // 8px spacing
 
-      // Adjust if it goes off screen
-      if (y < 0) { // If not enough space on top, show below
-        y = triggerRect.top + triggerRect.height + 8;
+        // Adjust if it goes off screen
+        if (y < 0) { // If not enough space on top, show below
+          y = triggerRect.top + triggerRect.height + 8;
+        }
+        if (x < 0) x = 5;
+        if ((x + tipRect.width) > window.innerWidth) x = window.innerWidth - tipRect.width - 5;
+
+        tip.style.top = (y + scrollTop) + 'px';
+        tip.style.left = (x + scrollLeft) + 'px';
+        tip.style.opacity = '0';
+        animateTo(tip, { opacity: '1' }, 200);
       }
-      if (x < 0) x = 5;
-      if ((x + tipRect.width) > window.innerWidth) x = window.innerWidth - tipRect.width - 5;
-      
-      el2.css({
-        top: (y + scrollTop) + 'px',
-        left: (x + scrollLeft) + 'px',
-        opacity: 0
-      }).stop().animate({ opacity: 1 }, 200);
-    }
-  });
+    });
 
-  $(el).find('.tooltip').on('mouseout', function(event) {
-    if (this.tooltip) {
-      $(this.tooltip).stop().animate({ opacity: 0 }, 200, function() {
-        $(this).remove();
-      });
-      this.tooltip = null;
-    }
+    t.addEventListener('mouseout', function() {
+      if (this.tooltip) {
+        var tip = this.tooltip;
+        this.tooltip = null;
+        animateTo(tip, { opacity: '0' }, 200, function() { tip.remove(); });
+      }
+    });
   });
 };
 
 me.initPopups = function(el) {
-  $(el).find('.popupmenu').click(function(event) {
-    var data = $(this).data('popup');
-    if (data) {
+  el.querySelectorAll('.popupmenu').forEach(function(p) {
+    p.addEventListener('click', function(event) {
+      var data = readData(this, 'popup');
+      if (data) {
         data.clientX = event.clientX;
         data.clientY = event.clientY;
         me.popup(data);
-    }
+      }
+    });
   });
 };
 
 me.closePopup = function(data, cb) {
-  var el2 = $(data.selector);
+  var el2 = resolveEl(data.selector);
   if (data && data.modal) {
-    var w = el2.outerWidth();
-    var h = el2.outerHeight();
-    el2.animate({
+    animateTo(el2, {
       left: data.clientX + 'px',
       top: data.clientY + 'px',
       width: '0px',
       height: '0px',
-      opacity: 0
+      opacity: '0'
     }, 300, function() {
-      el2.css('display', 'none');
+      el2.style.display = 'none';
       // Restore original dimensions for next time
-      el2.css({ 'width': '', 'height': '', 'opacity': 1 });
+      setStyles(el2, { width: '', height: '', opacity: '1' });
       if (cb) cb();
       if (data.close) data.close();
     });
   } else {
-    el2.css('display', 'none');
+    el2.style.display = 'none';
     if (data.close) data.close();
   }
 
   if (data.bg) {
-    $(data.bg).fadeOut(300, function() {
-      $(this).remove();
-    });
+    var bg = data.bg;
+    fadeOut(bg, 300, function() { bg.remove(); });
   }
 }
 
 me.popup = function(data, cb) {
-  var el2 = $(data.selector);
-  if (!el2.length) {
+  var el2 = resolveEl(data.selector);
+  if (!el2) {
       console.error("Popup selector not found:", data.selector);
       return;
   }
-  var bg = null;
 
   if (data.modal) {
-    bg = data.bg = $('<div class="greyedout"></div>').hide().appendTo(document.body).fadeIn(300);
+    var bg = data.bg = document.createElement('div');
+    bg.className = 'greyedout';
+    bg.style.display = 'none';
+    document.body.appendChild(bg);
+    fadeIn(bg, 300);
 
     // Correctly measure the dimensions of the hidden modal
-    el2.css({ position: 'absolute', visibility: 'hidden', display: 'block' });
-    var w = el2.outerWidth();
-    var h = el2.outerHeight();
-    el2.css({ position: '', visibility: '', display: '' }); // Reset styles
+    setStyles(el2, { position: 'absolute', visibility: 'hidden', display: 'block' });
+    var w = el2.offsetWidth;
+    var h = el2.offsetHeight;
+    setStyles(el2, { position: '', visibility: '', display: '' }); // Reset styles
 
     // Set initial state for animation
-    el2.css({
-      'display': 'block',
-      'position': 'fixed',
-      'z-index': '15',
-      'width': '0px',
-      'height': '0px',
-      'top': data.clientY + 'px',
-      'left': data.clientX + 'px',
-      'opacity': 0
+    setStyles(el2, {
+      display: 'block',
+      position: 'fixed',
+      zIndex: '15',
+      width: '0px',
+      height: '0px',
+      top: data.clientY + 'px',
+      left: data.clientX + 'px',
+      opacity: '0'
     });
-    
+
     var x = (window.innerWidth - w) / 2;
     var y = (window.innerHeight - h) / 2;
 
     // Animate to final state, including height
-    el2.animate({
+    animateTo(el2, {
       left: x + 'px',
       top: y + 'px',
       width: w + 'px',
       height: h + 'px',
-      opacity: 1
+      opacity: '1'
     }, 400, function() {
       // After animation, remove fixed width/height so it can be responsive
-      el2.css({'width': '', 'height': ''});
+      setStyles(el2, { width: '', height: '' });
       if (cb) cb();
     });
 
   } else {
-    // --- FIX for Non-Modal Popups (like context menus) ---
+    // --- Non-Modal Popups (like context menus) ---
     // Position and display the popup off-screen to guarantee correct measurement
-    el2.css({
-      'position': 'fixed',
-      'z-index': '6',
-      'left': '-9999px',
-      'top': '-9999px',
-      'display': 'block',
-      'visibility': 'visible'
+    setStyles(el2, {
+      position: 'fixed',
+      zIndex: '6',
+      left: '-9999px',
+      top: '-9999px',
+      display: 'block',
+      visibility: 'visible'
     });
 
-    var popWidth = el2.outerWidth();
-    var popHeight = el2.outerHeight();
+    var popWidth = el2.offsetWidth;
+    var popHeight = el2.offsetHeight;
 
     var x = data.clientX;
     var y = data.clientY;
@@ -231,26 +283,26 @@ me.popup = function(data, cb) {
     }
 
     // Now set the final on-screen position
-    el2.css({
-      'left': x + 'px',
-      'top': y + 'px'
-    });
-    
+    el2.style.left = x + 'px';
+    el2.style.top = y + 'px';
+
     // Add a one-time click handler to the document to close the popup
     setTimeout(function() {
-      $(document).one('click', function(e) {
-          if (!el2.is(e.target) && el2.has(e.target).length === 0) {
-               me.closePopup(data);
-          }
-      });
+      document.addEventListener('click', function(e) {
+        if (el2 !== e.target && !el2.contains(e.target)) {
+          me.closePopup(data);
+        }
+      }, { once: true });
     }, 50);
 
     if (cb) cb();
   }
 
-  var selector = data.closeselector ? data.closeselector : '.popupcard-close';
-  el2.find(selector).off('click').on('click', function() {
-    me.closePopup(data);
+  var sel = data.closeselector ? data.closeselector : '.popupcard-close';
+  var closers = typeof sel === 'string' ? el2.querySelectorAll(sel) : [sel];
+  closers.forEach(function(closer) {
+    // onclick assignment replaces any prior handler (the .off().on() semantics)
+    closer.onclick = function() { me.closePopup(data); };
   });
 };
 
@@ -259,7 +311,7 @@ me.prompt = function(d) {
   var sub = d.subtext ? d.subtext : "";
   var ok = d.ok ? d.ok : "ok";
 
-  var el = $(`
+  var el = fromHTML(`
     <div class="fixed-wrap">
       <div class="card modal mydialog">
         <div class="pad16 card-header dialog-header">
@@ -280,26 +332,28 @@ me.prompt = function(d) {
     </div>
   `);
 
-  $(document.body).append(el);
-  d.selector = el.find('.card')[0];
-  d.closeselector = el.find('.close-prompt-dialog')[0];
+  document.body.appendChild(el);
+  d.selector = el.querySelector('.card');
+  d.closeselector = el.querySelector('.close-prompt-dialog');
   d.modal = true;
   d.close = function() { el.remove(); };
   d.clientX = window.innerWidth / 2;
   d.clientY = window.innerHeight / 2;
 
   me.popup(d, function() {
-    el.find('input.textinput').select().focus();
+    var input = el.querySelector('input.textinput');
+    input.select();
+    input.focus();
   });
 
-  el.find('.continuebutton').click(function() {
-    var val = el.find('input.textinput').val();
+  el.querySelector('.continuebutton').addEventListener('click', function() {
+    var val = el.querySelector('input.textinput').value;
     if (d.validate) {
       if (d.validate(val)) {
         d.cb(val);
         me.closePopup(d);
       } else {
-        el.find('.subtext').css("color", "var(--error-color)");
+        el.querySelector('.subtext').style.color = "var(--error-color)";
       }
     } else {
       d.cb(val);
@@ -313,7 +367,7 @@ me.confirm = function(d) {
     var ok = d.ok ? d.ok : "OK";
     var cancel = d.cancel ? d.cancel : "Cancel";
 
-    var el = $(`
+    var el = fromHTML(`
     <div class="fixed-wrap">
         <div class="card modal mydialog">
             <div class="pad16 card-header dialog-header">
@@ -330,58 +384,55 @@ me.confirm = function(d) {
         </div>
     </div>`);
 
-    $(document.body).append(el);
-    d.selector = el.find('.card')[0];
+    document.body.appendChild(el);
+    d.selector = el.querySelector('.card');
     d.closeselector = '.close-prompt-dialog, .cancelbutton';
     d.modal = true;
-    d.close = function(){ el.remove(); };
+    d.close = function() { el.remove(); };
     d.clientX = window.innerWidth / 2;
     d.clientY = window.innerHeight / 2;
-    
+
     me.popup(d);
-    
-    el.find('.continuebutton').click(function(){
-        if(d.cb) d.cb(true); // Confirm true
+
+    el.querySelector('.continuebutton').addEventListener('click', function() {
+        if (d.cb) d.cb(true); // Confirm true
         me.closePopup(d);
     });
 
-    el.find('.cancelbutton').click(function(){
-        if(d.cb) d.cb(false); // Confirm false
+    el.querySelector('.cancelbutton').addEventListener('click', function() {
+        if (d.cb) d.cb(false); // Confirm false
         me.closePopup(d);
     });
 };
 
 
 me.initProgress = function(el) {
-  var bars = $(el).find('.progressbar').toArray();
-  for (var i in bars) {
-    var bar = bars[i];
-    $(bar).html('<div class="progressbar-inner"></div>');
-    $(bar).data('percent', 0);
+  el.querySelectorAll('.progressbar').forEach(function(bar) {
+    bar.innerHTML = '<div class="progressbar-inner"></div>';
+    bar.dataset.percent = 0;
     bar.indeterminate = false;
     bar.setProgress = function(val) {
-      var progbar = $(this).find('.progressbar-inner');
+      var progbar = this.querySelector('.progressbar-inner');
       if (val == 'indeterminate') {
         this.indeterminate = true;
-        progbar.css({
-            'transition': 'all 0.8s ease-in-out',
-            'animation': 'indeterminate-progress 2s infinite linear'
-        });
-        if (!$('#indeterminate-keyframes').length) {
-            $('<style id="indeterminate-keyframes">@keyframes indeterminate-progress { 0% { left: -50%; width: 50%; } 100% { left: 100%; width: 50%; } }</style>').appendTo('head');
+        progbar.style.transition = 'all 0.8s ease-in-out';
+        progbar.style.animation = 'indeterminate-progress 2s infinite linear';
+        if (!document.getElementById('indeterminate-keyframes')) {
+          var st = document.createElement('style');
+          st.id = 'indeterminate-keyframes';
+          st.textContent = '@keyframes indeterminate-progress { 0% { left: -50%; width: 50%; } 100% { left: 100%; width: 50%; } }';
+          document.head.appendChild(st);
         }
       } else {
         this.indeterminate = false;
-        progbar.css({
-            'animation': 'none',
-            'transition': 'width 0.3s ease',
-            'width': val + '%',
-            'left': '0%'
-        });
-        $(this).data('percent', val);
+        progbar.style.animation = 'none';
+        progbar.style.transition = 'width 0.3s ease';
+        progbar.style.width = val + '%';
+        progbar.style.left = '0%';
+        this.dataset.percent = val;
       }
     };
-  }
+  });
 };
 
 

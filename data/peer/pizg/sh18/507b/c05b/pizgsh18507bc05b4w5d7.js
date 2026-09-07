@@ -1,11 +1,11 @@
 var me = this;
-var ME = $('#'+me.UUID)[0];
+var ME = document.getElementById(me.UUID);
 
 me.ready = function(){
   if (document.peers) build();
   else fetch();
 };
-  
+
 function fetch(){
   json('../peer/peers', null, function(result){
     document.peers = result.data;
@@ -14,7 +14,7 @@ function fetch(){
 };
 
 function build(){
-  var el = $(ME).find('.peerselector')[0];
+  var el = ME.querySelector('.peerselector');
 
   var data = ME.DATA;
   if (!data) data = {};
@@ -32,6 +32,6 @@ function build(){
     list.unshift(l);
   }
   data.list = list;
-    
+
   installControl(el, 'app', 'select', function(api){}, data);
 };

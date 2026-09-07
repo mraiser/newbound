@@ -31,11 +31,18 @@
 }
 
 .userrow:hover{
-  background-color:#0002;
+  background-color:rgba(240, 166, 60, 0.08); /* accent wash — black-alpha is invisible on graphite */
 }
 
 .userrow{
   vertical-align:top;
+}
+
+.userrow img,
+img.adduserbutton,
+img.addgroupbutton{
+  /* legacy light-theme glyphs — force to a light silhouette on graphite */
+  filter: brightness(0) invert(0.85);
 }
 
 .usertitle {
@@ -50,8 +57,9 @@
   right:10px;
 }
 
-.usercard-grouplist{
-  background-color:#0001;
+.card.usercard-grouplist{
+  /* inset well; .card.x beats the kit's later .card surface rule */
+  background-color:var(--ground);
   height:80px;
   overflow-y:auto;
 }

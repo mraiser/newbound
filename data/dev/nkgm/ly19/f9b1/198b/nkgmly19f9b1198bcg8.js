@@ -33,16 +33,14 @@
 // that are already untangled stay exactly where component separation put
 // them (verified in tools/flow3d-check.mjs).
 //
-// LIBRARY control — headless: defines window.NB_FLOWLAYOUT once (idempotent across
-// installs). Consumers list this control as a hidden data-control child
-// div and use the global from their ready.
+// LIBRARY control — headless: the api rides this control's own element
+// (zero-globals doctrine). Consumers mount it as a hidden data-control
+// child div and read the element's api.
 
 var me = this;
 var ME = document.getElementById(me.UUID);
 
-me.ready = function () {
-  if (window.NB_FLOWLAYOUT) return;
-  window.NB_FLOWLAYOUT = (function () {
+(function () {
 
 const Y_PITCH = 1.6;
 const X_GAP = 0.6;
@@ -372,6 +370,5 @@ function untangle(c) {
   return { label: "auto-layout: untangle", positions: relaxed };
 }
 
-    return { layerAssign, tidy, components, countCrossings, relax, untangle };
+    Object.assign(me, { layerAssign, tidy, components, countCrossings, relax, untangle });
   })();
-};

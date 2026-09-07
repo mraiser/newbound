@@ -10,8 +10,8 @@ var me = this;
 var ME = document.getElementById(me.UUID);
 
 var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
-  const { FACETS } = window.NB_FACETS;
-  const { viewctx } = window.NB_VIEWCTX;
+  const { FACETS } = document.querySelector('[data-control="dev:facets"]').api;
+  const viewctx = document.querySelector(".nb-viewctx").api;
   // ── backend calls: api.js primitives only ─────────────────
   const jsonP = (c2, v2) => new Promise((res2) => json(c2, v2, res2));
   const invokeP = (l2, c2, m2, a2) => new Promise((res2) => invokeCommand(l2, c2, m2, a2, res2));

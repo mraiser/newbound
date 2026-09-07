@@ -10,16 +10,14 @@
 // offer. Register returns an unregister function; surfaces unregister
 // on dispose.
 //
-// LIBRARY control — headless: defines window.NB_VIEWCTX once (idempotent across
-// installs). Consumers list this control as a hidden data-control child
-// div and use the global from their ready.
+// LIBRARY control — headless: the api rides this control's own element
+// (zero-globals doctrine). Consumers mount it as a hidden data-control
+// child div and read the element's api.
 
 var me = this;
 var ME = document.getElementById(me.UUID);
 
-me.ready = function () {
-  if (window.NB_VIEWCTX) return;
-  window.NB_VIEWCTX = (function () {
+(function () {
 
 const providers = new Map();
 
@@ -61,6 +59,5 @@ const viewctx = {
   },
 };
 
-    return { viewctx };
+    Object.assign(me, viewctx);
   })();
-};
