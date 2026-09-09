@@ -1,5 +1,5 @@
-var me = this; 
-var ME = $('#'+me.UUID)[0];
+var me = this;
+var ME = document.getElementById(me.UUID);
 
 me.data = ME.DATA;
 

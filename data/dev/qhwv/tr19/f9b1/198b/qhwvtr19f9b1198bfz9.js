@@ -8,16 +8,14 @@
 // and the registry (Primitive::list()) can replace this table when a live
 // catalog command exists. Every primitive emits on the single output `a`.
 //
-// LIBRARY control — headless: defines window.NB_FLOWPRIMS once (idempotent across
-// installs). Consumers list this control as a hidden data-control child
-// div and use the global from their ready.
+// LIBRARY control — headless: the api rides this control's own element
+// (zero-globals doctrine). Consumers mount it as a hidden data-control
+// child div and read the element's api.
 
 var me = this;
 var ME = document.getElementById(me.UUID);
 
-me.ready = function () {
-  if (window.NB_FLOWPRIMS) return;
-  window.NB_FLOWPRIMS = (function () {
+(function () {
 
 const P = (family, name, ins) => ({ family, name, ins, outs: ["a"] });
 
@@ -99,6 +97,5 @@ function signature(prim) {
   return `(${prim.ins.join(", ")}) → a`;
 }
 
-    return { PRIMS, FAMILIES, signature };
+    Object.assign(me, { PRIMS, FAMILIES, signature });
   })();
-};

@@ -14,20 +14,19 @@
 // go through sceneexpr's parser, and the only platform touchpoint is the
 // injected `invoke` callback (the editor gates it like run ▸).
 //
-// LIBRARY control — headless: defines window.NB_SCENERUN once (idempotent across
-// installs). Consumers list this control as a hidden data-control child
-// div and use the global from their ready.
+// LIBRARY control — headless: the api rides this control's own element
+// (zero-globals doctrine). Consumers mount it as a hidden data-control
+// child div and read the element's api.
 
 var me = this;
 var ME = document.getElementById(me.UUID);
 
 me.ready = function () {
-  if (window.NB_SCENERUN) return;
   // sibling libraries — child divs in this control's html, ready first
-  const { compile } = window.NB_SCENEEXPR;
-  const { parseTarget, parseOn } = window.NB_SCENEDOC;
-  const { project, envOf, deltaFor, instanceSpec } = window.NB_SCENEPROJECT;
-  window.NB_SCENERUN = (function () {
+  const { compile } = document.querySelector('[data-control="app:sceneexpr"]').api;
+  const { parseTarget, parseOn } = document.querySelector('[data-control="app:scenedoc"]').api;
+  const { project, envOf, deltaFor, instanceSpec } = document.querySelector('[data-control="app:sceneproject"]').api;
+  Object.assign(me, (function () {
 
 const MOUNT_DEPTH_CAP = 8;
 const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
@@ -621,5 +620,5 @@ class SceneRuntime {
 }
 
     return { createRuntime };
-  })();
+  })());
 };

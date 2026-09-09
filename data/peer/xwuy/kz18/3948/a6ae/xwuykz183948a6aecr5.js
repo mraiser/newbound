@@ -1,21 +1,29 @@
 var me = this;
-var ME = $('#'+me.UUID)[0];
+var ME = document.getElementById(me.UUID);
+
+function animateTo(el, props, ms, cb) {
+  var done = function() { for (var k in props) el.style[k] = props[k]; if (cb) cb(); };
+  try {
+    var anim = el.animate([props], { duration: ms, easing: 'ease' });
+    anim.onfinish = done;
+  } catch (x) { done(); }
+}
 
 me.refresh = function(){
   installControl('#headsupdisplay', 'peer', 'headsup', function(api){}, ME.DATA);
 };
 
 me.ready = function(){
-  me.check = $(ME).find('.rp-uuid')[0];
+  me.check = ME.querySelector('.rp-uuid');
   me.update();
   document.body.api.ui.initNavbar(ME);
   document.body.api.ui.initPopups(ME);
   initCrates();
-  
+
   var uuid = ME.DATA.id;
   json('../peer/remote/'+uuid+'/app/libs', null, function(result){
     if (result.data && document.body.locallibraries) {
-      var el = $(ME).find('.upgradelist');
+      var el = ME.querySelector('.upgradelist');
       for (var i in result.data) {
         var theirlib = result.data[i];
         var mylib = getByProperty(document.body.locallibraries, 'id', theirlib.id);
@@ -26,31 +34,33 @@ me.ready = function(){
             if (mylib.version > theirlib.version) {
 
               var newhtml = '<span class="chip ispos" id="U_'+mylib.id+'"><span class="clickupdate" data-lib="'+mylib.id+'" data-version="'+mylib.version+'">'
-                + mylib.id 
-                + ' v' 
-                + theirlib.version 
-                + ' ➤ ' 
-                + mylib.version 
+                + mylib.id
+                + ' v'
+                + theirlib.version
+                + ' ➤ '
+                + mylib.version
                 + '</span><img src="../app/asset/app/close-white.png" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
 
-              $(ME).find('.availableupgrades').css('display', 'block');
-              el.append(newhtml);
+              ME.querySelector('.availableupgrades').style.display = 'block';
+              el.insertAdjacentHTML('beforeend', newhtml);
             }
           }
         }
       }
-      el.find('.removeupdate').click(function(){
-        $(this).closest('.chip').remove();
+      el.querySelectorAll('.removeupdate').forEach(function(x){
+        x.addEventListener('click', function(){
+          this.closest('.chip').remove();
+        });
       });
     }
   });
-  
+
   json('../peer/remote/'+ME.DATA.id+'/security/current_user', null, function(result){
-    if (result.status == "ok") { 
-      $(ME).find('.rp-key').text(result.data.groups);
-      if (result.data.groups.indexOf('admin') != -1) $(ME).find('.adminonly').css('display', 'block');
+    if (result.status == "ok") {
+      ME.querySelector('.rp-key').textContent = result.data.groups;
+      if (result.data.groups.indexOf('admin') != -1) ME.querySelector('.adminonly').style.display = 'block';
     }
-    else $(ME).find('.rp-key').text('n/a');
+    else ME.querySelector('.rp-key').textContent = 'n/a';
   });
 
   json('../security/users', null, function(result){
@@ -60,12 +70,12 @@ me.ready = function(){
     // the panel's fields unfilled.
     var u = (result.data || {})[ME.DATA.id];
     var g = u && u.groups && u.groups[0] ? u.groups : 'anonymous';
-    $(ME).find('.rp-lock').text(g);
-  });  
-  
+    ME.querySelector('.rp-lock').textContent = g;
+  });
+
   json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_shared", function(result){
     if (result.status != 'ok'){
-      $(ME).find('.hudapps').html(result.msg);
+      ME.querySelector('.hudapps').innerHTML = result.msg;
       me.data = { "list": [] };
     }
     else {
@@ -74,9 +84,9 @@ me.ready = function(){
     }
   });
   json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_available", function(result){
-    var el = $(ME).find('.add-control-available');
+    var el = ME.querySelector('.add-control-available');
     if (result.status != 'ok'){
-      el.html(result.msg);
+      el.innerHTML = result.msg;
     }
     else {
       me.available = result.data;
@@ -84,17 +94,20 @@ me.ready = function(){
       for (i in result.data) {
         var rdi = result.data[i];
         if (rdi.title) {
-          newhtml += '<tr><td class="add-ctl-item" data-id="'+i+'">'+rdi.title+'</tr></td>';;
+          newhtml += '<tr><td class="add-ctl-item" data-id="'+i+'">'+rdi.title+'</tr></td>';
         }
       }
       if (newhtml == '') newhtml = '<i>there are no available controls to install on this device</i>';
       else newhtml = '<table class="tablelist">' + newhtml + '</table>';
-      el.html(newhtml).find('.add-ctl-item').click(function(){
-        var d = me.available[$(this).data('id')];
-        me.data.list.push(d);
-        json('../peer/remote/'+ME.DATA.id+'/app/write', "lib=runtime&id=controls_shared&readers=[]&writers=[]&data="+encodeURIComponent(JSON.stringify(me.data)), function(result){
-          me.refresh();
-          $(ME).find('.add-control-popup-close').click();
+      el.innerHTML = newhtml;
+      el.querySelectorAll('.add-ctl-item').forEach(function(item){
+        item.addEventListener('click', function(){
+          var d = me.available[this.dataset.id];
+          me.data.list.push(d);
+          json('../peer/remote/'+ME.DATA.id+'/app/write', "lib=runtime&id=controls_shared&readers=[]&writers=[]&data="+encodeURIComponent(JSON.stringify(me.data)), function(result){
+            me.refresh();
+            ME.querySelector('.add-control-popup-close').click();
+          });
         });
       });
     }
@@ -102,11 +115,12 @@ me.ready = function(){
 };
 
 function buildControls(){
-  $('.navbar-tab2').click();
+  var tab2 = document.querySelector('.navbar-tab2');
+  if (tab2) tab2.click();
 
   var data = me.data;
-  var wrap = $(ME).find('.hudapps');
-  wrap.empty();
+  var wrap = ME.querySelector('.hudapps');
+  wrap.innerHTML = '';
 
   for (var i in data.list){
     var ctl = data.list[i];
@@ -119,84 +133,87 @@ function buildControls(){
     db = j == -1 ? db : db.substring(0,j);
     var claz = !ctl.big ? 'iconmode' : 'big';
 
-    var el = $('<div class="inline '+claz+'"></div>')[0];
-    wrap.append(el);
+    var el = document.createElement('div');
+    el.className = 'inline ' + claz;
+    wrap.appendChild(el);
     d.peer = ME.DATA.id;
     installControl(el, db, id, function(api){}, d);
   }
 }
 
 me.install = function(lib, v, cb) {
-  var myuuid = $('.localpeerid').text();
+  var myuuid = document.querySelector('.localpeerid').textContent;
   var uuid = ME.DATA.id;
-  var el = $(ME).find('#U_'+lib);
-  el.animate({'width':'100%','height':'60px'},300, function(){
-    el.append("<div class='progressbar myprogress'></div>");
+  var el = ME.querySelector('#U_'+lib);
+  animateTo(el, {width:'100%', height:'60px'}, 300, function(){
+    el.insertAdjacentHTML('beforeend', "<div class='progressbar myprogress'></div>");
     document.body.api.ui.initProgress(ME);
-    el.find('.myprogress')[0].setProgress('indeterminate');
+    el.querySelector('.myprogress').setProgress('indeterminate');
   });
   var d = 'uuid='+myuuid+'&lib='+lib;
   json('../peer/remote/'+uuid+'/dev/install_lib', d, function(result){
     if (result.status == "ok") {
       recompile = recompile || result.data;
-      el.find('.myprogress')[0].setProgress(100);
-      el.animate({'width':'0px','height':'0px'},300, function(){
+      el.querySelector('.myprogress').setProgress(100);
+      animateTo(el, {width:'0px', height:'0px'}, 300, function(){
         el.remove();
       });
       if (cb) cb();
     }
     else {
-      el.find('.myprogress').remove();
-      el.append("<div class='progerr'><font color='red'>Error: "+result.msg+"</font></div>");
+      var prog = el.querySelector('.myprogress');
+      if (prog) prog.remove();
+      el.insertAdjacentHTML('beforeend', "<div class='progerr'><font color='red'>Error: "+result.msg+"</font></div>");
     }
   });
 }
 
-$(ME).find('.closehud').click(function(){
-  var el = $("#headsupdisplay");
-  el.animate({width:0}, 300, function(){ el.css('display', 'none').html(''); });
-  $(ME).parent()[0].api.focus(null);
+ME.querySelector('.closehud').addEventListener('click', function(){
+  var el = document.getElementById("headsupdisplay");
+  animateTo(el, {width:'0px'}, 300, function(){ el.style.display = 'none'; el.innerHTML = ''; });
+  var par = ME.parentElement;
+  if (par && par.api && par.api.focus) par.api.focus(null);
 });
 
 me.update = function(){
-  if (me.check == $(ME).find('.rp-uuid')[0]) {
-    ME.DATA = $('#peer_'+ME.DATA.id)[0].DATA;
-    $(ME).find('.rp-name').text(ME.DATA.name);
-    $(ME).find('.rp-uuid').text(ME.DATA.id);
-    $(ME).find('.hud_ipaddr').text(ME.DATA.address);
-    $(ME).find('.hud_port').text(ME.DATA.p2p_port);
-    $(ME).find('.hud_http_port').text(ME.DATA.http_port);
-    $(ME).find('#keepalive').prop('checked', ME.DATA.keepalive);
-    
+  if (me.check == ME.querySelector('.rp-uuid')) {
+    ME.DATA = document.getElementById('peer_'+ME.DATA.id).DATA;
+    ME.querySelector('.rp-name').textContent = ME.DATA.name;
+    ME.querySelector('.rp-uuid').textContent = ME.DATA.id;
+    ME.querySelector('.hud_ipaddr').textContent = ME.DATA.address;
+    ME.querySelector('.hud_port').textContent = ME.DATA.p2p_port;
+    ME.querySelector('.hud_http_port').textContent = ME.DATA.http_port;
+    ME.querySelector('#keepalive').checked = !!ME.DATA.keepalive;
+
     var newhtml = '';
     for (var i in ME.DATA.addresses) {
       newhtml += '<a class="chip" target="_blank" href="http://'+ME.DATA.addresses[i]+':'+ME.DATA.http_port+'?session_id='+ME.DATA.session_id+'">'+ME.DATA.addresses[i]+'</a>&nbsp;'
     }
-    $(ME).find('.hud_address_list').html(newhtml);
+    ME.querySelector('.hud_address_list').innerHTML = newhtml;
 
     var c = ME.DATA.tcp ? '#84bd00' : ME.DATA.udp ? '#00f' : ME.DATA.connected ? '#ff0' : 'ccc';
-    $(ME).find('.connectionindicator').css('background-color', c);
+    ME.querySelector('.connectionindicator').style.backgroundColor = c;
     var l = ME.DATA.latency ? ME.DATA.latency+'ms' : '--';
-    $(ME).find('.connectionlatency').text(l);
-    
+    ME.querySelector('.connectionlatency').textContent = l;
+
     setTimeout(me.update, 3000);
   }
 };
 
-$(ME).find('.addressexpandbutton').click(function(){
-  $(this).css('display', 'none');
-  $(ME).find('.closeaddressbutton').css('display', 'inline-block');
-  $(ME).find('.addressexpand').css('display', 'block');
+ME.querySelector('.addressexpandbutton').addEventListener('click', function(){
+  this.style.display = 'none';
+  ME.querySelector('.closeaddressbutton').style.display = 'inline-block';
+  ME.querySelector('.addressexpand').style.display = 'block';
 });
 
-$(ME).find('.closeaddressbutton').click(function(){
-  $(this).css('display', 'none');
-  $(ME).find('.addressexpandbutton').css('display', 'inline-block');
-  $(ME).find('.addressexpand').css('display', 'none');
+ME.querySelector('.closeaddressbutton').addEventListener('click', function(){
+  this.style.display = 'none';
+  ME.querySelector('.addressexpandbutton').style.display = 'inline-block';
+  ME.querySelector('.addressexpand').style.display = 'none';
 });
 
-$(ME).find('.cancelupdateall').click(function(){
-  $(ME).find('.availableupgrades').css('display', 'none');
+ME.querySelector('.cancelupdateall').addEventListener('click', function(){
+  ME.querySelector('.availableupgrades').style.display = 'none';
 });
 
 function updateNext(){
@@ -210,14 +227,16 @@ function updateNext(){
     if (recompile){
       recompile = false;
       var uuid = ME.DATA.id;
-      $(ME).find('.upgradelist').html("<i>Recompiling Rust...</i>");
+      ME.querySelector('.upgradelist').innerHTML = "<i>Recompiling Rust...</i>";
       json('../peer/remote/'+uuid+'/dev/compile_rust', null, function(result){
         updateNext();
       });
     }
     else{
-      $(ME).find('.availableupgrades').animate({"opacity":0},300, function(){
-        $(this).css('display', 'none').css('opacity', '100%');
+      var el = ME.querySelector('.availableupgrades');
+      animateTo(el, {opacity:'0'}, 300, function(){
+        el.style.display = 'none';
+        el.style.opacity = '';
       });
     }
   }
@@ -225,42 +244,40 @@ function updateNext(){
 
 var ulist = [];
 var recompile = false;
-$(ME).find('.updateall').click(function(){
-  $(ME).find('.updatebuttons').css('display', 'none');
+ME.querySelector('.updateall').addEventListener('click', function(){
+  ME.querySelector('.updatebuttons').style.display = 'none';
   ulist = [];
-  $(ME).find('.upgradelist').find('.chip').each(function(){
-    var el = $(this).find('.clickupdate');
-    var lib = el.data("lib");
-    var v = el.data("version");
-    ulist.push([lib,v]);
+  ME.querySelectorAll('.upgradelist .chip').forEach(function(chip){
+    var el = chip.querySelector('.clickupdate');
+    ulist.push([el.dataset.lib, el.dataset.version]);
   });
   updateNext();
 });
 
-$(ME).find('.control-settings-popup').on("mouseleave", function(){
-  $(this).css('display', 'none');
+ME.querySelector('.control-settings-popup').addEventListener("mouseleave", function(){
+  this.style.display = 'none';
 });
 
-$(ME).find('.refreshhud').on("click", me.refresh);
+ME.querySelector('.refreshhud').addEventListener("click", me.refresh);
 
-$(ME).find('.closeonclick').on("click", function(){
-  $(ME).find('.control-settings-popup').css('display', 'none');
+ME.querySelector('.closeonclick').addEventListener("click", function(){
+  ME.querySelector('.control-settings-popup').style.display = 'none';
 });
 
 // --- Platform crate versions on the remote peer (crate-update feature) ---
 function initCrates(){
   var uuid = ME.DATA.id;
   json('../peer/remote/'+uuid+'/dev/crate_versions', null, function(r){
-    if (r.status != 'ok') { $(ME).find('.hudcrates').remove(); return; }
+    if (r.status != 'ok') { var hc = ME.querySelector('.hudcrates'); if (hc) hc.remove(); return; }
     me.remotecrates = r;
     var s = 'flowlang ' + r.flowlang + ' / ndata ' + r.ndata + (r.mismatch ? ' (MANIFESTS DISAGREE)' : '');
-    $(ME).find('.hud_crates').text(s);
+    ME.querySelector('.hud_crates').textContent = s;
     json('../dev/crate_versions', null, function(mine){
       if (mine.status != 'ok') return;
-      $(ME).find('.hud_flowlang').val(mine.flowlang);
-      $(ME).find('.hud_ndata').val(mine.ndata);
+      ME.querySelector('.hud_flowlang').value = mine.flowlang;
+      ME.querySelector('.hud_ndata').value = mine.ndata;
       if (mine.flowlang != r.flowlang || mine.ndata != r.ndata) {
-        $(ME).find('.hud_crates').append(' <span class="chip ispos">local: flowlang '+mine.flowlang+' / ndata '+mine.ndata+'</span>');
+        ME.querySelector('.hud_crates').insertAdjacentHTML('beforeend', ' <span class="chip ispos">local: flowlang '+mine.flowlang+' / ndata '+mine.ndata+'</span>');
       }
     });
   });
@@ -271,52 +288,56 @@ function initCrates(){
 
 function pollRemoteCrates(){
   var uuid = ME.DATA.id;
-  var d = $(ME).find('.hudcratestatus');
-  d.css('display','block');
+  var d = ME.querySelector('.hudcratestatus');
+  d.style.display = 'block';
   if (me.cratePoll) clearInterval(me.cratePoll);
   me.cratePoll = setInterval(function(){
     // same liveness idiom as me.update: a torn-down panel stops polling
-    if (me.check != $(ME).find('.rp-uuid')[0]) { clearInterval(me.cratePoll); return; }
+    if (me.check != ME.querySelector('.rp-uuid')) { clearInterval(me.cratePoll); return; }
     json('../peer/remote/'+uuid+'/dev/update_crates_status', null, function(r){
       var s = r.state + ' — step ' + (r.step||0) + '/' + (r.steps||4) + ' ' + (r.label||'');
       if (r.state == 'done') s += ' — verdict: ' + r.verdict;
-      d.text(s);
+      d.textContent = s;
       if (r.state != 'running') {
         clearInterval(me.cratePoll);
-        if (r.state == 'done' && r.verdict == 'restart') $(ME).find('.hudcraterestart').css('display','inline-block');
+        if (r.state == 'done' && r.verdict == 'restart') ME.querySelector('.hudcraterestart').style.display = 'inline-block';
       }
     });
   }, 3000);
 }
 
-$(ME).find('.hudcrateupdate').click(function(){
+ME.querySelector('.hudcrateupdate').addEventListener('click', function(){
   var uuid = ME.DATA.id;
-  var fl = $(ME).find('.hud_flowlang').val().trim();
-  var nd = $(ME).find('.hud_ndata').val().trim();
+  var fl = ME.querySelector('.hud_flowlang').value.trim();
+  var nd = ME.querySelector('.hud_ndata').value.trim();
   if (!fl || !nd) { alert('Enter both crate versions.'); return; }
   if (!confirm('Pin flowlang '+fl+' / ndata '+nd+' on '+ME.DATA.name+' and rebuild its whole platform? This takes several minutes.')) return;
   json('../peer/remote/'+uuid+'/dev/update_crates', 'flowlang='+encodeURIComponent(fl)+'&ndata='+encodeURIComponent(nd), function(r){
-    var d = $(ME).find('.hudcratestatus');
-    d.css('display','block').text(r.msg || 'launched');
+    var d = ME.querySelector('.hudcratestatus');
+    d.style.display = 'block';
+    d.textContent = r.msg || 'launched';
     if (r.status == 'ok') pollRemoteCrates();
   });
 });
 
-$(ME).find('.hudcratehardreset').click(function(){
+ME.querySelector('.hudcratehardreset').addEventListener('click', function(){
   var uuid = ME.DATA.id;
   if (!confirm('HARD RESET '+ME.DATA.name+': re-clone canon newbound from GitHub over that instance (platform sources and core store), rebuild everything, and restart it when done. Its local libraries are untouched. This takes several minutes. Continue?')) return;
   json('../peer/remote/'+uuid+'/dev/hard_reset', 'url=', function(r){
-    var d = $(ME).find('.hudcratestatus');
-    d.css('display','block').text(r.msg || 'launched');
+    var d = ME.querySelector('.hudcratestatus');
+    d.style.display = 'block';
+    d.textContent = r.msg || 'launched';
     if (r.status == 'ok') pollRemoteCrates();
   });
 });
 
-$(ME).find('.hudcraterestart').click(function(){
+ME.querySelector('.hudcraterestart').addEventListener('click', function(){
   var uuid = ME.DATA.id;
   if (!confirm('Restart the Newbound instance on '+ME.DATA.name+'?')) return;
   json('../peer/remote/'+uuid+'/dev/restart_instance', null, function(r){
-    $(ME).find('.hudcratestatus').css('display','block').text(r.msg || 'restart requested');
-    $(ME).find('.hudcraterestart').css('display','none');
+    var d = ME.querySelector('.hudcratestatus');
+    d.style.display = 'block';
+    d.textContent = r.msg || 'restart requested';
+    ME.querySelector('.hudcraterestart').style.display = 'none';
   });
 });

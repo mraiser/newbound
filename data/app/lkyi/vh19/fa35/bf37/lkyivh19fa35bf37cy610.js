@@ -10,19 +10,18 @@
 // design acceptance 3). Mutations restore prior absence exactly (created
 // containers are deleted again on undo).
 //
-// LIBRARY control — headless: defines window.NB_SCENEDOC once (idempotent across
-// installs). Consumers list this control as a hidden data-control child
-// div and use the global from their ready.
+// LIBRARY control — headless: the api rides this control's own element
+// (zero-globals doctrine). Consumers mount it as a hidden data-control
+// child div and read the element's api.
 
 var me = this;
 var ME = document.getElementById(me.UUID);
 
 me.ready = function () {
-  if (window.NB_SCENEDOC) return;
   // sibling libraries — child divs in this control's html, ready first
-  const { parse: parseExpr } = window.NB_SCENEEXPR;
-  const { TOKEN_NAMES } = window.NB_SCENETOKENS;
-  window.NB_SCENEDOC = (function () {
+  const { parse: parseExpr } = document.querySelector('[data-control="app:sceneexpr"]').api;
+  const { TOKEN_NAMES } = document.querySelector('[data-control="app:scenetokens"]').api;
+  Object.assign(me, (function () {
 
 const DIAG = {
   SD1: "SD-1",   // duplicate / malformed ids (nodes + mounts share one space)
@@ -839,5 +838,5 @@ function parse(input) {
 }
 
     return { DIAG, NAME_RE, STATE_TYPES, NODE_EVENTS, DRAG_LOCALS, KINDS, MATERIAL_KINDS, LIGHT_MODES, MOUNT_BIND, bindablePaths, parseTarget, parseOn, readProp, SceneDoc, parse };
-  })();
+  })());
 };

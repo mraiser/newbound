@@ -7,16 +7,15 @@
 // flat-shaded) · emissive (bool, unlit — labels/glows). scenestage maps these
 // onto real materials; nothing else interprets them.
 //
-// LIBRARY control — headless: defines window.NB_SCENETOKENS once (idempotent across
-// installs). Consumers list this control as a hidden data-control child
-// div and use the global from their ready.
+// LIBRARY control — headless: the api rides this control's own element
+// (zero-globals doctrine). Consumers mount it as a hidden data-control
+// child div and read the element's api.
 
 var me = this;
 var ME = document.getElementById(me.UUID);
 
 me.ready = function () {
-  if (window.NB_SCENETOKENS) return;
-  window.NB_SCENETOKENS = (function () {
+  Object.assign(me, (function () {
 
 const TOKENS = {
   light: {
@@ -64,5 +63,5 @@ function resolveMaterial(material, theme = "light") {
 }
 
     return { TOKENS, TOKEN_NAMES, resolveMaterial };
-  })();
+  })());
 };

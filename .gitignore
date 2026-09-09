@@ -59,6 +59,10 @@ runtime/dev/libraries/
 runtime/dev/repos.json
 runtime/dev/plugins.json
 
+# Stuff that shouldn't be generated
+runtime/src
+runtime/Cargo.toml
+
 #Per-instance botd.properties files
 runtime/app/botd.properties
 runtime/dev/botd.properties

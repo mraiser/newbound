@@ -13,13 +13,13 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   const {
     parse: parseScene, KINDS, MATERIAL_KINDS, LIGHT_MODES,
     bindablePaths, MOUNT_BIND, NODE_EVENTS, STATE_TYPES,
-  } = window.NB_SCENEDOC;
-  const { parse: parseExpr } = window.NB_SCENEEXPR;
-  const { TOKEN_NAMES } = window.NB_SCENETOKENS;
-  const { project, envOf } = window.NB_SCENEPROJECT;
-  const { createRuntime } = window.NB_SCENERUN;
-  const { hasWebGL } = window.NB_WEBGL;
-  const { viewctx } = window.NB_VIEWCTX;
+  } = document.querySelector('[data-control="app:scenedoc"]').api;
+  const { parse: parseExpr } = document.querySelector('[data-control="app:sceneexpr"]').api;
+  const { TOKEN_NAMES } = document.querySelector('[data-control="app:scenetokens"]').api;
+  const { project, envOf } = document.querySelector('[data-control="app:sceneproject"]').api;
+  const { createRuntime } = document.querySelector('[data-control="app:scenerun"]').api;
+  const { hasWebGL } = document.querySelector('[data-control="app:webgl"]').api;
+  const viewctx = document.querySelector(".nb-viewctx").api;
   // the vendored stage off its real asset URL — page-relative for tunneling
   const { mountScene } = await import("../app/asset/app/vendor/nb_three/scenestage.js");
   const jsonP = (c2, v2) => new Promise((res2) => json(c2, v2, res2));

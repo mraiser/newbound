@@ -7,8 +7,10 @@ var me = this;
 var ME = document.getElementById(me.UUID);
 
 var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
-  const { hasWebGL } = window.NB_WEBGL;
-  const { viewctx } = window.NB_VIEWCTX;
+  // library apis ride their mounted elements (zero-globals doctrine);
+  // .nb-viewctx on this frame's own mount is the page's one registry
+  const { hasWebGL } = ME.querySelector('[data-control="app:webgl"]').api;
+  const viewctx = document.querySelector(".nb-viewctx").api;
   const jsonP = (c2, v2) => new Promise((res2) => json(c2, v2, res2));
   const readRec = async (l2, id2) => {
     const r2 = await jsonP("../app/read", "lib=" + encodeURIComponent(l2) + "&id=" + encodeURIComponent(id2));

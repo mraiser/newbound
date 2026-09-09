@@ -19,16 +19,15 @@
 // Eval never throws to callers — evalExpr returns {ok, value|error}; a
 // failed eval keeps the property's last good value (design §2.6).
 //
-// LIBRARY control — headless: defines window.NB_SCENEEXPR once (idempotent across
-// installs). Consumers list this control as a hidden data-control child
-// div and use the global from their ready.
+// LIBRARY control — headless: the api rides this control's own element
+// (zero-globals doctrine). Consumers mount it as a hidden data-control
+// child div and read the element's api.
 
 var me = this;
 var ME = document.getElementById(me.UUID);
 
 me.ready = function () {
-  if (window.NB_SCENEEXPR) return;
-  window.NB_SCENEEXPR = (function () {
+  Object.assign(me, (function () {
 
 const FUNCTIONS = {
   sin: Math.sin, cos: Math.cos, tan: Math.tan, atan2: Math.atan2,
@@ -244,5 +243,5 @@ function compile(src) {
 }
 
     return { FUNCTIONS, CONSTANTS, parse, evalExpr, compile };
-  })();
+  })());
 };

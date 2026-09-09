@@ -21,16 +21,15 @@
 // The sim runs in the XZ plane (y stays whatever the item carries).
 // Units: world units and seconds; forces are accelerations (unit mass).
 //
-// LIBRARY control — headless: defines window.NB_FORCELAYOUT once (idempotent across
-// installs). Consumers list this control as a hidden data-control child
-// div and use the global from their ready.
+// LIBRARY control — headless: the api rides this control's own element
+// (zero-globals doctrine). Consumers mount it as a hidden data-control
+// child div and read the element's api.
 
 var me = this;
 var ME = document.getElementById(me.UUID);
 
 me.ready = function () {
-  if (window.NB_FORCELAYOUT) return;
-  window.NB_FORCELAYOUT = (function () {
+  Object.assign(me, (function () {
 
 const DEFAULTS = {
   repel: 4.0,        // pairwise repulsion strength (repel/d²)
@@ -145,5 +144,5 @@ function energy(items) {
 }
 
     return { step, energy };
-  })();
+  })());
 };
