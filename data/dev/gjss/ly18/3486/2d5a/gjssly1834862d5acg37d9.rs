@@ -41,7 +41,7 @@ if failed {
     if advanced {
         outcome = "OK".to_string();
     } else {
-        outcome = "error: cargo reported success but produced no new build artifact. Likely stale fingerprints or clock skew (no RTC on this machine). Run `rebuild_lib` to reset build state.".to_string();
+        outcome = format!("error: cargo exited 0 but no artifact advanced under {}. That is the whole observed fact; do not infer a cause from this message. The check itself may be probing the wrong target dir for this crate. Try `rebuild_lib` to reset build state.", effective_target_dir(&root).display());
     }
 }
 
