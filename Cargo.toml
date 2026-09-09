@@ -1,4 +1,5 @@
 [workspace]
+exclude = ["agent", "grabmore", "kb", "fillmore", "hagarmap", "trainmore", "genmore", "runtime", "oneshot_base", "nebula", "gudrun"]
 resolver = "2"
 
 [package]
@@ -14,6 +15,7 @@ python_runtime = ["flowlang/python_runtime","newbound_core/python_runtime"]
 javascript_runtime = ["flowlang/javascript_runtime","newbound_core/javascript_runtime"]
 
 [dependencies]
+cmd = { path = "./cmd" }
 newbound_core = { path = "./newbound_core" }
 
 flowlang = { version="0.3.34" }
