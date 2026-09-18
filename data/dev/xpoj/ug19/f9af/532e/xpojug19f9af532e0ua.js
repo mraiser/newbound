@@ -367,7 +367,10 @@ me.cells = readTranscript;
 me.addRenderer = function (kind, fn) {
   renderers[kind] = fn;
   cellsEl.replaceChildren();
-  for (const entry of readTranscript()) renderCell(entry);
+  for (const entry of readTranscript()) {
+    const el = renderCell(entry);
+    if (!el.isConnected) cellsEl.appendChild(el);
+  }
 };
 /** The typed-command-name confirm ceremony (DESIGN §5.6). */
 me.confirmTyped = askConfirm;
