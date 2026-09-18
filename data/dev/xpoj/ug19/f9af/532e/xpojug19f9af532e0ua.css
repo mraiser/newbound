@@ -66,9 +66,27 @@
   color: var(--text-dim);
   white-space: pre;
   overflow-x: auto;
-  max-height: 140px;
-  overflow-y: auto;
 }
+/* long outputs truncate, never scroll — the drawer body is the only
+   scroller. clampOutput (js) adds .clamped plus a more/less toggle
+   when the content genuinely overflows. */
+.nb-session .ss-cell-out.clamped {
+  max-height: 140px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent);
+  mask-image: linear-gradient(to bottom, black 60%, transparent);
+}
+.nb-session .ss-more {
+  display: block;
+  margin: 0 14px 10px 38px;
+  font: 10px var(--mono);
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
+  border-radius: 6px;
+  padding: 3px 10px;
+}
+.nb-session .ss-more:hover { background: rgba(240, 166, 60, 0.1); }
 .nb-session .ss-cell-out.err { color: var(--danger); }
 .nb-session .ss-new {
   display: flex;
