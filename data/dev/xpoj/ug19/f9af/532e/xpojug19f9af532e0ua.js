@@ -132,27 +132,33 @@ var renderers = {};
 // when the content genuinely overflows, append a more/less toggle.
 function clampOutput(cell, out) {
   out.classList.add("clamped");
-  if (out.scrollHeight <= out.clientHeight + 1) {
-    out.classList.remove("clamped");   // it fits — no clamp, no toggle
-    return;
-  }
-  const toggle = document.createElement("button");
-  toggle.type = "button";
-  toggle.className = "ss-more";
-  const label = () => {
-    const clamped = out.classList.contains("clamped");
-    toggle.textContent = clamped ? "more ▾" : "less ▴";
-    toggle.setAttribute("aria-expanded", String(!clamped));
-  };
-  toggle.addEventListener("click", () => {
-    out.classList.toggle("clamped");
+  // renderCell builds detached nodes, and a detached node has no layout —
+  // scrollHeight/clientHeight are both 0, so measuring here would always
+  // say "it fits". Defer the decision until the cell is in the document.
+  requestAnimationFrame(() => {
+    if (!out.isConnected) return;
+    if (out.scrollHeight <= out.clientHeight + 1) {
+      out.classList.remove("clamped");   // it fits — no clamp, no toggle
+      return;
+    }
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "ss-more";
+    const label = () => {
+      const clamped = out.classList.contains("clamped");
+      toggle.textContent = clamped ? "more ▾" : "less ▴";
+      toggle.setAttribute("aria-expanded", String(!clamped));
+    };
+    toggle.addEventListener("click", () => {
+      out.classList.toggle("clamped");
+      label();
+      // collapsing a long cell yanks everything below it upward — keep the
+      // cell's own header in view rather than stranding the user mid-jump
+      if (out.classList.contains("clamped")) cell.scrollIntoView({ block: "nearest" });
+    });
     label();
-    // collapsing a long cell yanks everything below it upward — keep the
-    // cell's own header in view rather than stranding the user mid-jump
-    if (out.classList.contains("clamped")) cell.scrollIntoView({ block: "nearest" });
+    cell.appendChild(toggle);
   });
-  label();
-  cell.appendChild(toggle);
 }
 
 function renderCell(entry) {
@@ -210,7 +216,12 @@ function renderCell(entry) {
   return cell;
 }
 
-for (const entry of readTranscript()) renderCell(entry);
+// renderCell returns command cells detached (the caller appends them);
+// dividers append themselves.
+for (const entry of readTranscript()) {
+  const el = renderCell(entry);
+  if (!el.isConnected) cellsEl.appendChild(el);
+}
 
 // ── running ───────────────────────────────────────────────
 function parseCall(text) {
