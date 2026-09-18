@@ -127,6 +127,40 @@ function pushTranscript(entry) {
 // whatever plugin writes those kinds. kind -> (entry) => Element.
 var renderers = {};
 
+// Long outputs truncate instead of scrolling — a scrollview nested inside
+// the drawer's own scroller is miserable. The css clamps .ss-cell-out;
+// when the content genuinely overflows, append a more/less toggle.
+function clampOutput(cell, out) {
+  out.classList.add("clamped");
+  // renderCell builds detached nodes, and a detached node has no layout —
+  // scrollHeight/clientHeight are both 0, so measuring here would always
+  // say "it fits". Defer the decision until the cell is in the document.
+  requestAnimationFrame(() => {
+    if (!out.isConnected) return;
+    if (out.scrollHeight <= out.clientHeight + 1) {
+      out.classList.remove("clamped");   // it fits — no clamp, no toggle
+      return;
+    }
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "ss-more";
+    const label = () => {
+      const clamped = out.classList.contains("clamped");
+      toggle.textContent = clamped ? "more ▾" : "less ▴";
+      toggle.setAttribute("aria-expanded", String(!clamped));
+    };
+    toggle.addEventListener("click", () => {
+      out.classList.toggle("clamped");
+      label();
+      // collapsing a long cell yanks everything below it upward — keep the
+      // cell's own header in view rather than stranding the user mid-jump
+      if (out.classList.contains("clamped")) cell.scrollIntoView({ block: "nearest" });
+    });
+    label();
+    cell.appendChild(toggle);
+  });
+}
+
 function renderCell(entry) {
   if (entry.kind === "divider") {
     const div = document.createElement("div");
@@ -150,12 +184,11 @@ function renderCell(entry) {
     out.className = "ss-cell-out" + (entry.error ? " err" : "");
     out.textContent = entry.text ?? JSON.stringify(entry);
     cell.appendChild(out);
+    clampOutput(cell, out);
     cellsEl.appendChild(cell);
     cell.scrollIntoView({ block: "nearest" });
     return cell;
   }
-  // a command cell. `auto` marks cells a plugin ran rather than the user
-  // (the stored flag was once named `agent` — accept old transcripts).
   const auto = entry.auto ?? entry.agent;
   const cell = document.createElement("div");
   cell.className = "ss-cell" + (auto ? " ss-auto" : "");
@@ -179,12 +212,16 @@ function renderCell(entry) {
   out.className = "ss-cell-out" + (entry.error ? " err" : "");
   out.textContent = entry.output;
   cell.append(input, out);
-  cellsEl.appendChild(cell);
-  cell.scrollIntoView({ block: "nearest" });
+  clampOutput(cell, out);
   return cell;
 }
 
-for (const entry of readTranscript()) renderCell(entry);
+// renderCell returns command cells detached (the caller appends them);
+// dividers append themselves.
+for (const entry of readTranscript()) {
+  const el = renderCell(entry);
+  if (!el.isConnected) cellsEl.appendChild(el);
+}
 
 // ── running ───────────────────────────────────────────────
 function parseCall(text) {
@@ -233,7 +270,9 @@ async function run() {
       output: typeof payload === "string" ? payload : JSON.stringify(payload, null, 1),
     });
   }
-  renderCell(entry);
+  const el = renderCell(entry);
+  cellsEl.appendChild(el);
+  el.scrollIntoView({ block: "nearest" });
   callInput.value = "";
   argsInput.value = "";
 }
@@ -315,7 +354,9 @@ me.isOpen = function () {
     own; pair it with addRenderer. */
 me.pushCell = function (entry) {
   const stored = pushTranscript(entry);
-  renderCell(stored);
+  const el = renderCell(stored);
+  cellsEl.appendChild(el);
+  el.scrollIntoView({ block: "nearest" });
   return stored;
 };
 /** The transcript, oldest first (bounded by the notebook's limit). */
@@ -326,7 +367,10 @@ me.cells = readTranscript;
 me.addRenderer = function (kind, fn) {
   renderers[kind] = fn;
   cellsEl.replaceChildren();
-  for (const entry of readTranscript()) renderCell(entry);
+  for (const entry of readTranscript()) {
+    const el = renderCell(entry);
+    if (!el.isConnected) cellsEl.appendChild(el);
+  }
 };
 /** The typed-command-name confirm ceremony (DESIGN §5.6). */
 me.confirmTyped = askConfirm;
