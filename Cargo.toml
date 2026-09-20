@@ -1,5 +1,5 @@
 [workspace]
-exclude = ["trainmore", "fillmore", "grabmore", "runtime", "oneshot_base", "kb", "nebula", "hagarmap", "genmore", "gudrun", "agent"]
+exclude = ["agent", "fillmore", "genmore", "grabmore", "gudrun", "hagarmap", "kb", "nebula", "oneshot_base", "runtime", "scratch", "trainmore"]
 resolver = "2"
 
 [package]
@@ -18,7 +18,7 @@ javascript_runtime = ["flowlang/javascript_runtime","newbound_core/javascript_ru
 cmd = { path = "./cmd" }
 newbound_core = { path = "./newbound_core" }
 
-flowlang = { version="0.3.34" }
+flowlang = { version="0.3.36" }
 ndata = "0.3.17"
 
 serde = { version = "^1.0", features = ["derive"], optional = true }

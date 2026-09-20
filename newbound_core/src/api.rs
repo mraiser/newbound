@@ -4513,6 +4513,16 @@ pub mod peer {
 pub mod runtime {
 }
 
+pub mod scratch {
+    pub mod scratch {
+        use ::ndata::dataobject::DataObject;
+        use ::ndata::dataarray::DataArray;
+        use ::ndata::databytes::DataBytes;
+        use ::ndata::data::Data;
+
+    }
+}
+
 pub mod security {
     pub mod security {
         use ::ndata::dataobject::DataObject;
@@ -5153,6 +5163,7 @@ pub struct old_peer_peer_model {}
 pub struct old_peer_reboot {}
 pub struct old_peer_service {}
 pub struct old_peer_peer_select {}
+pub struct old_scratch_scratch {}
 pub struct old_security_security {}
 pub struct old_storage_storage {}
 pub struct old_trainmore_common {}
@@ -5356,6 +5367,9 @@ pub struct old_peer {
 }
 pub struct old_runtime {
 }
+pub struct old_scratch {
+    pub scratch: old_scratch_scratch,
+}
 pub struct old_security {
     pub security: old_security_security,
 }
@@ -5392,6 +5406,7 @@ pub struct api {
     pub nebula: old_nebula,
     pub peer: old_peer,
     pub runtime: old_runtime,
+    pub scratch: old_scratch,
     pub security: old_security,
     pub storage: old_storage,
     pub trainmore: old_trainmore,
@@ -5585,6 +5600,9 @@ pub const fn new() -> api {
             peer_select: old_peer_peer_select {},
         },
         runtime: old_runtime {
+        },
+        scratch: old_scratch {
+            scratch: old_scratch_scratch {},
         },
         security: old_security {
             security: old_security_security {},
