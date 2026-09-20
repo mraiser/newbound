@@ -5,11 +5,10 @@ use flowlang::datastore::DataStore;
 use ndata::data::Data;
 use crate::peer::peer::peers::user_to_peer;
 use crate::security::security::users::users;
-use blake2::{Blake2b, Digest, digest::consts::U10};
+use flowlang::blake2b::Blake2b;
 use crate::peer::service::listen::to_hex;
 use std::collections::HashMap;
 use flowlang::flowlang::system::time::time;
-type Blake2b80 = Blake2b<U10>;
 use flowlang::flowlang::system::system_call::system_call;
 
 pub fn execute(o: DataObject) -> DataObject {
@@ -111,7 +110,7 @@ if uuid.is_array() || (uuid.is_string() && uuid.string().starts_with("[")) {
   let mut map = HashMap::new();
   for (uuid, user) in users.objects() {
     if uuid.len() == 36 {
-      let mut hasher = Blake2b80::new();
+      let mut hasher = Blake2b::new(10);
       hasher.update(salt.to_owned().as_bytes());
       hasher.update(uuid.as_bytes());
       let res = hasher.finalize();
@@ -219,7 +218,7 @@ ip -o -6 addr list | awk '{print $4}' | cut -d/ -f1 | grep -v -E '^::1$'
       let mut map = HashMap::new();
       for (user_id_key, user_obj) in users.objects() {
         if user_id_key.len() == 36 {
-          let mut hasher = Blake2b80::new();
+          let mut hasher = Blake2b::new(10);
           hasher.update(salt.to_owned().as_bytes());
           hasher.update(user_id_key.as_bytes());
           let res = hasher.finalize();
