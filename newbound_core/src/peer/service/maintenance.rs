@@ -11,12 +11,11 @@ use crate::peer::peer::peers::user_to_peer;
 use flowlang::datastore::DataStore;
 use crate::peer::service::listen::relay;
 use crate::peer::service::listen::get_tcp;
-use blake2::{Blake2b, Digest, digest::consts::U10};
+use flowlang::blake2b::Blake2b;
 use flowlang::flowlang::system::unique_session_id::unique_session_id;
 use crate::peer::service::listen::to_hex;
 use crate::peer::service::listen::P2PConnection;
 
-type Blake2b80 = Blake2b<U10>;
 pub fn execute(_: DataObject) -> DataObject {
     use std::panic;
     let ax = panic::catch_unwind(panic::AssertUnwindSafe(|| {
@@ -82,7 +81,7 @@ for (uuid, user) in users.objects(){
   if uuid.len() == 36 {
     let user = user.object();
     
-    let mut hasher = Blake2b80::new();
+    let mut hasher = Blake2b::new(10);
     hasher.update(salt.as_bytes());
     hasher.update(uuid.as_bytes());
     let res = hasher.finalize();

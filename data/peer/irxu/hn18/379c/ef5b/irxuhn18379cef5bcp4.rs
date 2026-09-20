@@ -374,8 +374,7 @@ impl P2PConnection {
         let peer_public_arr: [u8; 32] = peer_public_bytes.try_into().unwrap();
 
         let shared_secret = x25519(my_private_arr, peer_public_arr);
-        let key = GenericArray::from(shared_secret);
-        let cipher = Aes256::new(&key);
+        let cipher = Aes256::new(&shared_secret);
 
         let sessionid = unique_session_id();
         let new_p2p_connection = P2PConnection {
@@ -717,8 +716,7 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
   if !init { let _x = stream.write(&my_session_public, "HANDSHAKE".to_string()).unwrap(); }
 
   let shared_secret = x25519(my_session_private, remote_session_public);
-  let key = GenericArray::from(shared_secret);
-  let cipher = Aes256::new(&key);
+  let cipher = Aes256::new(&shared_secret);
 
   let bytes = encrypt(&cipher, my_uuid.as_bytes());
   let _x = stream.write(&bytes, "HANDSHAKE".to_string()).unwrap();
@@ -766,8 +764,7 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
     let peer_public: [u8; 32] = peer_public.try_into().unwrap();
 
     let shared_secret = x25519(my_private, peer_public);
-    let key = GenericArray::from(shared_secret);
-    let cipher = Aes256::new(&key);
+    let cipher = Aes256::new(&shared_secret);
 
     let isok;
     if init {
@@ -1058,8 +1055,7 @@ pub fn handle_next_message(conn: &mut P2PConnection) -> bool {
                 let peer_public_arr: [u8; 32] = peer_public.try_into().unwrap();
 
                 let shared_secret_to_failed = x25519(my_private_arr, peer_public_arr);
-                let key_to_failed = GenericArray::from(shared_secret_to_failed);
-                let cipher_to_failed = Aes256::new(&key_to_failed);
+                let cipher_to_failed = Aes256::new(&shared_secret_to_failed);
 
                 let command_object_encrypted_bytes = &decrypted_payload[46 .. 46 + original_payload_len];
                 let command_object_decrypted_bytes = decrypt(&cipher_to_failed, command_object_encrypted_bytes);
@@ -1152,24 +1148,14 @@ pub fn encrypt(cipher: &Aes256, buf: &[u8]) -> Vec<u8> {
     while temp_buf.len() % 16 != 0 {
         temp_buf.push(0);
     }
-
-    let mut result_buf = Vec::with_capacity(temp_buf.len());
-    for chunk in temp_buf.chunks(16) {
-        let mut block = GenericArray::clone_from_slice(chunk);
-        cipher.encrypt_block(&mut block);
-        result_buf.extend_from_slice(block.as_slice());
-    }
-    result_buf
+    cipher.encrypt_blocks(&mut temp_buf);
+    temp_buf
 }
 
 pub fn decrypt(cipher: &Aes256, buf: &[u8]) -> Vec<u8> {
     if buf.len() % 16 != 0 { return Vec::new(); }
-    let mut result_buf = Vec::with_capacity(buf.len());
-    for chunk in buf.chunks(16) {
-        let mut block = GenericArray::clone_from_slice(chunk);
-        cipher.decrypt_block(&mut block);
-        result_buf.extend_from_slice(block.as_slice());
-    }
+    let mut result_buf = buf.to_vec();
+    cipher.decrypt_blocks(&mut result_buf);
     result_buf
 }
 
