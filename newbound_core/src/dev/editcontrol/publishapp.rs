@@ -12,14 +12,7 @@ use crate::app::util::zip::zip;
 use crate::app::util::hash::hash;
 use flowlang::appserver::*;
 use core::num::ParseIntError;
-//use rand::rngs::OsRng;
-//use x25519_dalek::{StaticSecret, PublicKey};
-use aes::Aes256;
-use aes::cipher::{
-    BlockEncrypt, KeyInit,
-    generic_array::GenericArray,
-};
-
+use flowlang::aes::Aes256;
 
 use flowlang::x25519::*;
 
@@ -203,20 +196,12 @@ for lib in libs {
     
     let (app_private, app_public) = generate_x25519_keypair();
     let shared_secret = x25519(private, app_public);
-    let key = GenericArray::from(shared_secret);
-    let cipher = Aes256::new(&key);
+    let cipher = Aes256::new(&shared_secret);
     
     
     
-    let buf = decode_hex(&h).unwrap();
-    let blocks: Vec<&[u8]> = buf.chunks(16).collect();
-    let mut buf = Vec::new();
-    for ba in blocks {
-      let block: [u8; 16] = ba.try_into().expect("slice with incorrect length");
-      let mut block = GenericArray::from(block);
-      cipher.encrypt_block(&mut block);
-      buf.extend_from_slice(&block[0..16]);
-    }
+    let mut buf = decode_hex(&h).unwrap();
+    cipher.encrypt_blocks(&mut buf);
     let sig = to_hex(&buf);
     
     let mut meta = DataObject::new();
