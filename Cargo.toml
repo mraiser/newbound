@@ -1,5 +1,4 @@
 [workspace]
-exclude = ["agent", "fillmore", "genmore", "grabmore", "gudrun", "hagarmap", "kb", "nebula", "oneshot_base", "runtime", "scratch", "trainmore"]
 resolver = "2"
 
 [package]
