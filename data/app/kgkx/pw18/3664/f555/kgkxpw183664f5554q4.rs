@@ -1,5 +1,5 @@
   let path = Path::new(&file);
-  let mut hasher = Blake2b512::new();
+  let mut hasher = Blake2b::new(64);
   hash_path(&path, &mut hasher);
   let res = hasher.finalize();
   let mut s = "".to_string();
@@ -9,7 +9,7 @@
   s
 }
 
-pub fn hash_path(path:&Path, hasher:&mut Blake2b512) {
+pub fn hash_path(path:&Path, hasher:&mut Blake2b) {
   if path.is_dir() { 
     hash_dir(path, hasher); 
   }
@@ -18,14 +18,14 @@ pub fn hash_path(path:&Path, hasher:&mut Blake2b512) {
   }
 }
 
-pub fn hash_file(path:&Path, hasher:&mut Blake2b512) {
+pub fn hash_file(path:&Path, hasher:&mut Blake2b) {
   let mut f = File::open(path).unwrap();
   let mut buffer = Vec::new();
   let _x = f.read_to_end(&mut buffer).unwrap();
   hasher.update(&buffer);
 }
 
-pub fn hash_dir(path:&Path, hasher:&mut Blake2b512) {
+pub fn hash_dir(path:&Path, hasher:&mut Blake2b) {
   let mut vec = Vec::new();
   for file in fs::read_dir(path).unwrap() {
     let path = file.unwrap().path().into_os_string().into_string().unwrap();

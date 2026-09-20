@@ -243,8 +243,7 @@ fn do_listen() {
         response_buf.extend_from_slice(&local_session_public);
 
         let shared_secret = x25519(local_session_private, remote_session_public);
-        let key = GenericArray::from(shared_secret);
-        let cipher = Aes256::new(&key);
+        let cipher = Aes256::new(&shared_secret);
 
         let encrypted_uuid = encrypt(&cipher, local_uuid.as_bytes());
         response_buf.extend_from_slice(&encrypted_uuid);
@@ -279,8 +278,7 @@ fn do_listen() {
             }
             if ok {
                 let permanent_shared_secret = x25519(local_permanent_private, peer_public_key_arr);
-                let permanent_key = GenericArray::from(permanent_shared_secret);
-                let permanent_cipher = Aes256::new(&permanent_key);
+                let permanent_cipher = Aes256::new(&permanent_shared_secret);
                 return Some((remote_uuid_str, user_data, permanent_cipher, response_bytes));
             } else {
                 println!("BAD PUB KEY GIVEN");

@@ -14,17 +14,16 @@ python_runtime = ["flowlang/python_runtime","newbound_core/python_runtime"]
 javascript_runtime = ["flowlang/javascript_runtime","newbound_core/javascript_runtime"]
 
 [dependencies]
+cmd = { path = "./cmd" }
 newbound_core = { path = "./newbound_core" }
 
-flowlang = { version="0.3.34" }
+flowlang = { version="0.3.36" }
 ndata = "0.3.17"
 
 serde = { version = "^1.0", features = ["derive"], optional = true }
 serde_json = { version = "^1.0", optional = true }
 wry = { version="0.27.0", optional=true }
 
-aes = "^0.8"
-blake2 = "^0.10"
 
 [[bin]]
 name = "newbound"
