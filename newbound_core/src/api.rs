@@ -4521,6 +4521,19 @@ pub mod scratch {
         use ::ndata::data::Data;
 
     }
+    pub mod stripe {
+        use ::ndata::dataobject::DataObject;
+        use ::ndata::dataarray::DataArray;
+        use ::ndata::databytes::DataBytes;
+        use ::ndata::data::Data;
+
+        pub fn sync(api_key: String) -> DataObject {
+            let mut d = DataObject::new();
+            d.put_string("api_key", &api_key);
+            ::flowlang::rustcmd::RustCmd::new("myhkkw1a0c0e6e7d1j2").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
+    }
 }
 
 pub mod security {
@@ -5164,6 +5177,7 @@ pub struct old_peer_reboot {}
 pub struct old_peer_service {}
 pub struct old_peer_peer_select {}
 pub struct old_scratch_scratch {}
+pub struct old_scratch_stripe {}
 pub struct old_security_security {}
 pub struct old_storage_storage {}
 pub struct old_trainmore_common {}
@@ -5369,6 +5383,7 @@ pub struct old_runtime {
 }
 pub struct old_scratch {
     pub scratch: old_scratch_scratch,
+    pub stripe: old_scratch_stripe,
 }
 pub struct old_security {
     pub security: old_security_security,
@@ -5603,6 +5618,7 @@ pub const fn new() -> api {
         },
         scratch: old_scratch {
             scratch: old_scratch_scratch {},
+            stripe: old_scratch_stripe {},
         },
         security: old_security {
             security: old_security_security {},
@@ -7743,6 +7759,12 @@ impl old_peer_service {
     #[deprecated(note = "use api::peer::service::udp_connect instead")]
     pub fn udp_connect(&self, ipaddr: String, port: i64) -> DataObject {
         self::peer::service::udp_connect(ipaddr, port)
+    }
+}
+impl old_scratch_stripe {
+    #[deprecated(note = "use api::scratch::stripe::sync instead")]
+    pub fn sync(&self, api_key: String) -> DataObject {
+        self::scratch::stripe::sync(api_key)
     }
 }
 impl old_security_security {

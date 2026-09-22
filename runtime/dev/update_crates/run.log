@@ -1,4 +1,10 @@
 == STEP 1: cargo build --release --features=serde_support,python_runtime
+    Updating crates.io index
+     Locking 1 package to latest compatible version
+    Updating flowlang v0.3.36 -> v0.3.38
+ Downloading crates ...
+  Downloaded flowlang v0.3.38
+   Compiling flowlang v0.3.38
    Compiling newbound_core v0.1.0 (/home/mraiser/newbound/newbound_core)
    Compiling cmd v0.1.0 (/home/mraiser/newbound/cmd)
 warning: unused import: `Transform`
@@ -9,20 +15,6 @@ warning: unused import: `Transform`
   |
   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
 
-warning: unused variable: `cmds`
- --> cmd/src/oneshot_jobs/mod.rs:3:16
-  |
-3 | pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
-  |                ^^^^ help: if this is intentional, prefix it with an underscore: `_cmds`
-  |
-  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
-
-warning: unused variable: `cmds`
- --> cmd/src/oneshot_msgs/mod.rs:3:16
-  |
-3 | pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
-  |                ^^^^ help: if this is intentional, prefix it with an underscore: `_cmds`
-
 warning: unused import: `crate::peer::service::listen::relay`
   --> newbound_core/src/peer/service/maintenance.rs:12:5
    |
@@ -32,17 +24,17 @@ warning: unused import: `crate::peer::service::listen::relay`
    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
 
 warning: unused doc comment
-   --> newbound_core/src/peer/service/maintenance.rs:146:11
+   --> newbound_core/src/peer/service/maintenance.rs:145:11
     |
-146 | /           /**
-147 | |           * Disabled relay
-148 | |           *
-149 | |           if get_tcp(user.clone()).is_some() {
+145 | /           /**
+146 | |           * Disabled relay
+147 | |           *
+148 | |           if get_tcp(user.clone()).is_some() {
 ...   |
-159 | |           */
+158 | |           */
     | |____________^
 ...
-162 |             fire_event("peer", "UPDATE", user_to_peer(user, uuid));
+161 |             fire_event("peer", "UPDATE", user_to_peer(user, uuid));
     |             ------------------------------------------------------ rustdoc does not generate documentation for expressions
     |
     = help: use `/* */` for a plain comment
@@ -95,6 +87,20 @@ warning: unused import: `ndata::Data::DArray`
   |
 6 | use ndata::Data::DArray;
   |     ^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `cmds`
+ --> cmd/src/oneshot_jobs/mod.rs:3:16
+  |
+3 | pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
+  |                ^^^^ help: if this is intentional, prefix it with an underscore: `_cmds`
+  |
+  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `cmds`
+ --> cmd/src/oneshot_msgs/mod.rs:3:16
+  |
+3 | pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
+  |                ^^^^ help: if this is intentional, prefix it with an underscore: `_cmds`
 
 warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
   --> newbound_core/src/dev/code/set_command_imports.rs:62:33
@@ -255,9 +261,9 @@ warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api
    |                                                 ^^^^^^^^^
 
 warning: unused variable: `system`
-   --> newbound_core/src/peer/service/maintenance.rs:118:13
+   --> newbound_core/src/peer/service/maintenance.rs:117:13
     |
-118 |         let system = DataStore::globals().get_object("system");
+117 |         let system = DataStore::globals().get_object("system");
     |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_system`
     |
     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
@@ -361,80 +367,107 @@ warning: variable does not need to be mutable
 
 warning: `newbound_core` (lib) generated 48 warnings (run `cargo fix --lib -p newbound_core` to apply 19 suggestions)
    Compiling newbound v0.1.0 (/home/mraiser/newbound)
-    Finished `release` profile [optimized] target(s) in 2.95s
+    Finished `release` profile [optimized] target(s) in 5.84s
 == STEP 2: target/release/newbound rebuild
-hotswap: loaded 'hagarmap' generation 1 (2 commands)
-hotswap: loaded 'grabmore' generation 2 (39 commands)
-hotswap: loaded 'trainmore' generation 3 (45 commands)
-hotswap: loaded 'scratch' generation 4 (6 commands)
+hotswap: failed to load 'hagarmap': refusing to load 'hagarmap': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'grabmore': refusing to load 'grabmore': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'trainmore': refusing to load 'trainmore': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'scratch': refusing to load 'scratch': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
 hotswap: library 'nebula' predates the ABI contract symbol; loading unchecked
 hotswap: loaded 'nebula' generation 5 (21 commands)
-hotswap: loaded 'fillmore' generation 6 (26 commands)
-hotswap: loaded 'runtime' generation 7 (0 commands)
-hotswap: loaded 'oneshot_base' generation 8 (18 commands)
-hotswap: loaded 'kb' generation 9 (0 commands)
-hotswap: loaded 'genmore' generation 10 (75 commands)
-hotswap: loaded 'gudrun' generation 11 (78 commands)
-hotswap: loaded 'agent' generation 12 (105 commands)
+hotswap: failed to load 'fillmore': refusing to load 'fillmore': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'runtime': refusing to load 'runtime': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'oneshot_base': refusing to load 'oneshot_base': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'kb': refusing to load 'kb': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'genmore': refusing to load 'genmore': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'gudrun': refusing to load 'gudrun': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'agent': refusing to load 'agent': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
 REBUILDING ALL
-NOTE: flowlang version for library "app" is builder-managed (the core pair comes from the root Cargo.lock); ignoring the value in meta.json.
-NOTE: ndata version for library "app" is builder-managed (the core pair comes from the root Cargo.lock); ignoring the value in meta.json.
 == STEP 3: target/release/newbound recompile
-hotswap: loaded 'hagarmap' generation 1 (2 commands)
-hotswap: loaded 'grabmore' generation 2 (39 commands)
-hotswap: loaded 'trainmore' generation 3 (45 commands)
-hotswap: loaded 'scratch' generation 4 (6 commands)
+hotswap: failed to load 'hagarmap': refusing to load 'hagarmap': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'grabmore': refusing to load 'grabmore': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'trainmore': refusing to load 'trainmore': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'scratch': refusing to load 'scratch': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
 hotswap: library 'nebula' predates the ABI contract symbol; loading unchecked
 hotswap: loaded 'nebula' generation 5 (21 commands)
-hotswap: loaded 'fillmore' generation 6 (26 commands)
-hotswap: loaded 'runtime' generation 7 (0 commands)
-hotswap: loaded 'oneshot_base' generation 8 (18 commands)
-hotswap: loaded 'kb' generation 9 (0 commands)
-hotswap: loaded 'genmore' generation 10 (75 commands)
-hotswap: loaded 'gudrun' generation 11 (78 commands)
-hotswap: loaded 'agent' generation 12 (105 commands)
+hotswap: failed to load 'fillmore': refusing to load 'fillmore': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'runtime': refusing to load 'runtime': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'oneshot_base': refusing to load 'oneshot_base': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'kb': refusing to load 'kb': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'genmore': refusing to load 'genmore': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'gudrun': refusing to load 'gudrun': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: failed to load 'agent': refusing to load 'agent': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
 RECOMPILING agent (agent)
 executing command in directory agent
+hotswap: 'hagarmap' dylib changed or appeared; loading
+hotswap: reload of 'hagarmap' failed: refusing to load 'hagarmap': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: 'grabmore' dylib changed or appeared; loading
+hotswap: reload of 'grabmore' failed: refusing to load 'grabmore': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: 'trainmore' dylib changed or appeared; loading
+hotswap: reload of 'trainmore' failed: refusing to load 'trainmore': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: 'scratch' dylib changed or appeared; loading
+hotswap: reload of 'scratch' failed: refusing to load 'scratch': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: 'fillmore' dylib changed or appeared; loading
+hotswap: reload of 'fillmore' failed: refusing to load 'fillmore': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: 'runtime' dylib changed or appeared; loading
+hotswap: reload of 'runtime' failed: refusing to load 'runtime': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: 'oneshot_base' dylib changed or appeared; loading
+hotswap: reload of 'oneshot_base' failed: refusing to load 'oneshot_base': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: 'kb' dylib changed or appeared; loading
+hotswap: reload of 'kb' failed: refusing to load 'kb': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: 'genmore' dylib changed or appeared; loading
+hotswap: reload of 'genmore' failed: refusing to load 'genmore': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: 'gudrun' dylib changed or appeared; loading
+hotswap: reload of 'gudrun' failed: refusing to load 'gudrun': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
+hotswap: 'agent' dylib changed or appeared; loading
+hotswap: reload of 'agent' failed: refusing to load 'agent': ABI contract mismatch (host 'flowlang=0.3.38;profile=release;ptr=8;init_size=120;cfg_size=96', library 'flowlang=0.3.36;profile=release;ptr=8;init_size=120;cfg_size=96')
 RECOMPILING fillmore (fillmore)
 executing command in directory fillmore
+hotswap: 'agent' dylib changed or appeared; loading
+hotswap: loaded 'agent' generation 24 (105 commands)
 RECOMPILING genmore (genmore)
 executing command in directory genmore
-hotswap: 'agent' dylib changed or appeared; loading
-hotswap: loaded 'agent' generation 13 (105 commands)
 hotswap: 'fillmore' dylib changed or appeared; loading
-hotswap: loaded 'fillmore' generation 14 (26 commands)
+hotswap: loaded 'fillmore' generation 25 (26 commands)
 RECOMPILING grabmore (grabmore)
 executing command in directory grabmore
+hotswap: 'genmore' dylib changed or appeared; loading
+hotswap: loaded 'genmore' generation 26 (75 commands)
 RECOMPILING gudrun (gudrun)
 executing command in directory gudrun
-hotswap: 'genmore' dylib changed or appeared; loading
-hotswap: loaded 'genmore' generation 15 (75 commands)
+hotswap: 'grabmore' dylib changed or appeared; loading
+hotswap: loaded 'grabmore' generation 27 (39 commands)
 RECOMPILING hagarmap (hagarmap)
 executing command in directory hagarmap
-hotswap: 'grabmore' dylib changed or appeared; loading
-hotswap: loaded 'grabmore' generation 16 (39 commands)
 RECOMPILING kb (kb)
 executing command in directory kb
+hotswap: 'gudrun' dylib changed or appeared; loading
+hotswap: loaded 'gudrun' generation 28 (78 commands)
+hotswap: 'hagarmap' dylib changed or appeared; loading
+hotswap: loaded 'hagarmap' generation 29 (2 commands)
 RECOMPILING minifig (oneshot_base)
 executing command in directory oneshot_base
+hotswap: 'kb' dylib changed or appeared; loading
+hotswap: loaded 'kb' generation 30 (0 commands)
 RECOMPILING nebula (nebula)
 executing command in directory nebula
-hotswap: 'gudrun' dylib changed or appeared; loading
-hotswap: loaded 'gudrun' generation 17 (78 commands)
 RECOMPILING runtime (runtime)
 executing command in directory runtime
+hotswap: 'oneshot_base' dylib changed or appeared; loading
+hotswap: loaded 'oneshot_base' generation 31 (18 commands)
+hotswap: 'nebula' dylib changed or appeared; loading
+hotswap: library 'nebula' predates the ABI contract symbol; loading unchecked
+hotswap: loaded 'nebula' generation 32 (21 commands)
 RECOMPILING scratch (scratch)
 executing command in directory scratch
 RECOMPILING storage (oneshot_base)
 executing command in directory oneshot_base
 RECOMPILING trainmore (trainmore)
 executing command in directory trainmore
-hotswap: 'hagarmap' dylib changed or appeared; loading
-hotswap: loaded 'hagarmap' generation 18 (2 commands)
-hotswap: 'oneshot_base' dylib changed or appeared; loading
-hotswap: loaded 'oneshot_base' generation 19 (18 commands)
-hotswap: 'kb' dylib changed or appeared; loading
-hotswap: loaded 'kb' generation 20 (0 commands)
+hotswap: 'runtime' dylib changed or appeared; loading
+hotswap: loaded 'runtime' generation 33 (0 commands)
+hotswap: 'scratch' dylib changed or appeared; loading
+hotswap: loaded 'scratch' generation 34 (6 commands)
 13 compiled, 0 failed
 == STEP 4: cargo build --release --features=serde_support,python_runtime
    Compiling newbound_core v0.1.0 (/home/mraiser/newbound/newbound_core)
@@ -447,20 +480,6 @@ warning: unused import: `Transform`
   |
   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
 
-warning: unused variable: `cmds`
- --> cmd/src/oneshot_jobs/mod.rs:3:16
-  |
-3 | pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
-  |                ^^^^ help: if this is intentional, prefix it with an underscore: `_cmds`
-  |
-  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
-
-warning: unused variable: `cmds`
- --> cmd/src/oneshot_msgs/mod.rs:3:16
-  |
-3 | pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
-  |                ^^^^ help: if this is intentional, prefix it with an underscore: `_cmds`
-
 warning: unused import: `crate::peer::service::listen::relay`
   --> newbound_core/src/peer/service/maintenance.rs:12:5
    |
@@ -470,17 +489,17 @@ warning: unused import: `crate::peer::service::listen::relay`
    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
 
 warning: unused doc comment
-   --> newbound_core/src/peer/service/maintenance.rs:146:11
+   --> newbound_core/src/peer/service/maintenance.rs:145:11
     |
-146 | /           /**
-147 | |           * Disabled relay
-148 | |           *
-149 | |           if get_tcp(user.clone()).is_some() {
+145 | /           /**
+146 | |           * Disabled relay
+147 | |           *
+148 | |           if get_tcp(user.clone()).is_some() {
 ...   |
-159 | |           */
+158 | |           */
     | |____________^
 ...
-162 |             fire_event("peer", "UPDATE", user_to_peer(user, uuid));
+161 |             fire_event("peer", "UPDATE", user_to_peer(user, uuid));
     |             ------------------------------------------------------ rustdoc does not generate documentation for expressions
     |
     = help: use `/* */` for a plain comment
@@ -533,6 +552,20 @@ warning: unused import: `ndata::Data::DArray`
   |
 6 | use ndata::Data::DArray;
   |     ^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `cmds`
+ --> cmd/src/oneshot_jobs/mod.rs:3:16
+  |
+3 | pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
+  |                ^^^^ help: if this is intentional, prefix it with an underscore: `_cmds`
+  |
+  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `cmds`
+ --> cmd/src/oneshot_msgs/mod.rs:3:16
+  |
+3 | pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
+  |                ^^^^ help: if this is intentional, prefix it with an underscore: `_cmds`
 
 warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api::dev::editcontrol::lookup_id instead
   --> newbound_core/src/dev/code/set_command_imports.rs:62:33
@@ -693,9 +726,9 @@ warning: use of deprecated method `api::old_dev_editcontrol::lookup_id`: use api
    |                                                 ^^^^^^^^^
 
 warning: unused variable: `system`
-   --> newbound_core/src/peer/service/maintenance.rs:118:13
+   --> newbound_core/src/peer/service/maintenance.rs:117:13
     |
-118 |         let system = DataStore::globals().get_object("system");
+117 |         let system = DataStore::globals().get_object("system");
     |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_system`
     |
     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
@@ -799,5 +832,5 @@ warning: variable does not need to be mutable
 
 warning: `newbound_core` (lib) generated 48 warnings (run `cargo fix --lib -p newbound_core` to apply 19 suggestions)
    Compiling newbound v0.1.0 (/home/mraiser/newbound)
-    Finished `release` profile [optimized] target(s) in 2.98s
-== DONE: verdict=no-restart
+    Finished `release` profile [optimized] target(s) in 3.07s
+== DONE: verdict=restart
