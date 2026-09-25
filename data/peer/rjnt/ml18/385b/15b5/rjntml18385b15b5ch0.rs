@@ -27,7 +27,7 @@ for (uuid, user) in users.objects(){
   if uuid.len() == 36 {
     let user = user.object();
     
-    let mut hasher = Blake2b80::new();
+    let mut hasher = Blake2b::new(10);
     hasher.update(salt.as_bytes());
     hasher.update(uuid.as_bytes());
     let res = hasher.finalize();
