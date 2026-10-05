@@ -11,10 +11,10 @@
 //   asset    -> absolute path to a library asset file (direct probe). lib+name.
 //   library  -> list of library ids in the instance.
 //   path     -> resolve a 16+ char record id to its sharded data/ path (O(1)). id.
-//   text     -> search CONTENT. query. Default: indexed command-source search
+//   text     -> search CONTENT. query. Indexed command-source search
 //               (dev.code.search_commands) scoped by lib/ctl (empty = all),
-//               with a matching-line preview per hit. page=true: search the
-//               LIVE browser page's visible text via one agent.browser.eval.
+//               with a matching-line preview per hit. To search the LIVE
+//               browser page's visible text, use agent.browser.find_text.
 //
 // Every route is indexed or O(1). Returns {status, ...} or {status:err, msg}.
 
@@ -40,24 +40,6 @@ fn shard_path(lib: &str, id: &str) -> String {
     } else {
         format!("data/{}/{}", lib, id)
     }
-}
-
-// Encode a Rust string as a JS string literal (for embedding `query` in eval JS).
-fn js_string(s: &str) -> String {
-    let mut out = String::from("\"");
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
 }
 
 let kind_l = kind.trim().to_lowercase();
@@ -180,18 +162,6 @@ match kind_l.as_str() {
     "text" => {
         if query.is_empty() {
             return err("text kind needs `query`");
-        }
-        if page {
-            let jq = js_string(&query);
-            let js = format!(
-                "(function(){{var q={jq}.toLowerCase();var out=[];var all=document.querySelectorAll('*');for(var i=0;i<all.length;i++){{var e=all[i];if(e.children.length)continue;var t=(e.textContent||'').replace(/\\s+/g,' ').trim();if(t&&t.toLowerCase().indexOf(q)>=0){{var d=e.tagName.toLowerCase();var id=e.id?'#'+e.id:'';var cn=(''+(e.className||'')).trim().split(/\\s+/).filter(Boolean).slice(0,2).map(function(x){{return '.'+x;}}).join('');out.push({{el:d+id+cn,text:t.slice(0,200)}});}}}}return {{count:out.length,matches:out.slice(0,50)}};}})()",
-                jq = jq
-            );
-            let r = crate::api::new().agent.browser.eval(js, 15000);
-            let mut o = ok();
-            o.put_string("mode", "page");
-            o.put_object("result", r);
-            return o;
         }
         let scope_lib = if lib.is_empty() { "*".to_string() } else { lib.clone() };
         let scope_ctl = if ctl.is_empty() { "*".to_string() } else { ctl.clone() };
