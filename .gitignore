@@ -13,8 +13,8 @@
 !license.md
 !Cargo.toml
 !Cargo.lock
-!build.sh
-!debug.sh
+!build_newbound_from_scratch.sh
+!build_newbound_from_scratch_with_python.sh
 !downgrade.sh
 !hardreset.sh
 !newbound.sh
