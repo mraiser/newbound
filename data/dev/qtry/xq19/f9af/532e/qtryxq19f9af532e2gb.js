@@ -663,7 +663,6 @@ async function init(host, { openLib, openControl, toast }) {
   });
 
   async function showFan(libId) {
-    debugger;
     fanLib = libId;
     for (const [id, el] of stackEls) el.classList.toggle("on", id === libId);
     fanEl.hidden = false;
