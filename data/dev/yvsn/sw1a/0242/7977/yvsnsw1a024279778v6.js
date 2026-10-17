@@ -265,6 +265,7 @@ async function init(host, props) {
           <button type="button" class="r-untrack" title="library repos never track builder output: git rm --cached every Cargo.lock and src/api.rs, ignore each crate's pair, commit + push (dev.git.untrack_generated)">untrack generated</button>
           <button type="button" class="r-publish" title="publish the current branch upstream (push -u origin)">publish</button>
           <button type="button" class="r-push" title="push the current branch to its upstream">push</button>
+          <button type="button" class="r-checkout" title="switch to an existing local branch (git checkout — dev.git.write)">checkout…</button>
           <button type="button" class="r-fetch" title="fetch --prune">fetch</button>
           <button type="button" class="r-edit" title="load this entry into the register form">edit</button>
           <button type="button" class="r-rm"
@@ -381,6 +382,16 @@ async function init(host, props) {
     row.querySelector(".r-log").onclick = (e) =>
       act(e.target, "read", "log", ["--oneline", "--decorate", "-n", "20"]);
     row.querySelector(".r-diff").onclick = (e) => act(e.target, "read", "diff", ["--stat"]);
+    row.querySelector(".r-checkout").onclick = async (e) => {
+      const s = row.state || {};
+      const name = prompt(`switch ${repo.name} to an existing local branch (currently ${s.branch || "unknown"}):`);
+      if (!name || !name.trim()) return;
+      if (name.trim() === s.branch) { toast.show(`already on ${s.branch}`); return; }
+      if (await act(e.target, "write", "checkout", [name.trim()])) {
+        toast.show(`on ${name.trim()}`);
+        refreshState(repo, row, false);
+      }
+    };
     row.querySelector(".r-fetch").onclick = async (e) => {
       if (await act(e.target, "remote_op", "fetch", ["--prune"])) refreshState(repo, row, false);
     };
