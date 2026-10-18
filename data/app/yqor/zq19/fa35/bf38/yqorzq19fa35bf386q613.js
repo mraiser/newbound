@@ -10,9 +10,17 @@
 // removeObject/requestRender), so this module stays node-testable with a
 // stub stage and a manual clock.
 //
-// Security posture (design §3.7): nothing here executes code — expressions
-// go through sceneexpr's parser, and the only platform touchpoint is the
-// injected `invoke` callback (the editor gates it like run ▸).
+// Security posture (design §3.7): the scene facet itself stays inert data —
+// expressions go through sceneexpr's parser, and the only platform touchpoint
+// is the injected `invoke` callback (the editor gates it like run ▸).
+// BEHAVIORS are the documented exception: a behavior is REAL JS, but it lives
+// in the CONTROL's js facet (me.sceneBehaviors) — the same trust domain as
+// every other facet of that control, never in the scene JSON, which can still
+// travel. The facet holds only NAME references (behaviors.animate/render, a
+// wire's "do": "name.method", a node's "behavior": "name"). The runtime
+// resolves those names against an impl map the HOST injects via opts.behaviors
+// (editor and player both pass the control's own me.sceneBehaviors). A scene
+// facet with no injected impls runs exactly as before — behaviors inert.
 //
 // LIBRARY control — headless: the api rides this control's own element
 // (zero-globals doctrine). Consumers mount it as a hidden data-control
@@ -37,6 +45,9 @@ const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
  *   theme      — "light" | "dark"
  *   loadDoc    — async (lib, ctl) → SceneDoc | null   (mount resolution; optional)
  *   invoke     — async (lib, ctl, cmd, args) → result | Error   (gated; optional)
+ *   behaviors  — { name → impl } map (the control's me.sceneBehaviors; optional).
+ *                An impl may define animate(ctx), render(ctx, dt), and any
+ *                event methods wires/nodes name. Absent ⇒ behaviors inert.
  *   onDiag     — (message) → void   (runtime diagnostics chip; optional)
  *   onState    — (instancePath, field, value) → void  (the editor's live state tab)
  *   reduced    — bool: prefers-reduced-motion (ease→snap, stepped clock)
@@ -64,6 +75,10 @@ class Instance {
     this.t0 = 0;
     this.tNow = 0;
     this.usesT = false;
+    this.item = null;             // collection item (each-mounted instances)
+    this.instIndex = -1;          // collection index (each-mounted instances)
+    this.behaviorCtx = null;      // built lazily by SceneRuntime._behaviorCtx(inst)
+    this.behaviorData = {};       // scratch state the behavior keeps across frames
   }
   scope(extra) {
     const s = { ...this.state, t: this.tNow };
@@ -81,10 +96,12 @@ class SceneRuntime {
     this.instances = new Map();   // prefix → Instance
     this.diags = [];
     this._docCache = new Map();   // "lib:ctl" → SceneDoc | null
+    this.behaviors = opts.behaviors || {};   // name → impl (me.sceneBehaviors)
     this._running = false;
     this._raf = 0;
     this._stepTimer = 0;
     this._disposed = false;
+    this._lastStepMs = 0;
   }
 
   _diag(msg) {
@@ -407,6 +424,163 @@ class SceneRuntime {
   stateOf(prefix = "") {
     const inst = this.instances.get(prefix);
     return inst ? { ...inst.state } : {};
+  }
+
+  // ── behaviors (real JS on the control's js facet; the OO layer) ────────────
+
+  /** The behavior's handle on an instance. Lazily built, cached on the
+      instance. Everything the behavior touches flows through the runtime's own
+      paths (state writes re-fire bindings; rigs read the COMPUTED — post-binding,
+      post-ease — values the stage is actually showing), so a behavior and the
+      declarative layer compose instead of fighting. */
+  _behaviorCtx(inst) {
+    if (inst.behaviorCtx) return inst.behaviorCtx;
+    const rt = this;
+    const ctx = {
+      state: inst.state,                 // live reference — reads see current values
+      data: inst.behaviorData,           // scratch state kept across frames
+      t: inst.tNow,
+      item: inst.item,
+      index: inst.instIndex,
+      key: inst.instKey,
+      prefix: inst.prefix,
+      /** CURRENT displayed transform (post-binding/ease) for a node/mount in
+          THIS instance — the rig. Returns null for an unknown id. */
+      rig(id) {
+        const g = (p) => inst.computed.get(`${id}.${p}`);
+        if (!inst.computed.has(`${id}.pos.x`) && !inst.doc.byId(id)) return null;
+        return {
+          pos: { x: g("pos.x") ?? 0, y: g("pos.y") ?? 0, z: g("pos.z") ?? 0 },
+          rot: { x: g("rot.x") ?? 0, y: g("rot.y") ?? 0, z: g("rot.z") ?? 0 },
+          scale: { x: g("scale.x") ?? 1, y: g("scale.y") ?? 1, z: g("scale.z") ?? 1 },
+          visible: g("visible") !== false,
+        };
+      },
+      /** Write a rig property directly (bypasses bindings; use for physics). */
+      setRig(id, path, value) {
+        inst.computed.set(`${id}.${path}`, value);
+        rt.stage.requestRender();
+      },
+      /** Write a state field (re-fires its bindings — the declarative path). */
+      set(field, value) { rt._setInstanceState(inst, field, value, false); },
+      /** Fire a wire on this instance as if a node event had occurred. */
+      fire(on, locals) { rt._fire(inst, on, locals || {}); },
+      /** Invoke a platform command (gated like run ▸). */
+      invoke: (lib, ctl, cmd, args) => rt._behaviorInvoke(inst, lib, ctl, cmd, args),
+      diag: (m) => rt._diag(`behavior: ${m}`),
+    };
+    ctx.instances = rt._instancesView(inst);
+    inst.behaviorCtx = ctx;
+    return ctx;
+  }
+
+  /** A live view over a collection's instances ("all my peers" iteration). For
+      an each-mounted child, its own siblings; for a root, its collections. */
+  _instancesView(inst) {
+    const rt = this;
+    const collsOf = () => inst.mountEntry && inst.parent
+      ? inst.parent.collections.filter((c) => c.entry.id === inst.mountEntry.id)
+      : inst.collections;
+    return {
+      /** Iterate collection instances: fn(ctxOrNull, key, item, index). */
+      each(fn) {
+        for (const coll of collsOf()) {
+          for (const [key, known] of coll.instances) {
+            const childInst = known.childPrefix ? rt.instances.get(known.childPrefix) : null;
+            fn(childInst ? rt._behaviorCtx(childInst) : null, key, known.item, known.index);
+          }
+        }
+      },
+      count() { let n = 0; for (const coll of collsOf()) n += coll.instances.size; return n; },
+    };
+  }
+
+  /** Resolve "name" or "name.method" against the injected impls. */
+  _behaviorRef(ref) {
+    if (typeof ref !== "string") return null;
+    const dot = ref.indexOf(".");
+    if (dot < 0) return { impl: this.behaviors[ref], method: null };
+    return { impl: this.behaviors[ref.slice(0, dot)], method: ref.slice(dot + 1) };
+  }
+
+  /** Call a behavior hook for an instance. No-op if the impl is absent. */
+  _callBehavior(inst, ref, ...args) {
+    const r = this._behaviorRef(ref);
+    if (!r || !r.impl) return;
+    const fn = r.method ? r.impl[r.method] : (r.impl.render || r.impl);
+    if (typeof fn !== "function") return;
+    try { fn.apply(r.impl, [this._behaviorCtx(inst), ...args]); }
+    catch (e) { this._diag(`behavior ${ref}: ${e && e.message ? e.message : e}`); }
+  }
+
+  async _behaviorInvoke(inst, lib, ctl, cmd, args) {
+    if (!this.opts.invoke) { this._diag(`behavior invoke ${lib}.${ctl}.${cmd}: not available here`); return new Error("invoke unavailable"); }
+    return this.opts.invoke(lib, ctl, cmd, args || {});
+  }
+
+  /** The doc's behavior block for an instance ({} when absent). */
+  _behaviorBlock(inst) {
+    const b = inst.doc.root && inst.doc.root.behaviors;
+    return isObj(b) ? b : {};
+  }
+
+  /** True when any instance has a render behavior — the clock must free-run. */
+  _behaviorAnimated() {
+    for (const inst of this.instances.values()) {
+      const rb = this._behaviorRef(this._behaviorBlock(inst).render);
+      if (rb && rb.impl) return true;
+      for (const n of inst.doc.nodes()) {
+        if (isObj(n) && typeof n.behavior === "string") {
+          const r = this._behaviorRef(n.behavior);
+          if (r && r.impl && typeof r.impl.render === "function") return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Fire the per-frame render behaviors. dt in seconds. */
+  _tickBehaviors(dt) {
+    for (const inst of this.instances.values()) {
+      const ctx = this._behaviorCtx(inst);
+      ctx.t = inst.tNow;
+      const block = this._behaviorBlock(inst);
+      if (block.render) this._callBehavior(inst, block.render, dt);
+      for (const n of inst.doc.nodes()) {
+        if (isObj(n) && typeof n.behavior === "string") {
+          const r = this._behaviorRef(n.behavior);
+          if (r && r.impl && typeof r.impl.render === "function") {
+            const scoped = Object.create(ctx);
+            scoped.node = n.id;
+            try { r.impl.render.call(r.impl, scoped, dt, n.id); }
+            catch (e) { this._diag(`behavior ${n.behavior}.render: ${e && e.message ? e.message : e}`); }
+          }
+        }
+      }
+    }
+  }
+
+  /** Fire a NODE-level behavior event method. The node names a behavior via its
+      "behavior" key; that impl's <event>(ctx, locals) runs with a ctx whose
+      rig()/setRig() default to THIS node. */
+  _nodeEventBehavior(inst, templateOrNodeId, event, locals) {
+    let node = null;
+    for (const n of inst.doc.nodes()) { if (isObj(n) && n.id === templateOrNodeId) { node = n; break; } }
+    if (!node || typeof node.behavior !== "string") return;
+    const r = this._behaviorRef(node.behavior);
+    if (!r || !r.impl) return;
+    const method = r.method || event;   // "name" ⇒ impl[event]; "name.onTap" ⇒ impl.onTap
+    if (typeof r.impl[method] !== "function") return;
+    const ctx = this._behaviorCtx(inst);
+    const nodeId = templateOrNodeId;
+    const scoped = Object.create(ctx);
+    scoped.node = nodeId;
+    scoped.rig = (id) => ctx.rig(id === undefined ? nodeId : id);
+    scoped.setRig = (id, path, value) => {
+      if (value === undefined) { ctx.setRig(nodeId, id, path); } else { ctx.setRig(id, path, value); }
+    };
+    try { r.impl[method].call(r.impl, scoped, locals || {}); }
+    catch (e) { this._diag(`behavior ${node.behavior}.${method}: ${e && e.message ? e.message : e}`); }
   }
 
   _setInstanceState(inst, field, value, boot) {
