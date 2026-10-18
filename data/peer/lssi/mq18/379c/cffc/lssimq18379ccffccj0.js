@@ -130,22 +130,7 @@ me.sceneBehaviors = {
   }
 };
 
-    // self-contained: the editor/player extract this behavior with a sandboxed
-    // eval of just the literal, so it can use ONLY its own scope + globals —
-    // never the facet's closure. This behavior IS the one home of the physics.
-    var REPEL = 4.0, SPRING = 1.2, REST = 2.4, ANCHOR = 0.35, ANCHOR_FREE = 0.06;
-    var DAMPING = 3.0, MAX_SPEED = 2.0, D_MIN = 1.2, SUBSTEPS = 8;
-    var FIELD_BASE = 6.0, FLATTEN = 1.8;
-    function fieldRadius(n){ return FIELD_BASE * Math.cbrt(Math.max(1, n)); }
-    function hash32(s){ var h = 0x811c9dc5; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h >>> 0; }
-    function unit(s){ return (hash32(s) >>> 8) / 0x1000000; }
-    function seed(id, n){
-      var th = unit('a:' + id) * 2 * Math.PI, c = unit('b:' + id) * 2 - 1;
-      var r = 0.35 * fieldRadius(n) * (0.55 + 0.45 * unit('c:' + id));
-      var s = Math.sqrt(Math.max(0, 1 - c * c));
-      return { x: r * s * Math.cos(th), y: r * c / FLATTEN, z: r * s * Math.sin(th), vx: 0, vy: 0, vz: 0 };
-    }
-    function step(layout, items, connections, dt) {
+me.uiReady
       var list = [], byId = {};
       for (var i = 0; i < items.length; i++) {
         var it = items[i], l = layout[it.id] || (layout[it.id] = seed(it.id, items.length));
