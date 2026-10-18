@@ -221,6 +221,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         api.scene = me;                // … and the host as me.scene
         api.owner = me;                // (the scenegraph names)
         api.model = { rig, key };      // a light model handle
+        api.data = inst.data;          // the addControl seed, as me.data
         if (!api.children) api.children = [];
 
         // resolve behaviors: me.sceneBehaviors.<impl> OR direct me.animate/render/click
