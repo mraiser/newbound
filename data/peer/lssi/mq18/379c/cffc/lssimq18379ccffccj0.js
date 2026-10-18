@@ -534,14 +534,66 @@ function checkForUpdates(peer) {
 }
 
 ME.querySelector('#updateallpeersnow').addEventListener('click', function(){
-  ME.querySelectorAll('.peerupdatelist .uprow').forEach(function(row){
-    if (row.querySelector('.libupdate').checked) {
+  var myuuid = document.querySelector('.localpeerid').textContent;
+  ME.querySelectorAll('.libupdate').forEach(function(el){
+    if (el.checked) {
+      var row = el.closest('.uprow');
       var peer = row.dataset.peer;
-      row.querySelector('.rowstatus').innerHTML = "<i>Updating...</i>";
-      json('../peer/remote/'+peer+'/dev/update_from_master', null, function(result){
-        if (result.status == 'ok') row.querySelector('.rowstatus').innerHTML = "<i>Updated</i>";
-        else row.querySelector('.rowstatus').innerHTML = '<font color="red">Error: '+result.msg+'</font>';
+      var libs = [];
+      row.querySelectorAll('.clickupdate').forEach(function(chip){
+        libs.push(chip.dataset.lib);
       });
+
+      if (libs.length > 0 || row.querySelector('.clickcrates')) {
+
+        var recompile = false;
+
+        function fetchNext() {
+          if (libs.length > 0) {
+            var lib = libs.pop();
+            console.log(peer+"/"+lib);
+            var x = row.querySelector('.removeupdate');
+            var chip = x.parentElement;
+            chip.style.color = 'rgba(0,0,0,0.5)';
+            x.remove();
+
+            var d = 'uuid='+myuuid+'&lib='+lib;
+            json('../peer/remote/'+peer+'/dev/install_lib', d, function(result){
+              if (result.status == "ok") {
+                recompile = recompile || result.data;
+                chip.remove();
+                fetchNext();
+              }
+              else {
+                chip.style.color = 'rgba(255,0,0,0.5)';
+                chip.insertAdjacentHTML('beforeend', '<br>Error: '+result.msg);
+              }
+            });
+          }
+          else {
+            var cratechip = row.querySelector('.clickcrates');
+            if (cratechip) {
+              // the crate runner's own rebuild+recompile covers everything a
+              // compile_rust would have done, so it replaces that step
+              var fl = cratechip.dataset.flowlang;
+              var nd = cratechip.dataset.ndata;
+              row.querySelector('.rowstatus').innerHTML = "<i>Updating platform crates to flowlang "+fl+" / ndata "+nd+"...</i>";
+              json('../peer/remote/'+peer+'/dev/update_crates', 'flowlang='+encodeURIComponent(fl)+'&ndata='+encodeURIComponent(nd), function(result){
+                if (result.status == 'ok') row.querySelector('.rowstatus').innerHTML = "<i>crate update launched — open the peer's panel for progress and the restart verdict</i>";
+                else row.querySelector('.rowstatus').innerHTML = '<font color="red">Error: '+result.msg+'</font>';
+              });
+            }
+            else if (recompile) {
+              row.querySelector('.rowstatus').innerHTML = "<i>Recompiling Rust...</i>";
+              json('../peer/remote/'+peer+'/dev/compile_rust', null, function(result){
+                row.remove();
+              });
+            }
+            else row.remove();
+          }
+        }
+        fetchNext();
+      }
     }
   });
 });
