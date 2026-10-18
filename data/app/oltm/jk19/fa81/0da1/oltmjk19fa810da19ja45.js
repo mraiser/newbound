@@ -72,6 +72,52 @@ var readyP = new Promise(function (res2) { me.ready = res2; }).then(async () => 
     return parseScene(rec.scene);
   }
 
+  // behaviors: the played control's OWN js facet carries me.sceneBehaviors —
+  // real JS in the control's trust domain. Extract the object literal with a
+  // sandboxed eval (the facet references impls by NAME; the code never travels
+  // in the scene JSON).
+  function extractSceneBehaviors(jsSrc) {
+    if (typeof jsSrc !== "string") return {};
+    const m = /sceneBehaviors\s*=\s*(\{[\s\S]*)/.exec(jsSrc);
+    if (!m) return {};
+    const start = jsSrc.indexOf("{", m.index);
+    if (start < 0) return {};
+    let depth = 0, i = start, inStr = null, inLine = false, inBlock = false;
+    for (; i < jsSrc.length; i++) {
+      const c = jsSrc[i], nx = jsSrc[i + 1];
+      if (inLine) { if (c === "\n") inLine = false; continue; }
+      if (inBlock) { if (c === "*" && nx === "/") { inBlock = false; i++; } continue; }
+      if (inStr) { if (c === "\\") { i++; continue; } if (c === inStr) inStr = null; continue; }
+      if (c === "/" && nx === "/") { inLine = true; i++; continue; }
+      if (c === "/" && nx === "*") { inBlock = true; i++; continue; }
+      if (c === '"' || c === "'" || c === "`") { inStr = c; continue; }
+      if (c === "{") depth++;
+      else if (c === "}") { depth--; if (depth === 0) { i++; break; } }
+    }
+    try {
+      const fn = new Function(`"use strict"; return (${jsSrc.slice(start, i)});`);
+      const out = fn();
+      return (out && typeof out === "object") ? out : {};
+    } catch (e) { return {}; }
+  }
+
+  async function loadSceneBehaviors(lib, ctl) {
+    // prefer the workbench posture (record.js on the read); fall back to DATA.behaviors
+    if (ME.DATA.behaviors && typeof ME.DATA.behaviors === "object") return ME.DATA.behaviors;
+    try {
+      const controls = await controlsOf(lib);
+      if (controls instanceof Error) return {};
+      const entry = controls.find((c) => c.name === ctl);
+      if (!entry) return {};
+      const rec = await readRec(lib, entry.id);
+      if (rec instanceof Error) return {};
+      return extractSceneBehaviors(rec.js);
+    } catch (e) { return {}; }
+  }
+  const sceneBehaviors = ME.DATA.doc !== undefined
+    ? (ME.DATA.behaviors || {})
+    : await loadSceneBehaviors(ME.DATA.lib, ME.DATA.ctl);
+
   const doc = ME.DATA.doc !== undefined
     ? parseScene(ME.DATA.doc)
     : await loadSceneDoc(ME.DATA.lib, ME.DATA.ctl);
@@ -111,6 +157,7 @@ var readyP = new Promise(function (res2) { me.ready = res2; }).then(async () => 
     theme: dark() ? "dark" : "light",
     reduced: reducedMotion(),
     loadDoc: loadSceneDoc,
+    behaviors: sceneBehaviors,
     invoke: async (ilib, ictl, icmd, args) => {
       const r = await invokeP(ilib, ictl, icmd, args);
       if (r.status !== "ok") return new Error(r.msg || "invoke failed");
