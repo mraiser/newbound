@@ -281,6 +281,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     stage.requestRender();
   };
 
+  me.byId = function (key) { return byKey.get(key) || null; };
+
   // ── click dispatch: raycast hit → the instance's click(ctx) ──────────────
   function instForSpec(specId) {
     if (!specId) return null;
