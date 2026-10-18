@@ -457,8 +457,12 @@ class SceneDoc {
     } else if (typeof a.emit === "string") {
       if (!NAME_RE.test(a.emit)) push(DIAG.SD7, "error", path, `malformed emit name "${a.emit}"`);
       if (isObj(a.with)) for (const [k, e] of Object.entries(a.with)) this._checkExpr(e, locals, `${path}.with.${k}`, push, loose);
+    } else if (typeof a.behavior === "string") {
+      // a behavior method ref: "impl" or "impl.method" — resolved against the
+      // control's js facet at runtime, so here we only check the shape
+      if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$/.test(a.behavior)) push(DIAG.SD7, "error", path, `behavior must be "impl" or "impl.method", got "${a.behavior}"`);
     } else {
-      push(DIAG.SD7, "error", path, "action must be one of set / invoke / emit");
+      push(DIAG.SD7, "error", path, "action must be one of set / invoke / emit / behavior");
     }
   }
 
