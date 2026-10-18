@@ -416,3 +416,199 @@ function feedTick(){
   }
 }
 function startFeed(){
+  if (me.feed || !me.player || !me.info) return;
+  settled = 0;
+  feedTick();
+  if (!me.feed) me.feed = setInterval(feedTick, FEED_MS);
+}
+// The feed sleeps once the layout settles, but staleness keeps advancing —
+// so a slow tick re-pushes ONLY when a tint actually changed. No physics, no
+// wake: just the colours.
+var tintTimer = setInterval(function(){
+  if (!me.player || me.feed) return;          // the live feed already covers it
+  var now = Date.now(), items = [], moved = false;
+  var list = peerList();
+  var pos = simPositions();
+  // A peer with no sim slot has never been placed — it arrived while the feed
+  // was asleep (normally an UPDATE event wakes it; nothing guarantees one).
+  // Wake the feed so it gets placed, rather than skipping it forever.
+  for (var i in list) {
+    if (!pos[list[i].id]) { wakeFeed(); return; }
+  }
+  for (var i in list) {
+    var p = list[i], l = pos[p.id];
+    if (!l) continue;
+    var tint = tintFor(p, now);
+    if (me.lastTint && me.lastTint[p.id] !== tint) moved = true;
+    items.push({id: p.id, displayname: p.displayname || p.name || p.id,
+                connected: Boolean(p.connected), tint: tint,
+                x: l.x, y: l.y, z: l.z});
+  }
+  if (!me.lastTint) { me.lastTint = {}; moved = items.length > 0; }
+  for (var i in items) me.lastTint[items[i].id] = items[i].tint;
+  if (moved && items.length) sceneSet('peers', items);
+}, TINT_MS);
+
+function wakeFeed(){
+  settled = 0;
+  startFeed();
+}
+
+ME.querySelector('.updateallpeersbutton').addEventListener('click', function(){
+  // local crate versions first: the rows' crate-diff chips compare against them
+  json('../dev/crate_versions', null, function(r){ me.localcrates = r; buildUpdateDialog(); });
+});
+
+function buildUpdateDialog(){
+  var newhtml = '<table cellpadding="10px" class="updateablepeerstable"><thead><tr><th><label class="plaincheckbox"><input type="checkbox" class="toggleallupdates"><span></span></label></th><th style="text-align:left;">Peer</th><th style="text-align:left;">Available Updates</th></tr></thead><tbody>';
+  for (var i in me.peers) {
+    var p = me.peers[i];
+    if (p.connected) {
+      var uuid = p.id;
+      newhtml += '<tr class="uprow r_'+uuid+'" data-peer="'+uuid+'">'
+        + '<td><label class="plaincheckbox"><input type="checkbox" class="libupdate"><span></span></label></td>'
+        + '<td>'+p.name+'<br><div style="font-size:x-small;">'+uuid+'</div></td>'
+        + '<td class="rowstatus"><i>pending...</i></td>'
+        + '</tr>';
+      checkForUpdates(p);
+    }
+  }
+  newhtml += '</tbody></table>';
+
+  var el = ME.querySelector('.peerupdatelist');
+  el.innerHTML = newhtml;
+  el.querySelector('.toggleallupdates').addEventListener('click', function(){
+    var b = this.checked;
+    el.querySelectorAll('.libupdate').forEach(function(box){ box.checked = b; });
+  });
+}
+
+function checkForUpdates(peer) {
+  var uuid = peer.id;
+  json('../peer/remote/'+uuid+'/app/libs', null, function(result){
+    if (result.data && document.body.locallibraries) {
+      var newhtml = '';
+      for (var i in result.data) {
+        var theirlib = result.data[i];
+        var mylib = getByProperty(document.body.locallibraries, 'id', theirlib.id);
+        if (mylib) {
+          var author = mylib.author;
+          var authorkey = mylib.authorkey;
+          if (true) { //(author && authorkey && theirlib.author == author && theirlib.authorkey == authorkey) {
+            if (mylib.version > theirlib.version) {
+              newhtml += '<span class="chip ispos" id="U_'+mylib.id+'"><span class="clickupdate" data-lib="'+mylib.id+'" data-version="'+mylib.version+'">'
+                + mylib.id
+                + ' v'
+                + theirlib.version
+                + ' ➤ '
+                + mylib.version
+                + '</span><img src="../app/asset/app/close-white.png" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
+            }
+          }
+        }
+      }
+      // crate pins ride the same row: a peer lagging the local flowlang/ndata
+      // versions gets a distinct chip (clickcrates, NOT clickupdate - the lib
+      // installer must never treat it as a library)
+      json('../peer/remote/'+uuid+'/dev/crate_versions', null, function(cr){
+        var lc = me.localcrates;
+        if (cr && cr.status == 'ok' && lc && lc.status == 'ok' && (cr.flowlang != lc.flowlang || cr.ndata != lc.ndata)) {
+          newhtml += '<span class="chip clickcrates" data-flowlang="'+lc.flowlang+'" data-ndata="'+lc.ndata+'">crates: flowlang '
+            + cr.flowlang + ' ➤ ' + lc.flowlang + ' / ndata ' + cr.ndata + ' ➤ ' + lc.ndata
+            + '<img src="../app/asset/app/close-white.png" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
+        }
+        var el = ME.querySelector('.r_'+uuid);
+        if (!el) return;
+        if (newhtml == '') el.remove();
+        else {
+          el.querySelector('.rowstatus').innerHTML = newhtml;
+          el.querySelectorAll('.removeupdate').forEach(function(x){
+            x.addEventListener('click', function(){
+              this.closest('.chip').remove();
+            });
+          });
+        }
+      });
+    }
+  });
+}
+
+ME.querySelector('#updateallpeersnow').addEventListener('click', function(){
+  ME.querySelectorAll('.peerupdatelist .uprow').forEach(function(row){
+    if (row.querySelector('.libupdate').checked) {
+      var peer = row.dataset.peer;
+      row.querySelector('.rowstatus').innerHTML = "<i>Updating...</i>";
+      json('../peer/remote/'+peer+'/dev/update_from_master', null, function(result){
+        if (result.status == 'ok') row.querySelector('.rowstatus').innerHTML = "<i>Updated</i>";
+        else row.querySelector('.rowstatus').innerHTML = '<font color="red">Error: '+result.msg+'</font>';
+      });
+    }
+  });
+});
+
+ME.querySelector('.addpeerbutton').addEventListener('click', function(){
+  json('../peer/discovery', null, function(result){
+    me.discovery = result.data;
+    var newhtml = '';
+    var now = new Date().getTime();
+    for (sip in result.data) {
+      var rds = result.data[sip];
+      if (now - rds.time < 30000 && !getByProperty(me.peers, "id", rds.uuid)) {
+        newhtml += '<tr class="clickme" data-sip="'+sip+'"><td>'+sip+'</td><td>'+rds.name+'</td><td><span class="smalltext">'+rds.uuid+'</span></td></tr>';
+      }
+    }
+    if (newhtml == '') newhtml = '<div class="padme"><i>No new devices found on LAN</i></div>';
+    else newhtml = '<table class="lantable" border="0" cellpadding="0" cellspacing="20">' + newhtml + '</table>';
+    var disc = ME.querySelector('.discovered');
+    disc.innerHTML = newhtml;
+    disc.querySelectorAll('.clickme').forEach(function(rowEl){
+      rowEl.addEventListener('click', function(){
+        var sip = this.dataset.sip;
+        var rds = me.discovery[sip];
+        ME.querySelector('.autab2').click();
+        ME.querySelector('.addusername').value = rds.name;
+        ME.querySelector('.adduseruuid').value = rds.uuid;
+        ME.querySelector('.adduseripaddr').value = rds.address;
+        ME.querySelector('.adduserport').value = rds.p2pport;
+      });
+    });
+  });
+});
+
+ME.querySelector('#addconnection').addEventListener('click', function(){
+  var el_uuid = ME.querySelector('.adduseruuid');
+  el_uuid.parentElement.style.border = 'none';
+  var uuid = el_uuid.value;
+  const regexExp = /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/gi;
+  if (!regexExp.test(uuid)) {
+    el_uuid.parentElement.style.border = 'thin red solid';
+    document.body.api.ui.snackbar({"message":"A valid device ID is required"});
+  }
+  else if (uuid == me.info.uuid) {
+    el_uuid.parentElement.style.border = 'thin red solid';
+    document.body.api.ui.snackbar({"message":"You cannot connect to yourself"});
+  }
+  else {
+    ME.querySelector('.close-add-user').click();
+    var rando = guid();
+    var display = ME.querySelector('.addusername').value;
+    var keepalive = ME.querySelector('#useraddkeepalive').checked;
+    var group = JSON.stringify([ME.querySelector('.addusergroup').value]);
+    var address = ME.querySelector('.adduseripaddr').value;
+    var port = ME.querySelector('.adduserport').value;
+    var params = "id="+encodeURIComponent(uuid)
+      + "&displayname="+encodeURIComponent(display)
+      + "&password="+encodeURIComponent(rando)
+      + "&groups="+encodeURIComponent(group)
+      + "&keepalive="+keepalive
+      + "&address="+encodeURIComponent(address)
+      + "&port="+encodeURIComponent(port);
+    json('../security/setuser', params, function(result){
+      var params = "ipaddr="+encodeURIComponent(address)
+        + "&port="+encodeURIComponent(port);
+      json('../peer/udp_connect', params, function(result){
+
+      });
+    });
+  }
+});
