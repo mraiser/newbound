@@ -31,7 +31,7 @@ function freshness(ageMs){
   return 1 - (ageMs - 30000) / (900000 - 30000);
 }
 function tint(){
-  var p = me.data, now = Date.now();
+  var p = me.data || {}, now = Date.now();
   var h = 210, s0 = 0;                                   // grey: disconnected
   if (p.tcp) { h = 132; s0 = 0.46; }                     // green
   else if (p.udp) { h = 212; s0 = 0.48; }                // blue
@@ -45,6 +45,7 @@ function tint(){
 // constellation doesn't stack) and stamp the label. me.lines = connection
 // link-spec ids this orb owns.
 me.animate = function (ctx) {
+  if (!me.data) me.data = {};
   var id = (me.data && me.data.id) || ctx.key;
   me.peerId = id;
   me.vx = 0; me.vy = 0; me.vz = 0;
@@ -63,6 +64,7 @@ me.animate = function (ctx) {
 // plus connection springs for my links, and my tint/label upkeep.
 me.render = function (ctx, dt) {
   if (!dt || dt <= 0) dt = 0.016;
+  if (!me.data) me.data = {};
   var fx = 0, fy = 0, fz = 0;
   var siblings = ctx.host.children;
   var count = 0;
@@ -71,7 +73,7 @@ me.render = function (ctx, dt) {
     if (s === ctx.me || !s.rig) continue;
     var dx = ctx.rig.pos.x - s.rig.pos.x, dy = ctx.rig.pos.y - s.rig.pos.y, dz = ctx.rig.pos.z - s.rig.pos.z;
     var d2 = Math.max(0.04, dx*dx + dy*dy + dz*dz), d = Math.sqrt(d2);
-    var f = 2.0 / d2;                                   // 1/d² repulsion
+    var f = 1.2 / d2;                                   // 1/d² repulsion
     fx += (dx/d)*f; fy += (dy/d)*f; fz += (dz/d)*f; count++;
     // a connection to this sibling? a weak spring toward it, and own the link
     var rid = s.me && s.me.peerId;
@@ -82,8 +84,8 @@ me.render = function (ctx, dt) {
       me._wantLink(ctx, s, op);
     }
   }
-  // weak pull to centre (the constellation's gravity)
-  fx -= ctx.rig.pos.x * 0.4; fy -= (ctx.rig.pos.y - 0.5) * 0.8; fz -= ctx.rig.pos.z * 0.4;
+  // pull to centre (the constellation's gravity); Y pulled harder → a slab
+  fx -= ctx.rig.pos.x * 0.55; fy -= (ctx.rig.pos.y - 0.5) * 1.4; fz -= ctx.rig.pos.z * 0.55;
   me.vx = (me.vx + fx * dt) * 0.86;
   me.vy = (me.vy + fy * dt) * 0.86;
   me.vz = (me.vz + fz * dt) * 0.86;
