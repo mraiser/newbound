@@ -100,6 +100,7 @@ function watchHud(){
   if (hudWatch) return;
   hudWatch = setInterval(function(){
     var el = document.getElementById('headsupdisplay');
+    if (!el || !el.isConnected) { stopHudWatch(); return; }
     if (el.getAnimations && el.getAnimations().length > 0) return;
     if (getComputedStyle(el).display == 'none' || el.offsetWidth < 40) {
       stopHudWatch();
