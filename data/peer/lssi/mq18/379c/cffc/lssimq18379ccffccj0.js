@@ -10,7 +10,6 @@ var ME = document.getElementById(me.UUID);
 // (focus — tap toggles — opens/closes headsup).
 
 me.peers = [];
-me.layout = {};       // id -> {x, y, z, vx, vy, vz}
 
 // ── the constellation's physics as a SCENE BEHAVIOR ─────────────────────────
 // The force layout used to live ONLY here in host code, stepped by the feed and
@@ -231,143 +230,6 @@ function upsertPeerDiv(p){
   d.DATA = p;
 }
 
-// Force layout (assets/forcelayout.js semantics, inlined): loosely mimics
-// the physics that binds atoms in a molecule — 1/d² repulsion grows as
-// peers approach, so connected peers are drawn together but keep their
-// distance. Two guarantees make that hold at any cadence:
-//   · SUBSTEPPING: each call integrates 8 small sub-steps, so the stiff
-//     short-range repulsion is sampled while the barrier is climbed (one
-//     big step tunnels through it, then explodes).
-//   · SEPARATION PROJECTION: after integrating, any pair closer than
-//     D_MIN is pushed apart to exactly D_MIN and the closing velocity is
-//     cancelled — "orbs never merge" is an invariant, not a tuning hope.
-//   · A RADIAL FIELD BOUND: nothing drifts away forever, but the wall is a
-//     SPHERE whose radius grows with the population (cube root, so density
-//     holds steady as peers arrive) rather than a fixed box. A box has
-//     corners, and a fixed one turns a busy instance into a crowd pressed
-//     against flat walls.
-// The field is 3D. y is a real degree of freedom, not a constant: without it
-// every orb is trapped in one plane forever. It is pulled toward the midplane
-// FLATTEN times harder than x/z, so the constellation reads as a thick slab
-// you look into rather than a ball you look at — each orb's label hangs above
-// it, and unbounded y stacks those labels on each other.
-var REPEL = 4.0, SPRING = 1.2, REST = 2.4, ANCHOR = 0.35, ANCHOR_FREE = 0.06;
-var DAMPING = 3.0, MAX_SPEED = 2.0, D_MIN = 1.2, SUBSTEPS = 8;
-var FIELD_BASE = 6.0, FLATTEN = 1.8;
-
-function fieldRadius(n){ return FIELD_BASE * Math.cbrt(Math.max(1, n)); }
-
-// FNV-1a. A peer's first position is a deterministic function of its ID, so
-// it lands in the same part of the field every session and does not shuffle
-// when the peer list changes length — the old seed (index around a circle)
-// did both wrong. Salted three ways for three independent streams.
-function hash32(s){
-  var h = 0x811c9dc5;
-  for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
-  return h >>> 0;
-}
-function unit(s){ return (hash32(s) >>> 8) / 0x1000000; }   // [0,1)
-
-function seedPlacement(id, n){
-  var theta = unit('a:' + id) * 2 * Math.PI;        // azimuth
-  var c = unit('b:' + id) * 2 - 1;                  // cos(polar): uniform on a sphere
-  var r = 0.35 * fieldRadius(n) * (0.55 + 0.45 * unit('c:' + id));
-  var s = Math.sqrt(Math.max(0, 1 - c*c));
-  return {x: r*s*Math.cos(theta), y: r*c/FLATTEN, z: r*s*Math.sin(theta),
-          vx: 0, vy: 0, vz: 0};
-}
-
-function stepLayout(items, connections, dt){
-  var list = [];
-  var byId = {};
-  for (var i = 0; i < items.length; i++) {
-    var it = items[i];
-    var l = me.layout[it.id];
-    if (!l) l = me.layout[it.id] = seedPlacement(it.id, items.length);
-    if (l.y === undefined) { l.y = 0; l.vy = 0; }   // a slot from a 2D build
-    l.anchored = Boolean(it.connected || it.self);
-    byId[it.id] = l;
-    list.push(l);
-  }
-  var R = fieldRadius(list.length);
-  var h = dt / SUBSTEPS;
-  var damp = Math.exp(-DAMPING * h);
-  for (var s = 0; s < SUBSTEPS; s++) {
-    for (var i = 0; i < list.length; i++) { list[i].fx = 0; list[i].fy = 0; list[i].fz = 0; }
-    for (var i = 0; i < list.length; i++) {
-      for (var j = i + 1; j < list.length; j++) {
-        var a = list[i], b = list[j];
-        var dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
-        var d2 = Math.max(0.04, dx*dx + dy*dy + dz*dz);
-        var d = Math.sqrt(d2), f = REPEL / d2;
-        a.fx += (dx/d)*f; a.fy += (dy/d)*f; a.fz += (dz/d)*f;
-        b.fx -= (dx/d)*f; b.fy -= (dy/d)*f; b.fz -= (dz/d)*f;
-      }
-      // weak gravity for free peers too: they reach a force-balance orbit
-      // farther out instead of drifting forever (which defeats sleep)
-      var g = list[i].anchored ? ANCHOR : ANCHOR_FREE;
-      list[i].fx -= list[i].x * g;
-      list[i].fy -= list[i].y * g * FLATTEN;
-      list[i].fz -= list[i].z * g;
-    }
-    for (var i = 0; i < connections.length; i++) {
-      var c = connections[i];
-      var la = byId[c.a], lb = byId[c.b];
-      if (!la || !lb || la == lb) continue;
-      var dx = lb.x - la.x, dy = lb.y - la.y, dz = lb.z - la.z;
-      var d = Math.max(0.2, Math.sqrt(dx*dx + dy*dy + dz*dz));
-      var f = SPRING * (d - REST);
-      la.fx += (dx/d)*f; la.fy += (dy/d)*f; la.fz += (dz/d)*f;
-      lb.fx -= (dx/d)*f; lb.fy -= (dy/d)*f; lb.fz -= (dz/d)*f;
-    }
-    for (var i = 0; i < list.length; i++) {
-      var l = list[i];
-      l.vx = (l.vx + l.fx * h) * damp;
-      l.vy = (l.vy + l.fy * h) * damp;
-      l.vz = (l.vz + l.fz * h) * damp;
-      var sp = Math.sqrt(l.vx*l.vx + l.vy*l.vy + l.vz*l.vz);
-      if (sp > MAX_SPEED) { l.vx *= MAX_SPEED/sp; l.vy *= MAX_SPEED/sp; l.vz *= MAX_SPEED/sp; }
-      var nx = l.x + l.vx * h, ny = l.y + l.vy * h, nz = l.z + l.vz * h;
-      // The wall is a SPHERE of radius R, not a box: clamp the distance from
-      // centre and kill the OUTWARD component of the velocity (or a
-      // wall-pinned peer accumulates speed forever and the sim never
-      // settles/sleeps). Only the outward part goes — sliding along the
-      // wall is still allowed, so a pinned peer keeps looking for room.
-      var rad = Math.sqrt(nx*nx + ny*ny + nz*nz);
-      if (rad > R) {
-        var ux = nx/rad, uy = ny/rad, uz = nz/rad;
-        nx = ux*R; ny = uy*R; nz = uz*R;
-        var out = l.vx*ux + l.vy*uy + l.vz*uz;
-        if (out > 0) { l.vx -= ux*out; l.vy -= uy*out; l.vz -= uz*out; }
-      }
-      l.x = nx; l.y = ny; l.z = nz;
-    }
-    for (var i = 0; i < list.length; i++) {
-      for (var j = i + 1; j < list.length; j++) {
-        var a = list[i], b = list[j];
-        var dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
-        var d = Math.sqrt(dx*dx + dy*dy + dz*dz);
-        if (d >= D_MIN) continue;
-        var nx, ny, nz;
-        if (d < 1e-9) { nx = 1; ny = 0; nz = 0; d = 1e-9; }
-        else { nx = dx/d; ny = dy/d; nz = dz/d; }
-        var push = (D_MIN - d) / 2;
-        a.x -= nx*push; a.y -= ny*push; a.z -= nz*push;
-        b.x += nx*push; b.y += ny*push; b.z += nz*push;
-        var closing = (b.vx - a.vx)*nx + (b.vy - a.vy)*ny + (b.vz - a.vz)*nz;
-        if (closing < 0) {
-          a.vx += nx*closing/2; a.vy += ny*closing/2; a.vz += nz*closing/2;
-          b.vx -= nx*closing/2; b.vy -= ny*closing/2; b.vz -= nz*closing/2;
-        }
-      }
-    }
-  }
-  var e = 0;
-  for (var i = 0; i < list.length; i++)
-    e += list[i].vx*list[i].vx + list[i].vy*list[i].vy + list[i].vz*list[i].vz;
-  return e;
-}
-
 function pushScene(){
   // No self-orb: your own position carries no information (the corner
   // panel says who you are). Connected peers still drift toward center —
@@ -378,9 +240,10 @@ function pushScene(){
   // behavior's current positions along so a data push never resets the sim.
   var items = [];
   var list = peerList();
+  var pos = simPositions();
   for (var i in list) {
     var p = list[i];
-    var l = me.layout[p.id] || {};
+    var l = pos[p.id] || {};
     items.push({id: p.id, displayname: p.displayname || p.name || p.id,
                 connected: Boolean(p.connected), tint: tintFor(p, Date.now()),
                 x: l.x || 0, y: l.y || 0, z: l.z || 0});
@@ -571,15 +434,15 @@ var tintTimer = setInterval(function(){
   if (!me.player || me.feed) return;          // the live feed already covers it
   var now = Date.now(), items = [], moved = false;
   var list = peerList();
-  // A peer with no layout slot has never been through pushScene — it arrived
-  // while the feed was asleep (normally an UPDATE event wakes it; nothing
-  // guarantees one). Wake the feed so it gets placed, rather than skipping it
-  // forever.
+  var pos = simPositions();
+  // A peer with no sim slot has never been placed — it arrived while the feed
+  // was asleep (normally an UPDATE event wakes it; nothing guarantees one).
+  // Wake the feed so it gets placed, rather than skipping it forever.
   for (var i in list) {
-    if (!me.layout[list[i].id]) { wakeFeed(); return; }
+    if (!pos[list[i].id]) { wakeFeed(); return; }
   }
   for (var i in list) {
-    var p = list[i], l = me.layout[p.id];
+    var p = list[i], l = pos[p.id];
     if (!l) continue;
     var tint = tintFor(p, now);
     if (me.lastTint && me.lastTint[p.id] !== tint) moved = true;
