@@ -25,7 +25,7 @@ me.sceneBehaviors = {
   phys: (function () {
     // self-contained: the editor/player extract this behavior with a sandboxed
     // eval of just the literal, so it can use ONLY its own scope + globals —
-    // never the facet's closure (stepLayout et al. below are for the host feed).
+    // never the facet's closure. This behavior IS the one home of the physics.
     var REPEL = 4.0, SPRING = 1.2, REST = 2.4, ANCHOR = 0.35, ANCHOR_FREE = 0.06;
     var DAMPING = 3.0, MAX_SPEED = 2.0, D_MIN = 1.2, SUBSTEPS = 8;
     var FIELD_BASE = 6.0, FLATTEN = 1.8;
