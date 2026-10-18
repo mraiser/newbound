@@ -46,4 +46,8 @@
 .nb-card .c-dot.on-js { background: var(--f-js); }
 .nb-card .c-dot.on-data { background: var(--f-data); }
 .nb-card .c-dot.on-scene { background: var(--f-3d); }
+.nb-card .c-dot.on-scene.on-component {
+  /* a component (shape + per-instance behaviors): a solid 3d dot with a ring */
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--f-3d) 45%, transparent);
+}
 .nb-card .c-dot.on-cmd { background: var(--f-cmd); }
