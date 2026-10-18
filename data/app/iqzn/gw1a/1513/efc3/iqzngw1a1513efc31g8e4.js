@@ -75,6 +75,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   if (ME.DATA.caption) { footEl.hidden = false; capEl.textContent = ME.DATA.caption; }
 
+  me.frameAll = function () { if (me.stage && me.stage.frameAll) me.stage.frameAll(); };
+
   // ── the stage + the frame loop ────────────────────────────────────────────
   const stage = mountScene(canvasEl, {
     pickMode: "affordant",
@@ -84,7 +86,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     onDrag: (evt) => handleDrag(evt),
   });
   me.stage = stage;
-  stage.setScene([], envOf({ root: { env: ME.DATA.env || {} } }));
+  const env = ME.DATA.env || {};
+  stage.setScene([], {
+    lights: env.lights === "none" ? "none" : "default",
+    grid: env.grid !== false,
+    camera: (env.camera && typeof env.camera === "object") ? env.camera : null,
+  });
 
   let last = performance.now();
   let raf = 0;
@@ -248,13 +255,31 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const inst = byKey.get(key);
     if (!inst) return;
     for (const id of inst.specIds) stage.removeObject(id);
+    // drop any links this instance touched
+    for (const [lk, l] of [...links]) if (l.a === key || l.b === key) { stage.removeObject(lk); links.delete(lk); }
     byKey.delete(key);
     const i = me.children.indexOf(inst);
     if (i >= 0) me.children.splice(i, 1);
     stage.requestRender();
   };
 
-  me.frameAll = function () { if (stage.frameAll) stage.frameAll(); };
+  // ── connection links (world-space connectors that track two instances) ────
+  const links = new Map();   // linkId -> {a, b} instance keys
+  me.addLink = function (linkId, keyA, keyB, tone) {
+    if (links.has(linkId)) return;
+    links.set(linkId, { a: keyA, b: keyB });
+    stage.upsert({
+      id: linkId, kind: "link", from: `${keyA}:orb`, to: `${keyB}:orb`,
+      material: { token: tone || "wire" }, visible: true,
+    });
+    stage.requestRender();
+  };
+  me.removeLink = function (linkId) {
+    if (!links.has(linkId)) return;
+    links.delete(linkId);
+    stage.removeObject(linkId);
+    stage.requestRender();
+  };
 
   // ── click dispatch: raycast hit → the instance's click(ctx) ──────────────
   function instForSpec(specId) {
