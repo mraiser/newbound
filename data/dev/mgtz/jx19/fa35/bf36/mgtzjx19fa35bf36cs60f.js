@@ -58,6 +58,44 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   const labelIn = root.querySelector(".se-label");
   const conflictEl = root.querySelector(".se-conflict");
 
+  // ── behaviors: the control's OWN js facet is the behavior source ──────────
+  // A behavior is me.sceneBehaviors = { name → impl } on the edited control's js
+  // facet — real JS in the control's trust domain. The scene facet references
+  // impls by NAME. We extract the object literal with a sandboxed eval of just
+  // the assignment expression (never the whole facet, which may touch the DOM).
+  function extractSceneBehaviors(jsSrc) {
+    if (typeof jsSrc !== "string") return {};
+    const m = /sceneBehaviors\s*=\s*(\{[\s\S]*)/.exec(jsSrc);
+    if (!m) return {};
+    // find the balanced-brace end of the object literal starting at m.index
+    const start = jsSrc.indexOf("{", m.index);
+    if (start < 0) return {};
+    let depth = 0, i = start, inStr = null, inLine = false, inBlock = false;
+    for (; i < jsSrc.length; i++) {
+      const c = jsSrc[i], nx = jsSrc[i + 1];
+      if (inLine) { if (c === "\n") inLine = false; continue; }
+      if (inBlock) { if (c === "*" && nx === "/") { inBlock = false; i++; } continue; }
+      if (inStr) { if (c === "\\") { i++; continue; } if (c === inStr) inStr = null; continue; }
+      if (c === "/" && nx === "/") { inLine = true; i++; continue; }
+      if (c === "/" && nx === "*") { inBlock = true; i++; continue; }
+      if (c === '"' || c === "'" || c === "`") { inStr = c; continue; }
+      if (c === "{") depth++;
+      else if (c === "}") { depth--; if (depth === 0) { i++; break; } }
+    }
+    const lit = jsSrc.slice(start, i);
+    try {
+      // object-literal scope only: no DOM, no me — just the impl map. Methods
+      // may reference Math/JSON/etc. (globals) but not the page or the control.
+      const fn = new Function(`"use strict"; return (${lit});`);
+      const out = fn();
+      return (out && typeof out === "object") ? out : {};
+    } catch (e) {
+      console.log("sceneBehaviors literal failed to evaluate: " + (e && e.message ? e.message : e));
+      return {};
+    }
+  }
+  const sceneBehaviors = extractSceneBehaviors(record.js);
+
   if (!hasWebGL()) {
     canvasEl.innerHTML = `<p class="se-note" style="padding:14px">no WebGL here —
       the scene facet renders as raw JSON:</p><pre style="padding:0 14px;
@@ -227,6 +265,7 @@ async function init(host, { lib, name, record, toast, onSaved }) {
       stage,
       theme: dark() ? "dark" : "light",
       reduced: reducedMotion(),
+      behaviors: sceneBehaviors,
       loadDoc: async (mlib, mctl) => {
         const controls = await controlsOf(mlib);
         if (controls instanceof Error) return null;
