@@ -59,25 +59,32 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   const conflictEl = root.querySelector(".se-conflict");
 
   // ── behaviors: the control's OWN js facet is the behavior source ──────────
-  // A behavior is me.sceneBehaviors = { name → impl } on the edited control's js
-  // facet — real JS in the control's trust domain, with full access to the
-  // control's functions and `me` (the OO model — no cage; the same facet's
-  // me.ready already runs unconstrained). We boot the control in a hidden div
-  // and read its LIVE api.sceneBehaviors. The scene facet references impls by
-  // NAME; only the data ever travels, never the code.
-  async function loadSceneBehaviors() {
+  // A behavior is real JS on the edited control's js facet, with full access to
+  // the control's functions and `me` (no cage). We boot the control in a hidden
+  // div and read its LIVE api. Two behavior dialects live there:
+  //   · DECLARATIVE — me.sceneBehaviors = { name → impl }, referenced by NAME
+  //     from the scene facet (behaviors.animate/render, a node's "behavior").
+  //   · COMPONENT — per-instance methods me.animate / me.render / me.click on
+  //     the control itself; the control IS a 3D object hosted by app:scenehost,
+  //     and its scene facet is its SHAPE. We detect this dialect and offer a
+  //     component preview (PLAY hosts the control in a scenehost).
+  let controlApi = null;
+  async function loadControlApi() {
     return new Promise((resolve) => {
       const host2 = document.createElement("div");
       host2.style.display = "none";
       root.appendChild(host2);
-      try {
-        installControl(host2, lib, name, function (api) {
-          resolve((api && api.sceneBehaviors) || {});
-        });
-      } catch (e) { resolve({}); }
+      try { installControl(host2, lib, name, (api) => resolve(api || null)); }
+      catch (e) { resolve(null); }
     });
   }
-  const sceneBehaviors = await loadSceneBehaviors();
+  controlApi = await loadControlApi();
+  const sceneBehaviors = (controlApi && controlApi.sceneBehaviors) || {};
+  // a component control: declares per-instance behaviors on its own api
+  const isComponent = !!(controlApi && (
+    typeof controlApi.render === "function" ||
+    typeof controlApi.animate === "function" ||
+    typeof controlApi.click === "function"));
 
   if (!hasWebGL()) {
     canvasEl.innerHTML = `<p class="se-note" style="padding:14px">no WebGL here —
@@ -235,6 +242,8 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   }
 
   // ── play mode ─────────────────────────────────────────────────────────────
+  let compHost = null;   // the scenehost, in component preview
+  let compOverlay = null;
   async function enterPlay() {
     mode = "play";
     modeBtn.textContent = "◂ build";
@@ -243,6 +252,32 @@ async function init(host, { lib, name, record, toast, onSaved }) {
     stage.setPickMode("affordant");
     stage.setShowSlots(false);
     stage.emphasize(null);
+
+    // COMPONENT preview: the control IS a 3D object. Host it in a scenehost —
+    // its own per-instance animate/render/click run there, on the live shape.
+    if (isComponent) {
+      // overlay on top of the (paused) build canvas — don't destroy it
+      const overlay = document.createElement("div");
+      overlay.style.cssText = "position:absolute;inset:0;z-index:2;background:var(--panel,#1f242a)";
+      canvasEl.style.position = canvasEl.style.position || "relative";
+      canvasEl.appendChild(overlay);
+      compOverlay = overlay;
+      installControl(overlay, "app", "scenehost", async function (host3) {
+        compHost = host3;
+        host3.waitReady(async () => {
+          host3.hostData = host3.hostData || {};
+          // a few instances so sibling forces / per-instance behavior is visible
+          const seeds = (record.data && Array.isArray(record.data.instances))
+            ? record.data.instances : [{ id: "a" }, { id: "b" }, { id: "c" }];
+          for (const s of seeds) await host3.addControl(lib, name, s);
+          host3.frameAll();
+        });
+      }, { env: (doc && doc.env) || {} });
+      renderPanel();
+      return;
+    }
+
+    // DECLARATIVE play: the scene facet interpreted by scenerun in-pane.
     rt = createRuntime({
       doc,
       stage,
@@ -281,6 +316,13 @@ async function init(host, { lib, name, record, toast, onSaved }) {
     modeBtn.classList.remove("playing");
     addSel.disabled = false;
     if (rt) { rt.dispose(); rt = null; }
+    if (compHost) {
+      try { if (compHost.dispose) compHost.dispose(); } catch (e) {}
+      compHost = null;
+      // rebuild the build-mode stage canvas (the component preview replaced it)
+      canvasEl.innerHTML = "";
+      stage.mount ? stage.mount(canvasEl) : null;
+    }
     playDiags.length = 0;
     stage.setPickMode("all");
     stage.setShowSlots(true);
