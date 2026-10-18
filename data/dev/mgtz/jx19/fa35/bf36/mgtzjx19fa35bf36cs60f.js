@@ -597,6 +597,23 @@ async function init(host, { lib, name, record, toast, onSaved }) {
         mutate(doc.setAffordance(sel, "drag", dragSel.value === "no drag" ? null : { plane: dragSel.value })));
       af.appendChild(dragSel);
       panelEl.appendChild(af);
+      // behavior — the impl (in this control's js facet) whose event/render
+      // methods fire for this node
+      const bf = el("div", "se-form");
+      bf.appendChild(el("span", "se-note", "behavior"));
+      const bIn = el("input");
+      bIn.placeholder = "impl name (js facet)";
+      bIn.value = hit.entry.behavior ?? "";
+      bIn.setAttribute("list", "se-impls-" + me.UUID);
+      bIn.addEventListener("change", () => mutate(doc.setNodeBehavior(sel, bIn.value.trim() || null)));
+      const bList = el("datalist");
+      bList.id = "se-impls-" + me.UUID;
+      for (const nm of Object.keys(sceneBehaviors || {})) { const o = el("option"); o.value = nm; bList.appendChild(o); }
+      bf.append(bIn, bList);
+      if (bIn.value.trim() && !Object.keys(sceneBehaviors || {}).includes(bIn.value.trim())) {
+        bf.appendChild(el("span", "se-note", "✗ no impl")).style.color = "var(--danger, #c15a5a)";
+      }
+      panelEl.appendChild(bf);
       // parent
       const paf = el("div", "se-form");
       paf.appendChild(el("span", "se-note", "parent"));
