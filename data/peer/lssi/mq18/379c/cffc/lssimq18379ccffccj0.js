@@ -18,72 +18,6 @@ me.uiReady = function(ui){
   ui.initPopups(ME);
 };
 
-function sceneSet(field, value){
-  if (me.player) me.player.setState(field, value);
-}
-
-function toneFor(transport){
-  if (!transport) return 'wire';
-  if (transport.startsWith('tcp#')) return 'good';
-  if (transport.startsWith('udp#')) return 'human';
-  return 'wire';
-}
-
-// Orb colour: HUE BY TRANSPORT — the same convention the headsup panel has
-// always used (peer/headsup.js: tcp green, udp blue, connected-by-relay
-// yellow, otherwise grey) — with SATURATION FADING as the last contact
-// recedes. Colour is data here, not theme, so this uses the scene schema's
-// literal-colour escape (§2.3) rather than a token.
-var TINT_L = 0.54, FRESH_MS = 30000, STALE_MS = 900000, TINT_MS = 15000;
-var lastSeen = {};        // id -> epoch ms we last observed the peer connected
-
-function hslHex(h, s, l){
-  var c = (1 - Math.abs(2*l - 1)) * s, hp = h / 60;
-  var x = c * (1 - Math.abs(hp % 2 - 1)), m = l - c/2;
-  var r = 0, g = 0, b = 0;
-  if (hp < 1) { r = c; g = x; } else if (hp < 2) { r = x; g = c; }
-  else if (hp < 3) { g = c; b = x; } else if (hp < 4) { g = x; b = c; }
-  else if (hp < 5) { r = x; b = c; } else { r = c; b = x; }
-  function hx(v){ var n = Math.round((v + m) * 255);
-    return (n < 16 ? '0' : '') + Math.max(0, Math.min(255, n)).toString(16); }
-  return '#' + hx(r) + hx(g) + hx(b);
-}
-
-// 1 = fresh, 0 = fully stale. An unknown age (never connected, or the 0 the
-// peers command reports when nothing is up) reads as fully stale.
-function freshness(ageMs){
-  if (!isFinite(ageMs) || ageMs < 0) return 0;
-  if (ageMs <= FRESH_MS) return 1;
-  if (ageMs >= STALE_MS) return 0;
-  return 1 - (ageMs - FRESH_MS) / (STALE_MS - FRESH_MS);
-}
-
-function contactAge(p, now){
-  // last_contact is the CONNECTION's own stamp (peer.peer.peers reads it off
-  // whichever transport is up), so the span it measures is the real one: a
-  // connected-but-quiet UDP or relay peer fades exactly like a dropped one.
-  // Two honest limits ride along. A TCP stream keeps no per-read stamp and
-  // reports "now" (listen.rs P2PStream::last_contact) — the platform has
-  // nothing better, so a tcp peer stays fully saturated while it is up. And
-  // a dropped peer reports 0, so we fall back to the last time THIS PAGE saw
-  // it connected — in-memory, so a reload starts it stale.
-  if (p.connected) lastSeen[p.id] = now;
-  if (p.last_contact) return Math.max(0, now - p.last_contact);
-  if (p.connected) return 0;
-  if (lastSeen[p.id]) return now - lastSeen[p.id];
-  return Infinity;
-}
-
-function tintFor(p, now){
-  var h = 210, s0 = 0;                       // grey: disconnected
-  if (p.tcp) { h = 132; s0 = 0.46; }         // green
-  else if (p.udp) { h = 212; s0 = 0.48; }    // blue
-  else if (p.relay || p.connected) { h = 48; s0 = 0.60; }   // yellow
-  var f = freshness(contactAge(p, now));
-  // never fade to flat grey — a dim hue still reads as "this was a tcp peer"
-  return hslHex(h, s0 * (0.16 + 0.84 * f), TINT_L - (1 - f) * 0.12);
-}
-
 function peerList(){
   var out = [];
   for (var i in me.peers) out.push(me.peers[i]);
@@ -169,7 +103,6 @@ function watchHud(){
     if (el.getAnimations && el.getAnimations().length > 0) return;
     if (getComputedStyle(el).display == 'none' || el.offsetWidth < 40) {
       stopHudWatch();
-      sceneSet('focus', '');
     }
   }, 150);
 }
@@ -268,31 +201,7 @@ function syncPeers(){
 // under epsilon the loop stops entirely (true stillness, zero traffic);
 // any UPDATE event wakes it. Starts once BOTH the player and the local
 // info are ready.
-var FEED_MS = 100, SETTLE_E = 0.0004, SETTLE_TICKS = 6;
-var settled = 0;
-// the phys behavior keeps its kinetic energy on its ctx.data; the feed's
-// settle-and-sleep reads it from the live runtime (falls back to 0 → run)
-function simEnergy(){
-  try {
-    var rt = me.player && me.player.runtime;
-    var root = rt && rt.instances.get("");
-    return (root && root.behaviorData && root.behaviorData.energy) || 0;
-  } catch (x) { return 0; }
-}
-// positions are owned by the behavior's sim and surface in the scene's `peers`
-// state; the host reads them back from the live runtime (id → {x,y,z})
-function simPositions(){
-  var out = {};
-  try {
-    var rt = me.player && me.player.runtime;
-    var root = rt && rt.instances.get("");
-    var peers = root && root.state.peers;
-    if (Array.isArray(peers)) for (var i = 0; i < peers.length; i++) {
-      out[peers[i].id] = { x: peers[i].x || 0, y: peers[i].y || 0, z: peers[i].z || 0 };
-    }
-  } catch (x) {}
-  return out;
-}
+var FEED_MS = 500;   // slow data-sync cadence — orbs drive their own physics
 function feedTick(){
   syncPeers();
   syncPeerData();
