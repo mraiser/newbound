@@ -73,46 +73,23 @@ var readyP = new Promise(function (res2) { me.ready = res2; }).then(async () => 
   }
 
   // behaviors: the played control's OWN js facet carries me.sceneBehaviors —
-  // real JS in the control's trust domain. Extract the object literal with a
-  // sandboxed eval (the facet references impls by NAME; the code never travels
-  // in the scene JSON).
-  function extractSceneBehaviors(jsSrc) {
-    if (typeof jsSrc !== "string") return {};
-    const m = /sceneBehaviors\s*=\s*(\{[\s\S]*)/.exec(jsSrc);
-    if (!m) return {};
-    const start = jsSrc.indexOf("{", m.index);
-    if (start < 0) return {};
-    let depth = 0, i = start, inStr = null, inLine = false, inBlock = false;
-    for (; i < jsSrc.length; i++) {
-      const c = jsSrc[i], nx = jsSrc[i + 1];
-      if (inLine) { if (c === "\n") inLine = false; continue; }
-      if (inBlock) { if (c === "*" && nx === "/") { inBlock = false; i++; } continue; }
-      if (inStr) { if (c === "\\") { i++; continue; } if (c === inStr) inStr = null; continue; }
-      if (c === "/" && nx === "/") { inLine = true; i++; continue; }
-      if (c === "/" && nx === "*") { inBlock = true; i++; continue; }
-      if (c === '"' || c === "'" || c === "`") { inStr = c; continue; }
-      if (c === "{") depth++;
-      else if (c === "}") { depth--; if (depth === 0) { i++; break; } }
-    }
-    try {
-      const fn = new Function(`"use strict"; return (${jsSrc.slice(start, i)});`);
-      const out = fn();
-      return (out && typeof out === "object") ? out : {};
-    } catch (e) { return {}; }
-  }
-
+  // real JS in the control's trust domain, with full access to the control's
+  // functions and `me` (the OO model — there is no cage; the same facet's
+  // me.ready already runs unconstrained). We boot the control in a hidden div
+  // and read its LIVE api.sceneBehaviors. The scene JSON references impls by
+  // NAME; only the data ever travels, never the code.
   async function loadSceneBehaviors(lib, ctl) {
-    // prefer the workbench posture (record.js on the read); fall back to DATA.behaviors
     if (ME.DATA.behaviors && typeof ME.DATA.behaviors === "object") return ME.DATA.behaviors;
-    try {
-      const controls = await controlsOf(lib);
-      if (controls instanceof Error) return {};
-      const entry = controls.find((c) => c.name === ctl);
-      if (!entry) return {};
-      const rec = await readRec(lib, entry.id);
-      if (rec instanceof Error) return {};
-      return extractSceneBehaviors(rec.js);
-    } catch (e) { return {}; }
+    return new Promise((resolve) => {
+      const host = document.createElement("div");
+      host.style.display = "none";
+      ME.appendChild(host);
+      try {
+        installControl(host, lib, ctl, function (api) {
+          resolve((api && api.sceneBehaviors) || {});
+        });
+      } catch (e) { resolve({}); }
+    });
   }
   const sceneBehaviors = ME.DATA.doc !== undefined
     ? (ME.DATA.behaviors || {})
