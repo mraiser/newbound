@@ -10,7 +10,51 @@ var ME = document.getElementById(me.UUID);
 // (focus — tap toggles — opens/closes headsup).
 
 me.peers = [];
-me.layout = {};       // id -> {x, z, vx, vz}
+me.layout = {};       // id -> {x, y, z, vx, vy, vz}
+
+// ── the constellation's physics as a SCENE BEHAVIOR ─────────────────────────
+// The force layout used to live ONLY here in host code, stepped by the feed and
+// pushed into the scene — which meant the editor's PLAY mode (no host) froze,
+// and the sim was invisible to the IDE. Now it is ALSO a scene behavior on this
+// control: the scene facet references it by name (behaviors.animate/render), so
+// the runtime steps it every frame and the constellation self-animates anywhere
+// the scene runs. The host feed below still drives it live (it calls the same
+// step through the behavior's ctx); the behavior is the single home of the
+// physics. Positions flow out via ctx.set("peers", …), which re-fires the mount
+// bindings that place the orbs — the behavior never touches THREE directly.
+me.sceneBehaviors = {
+  phys: {
+    animate(ctx) {
+      // seed ctx.data.sim from the control's layout so a live session and a
+      // fresh PLAY share one physics state (no re-seed jump on mode switch)
+      ctx.data.sim = me.layout;
+      ctx.data.lastPush = 0;
+    },
+    render(ctx, dt) {
+      if (!dt || dt <= 0) return;
+      var peers = ctx.state.peers, connections = ctx.state.connections;
+      if (!Array.isArray(peers) || peers.length === 0) return;
+      // throttle the physics to the feed cadence — the render loop runs far
+      // faster than the sim needs, and a fixed dt keeps the integration stable
+      var now = ctx.t;
+      if (now - (ctx.data.lastPush || 0) < 0.09) return;
+      var step = Math.min(0.12, now - (ctx.data.lastPush || now));
+      ctx.data.lastPush = now;
+      var e = stepLayout(peers, Array.isArray(connections) ? connections : [], step);
+      var moved = false;
+      for (var i = 0; i < peers.length; i++) {
+        var l = me.layout[peers[i].id];
+        if (!l) continue;
+        if (peers[i].x !== l.x || peers[i].y !== l.y || peers[i].z !== l.z) {
+          peers[i].x = l.x; peers[i].y = l.y; peers[i].z = l.z; moved = true;
+        }
+      }
+      // a no-op set still re-fires bindings; only write when a position changed
+      if (moved) ctx.set("peers", peers);
+      ctx.data.energy = e;
+    }
+  }
+};
 
 me.uiReady = function(ui){
   me.ui = ui;
