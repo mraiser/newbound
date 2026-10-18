@@ -410,6 +410,7 @@ async function init(host, { lib, name, record, toast, onSaved }) {
       else if (activeTab === "bind") renderBind();
       else if (activeTab === "wires") renderWires();
       else if (activeTab === "mounts") renderMounts();
+      else if (activeTab === "behaviors") renderBehaviors();
       else if (activeTab === "diag") renderDiag();
     } finally {
       rendering = false;
@@ -831,6 +832,102 @@ async function init(host, { lib, name, record, toast, onSaved }) {
     panelEl.appendChild(form);
     panelEl.appendChild(el("p", "se-note",
       "events need the matching affordance on the node (tap/drag/hover — see the node inspector)"));
+  }
+
+  function renderBehaviors() {
+    const impls = Object.keys(sceneBehaviors || {});
+    const hasImpl = (ref) => {
+      if (typeof ref !== "string") return false;
+      const dot = ref.indexOf(".");
+      return impls.includes(dot < 0 ? ref : ref.slice(0, dot));
+    };
+    const refRow = (label, ref, onClear) => {
+      const row = el("div", "se-row");
+      const ok = hasImpl(ref);
+      row.appendChild(el("span", "grow", `${label} → ${ref}`));
+      const tag = el("span", "se-note", ok ? "✓" : "✗ no impl");
+      if (!ok) tag.style.color = "var(--danger, #c15a5a)";
+      row.appendChild(tag);
+      if (onClear) {
+        const x = el("button", null, "×");
+        x.addEventListener("click", onClear);
+        row.appendChild(x);
+      }
+      return row;
+    };
+
+    panelEl.appendChild(el("h4", null, "behaviors — js on this control"));
+    panelEl.appendChild(el("p", "se-note",
+      "impls live in this control's js facet as me.sceneBehaviors = { name → {animate, render, …} }. " +
+      "The scene references them by NAME — the code never travels in the facet JSON."));
+
+    // ── top-level lifecycle refs (behaviors.animate / render / customs) ──
+    const block = doc.behaviors();
+    const blockKeys = Object.keys(block);
+    if (!blockKeys.length) panelEl.appendChild(el("p", "se-note", "no top-level behavior refs yet"));
+    for (const k of blockKeys) {
+      panelEl.appendChild(refRow(k, block[k], () => mutate(doc.setBehaviorRef(k, null))));
+    }
+
+    // add a top-level ref
+    const form = el("div", "se-form");
+    const nameIn = el("input");
+    nameIn.placeholder = "hook (animate / render)";
+    nameIn.style.width = "110px";
+    const refIn = el("input");
+    refIn.placeholder = "impl name in js facet";
+    refIn.style.width = "120px";
+    const add = el("button", null, "set");
+    add.addEventListener("click", () => {
+      if (!nameIn.value.trim() || !refIn.value.trim()) return;
+      if (mutate(doc.setBehaviorRef(nameIn.value.trim(), refIn.value.trim()))) { nameIn.value = refIn.value = ""; }
+    });
+    form.append(nameIn, refIn, add);
+    panelEl.appendChild(form);
+
+    // ── per-node behavior refs ──────────────────────────────────────────
+    panelEl.appendChild(el("h4", null, "node behaviors"));
+    let anyNode = false;
+    for (const n of doc.nodes()) {
+      if (n && typeof n.behavior === "string") {
+        anyNode = true;
+        panelEl.appendChild(refRow(n.id, n.behavior, () => mutate(doc.setNodeBehavior(n.id, null))));
+      }
+    }
+    if (!anyNode) panelEl.appendChild(el("p", "se-note", "none — set one in a node's inspector"));
+
+    // ── the impls this control's js facet provides ──────────────────────
+    panelEl.appendChild(el("h4", null, `impls found in js facet (${impls.length})`));
+    if (!impls.length) {
+      panelEl.appendChild(el("p", "se-note",
+        "none — add me.sceneBehaviors = { … } to the js facet to give this scene behavior"));
+    }
+    for (const name of impls) {
+      const impl = sceneBehaviors[name] || {};
+      const hooks = ["animate", "render"].filter((h) => typeof impl[h] === "function");
+      const methods = Object.keys(impl).filter((k) => typeof impl[k] === "function" && !["animate", "render"].includes(k));
+      const row = el("div", "se-row");
+      row.appendChild(el("span", "grow", name));
+      row.appendChild(el("span", "se-note",
+        (hooks.length ? hooks.join(",") : "") + (methods.length ? (hooks.length ? " · " : "") + methods.join(",") : "")));
+      panelEl.appendChild(row);
+    }
+
+    // ── live per-instance inspector (PLAY) ──────────────────────────────
+    if (mode === "play" && rt) {
+      panelEl.appendChild(el("h4", null, "live instances"));
+      for (const [prefix, inst] of rt.instances) {
+        const row = el("div", "se-row");
+        const label = prefix === "" ? "(root)" : prefix.replace(/:$/, "");
+        const data = inst.behaviorData || {};
+        const keys = Object.keys(data).filter((k) => typeof data[k] !== "object" || data[k] === null);
+        row.appendChild(el("span", "grow", label));
+        row.appendChild(el("span", "se-note",
+          keys.slice(0, 4).map((k) => `${k}=${typeof data[k] === "number" ? +data[k].toFixed(3) : data[k]}`).join(" ")));
+        panelEl.appendChild(row);
+      }
+      panelEl.appendChild(el("p", "se-note", "per-instance behavior scratch (ctx.data) — refreshes with this tab"));
+    }
   }
 
   async function renderMounts() {
