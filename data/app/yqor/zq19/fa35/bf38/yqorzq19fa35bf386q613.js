@@ -123,6 +123,23 @@ class SceneRuntime {
     for (const inst of [...this.instances.values()]) {
       for (const coll of inst.collections) await this._syncCollection(inst, coll, true);
     }
+    // animate(): each instance's startup behavior fires once everything exists
+    // (collections materialized, rigs computed). ctx.t is 0.
+    for (const inst of this.instances.values()) {
+      const block = this._behaviorBlock(inst);
+      if (block.animate) this._callBehavior(inst, block.animate);
+      for (const n of inst.doc.nodes()) {
+        if (isObj(n) && typeof n.behavior === "string") {
+          const r = this._behaviorRef(n.behavior);
+          if (r && r.impl && typeof r.impl.animate === "function") {
+            const scoped = Object.create(this._behaviorCtx(inst));
+            scoped.node = n.id;
+            try { r.impl.animate.call(r.impl, scoped, n.id); }
+            catch (e) { this._diag(`behavior ${n.behavior}.animate: ${e && e.message ? e.message : e}`); }
+          }
+        }
+      }
+    }
     this._scheduleClock();
   }
 
@@ -294,6 +311,8 @@ class SceneRuntime {
             [...inst.chain, `${m.lib}:${m.ctl}`]);
           child.t0 = boot ? inst.t0 : this.now() - inst.tNow * 1000;
           child.tNow = inst.tNow;
+          child.item = item;
+          child.instIndex = index;
           this._applyItemOverrides(inst, coll, child, item, index, true);
           this._evalAll(child, true);
           const childSpecs = project(childDoc, {
@@ -324,6 +343,12 @@ class SceneRuntime {
   }
 
   _updateInstance(inst, coll, known, key, item, index, boot) {
+    known.item = item; known.index = index;
+    if (known.childPrefix) {
+      const ch = this.instances.get(known.childPrefix);
+      if (ch) { ch.item = item; ch.instIndex = index;
+        if (ch.behaviorCtx) { ch.behaviorCtx.item = item; ch.behaviorCtx.index = index; } }
+    }
     const overrides = this._evalProps(inst, coll, item, index);
     const id = this._instId(inst, coll, key);
     for (const [k, value] of overrides) {
@@ -645,6 +670,7 @@ class SceneRuntime {
     const hit = this._resolve(prefixedId);
     if (!hit) return;
     const t = this._eventTarget(hit.inst, hit.localId);
+    this._nodeEventBehavior(hit.inst, t.id, "tap", t.locals);
     this._fire(hit.inst, `${t.id}.tap`, t.locals);
   }
 
@@ -652,7 +678,9 @@ class SceneRuntime {
     const hit = this._resolve(prefixedId);
     if (!hit) return;
     const t = this._eventTarget(hit.inst, hit.localId);
-    this._fire(hit.inst, `${t.id}.${entered ? "hoverin" : "hoverout"}`, t.locals);
+    const ev = entered ? "hoverin" : "hoverout";
+    this._nodeEventBehavior(hit.inst, t.id, ev, t.locals);
+    this._fire(hit.inst, `${t.id}.${ev}`, t.locals);
   }
 
   handleDrag(evt) {
@@ -661,6 +689,7 @@ class SceneRuntime {
     const t = this._eventTarget(hit.inst, hit.localId);
     const locals = { ...t.locals, x: evt.x, y: evt.y, z: evt.z, dx: evt.dx, dy: evt.dy, dz: evt.dz };
     const event = evt.type === "start" ? "dragstart" : evt.type === "move" ? "dragmove" : "dragend";
+    this._nodeEventBehavior(hit.inst, t.id, event, locals);
     this._fire(hit.inst, `${t.id}.${event}`, locals);
   }
 
@@ -673,6 +702,15 @@ class SceneRuntime {
 
   _runAction(inst, a, locals) {
     if (!a || typeof a !== "object") return;
+    // a behavior method reference: "phys.grab" → impl.phys.grab(ctx, locals)
+    if (typeof a.behavior === "string") {
+      const r = this._behaviorRef(a.behavior);
+      if (r && r.impl && r.method && typeof r.impl[r.method] === "function") {
+        try { r.impl[r.method].call(r.impl, this._behaviorCtx(inst), locals || {}); }
+        catch (e) { this._diag(`behavior ${a.behavior}: ${e && e.message ? e.message : e}`); }
+      }
+      return;
+    }
     if (typeof a.set === "string") {
       const c = compile(a.to);
       if (!c.ok) return;
@@ -736,6 +774,7 @@ class SceneRuntime {
   // ── the clock (t + eases) ─────────────────────────────────────────────────
 
   _animated() {
+    if (this._behaviorAnimated()) return true;
     for (const inst of this.instances.values()) {
       if (inst.usesT || inst.eases.size) return true;
     }
@@ -746,6 +785,9 @@ class SceneRuntime {
   step() {
     if (this._disposed) return;
     const nowMs = this.now();
+    const dtMs = nowMs - (this._lastStepMs || nowMs);
+    this._lastStepMs = nowMs;
+    if (this._behaviorAnimated()) this._tickBehaviors(Math.max(0, dtMs) / 1000);
     for (const inst of this.instances.values()) {
       inst.tNow = (nowMs - inst.t0) / 1000;
       if (inst.usesT) {
@@ -787,6 +829,7 @@ class SceneRuntime {
   dispose() {
     this._disposed = true;
     this._running = false;
+    this._lastStepMs = 0;
     if (this._raf) cancelAnimationFrame(this._raf);
     if (this._stepTimer) clearTimeout(this._stepTimer);
     this.instances.clear();
