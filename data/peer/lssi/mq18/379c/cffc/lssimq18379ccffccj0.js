@@ -130,3 +130,289 @@ me.sceneBehaviors = {
   }
 };
 
+me.uiReady = function(ui){
+  me.ui = ui;
+  ME.querySelector('.wrap').style.display = 'block';
+  ui.initNavbar(ME);
+  ui.initPopups(ME);
+};
+
+function sceneSet(field, value){
+  if (me.player) me.player.setState(field, value);
+}
+
+function toneFor(transport){
+  if (!transport) return 'wire';
+  if (transport.startsWith('tcp#')) return 'good';
+  if (transport.startsWith('udp#')) return 'human';
+  return 'wire';
+}
+
+// Orb colour: HUE BY TRANSPORT — the same convention the headsup panel has
+// always used (peer/headsup.js: tcp green, udp blue, connected-by-relay
+// yellow, otherwise grey) — with SATURATION FADING as the last contact
+// recedes. Colour is data here, not theme, so this uses the scene schema's
+// literal-colour escape (§2.3) rather than a token.
+var TINT_L = 0.54, FRESH_MS = 30000, STALE_MS = 900000, TINT_MS = 15000;
+var lastSeen = {};        // id -> epoch ms we last observed the peer connected
+
+function hslHex(h, s, l){
+  var c = (1 - Math.abs(2*l - 1)) * s, hp = h / 60;
+  var x = c * (1 - Math.abs(hp % 2 - 1)), m = l - c/2;
+  var r = 0, g = 0, b = 0;
+  if (hp < 1) { r = c; g = x; } else if (hp < 2) { r = x; g = c; }
+  else if (hp < 3) { g = c; b = x; } else if (hp < 4) { g = x; b = c; }
+  else if (hp < 5) { r = x; b = c; } else { r = c; b = x; }
+  function hx(v){ var n = Math.round((v + m) * 255);
+    return (n < 16 ? '0' : '') + Math.max(0, Math.min(255, n)).toString(16); }
+  return '#' + hx(r) + hx(g) + hx(b);
+}
+
+// 1 = fresh, 0 = fully stale. An unknown age (never connected, or the 0 the
+// peers command reports when nothing is up) reads as fully stale.
+function freshness(ageMs){
+  if (!isFinite(ageMs) || ageMs < 0) return 0;
+  if (ageMs <= FRESH_MS) return 1;
+  if (ageMs >= STALE_MS) return 0;
+  return 1 - (ageMs - FRESH_MS) / (STALE_MS - FRESH_MS);
+}
+
+function contactAge(p, now){
+  // last_contact is the CONNECTION's own stamp (peer.peer.peers reads it off
+  // whichever transport is up), so the span it measures is the real one: a
+  // connected-but-quiet UDP or relay peer fades exactly like a dropped one.
+  // Two honest limits ride along. A TCP stream keeps no per-read stamp and
+  // reports "now" (listen.rs P2PStream::last_contact) — the platform has
+  // nothing better, so a tcp peer stays fully saturated while it is up. And
+  // a dropped peer reports 0, so we fall back to the last time THIS PAGE saw
+  // it connected — in-memory, so a reload starts it stale.
+  if (p.connected) lastSeen[p.id] = now;
+  if (p.last_contact) return Math.max(0, now - p.last_contact);
+  if (p.connected) return 0;
+  if (lastSeen[p.id]) return now - lastSeen[p.id];
+  return Infinity;
+}
+
+function tintFor(p, now){
+  var h = 210, s0 = 0;                       // grey: disconnected
+  if (p.tcp) { h = 132; s0 = 0.46; }         // green
+  else if (p.udp) { h = 212; s0 = 0.48; }    // blue
+  else if (p.relay || p.connected) { h = 48; s0 = 0.60; }   // yellow
+  var f = freshness(contactAge(p, now));
+  // never fade to flat grey — a dim hue still reads as "this was a tcp peer"
+  return hslHex(h, s0 * (0.16 + 0.84 * f), TINT_L - (1 - f) * 0.12);
+}
+
+function peerList(){
+  var out = [];
+  for (var i in me.peers) out.push(me.peers[i]);
+  return out;
+}
+
+// The legacy data-bus contract, kept: headsup (and anything else) reads a
+// peer's live record from document.getElementById('peer_'+id).DATA. The divs
+// are hidden stubs now — the 3D that used to hang off them lives in the
+// scene facet.
+function upsertPeerDiv(p){
+  var d = document.getElementById('peer_' + p.id);
+  if (!d) {
+    d = document.createElement('div');
+    d.id = 'peer_' + p.id;
+    d.style.display = 'none';
+    ME.appendChild(d);
+  }
+  d.DATA = p;
+}
+
+function pushScene(){
+  // No self-orb: your own position carries no information (the corner
+  // panel says who you are). Connected peers still drift toward center —
+  // the legacy pull — they just don't get a line to an invisible you.
+  // DATA ONLY: the phys scene-behavior owns the integration and writes
+  // positions back into `peers` state itself; this just refreshes the peer /
+  // connection records (tints, transport, display names) and carries the
+  // behavior's current positions along so a data push never resets the sim.
+  var items = [];
+  var list = peerList();
+  var pos = simPositions();
+  for (var i in list) {
+    var p = list[i];
+    var l = pos[p.id] || {};
+    items.push({id: p.id, displayname: p.displayname || p.name || p.id,
+                connected: Boolean(p.connected), tint: tintFor(p, Date.now()),
+                x: l.x || 0, y: l.y || 0, z: l.z || 0});
+  }
+  var connections = [];
+  var have = {};
+  for (var i in list) {
+    var p = list[i];
+    // p.peers maps peer-id -> transport ("tcp#..."/"udp#..."/relay)
+    for (var rid in (p.peers || {})) {
+      var key = p.id < rid ? p.id + '|' + rid : rid + '|' + p.id;
+      if (have[key]) continue;
+      have[key] = true;
+      connections.push({id: key, a: p.id, b: rid, tone: toneFor(p.peers[rid])});
+    }
+  }
+  sceneSet('peers', items);
+  sceneSet('connections', connections);
+  return me.lastEnergy || 0;
+}
+
+// The panel is a HEADS-UP DISPLAY: it floats OVER a full-bleed canvas and
+// never reflows the world it hovers on. Narrowing the viewer to make room
+// was tried and rejected for exactly that reason — a HUD that pushes the
+// scene aside is a sidebar. The cost is real and stated (DEVIATIONS 22):
+// the panel is position:fixed over the right edge and mostly opaque, so an
+// orb underneath it cannot be tapped until you drag the view to bring that
+// orb clear. Tap-to-close and switching peers work on any orb you can see.
+
+function animateWidth(el, target, ms, cb){
+  try {
+    var anim = el.animate([{ width: target + 'px' }], { duration: ms, easing: 'ease' });
+    anim.onfinish = function(){ el.style.width = target + 'px'; if (cb) cb(); }
+  } catch (x) {
+    el.style.width = target + 'px';
+    if (cb) cb();
+  }
+}
+
+// focus flows back from the scene (tap toggles): open/close the headsup panel
+function onSceneFocus(value){
+  var el = document.getElementById('headsupdisplay');
+  if (!value) {
+    stopHudWatch();
+    animateWidth(el, 0, 300, function(){ el.style.display = 'none'; });
+    return;
+  }
+  var p = null;
+  var list = peerList();
+  for (var i in list) if (list[i].id == value) p = list[i];
+  if (!p) return;
+  el.style.width = '0px';
+  el.style.display = 'block';
+  animateWidth(el, 680, 300);
+  installControl(el, 'peer', 'headsup', function(api){}, p);
+  watchHud();
+}
+
+// headsup closes itself from its own close icon without telling anyone —
+// while focus is set, watch the panel's visibility and clear focus when it
+// vanishes by ANY path (icon, popup machinery, whatever), so the scene's
+// selection halo always tracks the HUD. The width is only a verdict when the
+// panel is at rest: mid-open it is legitimately narrow, and a watcher that
+// read it then would close the panel it was hired to follow.
+var hudWatch = null;
+function watchHud(){
+  if (hudWatch) return;
+  hudWatch = setInterval(function(){
+    var el = document.getElementById('headsupdisplay');
+    if (el.getAnimations && el.getAnimations().length > 0) return;
+    if (getComputedStyle(el).display == 'none' || el.offsetWidth < 40) {
+      stopHudWatch();
+      sceneSet('focus', '');
+    }
+  }, 150);
+}
+function stopHudWatch(){
+  if (hudWatch) { clearInterval(hudWatch); hudWatch = null; }
+}
+
+me.ready = function(){
+  installControl(ME.querySelector('.viewer'), 'app', 'sceneplayer', function(api){
+    me.player = api;
+    api.waitReady(startFeed);
+  }, {lib: 'peer', ctl: 'peer', onState: function(prefix, field, value){
+    if (field == 'focus') onSceneFocus(value);
+  }});
+
+  subscribe_event("peer", "UPDATE", function(data){
+    var found = false;
+    for (var i in me.peers) {
+      if (me.peers[i].id == data.id) { me.peers[i] = data; found = true; }
+    }
+    if (!found) me.peers.push(data);
+    upsertPeerDiv(data);
+    wakeFeed();
+  });
+
+  send_peers(function(result){
+    me.peers = [];
+    for (var i in result.data) {
+      me.peers.push(result.data[i]);
+      upsertPeerDiv(result.data[i]);
+    }
+    send_info(null, null, null, function(result){
+      me.info = result.data;
+      ME.querySelector('.localpeername').textContent = result.data.name;
+      ME.querySelector('.localpeerid').textContent = result.data.uuid;
+      ME.querySelector('.localpeerport').textContent = "P2P Port: "+result.data.p2p_port;
+      ME.querySelector('.localhttpport').textContent = "HTTP Port: "+result.data.http_port;
+
+      json('../app/libs', null, function(result) {
+        document.body.locallibraries = result.data;
+      });
+
+      json('../security/groups', null, function(result){
+        if (result.status != 'ok') alert(result.msg);
+        else {
+          me.groups = result.data;
+          result.data.sort();
+          var newhtml = '';
+          for (var i in result.data) {
+            newhtml += '<option>'+result.data[i]+'</option>';
+          }
+          var sel = ME.querySelector('.groupselect');
+          sel.innerHTML = newhtml;
+          sel.value = 'anonymous';
+        }
+      });
+
+      startFeed();
+    });
+  });
+};
+
+// The feed loop: layout + push every FEED_MS (10Hz). The constellation's
+// position ease is {ms:100, curve:linear} — matched to THIS interval so
+// waypoints chain into continuous motion (change one, change both; an
+// ease shorter than the interval reads as spurts, longer causes snaps).
+// SETTLE-AND-SLEEP: molecules come to rest — when kinetic energy stays
+// under epsilon the loop stops entirely (true stillness, zero traffic);
+// any UPDATE event wakes it. Starts once BOTH the player and the local
+// info are ready.
+var FEED_MS = 100, SETTLE_E = 0.0004, SETTLE_TICKS = 6;
+var settled = 0;
+// the phys behavior keeps its kinetic energy on its ctx.data; the feed's
+// settle-and-sleep reads it from the live runtime (falls back to 0 → run)
+function simEnergy(){
+  try {
+    var rt = me.player && me.player.runtime;
+    var root = rt && rt.instances.get("");
+    return (root && root.behaviorData && root.behaviorData.energy) || 0;
+  } catch (x) { return 0; }
+}
+// positions are owned by the behavior's sim and surface in the scene's `peers`
+// state; the host reads them back from the live runtime (id → {x,y,z})
+function simPositions(){
+  var out = {};
+  try {
+    var rt = me.player && me.player.runtime;
+    var root = rt && rt.instances.get("");
+    var peers = root && root.state.peers;
+    if (Array.isArray(peers)) for (var i = 0; i < peers.length; i++) {
+      out[peers[i].id] = { x: peers[i].x || 0, y: peers[i].y || 0, z: peers[i].z || 0 };
+    }
+  } catch (x) {}
+  return out;
+}
+function feedTick(){
+  pushScene();
+  var e = simEnergy();
+  settled = e < SETTLE_E ? settled + 1 : 0;
+  if (settled >= SETTLE_TICKS) {
+    clearInterval(me.feed);
+    me.feed = null;
+  }
+}
+function startFeed(){
