@@ -144,6 +144,14 @@ async function init(host, { lib, ctlId, toast }) {
     chip.innerHTML = `<span class="dot" aria-hidden="true"></span><span></span>`;
     chip.querySelector(".dot").style.background = FACET_HUES[facet];
     chip.lastElementChild.textContent = facet === "cmd" ? "commands" : facet;
+    // a COMPONENT control: the scene facet is a SHAPE and the js declares
+    // per-instance behaviors (me.render/animate/click) — hosted by scenehost.
+    // Mark the scene chip so the workbench tells it from a declarative scene.
+    if (facet === "scene" && facetPresent(facet) && typeof record.js === "string"
+        && /me\.(render|animate|click)\s*=\s*function/.test(record.js)) {
+      chip.lastElementChild.textContent = "scene · component";
+      chip.title = "a 3D component: shape (scene facet) + per-instance behaviors (js) — play hosts it in a scenehost";
+    }
     if (facet === "cmd" && facetPresent(facet)) {
       const cnt = document.createElement("span");
       cnt.className = "cnt";
