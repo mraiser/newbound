@@ -1,0 +1,14 @@
+.nb-scenehost { display: block; width: 100%; height: 100%; min-height: 0; position: relative; }
+.nb-scenehost .sh-canvas { position: absolute; inset: 0; overflow: hidden; }
+.nb-scenehost .sh-canvas .ss-label {
+  color: var(--text, #d8dee6);
+  background: color-mix(in srgb, var(--panel, #1f242a) 82%, transparent);
+  border: 1px solid var(--line, #333b44);
+  border-radius: 5px;
+  padding: 1px 7px;
+  white-space: nowrap;
+  user-select: none;
+  cursor: default;
+}
+.nb-scenehost .sh-foot { position: absolute; left: 8px; bottom: 6px; }
+.nb-scenehost .sh-cap { color: var(--text-dim, #8a94a0); font: 11px ui-monospace, Menlo, monospace; }
