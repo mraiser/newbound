@@ -9,6 +9,8 @@
 // render(ctx, dt), and click(ctx) — come from its js facet (me.sceneBehaviors
 // or direct me.animate/render/click) and run as the child's own `me`, so a
 // behavior sees its siblings (ctx.host.children) and drives its own rig.
+// Lifecycle: animate(ctx) once on add → render(ctx, dt) every frame →
+// click(ctx, hit) on tap → dispose(ctx) when removeControl(key) drops it.
 //
 // The ctx a behavior gets:
 //   me        — the child control's live api (its `this`; behavior methods are
@@ -198,7 +200,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
           specIds: [],
           nodeRig: new Map(),     // nodeId -> {path: value} overrides
           data: data || {},
-          renderFn: null, clickFn: null, animateFn: null,
+          renderFn: null, clickFn: null, animateFn: null, disposeFn: null,
           ctx: null,
         };
         // the behavior ctx — runs as the child's own me
@@ -230,6 +232,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         inst.animateFn = api.animate || (impl && impl.animate) || null;
         inst.renderFn = api.render || (impl && impl.render) || null;
         inst.clickFn = api.click || (impl && impl.click) || null;
+        inst.disposeFn = api.dispose || (impl && impl.dispose) || null;
 
         // draw the child's shape
         if (shape && shape.specs.length) {
@@ -255,9 +258,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   me.removeControl = function (key) {
     const inst = byKey.get(key);
     if (!inst) return;
+    // lifecycle exit — let a control release timers/subscriptions it opened
+    if (inst.disposeFn) {
+      try { inst.disposeFn.call(inst.me, inst.ctx); }
+      catch (e) { diag(`${inst.key}.dispose: ${e && e.message ? e.message : e}`); }
+    }
     for (const id of inst.specIds) stage.removeObject(id);
     // drop any links this instance touched
     for (const [lk, l] of [...links]) if (l.a === key || l.b === key) { stage.removeObject(lk); links.delete(lk); }
+    // the hidden div the child was booted in — drop it so DOM doesn't accumulate
+    const home = inst.me && inst.me.UUID && document.getElementById(inst.me.UUID);
+    if (home && home.parentElement && home.parentElement.style.display === "none") home.parentElement.remove();
     byKey.delete(key);
     const i = me.children.indexOf(inst);
     if (i >= 0) me.children.splice(i, 1);
