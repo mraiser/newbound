@@ -49,7 +49,9 @@ var byKey = new Map();
 
 me.setState = function (field, value) {
   me.state[field] = value;
-  // a state change re-renders next frame; behaviors read it via ctx.host.state
+  // a state change re-renders next frame; behaviors read it via ctx.host.state,
+  // and any collection bound to the field re-syncs (props-down)
+  for (const inst of me.children) syncCollections(inst);
   if (me.stage) me.stage.requestRender();
 };
 
@@ -59,7 +61,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   const capEl = ME.querySelector(".sh-cap");
   const { hasWebGL } = document.querySelector('[data-control="app:webgl"]').api;
   const { parse: parseScene } = document.querySelector('[data-control="app:scenedoc"]').api;
-  const { project, envOf } = document.querySelector('[data-control="app:sceneproject"]').api;
+  const { project, envOf, instanceSpec } = document.querySelector('[data-control="app:sceneproject"]').api;
+  const { compile } = document.querySelector('[data-control="app:sceneexpr"]').api;
   const { mountScene } = await import("../app/asset/app/vendor/nb_three/scenestage.js");
   const jsonP = (c2, v2) => new Promise((res2) => json(c2, v2, res2));
   const readRec = async (l2, id2) => {
@@ -171,6 +174,60 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     return { doc, specs, rootNodeId };
   }
 
+  // ── collections: a shape's `each` templates render against the host's
+  // shared state (props-down). One runtime — the host — evaluates the binding
+  // expressions (sceneexpr, no dynamic code) and keyed-diffs the specs.
+  function readPath(obj, path) {
+    return String(path).split(".").reduce((o, k) => (o == null ? o : o[k]), obj);
+  }
+  function itemKey(entry, item, index) {
+    if (typeof entry.key === "string" && entry.key) {
+      const v = readPath(item, entry.key);
+      if (v !== undefined && v !== null) return String(v);
+    }
+    if (item && (item.id !== undefined)) return String(item.id);
+    if (item && (item.key !== undefined)) return String(item.key);
+    return String(index);
+  }
+  function evalProps(entry, item, index) {
+    const scope = Object.assign({}, me.state, { item, index });
+    const overrides = new Map();
+    for (const path of Object.keys(entry.props || {})) {
+      const c = compile(String(entry.props[path]));
+      if (!c.ok) { diag(`coll ${entry.id}.${path}: ${c.error}`); continue; }
+      const r = c.run(scope);
+      if (r.ok) overrides.set(`${entry.id}.${path}`, r.value);
+      else diag(`coll ${entry.id}.${path}: ${r.error}`);
+    }
+    return overrides;
+  }
+  function syncCollections(inst) {
+    if (!inst.shape) return;
+    const doc = inst.shape;
+    const templates = [];
+    for (const n of doc.nodes()) if (n.each !== undefined) templates.push({ entry: n, type: "node" });
+    for (const m of doc.mounts()) if (m.each !== undefined) templates.push({ entry: m, type: "mount" });
+    for (const t of templates) {
+      const list = me.state[t.entry.each];
+      const items = Array.isArray(list) ? list : [];
+      let coll = inst.colls.find((c) => c.entry === t.entry);
+      if (!coll) { coll = { entry: t.entry, type: t.type, ids: new Map() }; inst.colls.push(coll); }
+      const seen = new Set();
+      items.forEach((item, index) => {
+        const k = itemKey(t.entry, item, index);
+        seen.add(k);
+        const spec = instanceSpec(doc, t.entry, t.type, k, evalProps(t.entry, item, index),
+          { theme: dark() ? "dark" : "light", prefix: inst.specPrefix, parent: null });
+        stage.upsert(spec);
+        if (!coll.ids.has(k)) { coll.ids.set(k, spec.id); inst.specIds.push(spec.id); }
+      });
+      for (const [k, specId] of [...coll.ids]) {
+        if (!seen.has(k)) { stage.removeObject(specId); coll.ids.delete(k); const i = inst.specIds.indexOf(specId); if (i >= 0) inst.specIds.splice(i, 1); }
+      }
+    }
+    stage.requestRender();
+  }
+
   // ── addControl: the host's instancing call ────────────────────────────────
   me.addControl = async function (lib, ctl, data, key) {
     key = key || `i${keySeq++}`;
@@ -198,6 +255,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
           rootNodeId: shape ? shape.rootNodeId : null,
           specPrefix: prefix,
           specIds: [],
+          colls: [],            // [{ entry, type, keyFn, propFns:[{path,fn}], ids:Map<key,specId> }]
           nodeRig: new Map(),     // nodeId -> {path: value} overrides
           data: data || {},
           renderFn: null, clickFn: null, animateFn: null, disposeFn: null,
@@ -238,6 +296,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         if (shape && shape.specs.length) {
           for (const s of shape.specs) { stage.upsert(s); inst.specIds.push(s.id); }
         }
+        syncCollections(inst);
         resolve(inst);
       }, data);
     });
