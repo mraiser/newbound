@@ -47,11 +47,12 @@ var rt = null;          // the frame loop
 var keySeq = 0;
 var byKey = new Map();
 
+var syncColls = null;   // bound once the ready callback defines syncCollections
 me.setState = function (field, value) {
   me.state[field] = value;
   // a state change re-renders next frame; behaviors read it via ctx.host.state,
   // and any collection bound to the field re-syncs (props-down)
-  for (const inst of me.children) syncCollections(inst);
+  if (syncColls) for (const inst of me.children) syncColls(inst);
   if (me.stage) me.stage.requestRender();
 };
 
@@ -171,7 +172,13 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // the root node = the first top-level node (no parent) — the rig target
     let rootNodeId = null;
     for (const n of doc.nodes()) { if (!n.parent) { rootNodeId = n.id; break; } }
-    return { doc, specs, rootNodeId };
+    // Boot the child's js ONLY if it declares 3D behaviors (the unified
+    // contract: a control IS a 3D object when it has me.animate/render/click/
+    // dispose). A control whose js is a plain page controller renders its
+    // shape WITHOUT booting — its scene facet is pure shape/state data.
+    const js = typeof rec.js === "string" ? rec.js : "";
+    const hasBehavior = /me\.(animate|render|click|dispose)\s*=/.test(js) || /sceneBehaviors\s*=/.test(js);
+    return { doc, specs, rootNodeId, hasBehavior };
   }
 
   // ── collections: a shape's `each` templates render against the host's
@@ -189,8 +196,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (item && (item.key !== undefined)) return String(item.key);
     return String(index);
   }
-  function evalProps(entry, item, index) {
-    const scope = Object.assign({}, me.state, { item, index });
+  function evalProps(entry, item, index, doc) {
+    const defaults = (doc && typeof doc.stateDefaults === "function") ? doc.stateDefaults() : {};
+    const scope = Object.assign({}, defaults, me.state, { item, index });
     const overrides = new Map();
     for (const path of Object.keys(entry.props || {})) {
       const c = compile(String(entry.props[path]));
@@ -216,7 +224,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       items.forEach((item, index) => {
         const k = itemKey(t.entry, item, index);
         seen.add(k);
-        const spec = instanceSpec(doc, t.entry, t.type, k, evalProps(t.entry, item, index),
+        const spec = instanceSpec(doc, t.entry, t.type, k, evalProps(t.entry, item, index, doc),
           { theme: dark() ? "dark" : "light", prefix: inst.specPrefix, parent: null });
         stage.upsert(spec);
         if (!coll.ids.has(k)) { coll.ids.set(k, spec.id); inst.specIds.push(spec.id); }
@@ -227,6 +235,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     }
     stage.requestRender();
   }
+  syncColls = syncCollections;   // let module-scope setState re-sync collections
 
   // ── addControl: the host's instancing call ────────────────────────────────
   me.addControl = async function (lib, ctl, data, key) {
