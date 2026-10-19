@@ -243,49 +243,64 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const prefix = `${key}:`;
     const theme = dark() ? "dark" : "light";
 
-    // boot the child control in a hidden host → its live me (no cage)
-    const host2 = document.createElement("div");
-    host2.style.display = "none";
-    ME.appendChild(host2);
-
     const shape = await loadChildShape(lib, ctl, prefix, theme);
 
     const inst = await new Promise((resolve) => {
+      // build the instance + draw its shape; the live `me` attaches below when
+      // the control declares 3D behaviors (otherwise it stays a shape-only
+      // instance and never boots js)
+      const rig = {
+        pos: { x: 0, y: 0, z: 0 },
+        rot: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+        visible: true,
+      };
+      const inst = {
+        key, lib, ctl, me: null, rig,
+        shape: shape ? shape.doc : null,
+        rootNodeId: shape ? shape.rootNodeId : null,
+        specPrefix: prefix,
+        specIds: [],
+        colls: [],            // [{ entry, type, keyFn, propFns:[{path,fn}], ids:Map<key,specId> }]
+        nodeRig: new Map(),     // nodeId -> {path: value} overrides
+        data: data || {},
+        renderFn: null, clickFn: null, animateFn: null, disposeFn: null,
+        ctx: null,
+      };
+      const ctx = {
+        me: null,
+        rig,
+        data: inst.data,
+        key,
+        t: 0, dt: 0,
+        shape: inst.shape,
+        host: me,
+        setRig(nodeId, path, value) {
+          if (value === undefined) return; // (nodeId,path,value) only
+          if (!inst.nodeRig.has(nodeId)) inst.nodeRig.set(nodeId, {});
+          inst.nodeRig.get(nodeId)[path] = value;
+        },
+      };
+      inst.ctx = ctx;
+
+      // draw the child's shape
+      if (shape && shape.specs.length) {
+        for (const s of shape.specs) { stage.upsert(s); inst.specIds.push(s.id); }
+      }
+      syncCollections(inst);
+
+      // shape-only control — no behaviors to boot; resolve immediately
+      if (!shape || !shape.hasBehavior) { resolve(inst); return; }
+
+      // boot the child control in a hidden host → its live me (no cage)
+      const host2 = document.createElement("div");
+      host2.style.display = "none";
+      ME.appendChild(host2);
+      inst.bootHost = host2;
       installControl(host2, lib, ctl, function (api) {
-        const rig = {
-          pos: { x: 0, y: 0, z: 0 },
-          rot: { x: 0, y: 0, z: 0 },
-          scale: { x: 1, y: 1, z: 1 },
-          visible: true,
-        };
-        const inst = {
-          key, lib, ctl, me: api, rig,
-          shape: shape ? shape.doc : null,
-          rootNodeId: shape ? shape.rootNodeId : null,
-          specPrefix: prefix,
-          specIds: [],
-          colls: [],            // [{ entry, type, keyFn, propFns:[{path,fn}], ids:Map<key,specId> }]
-          nodeRig: new Map(),     // nodeId -> {path: value} overrides
-          data: data || {},
-          renderFn: null, clickFn: null, animateFn: null, disposeFn: null,
-          ctx: null,
-        };
-        // the behavior ctx — runs as the child's own me
-        const ctx = {
-          me: api,
-          rig,
-          data: inst.data,
-          key,
-          t: 0, dt: 0,
-          shape: inst.shape,
-          host: me,
-          setRig(nodeId, path, value) {
-            if (value === undefined) return; // (nodeId,path,value) only
-            if (!inst.nodeRig.has(nodeId)) inst.nodeRig.set(nodeId, {});
-            inst.nodeRig.get(nodeId)[path] = value;
-          },
-        };
-        inst.ctx = ctx;
+        if (!api) { resolve(inst); return; }
+        inst.me = api;
+        ctx.me = api;
         api.rig = rig;                 // the child sees its own rig as me.rig
         api.scene = me;                // … and the host as me.scene
         api.owner = me;                // (the scenegraph names)
@@ -301,11 +316,6 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         inst.clickFn = api.click || (impl && impl.click) || null;
         inst.disposeFn = api.dispose || (impl && impl.dispose) || null;
 
-        // draw the child's shape
-        if (shape && shape.specs.length) {
-          for (const s of shape.specs) { stage.upsert(s); inst.specIds.push(s.id); }
-        }
-        syncCollections(inst);
         resolve(inst);
       }, data);
     });
@@ -335,8 +345,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // drop any links this instance touched
     for (const [lk, l] of [...links]) if (l.a === key || l.b === key) { stage.removeObject(lk); links.delete(lk); }
     // the hidden div the child was booted in — drop it so DOM doesn't accumulate
-    const home = inst.me && inst.me.UUID && document.getElementById(inst.me.UUID);
-    if (home && home.parentElement && home.parentElement.style.display === "none") home.parentElement.remove();
+    if (inst.bootHost) { inst.bootHost.remove(); inst.bootHost = null; }
     byKey.delete(key);
     const i = me.children.indexOf(inst);
     if (i >= 0) me.children.splice(i, 1);
