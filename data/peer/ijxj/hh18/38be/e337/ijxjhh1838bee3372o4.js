@@ -71,6 +71,7 @@ me.render = function (ctx, dt) {
   var fx = 0, fy = 0, fz = 0;
   var siblings = ctx.host.children;
   var count = 0;
+  var connected = false;
   for (var k = 0; k < siblings.length; k++) {
     var s = siblings[k];
     if (s === ctx.me || !s.rig) continue;
@@ -81,17 +82,21 @@ me.render = function (ctx, dt) {
     // a connection to this sibling? a weak spring toward it, and own the link
     var rid = s.me && s.me.peerId;
     if (rid && me.data.peers && me.data.peers[rid]) {
+      connected = true;
       var op = me.data.peers[rid];
       var sf = 0.05 * d;                                 // spring pull
       fx -= (dx/d)*sf; fy -= (dy/d)*sf; fz -= (dz/d)*sf;
       me._wantLink(ctx, s, op);
     }
   }
-  // pull to centre (the constellation's gravity); X/Z toward the origin, Y
-  // toward THIS peer's own rest height — the stiffness is unchanged, only the
-  // rest point is per-peer, so the slab becomes a gentle deterministic puff.
-  var restY = (typeof me.restY === "number") ? me.restY : 0.5;
-  fx -= ctx.rig.pos.x * 0.55; fy -= (ctx.rig.pos.y - restY) * 1.4; fz -= ctx.rig.pos.z * 0.55;
+  // pull to centre — only CONNECTED peers feel it (the constellation's gravity
+  // holds the linked cluster together; a lone peer drifts free). Equal on all
+  // three axes: same 0.55 stiffness, each toward its own centre (Y toward this
+  // peer's rest height, so no axis is special).
+  if (connected) {
+    var restY = (typeof me.restY === "number") ? me.restY : 0.5;
+    fx -= ctx.rig.pos.x * 0.55; fy -= (ctx.rig.pos.y - restY) * 0.55; fz -= ctx.rig.pos.z * 0.55;
+  }
   me.vx = (me.vx + fx * dt) * 0.86;
   me.vy = (me.vy + fy * dt) * 0.86;
   me.vz = (me.vz + fz * dt) * 0.86;
