@@ -172,13 +172,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // the root node = the first top-level node (no parent) — the rig target
     let rootNodeId = null;
     for (const n of doc.nodes()) { if (!n.parent) { rootNodeId = n.id; break; } }
-    // Boot the child's js ONLY if it declares 3D behaviors (the unified
-    // contract: a control IS a 3D object when it has me.animate/render/click/
-    // dispose). A control whose js is a plain page controller renders its
-    // shape WITHOUT booting — its scene facet is pure shape/state data.
-    const js = typeof rec.js === "string" ? rec.js : "";
-    const hasBehavior = /me\.(animate|render|click|dispose)\s*=/.test(js) || /sceneBehaviors\s*=/.test(js);
-    return { doc, specs, rootNodeId, hasBehavior };
+    return { doc, specs, rootNodeId };
   }
 
   // ── collections: a shape's `each` templates render against the host's
@@ -246,9 +240,14 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const shape = await loadChildShape(lib, ctl, prefix, theme);
 
     const inst = await new Promise((resolve) => {
-      // build the instance + draw its shape; the live `me` attaches below when
-      // the control declares 3D behaviors (otherwise it stays a shape-only
-      // instance and never boots js)
+      // boot the child control in a hidden host → its live me (no cage). The
+      // instance + its shape are built first so addControl resolves on the api
+      // callback — never on the child's (possibly slow) me.ready.
+      const host2 = document.createElement("div");
+      host2.style.display = "none";
+      ME.appendChild(host2);
+      inst_boot(host2);
+      function inst_boot(homeEl) {
       const rig = {
         pos: { x: 0, y: 0, z: 0 },
         rot: { x: 0, y: 0, z: 0 },
@@ -266,6 +265,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         data: data || {},
         renderFn: null, clickFn: null, animateFn: null, disposeFn: null,
         ctx: null,
+        bootHost: homeEl,
       };
       const ctx = {
         me: null,
@@ -289,21 +289,13 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       }
       syncCollections(inst);
 
-      // shape-only control — no behaviors to boot; resolve immediately
-      if (!shape || !shape.hasBehavior) { resolve(inst); return; }
-
-      // boot the child control in a hidden host → its live me (no cage)
-      const host2 = document.createElement("div");
-      host2.style.display = "none";
-      ME.appendChild(host2);
-      inst.bootHost = host2;
-      installControl(host2, lib, ctl, function (api) {
+      installControl(homeEl, lib, ctl, function (api) {
         if (!api) { resolve(inst); return; }
         inst.me = api;
         ctx.me = api;
         api.rig = rig;                 // the child sees its own rig as me.rig
         api.scene = me;                // … and the host as me.scene
-        api.owner = me;                // (the scenegraph names)
+        api.owner = me;
         api.model = { rig, key };      // a light model handle
         api.data = inst.data;          // the addControl seed, as me.data
         if (!api.children) api.children = [];
@@ -318,6 +310,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
         resolve(inst);
       }, data);
+      }
     });
 
     me.children.push(inst);
