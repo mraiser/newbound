@@ -71,12 +71,17 @@ me.render = function (ctx, dt) {
   var fx = 0, fy = 0, fz = 0;
   var siblings = ctx.host.children;
   var count = 0;
+  // repulsion strength depends on MY connection to the local instance: a grey,
+  // disconnected orb shoves off much harder — it clears out of the cluster
+  // faster and, feeling no gravity, settles well beyond the connected peers.
+  var connectedToLocal = !!(me.data.tcp || me.data.udp || me.data.relay || me.data.connected);
+  var repulse = connectedToLocal ? 1.2 : 2.8;
   for (var k = 0; k < siblings.length; k++) {
     var s = siblings[k];
     if (s === ctx.me || !s.rig) continue;
     var dx = ctx.rig.pos.x - s.rig.pos.x, dy = ctx.rig.pos.y - s.rig.pos.y, dz = ctx.rig.pos.z - s.rig.pos.z;
     var d2 = Math.max(0.04, dx*dx + dy*dy + dz*dz), d = Math.sqrt(d2);
-    var f = 1.2 / d2;                                   // 1/d² repulsion
+    var f = repulse / d2;                              // 1/d² repulsion
     fx += (dx/d)*f; fy += (dy/d)*f; fz += (dz/d)*f; count++;
     // a connection to this sibling? a weak spring toward it, and own the link
     var rid = s.me && s.me.peerId;
@@ -92,7 +97,6 @@ me.render = function (ctx, dt) {
   // green/blue/yellow vs grey): a live peer is held to the centre; a grey,
   // disconnected orb is not. Radial spring — stronger far away, zero at the
   // centre (origin laterally, this peer's rest height vertically), isotropic.
-  var connectedToLocal = !!(me.data.tcp || me.data.udp || me.data.relay || me.data.connected);
   if (connectedToLocal) {
     var cy = (typeof me.restY === "number") ? me.restY : 0.5;
     var gx = ctx.rig.pos.x, gy = ctx.rig.pos.y - cy, gz = ctx.rig.pos.z;
