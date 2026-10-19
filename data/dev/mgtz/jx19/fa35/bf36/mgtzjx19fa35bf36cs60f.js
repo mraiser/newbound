@@ -96,6 +96,10 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   }
 
   // ── the doc + the save gate ───────────────────────────────────────────────
+  // The editor always loads through dev.code.read_control_scene (the journaled
+  // store read with a base hash); record.scene is only the fallback if that
+  // call ever fails. sceneApi gates that preference.
+  const sceneApi = true;
   const canSave = true;
   let hash = "";
   let doc, absent;
