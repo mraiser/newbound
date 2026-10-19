@@ -1,9 +1,9 @@
 // sceneeditor — the scene facet's pane in the workbench. Canvas
 // (scenestage) + right rail (nodes/state/bind/wires/mounts), BUILD mode
 // (gestures + forms mutate the doc through scenedoc's inverse-carrying
-// mutations; composed undo) and PLAY mode (scenerun goes live in-pane —
-// safe because the facet contains no code). Saves are whole-object
-// writes through write_control_scene with the base hash.
+// mutations; composed undo) and PLAY mode (the control hosted live in a
+// scenehost — the ONE scene runtime). Saves are whole-object writes
+// through write_control_scene with the base hash.
 
 
 var me = this;
@@ -17,7 +17,6 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   const { parse: parseExpr } = document.querySelector('[data-control="app:sceneexpr"]').api;
   const { TOKEN_NAMES } = document.querySelector('[data-control="app:scenetokens"]').api;
   const { project, envOf } = document.querySelector('[data-control="app:sceneproject"]').api;
-  const { createRuntime } = document.querySelector('[data-control="app:scenerun"]').api;
   const { hasWebGL } = document.querySelector('[data-control="app:webgl"]').api;
   const viewctx = document.querySelector(".nb-viewctx").api;
   // the vendored stage off its real asset URL — page-relative for tunneling
@@ -59,15 +58,12 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   const conflictEl = root.querySelector(".se-conflict");
 
   // ── behaviors: the control's OWN js facet is the behavior source ──────────
-  // A behavior is real JS on the edited control's js facet, with full access to
-  // the control's functions and `me` (no cage). We boot the control in a hidden
-  // div and read its LIVE api. Two behavior dialects live there:
-  //   · DECLARATIVE — me.sceneBehaviors = { name → impl }, referenced by NAME
-  //     from the scene facet (behaviors.animate/render, a node's "behavior").
-  //   · COMPONENT — per-instance methods me.animate / me.render / me.click on
-  //     the control itself; the control IS a 3D object hosted by app:scenehost,
-  //     and its scene facet is its SHAPE. We detect this dialect and offer a
-  //     component preview (PLAY hosts the control in a scenehost).
+  // A control's OWN js facet is the behavior source — real JS with full access
+  // to the control's functions and `me` (no cage). We boot the control in a
+  // hidden div and read its LIVE api. The ONE behavior model is per-instance:
+  // me.animate / me.render / me.click on the control — the control IS a 3D
+  // object hosted by app:scenehost, and its scene facet is its SHAPE. We detect
+  // those and PLAY hosts the control live in a scenehost (a preview instance).
   let controlApi = null;
   async function loadControlApi() {
     return new Promise((resolve) => {
@@ -128,31 +124,15 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   const undoStack = [], redoStack = [];
   let selected = null;
   let mode = "build";
-  let rt = null;
   let dragCtx = null;
   let gone = false;
 
   const stage = mountScene(canvasEl, {
     pickMode: "all",
     showSlots: true,
-    onTap: (id) => {
-      if (mode === "play") { if (rt) rt.handleTap(id); return; }
-      select(id);
-    },
-    onHover: (id) => {
-      if (mode === "play" && rt) { /* hover wires fire on transitions */
-        if (id !== hoverLast) {
-          if (hoverLast) rt.handleHover(hoverLast, false);
-          if (id) rt.handleHover(id, true);
-          hoverLast = id;
-        }
-      }
-      canvasEl.style.cursor = id ? "pointer" : "";
-    },
-    onDrag: (evt) => {
-      if (mode === "play") { if (rt) rt.handleDrag(evt); return; }
-      buildDrag(evt);
-    },
+    onTap: (id) => { if (mode === "play") return; select(id); },
+    onHover: (id) => { canvasEl.style.cursor = id ? "pointer" : ""; },
+    onDrag: (evt) => { if (mode === "play") return; buildDrag(evt); },
   });
   let hoverLast = null;
 
@@ -258,59 +238,27 @@ async function init(host, { lib, name, record, toast, onSaved }) {
     stage.setShowSlots(false);
     stage.emphasize(null);
 
-    // COMPONENT preview: the control IS a 3D object. Host it in a scenehost —
-    // its own per-instance animate/render/click run there, on the live shape.
-    if (isComponent) {
-      // overlay on top of the (paused) build canvas — don't destroy it
-      const overlay = document.createElement("div");
-      overlay.style.cssText = "position:absolute;inset:0;z-index:2;background:var(--panel,#1f242a)";
-      canvasEl.style.position = canvasEl.style.position || "relative";
-      canvasEl.appendChild(overlay);
-      compOverlay = overlay;
-      installControl(overlay, "app", "scenehost", async function (host3) {
-        compHost = host3;
-        host3.waitReady(async () => {
-          host3.hostData = host3.hostData || {};
-          // a few instances so sibling forces / per-instance behavior is visible
-          const seeds = (record.data && Array.isArray(record.data.instances))
-            ? record.data.instances : [{ id: "a" }, { id: "b" }, { id: "c" }];
-          for (const s of seeds) await host3.addControl(lib, name, s);
-          host3.frameAll();
-        });
-      }, { env: (doc && doc.env) || {} });
-      renderPanel();
-      return;
-    }
-
-    // DECLARATIVE play: the scene facet interpreted by scenerun in-pane.
-    rt = createRuntime({
-      doc,
-      stage,
-      theme: dark() ? "dark" : "light",
-      reduced: reducedMotion(),
-      behaviors: sceneBehaviors,
-      loadDoc: async (mlib, mctl) => {
-        const controls = await controlsOf(mlib);
-        if (controls instanceof Error) return null;
-        const entry = controls.find((c) => c.name === mctl);
-        if (!entry) return null;
-        const rec = await readRec(mlib, entry.id);
-        if (rec instanceof Error || rec.scene === undefined) return null;
-        return parseScene(rec.scene);
-      },
-      // The run ▸ posture: scene-driven command invocation is a
-      // disposable-instance activity.
-      invoke: true
-        ? async (ilib, ictl, icmd, args) => {
-            const r = await invokeP(ilib, ictl, icmd, args);
-            if (r.status !== "ok") return new Error(r.msg || "invoke failed");
-            return r.data ?? r.msg ?? r;
-          }
-        : undefined,
-      onDiag: (m) => { playDiags.push(m); diagBtn.classList.add("warn"); diagBtn.textContent = `△ ${playDiags.length}`; },
-      onState: () => { if (activeTab === "state") renderPanel(); },
-    });
-    await rt.start();
+    // PLAY hosts the control live in a scenehost — the ONE scene runtime. The
+    // edited control IS the 3D object: its scene facet is its shape, its js
+    // per-instance me.animate/render/click run there. (A control with no own-js
+    // behaviors still shows its shape.) Overlay on top of the paused build
+    // canvas — don't destroy it.
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:absolute;inset:0;z-index:2;background:var(--panel,#1f242a)";
+    canvasEl.style.position = canvasEl.style.position || "relative";
+    canvasEl.appendChild(overlay);
+    compOverlay = overlay;
+    installControl(overlay, "app", "scenehost", async function (host3) {
+      compHost = host3;
+      host3.waitReady(async () => {
+        host3.hostData = host3.hostData || {};
+        // a few instances so sibling forces / per-instance behavior is visible
+        const seeds = (record.data && Array.isArray(record.data.instances))
+          ? record.data.instances : [{ id: "a" }, { id: "b" }, { id: "c" }];
+        for (const s of seeds) await host3.addControl(lib, name, s);
+        host3.frameAll();
+      });
+    }, { env: (doc && doc.env) || {} });
     renderPanel();
   }
   const playDiags = [];
@@ -320,7 +268,6 @@ async function init(host, { lib, name, record, toast, onSaved }) {
     modeBtn.textContent = "play ▸";
     modeBtn.classList.remove("playing");
     addSel.disabled = false;
-    if (rt) { rt.dispose(); rt = null; }
     if (compHost) {
       try { if (compHost.dispose) compHost.dispose(); } catch (e) {}
       compHost = null;
@@ -710,7 +657,7 @@ async function init(host, { lib, name, record, toast, onSaved }) {
 
   function renderState() {
     panelEl.appendChild(el("h4", null, mode === "play" ? "state (live)" : "state (defaults)"));
-    const live = mode === "play" && rt ? rt.stateOf() : null;
+    const live = mode === "play" && compHost ? compHost.state : null;
     for (const f of doc.stateFields()) {
       const row = el("div", "se-row");
       row.appendChild(el("span", "grow", f.name));
