@@ -89,13 +89,26 @@ me.render = function (ctx, dt) {
       me._wantLink(ctx, s, op);
     }
   }
-  // pull to centre — only CONNECTED peers feel it (the constellation's gravity
-  // holds the linked cluster together; a lone peer drifts free). Equal on all
-  // three axes: same 0.55 stiffness, each toward its own centre (Y toward this
-  // peer's rest height, so no axis is special).
+  // pull to centre — only CONNECTED peers feel it. A radial spring: magnitude
+  // grows with distance from the centre (stronger far away) and fades to zero
+  // as the peer reaches it. The centre is the connected cluster's own — the
+  // origin laterally, the local mean rest height vertically — and the pull is
+  // the same on every axis (isotropic).
   if (connected) {
-    var restY = (typeof me.restY === "number") ? me.restY : 0.5;
-    fx -= ctx.rig.pos.x * 0.55; fy -= (ctx.rig.pos.y - restY) * 0.55; fz -= ctx.rig.pos.z * 0.55;
+    var cy = 0, cn = 0;
+    for (var m = 0; m < siblings.length; m++) {
+      var sm = siblings[m];
+      if (sm === ctx.me || !sm.rig) continue;
+      var smid = sm.me && sm.me.peerId;
+      if (smid && me.data.peers && me.data.peers[smid]) { cy += (typeof sm.me.restY === "number" ? sm.me.restY : 0.5); cn++; }
+    }
+    cy = cn ? cy / cn : (typeof me.restY === "number" ? me.restY : 0.5);
+    var gx = ctx.rig.pos.x, gy = ctx.rig.pos.y - cy, gz = ctx.rig.pos.z;
+    var gd = Math.sqrt(gx*gx + gy*gy + gz*gz);
+    if (gd > 1e-4) {
+      // isotropic Hooke pull toward the cluster centre: F = −k·(offset), k = 0.55
+      fx -= gx * 0.55; fy -= gy * 0.55; fz -= gz * 0.55;
+    }
   }
   me.vx = (me.vx + fx * dt) * 0.86;
   me.vy = (me.vy + fy * dt) * 0.86;
