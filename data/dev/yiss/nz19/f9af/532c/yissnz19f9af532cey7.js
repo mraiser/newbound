@@ -19,10 +19,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // mount a child control and resolve with its api once it is ready —
   // installControl is the platform's own mounter; waitReady is the
   // convention converted controls expose when their setup is async
-  const MOUNT_HOMES = { sceneplayer: "app" };
   function mount(name, el, props) {
     return new Promise(function (res) {
-      installControl(el, MOUNT_HOMES[name] || "dev", name, function (api) {
+      installControl(el, "dev", name, function (api) {
         if (api && api.waitReady) api.waitReady(function () { res(api); });
         else res(api);
       }, props || {});
@@ -108,39 +107,6 @@ async function init(host) {
       stage.appendChild(slot);
       setCrumb("git", "repos");
       stageApi = await mount("git", slot, { toast });
-      return;
-    }
-
-    if (location.hash.startsWith("#/player/")) {
-      // #/player/<lib>/<ctl> — a scene facet running standalone: the
-      // sceneplayer full-screen, chrome-free. Made for EMBEDDING — another
-      // app iframes /dev/ at this route and drives live state via
-      // postMessage {sceneSet: {field, value}} (the peer app's layout
-      // loop). The IDE chrome stays out of the way.
-      shelfApi = null;
-      stage.replaceChildren();
-      const slot = document.createElement("div");
-      slot.style.height = "100%";
-      stage.appendChild(slot);
-      const ctlName = decodeURIComponent(location.hash.split("/")[3] ?? "");
-      const api = await mount("sceneplayer", slot, {
-        lib: decodeURIComponent(lib ?? ""), ctl: ctlName,
-        caption: `${lib} ▸ ${ctlName}`,
-        // state changes flow OUT to an embedding parent (the peer app's
-        // headsup-open-on-focus case) — the inbound half is sceneSet below
-        onState: (prefix, field, value) => {
-          if (window.parent !== window) {
-            window.parent.postMessage({ sceneState: { prefix, field, value } }, "*");
-          }
-        },
-      });
-      const onMsg = (e) => {
-        const m = e.data && e.data.sceneSet;
-        if (m && typeof m.field === "string") api.setState(m.field, m.value);
-      };
-      window.addEventListener("message", onMsg);
-      stageApi = { dispose() { window.removeEventListener("message", onMsg); api.dispose(); } };
-      setCrumb(decodeURIComponent(lib ?? ""), ctlName);
       return;
     }
 
