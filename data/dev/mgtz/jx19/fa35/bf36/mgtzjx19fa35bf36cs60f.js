@@ -1,9 +1,9 @@
 // sceneeditor — the scene facet's pane in the workbench. Canvas
 // (scenestage) + right rail (nodes/state/bind/wires/mounts), BUILD mode
 // (gestures + forms mutate the doc through scenedoc's inverse-carrying
-// mutations; composed undo) and PLAY mode (scenerun goes live in-pane —
-// safe because the facet contains no code). Saves are whole-object
-// writes through write_control_scene with the base hash.
+// mutations; composed undo) and PLAY mode (the control hosted live in a
+// scenehost — the ONE scene runtime). Saves are whole-object writes
+// through write_control_scene with the base hash.
 
 
 var me = this;
@@ -17,7 +17,6 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   const { parse: parseExpr } = document.querySelector('[data-control="app:sceneexpr"]').api;
   const { TOKEN_NAMES } = document.querySelector('[data-control="app:scenetokens"]').api;
   const { project, envOf } = document.querySelector('[data-control="app:sceneproject"]').api;
-  const { createRuntime } = document.querySelector('[data-control="app:scenerun"]').api;
   const { hasWebGL } = document.querySelector('[data-control="app:webgl"]').api;
   const viewctx = document.querySelector(".nb-viewctx").api;
   // the vendored stage off its real asset URL — page-relative for tunneling
@@ -58,6 +57,26 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   const labelIn = root.querySelector(".se-label");
   const conflictEl = root.querySelector(".se-conflict");
 
+  // ── behaviors: the control's OWN js facet is the behavior source ──────────
+  // A control's OWN js facet is the behavior source — real JS with full access
+  // to the control's functions and `me` (no cage). We boot the control in a
+  // hidden div and read its LIVE api. The ONE behavior model is per-instance:
+  // me.animate / me.render / me.click on the control — the control IS a 3D
+  // object hosted by app:scenehost, and its scene facet is its SHAPE. We detect
+  // those and PLAY hosts the control live in a scenehost (a preview instance).
+  let controlApi = null;
+  async function loadControlApi() {
+    return new Promise((resolve) => {
+      const host2 = document.createElement("div");
+      host2.style.display = "none";
+      root.appendChild(host2);
+      try { installControl(host2, lib, name, (api) => resolve(api || null)); }
+      catch (e) { resolve(null); }
+    });
+  }
+  controlApi = await loadControlApi();
+  const sceneBehaviors = (controlApi && controlApi.sceneBehaviors) || {};
+
   if (!hasWebGL()) {
     canvasEl.innerHTML = `<p class="se-note" style="padding:14px">no WebGL here —
       the scene facet renders as raw JSON:</p><pre style="padding:0 14px;
@@ -68,6 +87,10 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   }
 
   // ── the doc + the save gate ───────────────────────────────────────────────
+  // The editor always loads through dev.code.read_control_scene (the journaled
+  // store read with a base hash); record.scene is only the fallback if that
+  // call ever fails. sceneApi gates that preference.
+  const sceneApi = true;
   const canSave = true;
   let hash = "";
   let doc, absent;
@@ -88,40 +111,22 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   await loadDoc();
   let baseline = JSON.stringify(doc.serialize());
 
-  capEl.textContent = "";
   saveBtn.hidden = labelIn.hidden = !canSave;
 
   // ── stage ─────────────────────────────────────────────────────────────────
   const undoStack = [], redoStack = [];
   let selected = null;
   let mode = "build";
-  let rt = null;
   let dragCtx = null;
   let gone = false;
 
   const stage = mountScene(canvasEl, {
     pickMode: "all",
     showSlots: true,
-    onTap: (id) => {
-      if (mode === "play") { if (rt) rt.handleTap(id); return; }
-      select(id);
-    },
-    onHover: (id) => {
-      if (mode === "play" && rt) { /* hover wires fire on transitions */
-        if (id !== hoverLast) {
-          if (hoverLast) rt.handleHover(hoverLast, false);
-          if (id) rt.handleHover(id, true);
-          hoverLast = id;
-        }
-      }
-      canvasEl.style.cursor = id ? "pointer" : "";
-    },
-    onDrag: (evt) => {
-      if (mode === "play") { if (rt) rt.handleDrag(evt); return; }
-      buildDrag(evt);
-    },
+    onTap: (id) => { if (mode === "play") return; select(id); },
+    onHover: (id) => { canvasEl.style.cursor = id ? "pointer" : ""; },
+    onDrag: (evt) => { if (mode === "play") return; buildDrag(evt); },
   });
-  let hoverLast = null;
 
   // Build-mode drag: live stage deltas during the gesture, ONE movePos
   // mutation at the end (one undo step, one label). World deltas are applied
@@ -214,6 +219,8 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   }
 
   // ── play mode ─────────────────────────────────────────────────────────────
+  let compHost = null;   // the scenehost, in component preview
+  let compOverlay = null;
   async function enterPlay() {
     mode = "play";
     modeBtn.textContent = "◂ build";
@@ -222,33 +229,28 @@ async function init(host, { lib, name, record, toast, onSaved }) {
     stage.setPickMode("affordant");
     stage.setShowSlots(false);
     stage.emphasize(null);
-    rt = createRuntime({
-      doc,
-      stage,
-      theme: dark() ? "dark" : "light",
-      reduced: reducedMotion(),
-      loadDoc: async (mlib, mctl) => {
-        const controls = await controlsOf(mlib);
-        if (controls instanceof Error) return null;
-        const entry = controls.find((c) => c.name === mctl);
-        if (!entry) return null;
-        const rec = await readRec(mlib, entry.id);
-        if (rec instanceof Error || rec.scene === undefined) return null;
-        return parseScene(rec.scene);
-      },
-      // The run ▸ posture: scene-driven command invocation is a
-      // disposable-instance activity.
-      invoke: true
-        ? async (ilib, ictl, icmd, args) => {
-            const r = await invokeP(ilib, ictl, icmd, args);
-            if (r.status !== "ok") return new Error(r.msg || "invoke failed");
-            return r.data ?? r.msg ?? r;
-          }
-        : undefined,
-      onDiag: (m) => { playDiags.push(m); diagBtn.classList.add("warn"); diagBtn.textContent = `△ ${playDiags.length}`; },
-      onState: () => { if (activeTab === "state") renderPanel(); },
-    });
-    await rt.start();
+
+    // PLAY hosts the control live in a scenehost — the ONE scene runtime. The
+    // edited control IS the 3D object: its scene facet is its shape, its js
+    // per-instance me.animate/render/click run there. (A control with no own-js
+    // behaviors still shows its shape.) Overlay on top of the paused build
+    // canvas — don't destroy it.
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:absolute;inset:0;z-index:2;background:var(--panel,#1f242a)";
+    canvasEl.style.position = canvasEl.style.position || "relative";
+    canvasEl.appendChild(overlay);
+    compOverlay = overlay;
+    installControl(overlay, "app", "scenehost", async function (host3) {
+      compHost = host3;
+      host3.waitReady(async () => {
+        host3.hostData = host3.hostData || {};
+        // a few instances so sibling forces / per-instance behavior is visible
+        const seeds = (record.data && Array.isArray(record.data.instances))
+          ? record.data.instances : [{ id: "a" }, { id: "b" }, { id: "c" }];
+        for (const s of seeds) await host3.addControl(lib, name, s);
+        host3.frameAll();
+      });
+    }, { env: (doc && doc.env) || {} });
     renderPanel();
   }
   const playDiags = [];
@@ -258,7 +260,11 @@ async function init(host, { lib, name, record, toast, onSaved }) {
     modeBtn.textContent = "play ▸";
     modeBtn.classList.remove("playing");
     addSel.disabled = false;
-    if (rt) { rt.dispose(); rt = null; }
+    if (compHost) {
+      try { if (compHost.dispose) compHost.dispose(); } catch (e) {}
+      compHost = null;
+    }
+    if (compOverlay) { compOverlay.remove(); compOverlay = null; }
     playDiags.length = 0;
     stage.setPickMode("all");
     stage.setShowSlots(true);
@@ -371,6 +377,7 @@ async function init(host, { lib, name, record, toast, onSaved }) {
       else if (activeTab === "bind") renderBind();
       else if (activeTab === "wires") renderWires();
       else if (activeTab === "mounts") renderMounts();
+      else if (activeTab === "behaviors") renderBehaviors();
       else if (activeTab === "diag") renderDiag();
     } finally {
       rendering = false;
@@ -557,6 +564,23 @@ async function init(host, { lib, name, record, toast, onSaved }) {
         mutate(doc.setAffordance(sel, "drag", dragSel.value === "no drag" ? null : { plane: dragSel.value })));
       af.appendChild(dragSel);
       panelEl.appendChild(af);
+      // behavior — the impl (in this control's js facet) whose event/render
+      // methods fire for this node
+      const bf = el("div", "se-form");
+      bf.appendChild(el("span", "se-note", "behavior"));
+      const bIn = el("input");
+      bIn.placeholder = "impl name (js facet)";
+      bIn.value = hit.entry.behavior ?? "";
+      bIn.setAttribute("list", "se-impls-" + me.UUID);
+      bIn.addEventListener("change", () => mutate(doc.setNodeBehavior(sel, bIn.value.trim() || null)));
+      const bList = el("datalist");
+      bList.id = "se-impls-" + me.UUID;
+      for (const nm of Object.keys(sceneBehaviors || {})) { const o = el("option"); o.value = nm; bList.appendChild(o); }
+      bf.append(bIn, bList);
+      if (bIn.value.trim() && !Object.keys(sceneBehaviors || {}).includes(bIn.value.trim())) {
+        bf.appendChild(el("span", "se-note", "✗ no impl")).style.color = "var(--danger, #c15a5a)";
+      }
+      panelEl.appendChild(bf);
       // parent
       const paf = el("div", "se-form");
       paf.appendChild(el("span", "se-note", "parent"));
@@ -625,7 +649,7 @@ async function init(host, { lib, name, record, toast, onSaved }) {
 
   function renderState() {
     panelEl.appendChild(el("h4", null, mode === "play" ? "state (live)" : "state (defaults)"));
-    const live = mode === "play" && rt ? rt.stateOf() : null;
+    const live = mode === "play" && compHost ? compHost.state : null;
     for (const f of doc.stateFields()) {
       const row = el("div", "se-row");
       row.appendChild(el("span", "grow", f.name));
@@ -638,7 +662,7 @@ async function init(host, { lib, name, record, toast, onSaved }) {
           if (f.type === "number") v = Number(v);
           else if (f.type === "boolean") v = v === "true";
           else if (f.type === "json") { try { v = JSON.parse(vi.value); } catch { return; } }
-          rt.setState(f.name, v);
+          compHost.setState(f.name, v);
         });
         row.appendChild(vi);
       } else {
@@ -794,6 +818,115 @@ async function init(host, { lib, name, record, toast, onSaved }) {
       "events need the matching affordance on the node (tap/drag/hover — see the node inspector)"));
   }
 
+  function renderBehaviors() {
+    const impls = Object.keys(sceneBehaviors || {});
+    const hasImpl = (ref) => {
+      if (typeof ref !== "string") return false;
+      const dot = ref.indexOf(".");
+      return impls.includes(dot < 0 ? ref : ref.slice(0, dot));
+    };
+    const refRow = (label, ref, onClear) => {
+      const row = el("div", "se-row");
+      const ok = hasImpl(ref);
+      row.appendChild(el("span", "grow", `${label} → ${ref}`));
+      const tag = el("span", "se-note", ok ? "✓" : "✗ no impl");
+      if (!ok) tag.style.color = "var(--danger, #c15a5a)";
+      row.appendChild(tag);
+      if (onClear) {
+        const x = el("button", null, "×");
+        x.addEventListener("click", onClear);
+        row.appendChild(x);
+      }
+      return row;
+    };
+
+    panelEl.appendChild(el("h4", null, "behaviors — js on this control"));
+
+    // ── per-instance behaviors on the control's own api (me.animate/render/
+    // click/dispose). One kind of control: these run for every instance when
+    // the control is added to a scenehost. ─────────────────────────────────
+    {
+      const methods = ["animate", "render", "click", "drag", "dispose"].filter((m) => controlApi && typeof controlApi[m] === "function");
+      if (methods.length) {
+        const row = el("div", "se-row");
+        row.appendChild(el("span", "grow", methods.join(" · ")));
+        row.appendChild(el("span", "se-note", "per-instance"));
+        panelEl.appendChild(row);
+        panelEl.appendChild(el("p", "se-note",
+          "the host calls addControl per instance: animate(ctx) once, render(ctx, dt) each frame, click(ctx) on tap, dispose(ctx) on remove. Press play to host it."));
+      } else {
+        panelEl.appendChild(el("p", "se-note",
+          "no per-instance behaviors — add me.animate / me.render / me.click to this control's js facet to give it behavior in a scene."));
+      }
+    }
+
+    // ── top-level lifecycle refs (behaviors.animate / render / customs) ──
+    const block = doc.behaviors();
+    const blockKeys = Object.keys(block);
+    if (!blockKeys.length) panelEl.appendChild(el("p", "se-note", "no top-level behavior refs yet"));
+    for (const k of blockKeys) {
+      panelEl.appendChild(refRow(k, block[k], () => mutate(doc.setBehaviorRef(k, null))));
+    }
+
+    // add a top-level ref
+    const form = el("div", "se-form");
+    const nameIn = el("input");
+    nameIn.placeholder = "hook (animate / render)";
+    nameIn.style.width = "110px";
+    const refIn = el("input");
+    refIn.placeholder = "impl name in js facet";
+    refIn.style.width = "120px";
+    const add = el("button", null, "set");
+    add.addEventListener("click", () => {
+      if (!nameIn.value.trim() || !refIn.value.trim()) return;
+      if (mutate(doc.setBehaviorRef(nameIn.value.trim(), refIn.value.trim()))) { nameIn.value = refIn.value = ""; }
+    });
+    form.append(nameIn, refIn, add);
+    panelEl.appendChild(form);
+
+    // ── per-node behavior refs ──────────────────────────────────────────
+    panelEl.appendChild(el("h4", null, "node behaviors"));
+    let anyNode = false;
+    for (const n of doc.nodes()) {
+      if (n && typeof n.behavior === "string") {
+        anyNode = true;
+        panelEl.appendChild(refRow(n.id, n.behavior, () => mutate(doc.setNodeBehavior(n.id, null))));
+      }
+    }
+    if (!anyNode) panelEl.appendChild(el("p", "se-note", "none — set one in a node's inspector"));
+
+    // ── the impls this control's js facet provides ──────────────────────
+    panelEl.appendChild(el("h4", null, `impls found in js facet (${impls.length})`));
+    if (!impls.length) {
+      panelEl.appendChild(el("p", "se-note",
+        "none — add me.sceneBehaviors = { … } to the js facet to give this scene behavior"));
+    }
+    for (const name of impls) {
+      const impl = sceneBehaviors[name] || {};
+      const hooks = ["animate", "render"].filter((h) => typeof impl[h] === "function");
+      const methods = Object.keys(impl).filter((k) => typeof impl[k] === "function" && !["animate", "render"].includes(k));
+      const row = el("div", "se-row");
+      row.appendChild(el("span", "grow", name));
+      row.appendChild(el("span", "se-note",
+        (hooks.length ? hooks.join(",") : "") + (methods.length ? (hooks.length ? " · " : "") + methods.join(",") : "")));
+      panelEl.appendChild(row);
+    }
+
+    // ── live per-instance inspector (PLAY) ──────────────────────────────
+    if (mode === "play" && compHost) {
+      panelEl.appendChild(el("h4", null, "live instances"));
+      for (const inst of compHost.children) {
+        const row = el("div", "se-row");
+        row.appendChild(el("span", "grow", inst.key));
+        const p = inst.rig && inst.rig.pos ? inst.rig.pos : { x: 0, y: 0, z: 0 };
+        row.appendChild(el("span", "se-note",
+          `pos ${+p.x.toFixed(2)}, ${+p.y.toFixed(2)}, ${+p.z.toFixed(2)}`));
+        panelEl.appendChild(row);
+      }
+      panelEl.appendChild(el("p", "se-note", "per-instance rigs in the scenehost — refreshes with this tab"));
+    }
+  }
+
   async function renderMounts() {
     panelEl.appendChild(el("h4", null, "mounts — child scenes"));
     for (const m of doc.mounts()) {
@@ -876,7 +1009,8 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   }, 2000);
 
   function dispose() {
-    if (rt) { rt.dispose(); rt = null; }
+    if (compHost) { try { if (compHost.dispose) compHost.dispose(); } catch (e) {} compHost = null; }
+    if (compOverlay) { compOverlay.remove(); compOverlay = null; }
     stage.dispose();
     unregCtx();
     clearInterval(watchdog);

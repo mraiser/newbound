@@ -10,7 +10,6 @@ var ME = document.getElementById(me.UUID);
 // (focus — tap toggles — opens/closes headsup).
 
 me.peers = [];
-me.layout = {};       // id -> {x, z, vx, vz}
 
 me.uiReady = function(ui){
   me.ui = ui;
@@ -18,72 +17,6 @@ me.uiReady = function(ui){
   ui.initNavbar(ME);
   ui.initPopups(ME);
 };
-
-function sceneSet(field, value){
-  if (me.player) me.player.setState(field, value);
-}
-
-function toneFor(transport){
-  if (!transport) return 'wire';
-  if (transport.startsWith('tcp#')) return 'good';
-  if (transport.startsWith('udp#')) return 'human';
-  return 'wire';
-}
-
-// Orb colour: HUE BY TRANSPORT — the same convention the headsup panel has
-// always used (peer/headsup.js: tcp green, udp blue, connected-by-relay
-// yellow, otherwise grey) — with SATURATION FADING as the last contact
-// recedes. Colour is data here, not theme, so this uses the scene schema's
-// literal-colour escape (§2.3) rather than a token.
-var TINT_L = 0.54, FRESH_MS = 30000, STALE_MS = 900000, TINT_MS = 15000;
-var lastSeen = {};        // id -> epoch ms we last observed the peer connected
-
-function hslHex(h, s, l){
-  var c = (1 - Math.abs(2*l - 1)) * s, hp = h / 60;
-  var x = c * (1 - Math.abs(hp % 2 - 1)), m = l - c/2;
-  var r = 0, g = 0, b = 0;
-  if (hp < 1) { r = c; g = x; } else if (hp < 2) { r = x; g = c; }
-  else if (hp < 3) { g = c; b = x; } else if (hp < 4) { g = x; b = c; }
-  else if (hp < 5) { r = x; b = c; } else { r = c; b = x; }
-  function hx(v){ var n = Math.round((v + m) * 255);
-    return (n < 16 ? '0' : '') + Math.max(0, Math.min(255, n)).toString(16); }
-  return '#' + hx(r) + hx(g) + hx(b);
-}
-
-// 1 = fresh, 0 = fully stale. An unknown age (never connected, or the 0 the
-// peers command reports when nothing is up) reads as fully stale.
-function freshness(ageMs){
-  if (!isFinite(ageMs) || ageMs < 0) return 0;
-  if (ageMs <= FRESH_MS) return 1;
-  if (ageMs >= STALE_MS) return 0;
-  return 1 - (ageMs - FRESH_MS) / (STALE_MS - FRESH_MS);
-}
-
-function contactAge(p, now){
-  // last_contact is the CONNECTION's own stamp (peer.peer.peers reads it off
-  // whichever transport is up), so the span it measures is the real one: a
-  // connected-but-quiet UDP or relay peer fades exactly like a dropped one.
-  // Two honest limits ride along. A TCP stream keeps no per-read stamp and
-  // reports "now" (listen.rs P2PStream::last_contact) — the platform has
-  // nothing better, so a tcp peer stays fully saturated while it is up. And
-  // a dropped peer reports 0, so we fall back to the last time THIS PAGE saw
-  // it connected — in-memory, so a reload starts it stale.
-  if (p.connected) lastSeen[p.id] = now;
-  if (p.last_contact) return Math.max(0, now - p.last_contact);
-  if (p.connected) return 0;
-  if (lastSeen[p.id]) return now - lastSeen[p.id];
-  return Infinity;
-}
-
-function tintFor(p, now){
-  var h = 210, s0 = 0;                       // grey: disconnected
-  if (p.tcp) { h = 132; s0 = 0.46; }         // green
-  else if (p.udp) { h = 212; s0 = 0.48; }    // blue
-  else if (p.relay || p.connected) { h = 48; s0 = 0.60; }   // yellow
-  var f = freshness(contactAge(p, now));
-  // never fade to flat grey — a dim hue still reads as "this was a tcp peer"
-  return hslHex(h, s0 * (0.16 + 0.84 * f), TINT_L - (1 - f) * 0.12);
-}
 
 function peerList(){
   var out = [];
@@ -106,176 +39,17 @@ function upsertPeerDiv(p){
   d.DATA = p;
 }
 
-// Force layout (assets/forcelayout.js semantics, inlined): loosely mimics
-// the physics that binds atoms in a molecule — 1/d² repulsion grows as
-// peers approach, so connected peers are drawn together but keep their
-// distance. Two guarantees make that hold at any cadence:
-//   · SUBSTEPPING: each call integrates 8 small sub-steps, so the stiff
-//     short-range repulsion is sampled while the barrier is climbed (one
-//     big step tunnels through it, then explodes).
-//   · SEPARATION PROJECTION: after integrating, any pair closer than
-//     D_MIN is pushed apart to exactly D_MIN and the closing velocity is
-//     cancelled — "orbs never merge" is an invariant, not a tuning hope.
-//   · A RADIAL FIELD BOUND: nothing drifts away forever, but the wall is a
-//     SPHERE whose radius grows with the population (cube root, so density
-//     holds steady as peers arrive) rather than a fixed box. A box has
-//     corners, and a fixed one turns a busy instance into a crowd pressed
-//     against flat walls.
-// The field is 3D. y is a real degree of freedom, not a constant: without it
-// every orb is trapped in one plane forever. It is pulled toward the midplane
-// FLATTEN times harder than x/z, so the constellation reads as a thick slab
-// you look into rather than a ball you look at — each orb's label hangs above
-// it, and unbounded y stacks those labels on each other.
-var REPEL = 4.0, SPRING = 1.2, REST = 2.4, ANCHOR = 0.35, ANCHOR_FREE = 0.06;
-var DAMPING = 3.0, MAX_SPEED = 2.0, D_MIN = 1.2, SUBSTEPS = 8;
-var FIELD_BASE = 6.0, FLATTEN = 1.8;
-
-function fieldRadius(n){ return FIELD_BASE * Math.cbrt(Math.max(1, n)); }
-
-// FNV-1a. A peer's first position is a deterministic function of its ID, so
-// it lands in the same part of the field every session and does not shuffle
-// when the peer list changes length — the old seed (index around a circle)
-// did both wrong. Salted three ways for three independent streams.
-function hash32(s){
-  var h = 0x811c9dc5;
-  for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
-  return h >>> 0;
-}
-function unit(s){ return (hash32(s) >>> 8) / 0x1000000; }   // [0,1)
-
-function seedPlacement(id, n){
-  var theta = unit('a:' + id) * 2 * Math.PI;        // azimuth
-  var c = unit('b:' + id) * 2 - 1;                  // cos(polar): uniform on a sphere
-  var r = 0.35 * fieldRadius(n) * (0.55 + 0.45 * unit('c:' + id));
-  var s = Math.sqrt(Math.max(0, 1 - c*c));
-  return {x: r*s*Math.cos(theta), y: r*c/FLATTEN, z: r*s*Math.sin(theta),
-          vx: 0, vy: 0, vz: 0};
-}
-
-function stepLayout(items, connections, dt){
-  var list = [];
-  var byId = {};
-  for (var i = 0; i < items.length; i++) {
-    var it = items[i];
-    var l = me.layout[it.id];
-    if (!l) l = me.layout[it.id] = seedPlacement(it.id, items.length);
-    if (l.y === undefined) { l.y = 0; l.vy = 0; }   // a slot from a 2D build
-    l.anchored = Boolean(it.connected || it.self);
-    byId[it.id] = l;
-    list.push(l);
-  }
-  var R = fieldRadius(list.length);
-  var h = dt / SUBSTEPS;
-  var damp = Math.exp(-DAMPING * h);
-  for (var s = 0; s < SUBSTEPS; s++) {
-    for (var i = 0; i < list.length; i++) { list[i].fx = 0; list[i].fy = 0; list[i].fz = 0; }
-    for (var i = 0; i < list.length; i++) {
-      for (var j = i + 1; j < list.length; j++) {
-        var a = list[i], b = list[j];
-        var dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
-        var d2 = Math.max(0.04, dx*dx + dy*dy + dz*dz);
-        var d = Math.sqrt(d2), f = REPEL / d2;
-        a.fx += (dx/d)*f; a.fy += (dy/d)*f; a.fz += (dz/d)*f;
-        b.fx -= (dx/d)*f; b.fy -= (dy/d)*f; b.fz -= (dz/d)*f;
-      }
-      // weak gravity for free peers too: they reach a force-balance orbit
-      // farther out instead of drifting forever (which defeats sleep)
-      var g = list[i].anchored ? ANCHOR : ANCHOR_FREE;
-      list[i].fx -= list[i].x * g;
-      list[i].fy -= list[i].y * g * FLATTEN;
-      list[i].fz -= list[i].z * g;
-    }
-    for (var i = 0; i < connections.length; i++) {
-      var c = connections[i];
-      var la = byId[c.a], lb = byId[c.b];
-      if (!la || !lb || la == lb) continue;
-      var dx = lb.x - la.x, dy = lb.y - la.y, dz = lb.z - la.z;
-      var d = Math.max(0.2, Math.sqrt(dx*dx + dy*dy + dz*dz));
-      var f = SPRING * (d - REST);
-      la.fx += (dx/d)*f; la.fy += (dy/d)*f; la.fz += (dz/d)*f;
-      lb.fx -= (dx/d)*f; lb.fy -= (dy/d)*f; lb.fz -= (dz/d)*f;
-    }
-    for (var i = 0; i < list.length; i++) {
-      var l = list[i];
-      l.vx = (l.vx + l.fx * h) * damp;
-      l.vy = (l.vy + l.fy * h) * damp;
-      l.vz = (l.vz + l.fz * h) * damp;
-      var sp = Math.sqrt(l.vx*l.vx + l.vy*l.vy + l.vz*l.vz);
-      if (sp > MAX_SPEED) { l.vx *= MAX_SPEED/sp; l.vy *= MAX_SPEED/sp; l.vz *= MAX_SPEED/sp; }
-      var nx = l.x + l.vx * h, ny = l.y + l.vy * h, nz = l.z + l.vz * h;
-      // The wall is a SPHERE of radius R, not a box: clamp the distance from
-      // centre and kill the OUTWARD component of the velocity (or a
-      // wall-pinned peer accumulates speed forever and the sim never
-      // settles/sleeps). Only the outward part goes — sliding along the
-      // wall is still allowed, so a pinned peer keeps looking for room.
-      var rad = Math.sqrt(nx*nx + ny*ny + nz*nz);
-      if (rad > R) {
-        var ux = nx/rad, uy = ny/rad, uz = nz/rad;
-        nx = ux*R; ny = uy*R; nz = uz*R;
-        var out = l.vx*ux + l.vy*uy + l.vz*uz;
-        if (out > 0) { l.vx -= ux*out; l.vy -= uy*out; l.vz -= uz*out; }
-      }
-      l.x = nx; l.y = ny; l.z = nz;
-    }
-    for (var i = 0; i < list.length; i++) {
-      for (var j = i + 1; j < list.length; j++) {
-        var a = list[i], b = list[j];
-        var dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
-        var d = Math.sqrt(dx*dx + dy*dy + dz*dz);
-        if (d >= D_MIN) continue;
-        var nx, ny, nz;
-        if (d < 1e-9) { nx = 1; ny = 0; nz = 0; d = 1e-9; }
-        else { nx = dx/d; ny = dy/d; nz = dz/d; }
-        var push = (D_MIN - d) / 2;
-        a.x -= nx*push; a.y -= ny*push; a.z -= nz*push;
-        b.x += nx*push; b.y += ny*push; b.z += nz*push;
-        var closing = (b.vx - a.vx)*nx + (b.vy - a.vy)*ny + (b.vz - a.vz)*nz;
-        if (closing < 0) {
-          a.vx += nx*closing/2; a.vy += ny*closing/2; a.vz += nz*closing/2;
-          b.vx -= nx*closing/2; b.vy -= ny*closing/2; b.vz -= nz*closing/2;
-        }
-      }
-    }
-  }
-  var e = 0;
-  for (var i = 0; i < list.length; i++)
-    e += list[i].vx*list[i].vx + list[i].vy*list[i].vy + list[i].vz*list[i].vz;
-  return e;
-}
-
-function pushScene(){
-  // No self-orb: your own position carries no information (the corner
-  // panel says who you are). Connected peers still drift toward center —
-  // the legacy pull — they just don't get a line to an invisible you.
-  var items = [];
+function syncPeerData(){
+  // Each orb drives its own physics now. The feed's job is just to keep each
+  // orb's data record fresh (display name, transport, last-contact) so its
+  // tint and label stay honest — and to add/remove instances as peers arrive
+  // and leave (syncPeers).
   var list = peerList();
   for (var i in list) {
     var p = list[i];
-    items.push({id: p.id, displayname: p.displayname || p.name || p.id,
-                connected: Boolean(p.connected), tint: tintFor(p, Date.now())});
+    var inst = me.host && me.host.byId && me.host.byId(p.id);
+    if (inst) inst.me.data = p;
   }
-  var connections = [];
-  var have = {};
-  for (var i in list) {
-    var p = list[i];
-    // p.peers maps peer-id -> transport ("tcp#..."/"udp#..."/relay)
-    for (var rid in (p.peers || {})) {
-      var key = p.id < rid ? p.id + '|' + rid : rid + '|' + p.id;
-      if (have[key]) continue;
-      have[key] = true;
-      connections.push({id: key, a: p.id, b: rid, tone: toneFor(p.peers[rid])});
-    }
-  }
-  var e = stepLayout(items, connections, FEED_MS / 1000);
-  for (var i in items) {
-    var l = me.layout[items[i].id];
-    items[i].x = l.x;
-    items[i].y = l.y;
-    items[i].z = l.z;
-  }
-  sceneSet('peers', items);
-  sceneSet('connections', connections);
-  return e;
 }
 
 // The panel is a HEADS-UP DISPLAY: it floats OVER a full-bleed canvas and
@@ -289,7 +63,7 @@ function pushScene(){
 function animateWidth(el, target, ms, cb){
   try {
     var anim = el.animate([{ width: target + 'px' }], { duration: ms, easing: 'ease' });
-    anim.onfinish = function(){ el.style.width = target + 'px'; if (cb) cb(); };
+    anim.onfinish = function(){ el.style.width = target + 'px'; if (cb) cb(); }
   } catch (x) {
     el.style.width = target + 'px';
     if (cb) cb();
@@ -326,10 +100,10 @@ function watchHud(){
   if (hudWatch) return;
   hudWatch = setInterval(function(){
     var el = document.getElementById('headsupdisplay');
+    if (!el || !el.isConnected) { stopHudWatch(); return; }
     if (el.getAnimations && el.getAnimations().length > 0) return;
     if (getComputedStyle(el).display == 'none' || el.offsetWidth < 40) {
       stopHudWatch();
-      sceneSet('focus', '');
     }
   }, 150);
 }
@@ -338,12 +112,19 @@ function stopHudWatch(){
 }
 
 me.ready = function(){
-  installControl(ME.querySelector('.viewer'), 'app', 'sceneplayer', function(api){
-    me.player = api;
-    api.waitReady(startFeed);
-  }, {lib: 'peer', ctl: 'peer', onState: function(prefix, field, value){
-    if (field == 'focus') onSceneFocus(value);
-  }});
+  // The 3D constellation is hosted by app:scenehost. This control is the
+  // front-end: it hosts the canvas + the other UI and ADDs a peer_model
+  // instance per peer (the host's call). Each orb's own render behavior drives
+  // its physics (force on itself from its siblings); each orb's click opens
+  // its headsup. No declarative each-mount, no host-side sim.
+  installControl(ME.querySelector('.viewer'), 'app', 'scenehost', function(api){
+    me.host = api;
+    api.waitReady(function(){
+      api.hostData = { onFocus: onSceneFocus };
+      syncPeers();
+      startFeed();
+    });
+  }, {});
 
   subscribe_event("peer", "UPDATE", function(data){
     var found = false;
@@ -352,6 +133,7 @@ me.ready = function(){
     }
     if (!found) me.peers.push(data);
     upsertPeerDiv(data);
+    syncPeers();
     wakeFeed();
   });
 
@@ -387,10 +169,30 @@ me.ready = function(){
         }
       });
 
+      syncPeers();
       startFeed();
     });
   });
 };
+
+// Add a peer_model instance per connected peer; remove the ones that left.
+// The host's call — each orb then drives itself (physics, tint, label, click).
+function syncPeers(){
+  if (!me.host) return;
+  var want = {};
+  var list = peerList();
+  for (var i in list) {
+    var p = list[i];
+    // no self-orb: your own position carries no information
+    if (me.info && p.id == me.info.uuid) continue;
+    want[p.id] = p;
+    if (!me.host.byId || !me.host.byId(p.id)) me.host.addControl('peer', 'peer_model', p, p.id);
+  }
+  for (var k = me.host.children.length - 1; k >= 0; k--) {
+    var inst = me.host.children[k];
+    if (!want[inst.key]) me.host.removeControl(inst.key);
+  }
+}
 
 // The feed loop: layout + push every FEED_MS (10Hz). The constellation's
 // position ease is {ms:100, curve:linear} — matched to THIS interval so
@@ -400,52 +202,20 @@ me.ready = function(){
 // under epsilon the loop stops entirely (true stillness, zero traffic);
 // any UPDATE event wakes it. Starts once BOTH the player and the local
 // info are ready.
-var FEED_MS = 100, SETTLE_E = 0.0004, SETTLE_TICKS = 6;
-var settled = 0;
+var FEED_MS = 500;   // slow data-sync cadence — orbs drive their own physics
 function feedTick(){
-  var e = pushScene();
-  settled = e < SETTLE_E ? settled + 1 : 0;
-  if (settled >= SETTLE_TICKS) {
-    clearInterval(me.feed);
-    me.feed = null;
-  }
+  syncPeers();
+  syncPeerData();
+  // orbs drive their own physics, so the feed's only settle is "nothing to do"
+  // — keep a slow cadence to catch tints advancing as last-contact recedes.
 }
 function startFeed(){
-  if (me.feed || !me.player || !me.info) return;
-  settled = 0;
+  if (me.feed || !me.host || !me.info) return;
   feedTick();
   if (!me.feed) me.feed = setInterval(feedTick, FEED_MS);
 }
-// The feed sleeps once the layout settles, but staleness keeps advancing —
-// so a slow tick re-pushes ONLY when a tint actually changed. No physics, no
-// wake: just the colours.
-var tintTimer = setInterval(function(){
-  if (!me.player || me.feed) return;          // the live feed already covers it
-  var now = Date.now(), items = [], moved = false;
-  var list = peerList();
-  // A peer with no layout slot has never been through pushScene — it arrived
-  // while the feed was asleep (normally an UPDATE event wakes it; nothing
-  // guarantees one). Wake the feed so it gets placed, rather than skipping it
-  // forever.
-  for (var i in list) {
-    if (!me.layout[list[i].id]) { wakeFeed(); return; }
-  }
-  for (var i in list) {
-    var p = list[i], l = me.layout[p.id];
-    if (!l) continue;
-    var tint = tintFor(p, now);
-    if (me.lastTint && me.lastTint[p.id] !== tint) moved = true;
-    items.push({id: p.id, displayname: p.displayname || p.name || p.id,
-                connected: Boolean(p.connected), tint: tint,
-                x: l.x, y: l.y, z: l.z});
-  }
-  if (!me.lastTint) { me.lastTint = {}; moved = items.length > 0; }
-  for (var i in items) me.lastTint[items[i].id] = items[i].tint;
-  if (moved && items.length) sceneSet('peers', items);
-}, TINT_MS);
 
 function wakeFeed(){
-  settled = 0;
   startFeed();
 }
 

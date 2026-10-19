@@ -46,6 +46,18 @@ me.setRecord = function (record) {
         : record?.[facet] !== undefined
           && (facet !== "cmd" || (record.cmd?.length ?? 0) > 0);
       dot.classList.toggle(`on-${facet}`, present);
+      // a COMPONENT control: its scene facet is a SHAPE and its js declares
+      // per-instance behaviors (me.render / me.animate / me.click) — hosted by
+      // app:scenehost. Mark the dot so the shelf can tell it from a declarative
+      // scene (read straight from record.js — no boot).
+      if (facet === "scene" && present && typeof record?.js === "string") {
+        const js = record.js;
+        const isComp = /me\.(render|animate|click)\s*=\s*function/.test(js);
+        if (isComp) {
+          dot.classList.add("on-component");
+          dot.title = "component — a 3D object: shape (scene facet) + per-instance behaviors (js)";
+        }
+      }
       dot.setAttribute("aria-label", `${facet}: ${record ? (present ? "present" : "absent") : "unknown"}`);
     }
   });

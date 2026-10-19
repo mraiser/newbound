@@ -164,7 +164,7 @@ function ensureArr(root, key) {
   return { arr: root[key], undo: () => { delete root[key]; } };
 }
 
-const KNOWN_TOP = new Set(["v", "state", "nodes", "mounts", "bindings", "wires", "env"]);
+const KNOWN_TOP = new Set(["v", "state", "nodes", "mounts", "bindings", "wires", "env", "behaviors"]);
 
 class SceneDoc {
   constructor(root, parseDiags) {
@@ -178,6 +178,9 @@ class SceneDoc {
   bindings() { return Array.isArray(this.root.bindings) ? this.root.bindings : []; }
   wires() { return Array.isArray(this.root.wires) ? this.root.wires : []; }
   env() { return isObj(this.root.env) ? this.root.env : {}; }
+  /** The behaviors block (design: the OO layer) — NAME references into the
+      control's js facet (me.sceneBehaviors), never code. {} when absent. */
+  behaviors() { return isObj(this.root.behaviors) ? this.root.behaviors : {}; }
 
   /** {type:"node"|"mount", entry} or null. Nodes win (SD-1 flags dupes). */
   byId(id) {
@@ -454,8 +457,12 @@ class SceneDoc {
     } else if (typeof a.emit === "string") {
       if (!NAME_RE.test(a.emit)) push(DIAG.SD7, "error", path, `malformed emit name "${a.emit}"`);
       if (isObj(a.with)) for (const [k, e] of Object.entries(a.with)) this._checkExpr(e, locals, `${path}.with.${k}`, push, loose);
+    } else if (typeof a.behavior === "string") {
+      // a behavior method ref: "impl" or "impl.method" — resolved against the
+      // control's js facet at runtime, so here we only check the shape
+      if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$/.test(a.behavior)) push(DIAG.SD7, "error", path, `behavior must be "impl" or "impl.method", got "${a.behavior}"`);
     } else {
-      push(DIAG.SD7, "error", path, "action must be one of set / invoke / emit");
+      push(DIAG.SD7, "error", path, "action must be one of set / invoke / emit / behavior");
     }
   }
 
@@ -794,6 +801,50 @@ class SceneDoc {
     return { label: `unwire ${w.on}`,
       undo: () => { arr.splice(index, 0, w); },
       redo: () => { const k = arr.indexOf(w); if (k >= 0) arr.splice(k, 1); } };
+  }
+
+  /** Set or clear a top-level behavior reference (behaviors.animate/render or a
+      custom name). ref is the impl NAME in the control's js facet; null clears. */
+  setBehaviorRef(name, ref) {
+    if (!NAME_RE.test(name)) return { error: `malformed behavior name "${name}"` };
+    if (ref !== null && typeof ref !== "string") return { error: "behavior ref must be a string or null" };
+    const root = this.root;
+    const had = isObj(root.behaviors) && name in root.behaviors;
+    const prev = had ? root.behaviors[name] : undefined;
+    const hadBlock = isObj(root.behaviors);
+    const prevBlock = hadBlock ? root.behaviors : undefined;
+    const apply = () => {
+      if (ref === null) {
+        if (isObj(root.behaviors) && name in root.behaviors) {
+          delete root.behaviors[name];
+          if (Object.keys(root.behaviors).length === 0) delete root.behaviors;
+        }
+      } else {
+        if (!isObj(root.behaviors)) root.behaviors = {};
+        root.behaviors[name] = ref;
+      }
+    };
+    apply();
+    return { label: `behavior ${name}`,
+      undo: () => {
+        if (hadBlock) root.behaviors = prevBlock; else delete root.behaviors;
+        if (had) root.behaviors[name] = prev; },
+      redo: apply };
+  }
+
+  /** Set or clear a node's behavior reference (node.behavior = impl name). */
+  setNodeBehavior(id, ref) {
+    const hit = this.byId(id);
+    if (!hit || hit.type !== "node") return { error: `no node "${id}"` };
+    if (ref !== null && typeof ref !== "string") return { error: "behavior ref must be a string or null" };
+    const entry = hit.entry;
+    const had = "behavior" in entry;
+    const prev = entry.behavior;
+    const apply = () => { if (ref === null) delete entry.behavior; else entry.behavior = ref; };
+    apply();
+    return { label: `node ${id} behavior`,
+      undo: () => { if (had) entry.behavior = prev; else delete entry.behavior; },
+      redo: apply };
   }
 
   setEnv(key, value) {
