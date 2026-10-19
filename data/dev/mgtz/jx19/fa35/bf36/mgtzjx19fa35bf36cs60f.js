@@ -76,11 +76,6 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   }
   controlApi = await loadControlApi();
   const sceneBehaviors = (controlApi && controlApi.sceneBehaviors) || {};
-  // a component control: declares per-instance behaviors on its own api
-  const isComponent = !!(controlApi && (
-    typeof controlApi.render === "function" ||
-    typeof controlApi.animate === "function" ||
-    typeof controlApi.click === "function"));
 
   if (!hasWebGL()) {
     canvasEl.innerHTML = `<p class="se-note" style="padding:14px">no WebGL here —
@@ -116,8 +111,6 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   await loadDoc();
   let baseline = JSON.stringify(doc.serialize());
 
-  capEl.textContent = isComponent ? "component — shape + per-instance behaviors (play hosts it)" : "";
-  if (isComponent) modeBtn.title = "host this component in a scenehost";
   saveBtn.hidden = labelIn.hidden = !canSave;
 
   // ── stage ─────────────────────────────────────────────────────────────────
@@ -849,21 +842,22 @@ async function init(host, { lib, name, record, toast, onSaved }) {
 
     panelEl.appendChild(el("h4", null, "behaviors — js on this control"));
 
-    // ── component dialect: per-instance methods on the control's own api ────
-    if (isComponent) {
-      const methods = ["animate", "render", "click", "drag"].filter((m) => controlApi && typeof controlApi[m] === "function");
-      panelEl.appendChild(el("p", "se-note",
-        `COMPONENT — this control IS a 3D object (hosted by app:scenehost). Its scene facet is its SHAPE; these per-instance methods run for every instance:`));
-      const row = el("div", "se-row");
-      row.appendChild(el("span", "grow", methods.length ? methods.join(" · ") : "(none)"));
-      row.appendChild(el("span", "se-note", "per-instance"));
-      panelEl.appendChild(row);
-      panelEl.appendChild(el("p", "se-note",
-        "the host calls addControl per instance; each runs animate(ctx) once, render(ctx, dt) each frame, click(ctx) on tap. Press play to host it."));
-    } else {
-      panelEl.appendChild(el("p", "se-note",
-        "impls live in this control's js facet as me.sceneBehaviors = { name → {animate, render, …} }. " +
-        "The scene references them by NAME — the code never travels in the facet JSON."));
+    // ── per-instance behaviors on the control's own api (me.animate/render/
+    // click/dispose). One kind of control: these run for every instance when
+    // the control is added to a scenehost. ─────────────────────────────────
+    {
+      const methods = ["animate", "render", "click", "drag", "dispose"].filter((m) => controlApi && typeof controlApi[m] === "function");
+      if (methods.length) {
+        const row = el("div", "se-row");
+        row.appendChild(el("span", "grow", methods.join(" · ")));
+        row.appendChild(el("span", "se-note", "per-instance"));
+        panelEl.appendChild(row);
+        panelEl.appendChild(el("p", "se-note",
+          "the host calls addControl per instance: animate(ctx) once, render(ctx, dt) each frame, click(ctx) on tap, dispose(ctx) on remove. Press play to host it."));
+      } else {
+        panelEl.appendChild(el("p", "se-note",
+          "no per-instance behaviors — add me.animate / me.render / me.click to this control's js facet to give it behavior in a scene."));
+      }
     }
 
     // ── top-level lifecycle refs (behaviors.animate / render / customs) ──
