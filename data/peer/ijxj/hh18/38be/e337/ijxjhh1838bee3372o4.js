@@ -55,7 +55,10 @@ me.animate = function (ctx) {
   var a = (h % 360) * Math.PI / 180;
   ctx.rig.pos.x = Math.cos(a) * 2.6;
   ctx.rig.pos.z = Math.sin(a) * 2.6;
-  ctx.rig.pos.y = 0.5;
+  // a slight, deterministic Y deviation from the same id hash — each peer has
+  // its own rest height (me.restY) so the constellation escapes the plane
+  me.restY = 0.5 + ((((h >>> 8) % 1000) / 1000) - 0.5) * 0.9;   // 0.05 .. 0.95
+  ctx.rig.pos.y = me.restY;
   ctx.setRig("tag", "text", me.data.displayname || me.data.name || id);
   ctx.setRig("orb", "material", { color: tint() });
 };
@@ -84,8 +87,11 @@ me.render = function (ctx, dt) {
       me._wantLink(ctx, s, op);
     }
   }
-  // pull to centre (the constellation's gravity); Y pulled harder → a slab
-  fx -= ctx.rig.pos.x * 0.55; fy -= (ctx.rig.pos.y - 0.5) * 1.4; fz -= ctx.rig.pos.z * 0.55;
+  // pull to centre (the constellation's gravity); X/Z toward the origin, Y
+  // toward THIS peer's own rest height — the stiffness is unchanged, only the
+  // rest point is per-peer, so the slab becomes a gentle deterministic puff.
+  var restY = (typeof me.restY === "number") ? me.restY : 0.5;
+  fx -= ctx.rig.pos.x * 0.55; fy -= (ctx.rig.pos.y - restY) * 1.4; fz -= ctx.rig.pos.z * 0.55;
   me.vx = (me.vx + fx * dt) * 0.86;
   me.vy = (me.vy + fy * dt) * 0.86;
   me.vz = (me.vz + fz * dt) * 0.86;
