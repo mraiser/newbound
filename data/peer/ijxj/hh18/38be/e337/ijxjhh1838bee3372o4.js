@@ -71,7 +71,6 @@ me.render = function (ctx, dt) {
   var fx = 0, fy = 0, fz = 0;
   var siblings = ctx.host.children;
   var count = 0;
-  var connected = false;
   for (var k = 0; k < siblings.length; k++) {
     var s = siblings[k];
     if (s === ctx.me || !s.rig) continue;
@@ -82,31 +81,24 @@ me.render = function (ctx, dt) {
     // a connection to this sibling? a weak spring toward it, and own the link
     var rid = s.me && s.me.peerId;
     if (rid && me.data.peers && me.data.peers[rid]) {
-      connected = true;
       var op = me.data.peers[rid];
       var sf = 0.05 * d;                                 // spring pull
       fx -= (dx/d)*sf; fy -= (dy/d)*sf; fz -= (dz/d)*sf;
       me._wantLink(ctx, s, op);
     }
   }
-  // pull to centre — only CONNECTED peers feel it. A radial spring: magnitude
-  // grows with distance from the centre (stronger far away) and fades to zero
-  // as the peer reaches it. The centre is the connected cluster's own — the
-  // origin laterally, the local mean rest height vertically — and the pull is
-  // the same on every axis (isotropic).
-  if (connected) {
-    var cy = 0, cn = 0;
-    for (var m = 0; m < siblings.length; m++) {
-      var sm = siblings[m];
-      if (sm === ctx.me || !sm.rig) continue;
-      var smid = sm.me && sm.me.peerId;
-      if (smid && me.data.peers && me.data.peers[smid]) { cy += (typeof sm.me.restY === "number" ? sm.me.restY : 0.5); cn++; }
-    }
-    cy = cn ? cy / cn : (typeof me.restY === "number" ? me.restY : 0.5);
+  // pull to centre — only peers CONNECTED TO THE LOCAL INSTANCE feel it. That
+  // is the orb's OWN transport state (the same condition tint() uses for
+  // green/blue/yellow vs grey): a live peer is held to the centre; a grey,
+  // disconnected orb is not. Radial spring — stronger far away, zero at the
+  // centre (origin laterally, this peer's rest height vertically), isotropic.
+  var connectedToLocal = !!(me.data.tcp || me.data.udp || me.data.relay || me.data.connected);
+  if (connectedToLocal) {
+    var cy = (typeof me.restY === "number") ? me.restY : 0.5;
     var gx = ctx.rig.pos.x, gy = ctx.rig.pos.y - cy, gz = ctx.rig.pos.z;
     var gd = Math.sqrt(gx*gx + gy*gy + gz*gz);
     if (gd > 1e-4) {
-      // isotropic Hooke pull toward the cluster centre: F = −k·(offset), k = 0.55
+      // isotropic Hooke pull toward the centre: F = −k·(offset), k = 0.55
       fx -= gx * 0.55; fy -= gy * 0.55; fz -= gz * 0.55;
     }
   }
