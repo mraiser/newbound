@@ -134,7 +134,6 @@ async function init(host, { lib, name, record, toast, onSaved }) {
     onHover: (id) => { canvasEl.style.cursor = id ? "pointer" : ""; },
     onDrag: (evt) => { if (mode === "play") return; buildDrag(evt); },
   });
-  let hoverLast = null;
 
   // Build-mode drag: live stage deltas during the gesture, ONE movePos
   // mutation at the end (one undo step, one label). World deltas are applied
@@ -670,7 +669,7 @@ async function init(host, { lib, name, record, toast, onSaved }) {
           if (f.type === "number") v = Number(v);
           else if (f.type === "boolean") v = v === "true";
           else if (f.type === "json") { try { v = JSON.parse(vi.value); } catch { return; } }
-          rt.setState(f.name, v);
+          compHost.setState(f.name, v);
         });
         row.appendChild(vi);
       } else {
@@ -920,19 +919,17 @@ async function init(host, { lib, name, record, toast, onSaved }) {
     }
 
     // ── live per-instance inspector (PLAY) ──────────────────────────────
-    if (mode === "play" && rt) {
+    if (mode === "play" && compHost) {
       panelEl.appendChild(el("h4", null, "live instances"));
-      for (const [prefix, inst] of rt.instances) {
+      for (const inst of compHost.children) {
         const row = el("div", "se-row");
-        const label = prefix === "" ? "(root)" : prefix.replace(/:$/, "");
-        const data = inst.behaviorData || {};
-        const keys = Object.keys(data).filter((k) => typeof data[k] !== "object" || data[k] === null);
-        row.appendChild(el("span", "grow", label));
+        row.appendChild(el("span", "grow", inst.key));
+        const p = inst.rig && inst.rig.pos ? inst.rig.pos : { x: 0, y: 0, z: 0 };
         row.appendChild(el("span", "se-note",
-          keys.slice(0, 4).map((k) => `${k}=${typeof data[k] === "number" ? +data[k].toFixed(3) : data[k]}`).join(" ")));
+          `pos ${+p.x.toFixed(2)}, ${+p.y.toFixed(2)}, ${+p.z.toFixed(2)}`));
         panelEl.appendChild(row);
       }
-      panelEl.appendChild(el("p", "se-note", "per-instance behavior scratch (ctx.data) — refreshes with this tab"));
+      panelEl.appendChild(el("p", "se-note", "per-instance rigs in the scenehost — refreshes with this tab"));
     }
   }
 
@@ -1018,7 +1015,8 @@ async function init(host, { lib, name, record, toast, onSaved }) {
   }, 2000);
 
   function dispose() {
-    if (rt) { rt.dispose(); rt = null; }
+    if (compHost) { try { if (compHost.dispose) compHost.dispose(); } catch (e) {} compHost = null; }
+    if (compOverlay) { compOverlay.remove(); compOverlay = null; }
     stage.dispose();
     unregCtx();
     clearInterval(watchdog);
