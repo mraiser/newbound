@@ -23,13 +23,23 @@ me.ready = function () {
         ctx.me.opName = d.name || "op";
         // stagger by phase so a deck of nodes doesn't bob in lockstep
         ctx.me._phase = phase;
+        // front-ortho anchor: the seeded flow position is the rest height
+        if (d.pos && typeof d.pos.y === "number") ctx.me.baseY = d.pos.y;
+        // label the body with the op's name (per-node override rides setRig)
+        if (ctx.setRig && ctx.me.opName) ctx.setRig("label", "text", ctx.me.opName);
       },
 
       // every frame: a gentle bob — the visible proof that the scenehost frame
-      // loop drives a control-scene behavior (the P0 gate)
+      // loop drives a control-scene behavior (the P0 gate). Also stamps a
+      // heartbeat into host.state._beats so the gate can CONFIRM the loop
+      // reaches behaviors headlessly.
       render(ctx, dt) {
         if (!ctx || !ctx.rig) return;
         const t = ctx.t || 0;
+        if (ctx.host && ctx.host.state) {
+          const beats = ctx.host.state._beats || (ctx.host.state._beats = {});
+          beats[ctx.key] = t;
+        }
         const base = (ctx.me.baseY !== undefined) ? ctx.me.baseY : (ctx.me.baseY = ctx.rig.pos.y);
         const sel = ctx.host && ctx.host.state && ctx.host.state.selectedKey === ctx.key;
         // selected nodes hold still & lift; the rest breathe
