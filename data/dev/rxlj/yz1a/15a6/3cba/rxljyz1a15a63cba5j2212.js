@@ -121,7 +121,18 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       }, 120);
 
       host.querySelector(".fs-frame").addEventListener("click", () => scenehost.frameAll && scenehost.frameAll());
-      status(`${n} ops hosted — click a node`);
+      // tap proof: on the GL stage a real click raycasts to a node and the
+      // stage's onTap fires; the null stage has no raycaster, so a click on
+      // the deck drives the same dispatch via host.tap (the headless surface).
+      if (scenehost.headless) {
+        hostEl.addEventListener("click", () => {
+          const k = (instances[0] && instances[0].key) || "op0";
+          if (scenehost.tap) scenehost.tap(`${k}:body`);
+        });
+        status(`${n} ops hosted — click the deck to tap`);
+      } else {
+        status(`${n} ops hosted — click a node`);
+      }
       return { dispose() { clearInterval(loopPoll); clearInterval(tapPoll); } };
     }).catch((e) => { status("add failed: " + (e && e.message ? e.message : e)); return null; });
     }); // waitReady: scenehost api resolved
