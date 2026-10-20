@@ -312,15 +312,33 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         api.data = inst.data;          // the addControl seed, as me.data
         if (!api.children) api.children = [];
 
-        // resolve behaviors: me.sceneBehaviors.<impl> OR direct me.animate/render/click
-        const impls = api.sceneBehaviors || {};
-        const impl = impls.default || impls[Object.keys(impls)[0]] || null;
-        inst.animateFn = api.animate || (impl && impl.animate) || null;
-        inst.renderFn = api.render || (impl && impl.render) || null;
-        inst.clickFn = api.click || (impl && impl.click) || null;
-        inst.disposeFn = api.dispose || (impl && impl.dispose) || null;
+        // resolve behaviors: me.sceneBehaviors.<impl> OR direct me.animate/render/click.
+        // Deferred one macrotask: installControl fires this callback BEFORE the
+        // child's own ready() runs (activateControls' setTimeout calls cb first,
+        // then api.ready). A control that assigns me.sceneBehaviors in ready() —
+        // e.g. dev:flownode — is not yet populated at cb time, so binding here
+        // would freeze render/click/etc to null. Deferring past that same-tick
+        // ready() lets every behavior surface. (Not headless-specific: it broke
+        // behavior dispatch on GL hosts too; headless merely exposed it.)
+        setTimeout(() => {
+          const impls = api.sceneBehaviors || {};
+          const impl = impls.default || impls[Object.keys(impls)[0]] || null;
+          inst.animateFn = api.animate || (impl && impl.animate) || null;
+          inst.renderFn = api.render || (impl && impl.render) || null;
+          inst.clickFn = api.click || (impl && impl.click) || null;
+          inst.disposeFn = api.dispose || (impl && impl.dispose) || null;
 
-        resolve(inst);
+          // animate(ctx) once, now that behaviors exist (deferred counterpart
+          // to the post-await block below, which still handles the case where
+          // the child's behaviors were set synchronously before ready).
+          if (inst.animateFn && !inst._animated) {
+            inst._animated = true;
+            try { inst.animateFn.call(inst.me, inst.ctx); }
+            catch (e) { diag(`${key}.animate: ${e && e.message ? e.message : e}`); }
+          }
+
+          resolve(inst);
+        });
       }, data);
       }
     });
@@ -328,8 +346,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     me.children.push(inst);
     byKey.set(key, inst);
 
-    // animate(ctx): once, now that the shape exists and the rig is live
-    if (inst.animateFn) {
+    // animate(ctx) once — only when the child's behaviors were bound
+    // synchronously (set before/at cb). When they arrive via the child's
+    // ready() the deferred setTimeout in inst_boot fires animate instead;
+    // _animated makes the two paths mutually exclusive.
+    if (inst.animateFn && !inst._animated) {
+      inst._animated = true;
       try { inst.animateFn.call(inst.me, inst.ctx); }
       catch (e) { diag(`${key}.animate: ${e && e.message ? e.message : e}`); }
     }
@@ -376,6 +398,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   };
 
   me.byId = function (key) { return byKey.get(key) || null; };
+
+  // programmatic tap: run the same dispatch a raycast hit triggers. The GL
+  // stage calls handleTap via its onTap; on the null stage there is no
+  // raycaster, so this is the headless/test surface for tap→behavior dispatch.
+  // specId is "<key>:<nodeId>" (nodeId optional) — the same id the GL stage emits.
+  me.tap = function (specId) { handleTap(specId); };
 
   // ── click dispatch: raycast hit → the instance's click(ctx) ──────────────
   function instForSpec(specId) {
