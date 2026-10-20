@@ -49,10 +49,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const lastEl = host.querySelector(".fs-last");
     const lastBody = host.querySelector(".fs-last-body");
 
-    // the ONE runtime is already mounted declaratively; grab its live api
-    const scenehost = hostEl.api;
+    // the ONE runtime is mounted declaratively; grab its element. Its api is
+    // assigned ASYNCHRONOUSLY at the end of the scenehost's boot (after the
+    // vendor import + facade controls resolve), so addControl is NOT there yet
+    // on first read — a race that fails intermittently on GL and GL-less hosts
+    // alike. Wait for readiness before touching addControl.
+    const hostApi = () => hostEl.api;
+    const gate0 = hostApi();
+    if (!gate0 || typeof gate0.waitReady !== "function") { status("no scenehost api"); gate(".fs-g-host", false, "no waitReady"); return null; }
+    return new Promise((res) => gate0.waitReady(() => res(gate0))).then((scenehost) => {
     if (!scenehost || !scenehost.addControl) { status("no scenehost api"); gate(".fs-g-host", false, "no addControl"); return null; }
-    gate(".fs-g-host", true);
+    gate(".fs-g-host", true, scenehost.headless ? "headless (no WebGL)" : "webgl");
 
     // parse the specimen into the flowdoc model (diagnostics never reject)
     const doc = parse(SPECIMEN);
@@ -117,6 +124,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       status(`${n} ops hosted — click a node`);
       return { dispose() { clearInterval(loopPoll); clearInterval(tapPoll); } };
     }).catch((e) => { status("add failed: " + (e && e.message ? e.message : e)); return null; });
+    }); // waitReady: scenehost api resolved
   }
 
   return init(ME);
