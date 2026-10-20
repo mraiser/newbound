@@ -75,16 +75,27 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     return d2 instanceof Error ? d2 : (d2.list ?? []);
   };
 
-  if (!hasWebGL()) {
-    canvasEl.innerHTML = '<p style="padding:14px" class="sh-cap">no WebGL here — this scene cannot render</p>';
-    return;
-  }
+  // GL-less hosts (CI, the Noobscape test browser) get a headless boot: the
+  // frame loop, instancing, behavior/tap dispatch and links all run — only the
+  // GL stage is swapped for a no-op null-renderer. The P0 verification gate
+  // rides this. Detect via hasWebGL() or force with DATA.headless:true.
+  const headless = (ME.DATA && ME.DATA.headless === true) || !hasWebGL();
   if (ME.DATA.caption) { footEl.hidden = false; capEl.textContent = ME.DATA.caption; }
+  if (headless) { footEl.hidden = false; capEl.textContent = "scenehost · headless (no WebGL) — logic only"; }
 
   me.frameAll = function () { if (me.stage && me.stage.frameAll) me.stage.frameAll(); };
 
   // ── the stage + the frame loop ────────────────────────────────────────────
-  const stage = mountScene(canvasEl, {
+  // null-renderer: the full stage contract as no-ops. Instancing, rigs, links
+  // and behaviors all still run; only rasterization is absent. The surface
+  // mirrors every stage.* call this closure makes (upsert/applyDelta/
+  // removeObject/setScene/requestRender/frameAll/dispose).
+  const nullStage = {
+    headless: true,
+    upsert() {}, applyDelta() {}, removeObject() {}, setScene() {},
+    requestRender() {}, frameAll() {}, dispose() {},
+  };
+  const stage = headless ? nullStage : mountScene(canvasEl, {
     pickMode: "affordant",
     showSlots: false,
     onTap: (id) => handleTap(id),
@@ -92,6 +103,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     onDrag: (evt) => handleDrag(evt),
   });
   me.stage = stage;
+  me.headless = headless;
   const env = ME.DATA.env || {};
   stage.setScene([], {
     lights: env.lights === "none" ? "none" : "default",
