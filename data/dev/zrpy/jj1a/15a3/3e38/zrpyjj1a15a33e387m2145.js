@@ -47,15 +47,22 @@ me.ready = function () {
       },
 
       // tap → the host's raycast hit. hit = { node, specId, key }. A tap on a
-      // TERMINAL node is a WIRING gesture (delegated to the editor via the
-      // host's shared onPortTap hook); a tap on the BODY is selection.
+      // TERMINAL node (in<N>/out<N>) is a WIRING gesture, routed to the
+      // editor's wiring engine via host.state.onSocketTap (P2: it owns I-1/I-2
+      // enforcement, the wire-source latch, and the legal-target commit). A tap
+      // on the BODY is selection. The P0/P1 onPortTap hook is kept as a
+      // fallback so the older flowspike harness still runs.
       click(ctx, hit) {
         if (!ctx.host) return;
         const node = hit && hit.node;
-        // route a terminal tap to the editor's wiring logic (P2)
-        if (node && /^(in|out)\d+$/.test(node) && typeof ctx.host.state.onPortTap === "function") {
-          ctx.host.state.onPortTap({ key: ctx.key, opIndex: ctx.me.opIndex, node, opType: ctx.me.opType });
-          return;
+        const st = ctx.host.state || (ctx.host.state = {});
+        if (node && /^(in|out)\d+$/.test(node)) {
+          // which = "in"|"out", socket ordinal = the trailing number
+          const which = node.slice(0, 2) === "in" ? "in" : "out";
+          const ord = +node.slice(which.length);
+          const payload = { key: ctx.key, opIndex: ctx.me.opIndex, which, ord, node, opType: ctx.me.opType };
+          if (typeof st.onSocketTap === "function") { st.onSocketTap(payload); return; }
+          if (typeof st.onPortTap === "function") { st.onPortTap({ key: ctx.key, opIndex: ctx.me.opIndex, node, opType: ctx.me.opType }); return; }
         }
         ctx.host.setState("lastClick", {
           key: ctx.key, node, opType: ctx.me.opType, name: ctx.me.opName, t: Date.now(),
@@ -64,12 +71,23 @@ me.ready = function () {
         ctx.host.setState("selectedKey", ctx.key);
       },
 
-      // drag gestures. A drag that began on an output socket is a WIRE drag
-      // (the editor moves the ghost tip + previews legal targets); any other
-      // drag is an op-move in the front plane.
+      // drag gestures. The editor owns the interpretation via host.state.onOpDrag
+      // (P2): it sees the start socket (out<N> → begin a wire from that output;
+      // anything else → begin an op move) and routes move/end accordingly —
+      // wire-source latch + I-1/I-2 target preview on socket moves, op-position
+      // live update on body moves. The evt carries {phase, id, x, y, z, dx, dy,
+      // dz, clientX, clientY, alt}; evt.id is the stage spec id "<key>:<node>".
+      // The P0/P1 fallback (direct rig move) keeps the older harness working.
       drag(ctx, evt) {
         if (!ctx || !ctx.rig || !evt) return;
-        if (typeof ctx.host.state.onOpDrag === "function") { ctx.host.state.onOpDrag(ctx.me.opIndex, evt); return; }
+        const st = ctx.host.state || (ctx.host.state = {});
+        if (typeof st.onOpDrag === "function") {
+          const m = /^([^:]+):(in|out)(\d+)$/.exec(evt.id || "");
+          const payload = { phase: evt.phase, key: ctx.key, opIndex: ctx.me.opIndex, evt };
+          if (m) { payload.which = m[2]; payload.ord = +m[3]; payload.node = m[2] + m[3]; }
+          st.onOpDrag(payload);
+          return;
+        }
         if (evt.phase === "move" && typeof evt.x === "number") {
           ctx.rig.pos.x = evt.x;
           if (typeof evt.y === "number") ctx.me.baseY = evt.y;
