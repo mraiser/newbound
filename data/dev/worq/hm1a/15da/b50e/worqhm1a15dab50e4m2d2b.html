@@ -1,0 +1,56 @@
+<section class="nb-flowedit3d" tabindex="0">
+  <div class="fe-head">
+    <button class="fe-back" title="Back (Esc)">←</button>
+    <span class="fe-title"></span>
+    <span class="fe-crumbs"></span>
+    <span class="fe-spacer"></span>
+    <span class="fe-status" role="status">booting…</span>
+    <span class="fe-decks" role="tablist" aria-label="case chain"></span>
+    <button class="fe-proj" aria-pressed="false" title="Front-orthographic (2) / perspective (3)">persp</button>
+    <button class="fe-frame" title="Frame the deck (A)">frame</button>
+    <button class="fe-undo" title="Undo (⌘Z)" disabled>undo</button>
+  </div>
+
+  <div class="fe-main">
+    <!-- the ONE runtime: an app:scenehost; ops are addControl'd into it and the
+         deck's scene facet (toSceneDoc) rides the stage as the facade. Wiring
+         gestures are flownode behaviors; the flow body stays authoritative. -->
+    <div class="data-control fe-host" data-control="app:scenehost:{}"></div>
+
+    <aside class="fe-rail">
+      <span class="lbl">P2 · wiring gestures ride scenehost</span>
+      <ul class="fe-gate">
+        <li class="fe-g-host">host booted — <b>pending</b></li>
+        <li class="fe-g-wiretap">port-tap wire — <b>pending</b></li>
+        <li class="fe-g-i1i2">I-1/I-2 refused — <b>pending</b></li>
+        <li class="fe-g-kbd">keyboard wire (W/→/Enter) — <b>pending</b></li>
+        <li class="fe-g-undo">undo restores — <b>pending</b></li>
+      </ul>
+      <p class="fe-ro"><b>editing on</b> — wiring gestures are flownode
+        behaviors on the host. Tap an output socket (or select an op and press
+        <kbd>W</kbd>) to start a wire; legal input targets preview; tap / Enter
+        commits, <kbd>Esc</kbd> cancels. The flow body is authoritative — every
+        wire is a FlowDoc mutation; the facade re-derives. <kbd>⌘Z</kbd> undoes.</p>
+      <p class="fe-keys lbl">keys</p>
+      <ul class="fe-keys-list">
+        <li><kbd>2</kbd> front-ortho · <kbd>3</kbd> perspective · <kbd>A</kbd> frame deck</li>
+        <li><kbd>[</kbd> <kbd>]</kbd> walk case chain · <kbd>Esc</kbd> back / cancel</li>
+        <li><kbd>W</kbd> wire from selection · <kbd>←</kbd><kbd>→</kbd> choose target · <kbd>Enter</kbd> commit</li>
+        <li><kbd>Del</kbd> unwires the selected wire · <kbd>⌘Z</kbd> undo</li>
+      </ul>
+    </aside>
+
+    <aside class="fe-inspect">
+      <span class="lbl">inspector</span>
+      <div class="fe-inspect-body">
+        <p class="fe-empty">Select an element. Output sockets start wires.</p>
+      </div>
+      <div class="fe-journal">
+        <span class="lbl">mutations · this session</span>
+        <ul class="fe-journal-list"></ul>
+      </div>
+    </aside>
+  </div>
+</section>
+<div class="data-control" data-control="dev:flowdoc" hidden></div>
+<div class="data-control" data-control="dev:flowproject" hidden></div>

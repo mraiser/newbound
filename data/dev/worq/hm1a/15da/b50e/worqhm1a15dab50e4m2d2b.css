@@ -1,0 +1,37 @@
+.nb-flowedit3d { display:flex; flex-direction:column; height:100%; min-height:420px;
+  font:13px/1.4 system-ui,sans-serif; color:#2d343c; background:#f6f7f8; outline:none; }
+.nb-flowedit3d .fe-head { display:flex; align-items:center; gap:6px; padding:6px 10px;
+  background:#fff; border-bottom:1px solid #e2e5e9; }
+.nb-flowedit3d .fe-title { font-weight:600; }
+.nb-flowedit3d .fe-crumbs .fe-crumb { color:#62bd8c; cursor:pointer; margin-right:4px; }
+.nb-flowedit3d .fe-spacer { flex:1; }
+.nb-flowedit3d .fe-status { font-size:12px; color:#6b7480; max-width:34ch;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nb-flowedit3d .fe-status.ok { color:#2f9e63; } .nb-flowedit3d .fe-status.bad { color:#c0392b; }
+.nb-flowedit3d .fe-decks { display:flex; gap:2px; }
+.nb-flowedit3d .fe-decks button { border:1px solid #dfe3e8; background:#fff; border-radius:6px;
+  padding:2px 8px; cursor:pointer; font-size:12px; }
+.nb-flowedit3d .fe-decks button.active { background:#62bd8c; color:#fff; border-color:#62bd8c; }
+.nb-flowedit3d button { border:1px solid #dfe3e8; background:#fff; border-radius:6px;
+  padding:3px 9px; cursor:pointer; font-size:12px; }
+.nb-flowedit3d button:disabled { opacity:.4; cursor:default; }
+.nb-flowedit3d .fe-proj[aria-pressed="true"] { background:#2d343c; color:#fff; }
+.nb-flowedit3d .fe-main { flex:1; display:flex; min-height:0; position:relative; }
+.nb-flowedit3d .fe-host { flex:1; min-width:0; }
+.nb-flowedit3d .fe-rail { width:230px; padding:10px; background:#fbfcfd; border-left:1px solid #e6e9ec;
+  overflow:auto; }
+.nb-flowedit3d .fe-inspect { width:250px; padding:10px; background:#fff; border-left:1px solid #e6e9ec;
+  overflow:auto; }
+.nb-flowedit3d .lbl { display:block; font-size:10px; text-transform:uppercase; letter-spacing:.06em;
+  color:#8a929c; margin:6px 0 4px; }
+.nb-flowedit3d .fe-gate { list-style:none; margin:0; padding:0; }
+.nb-flowedit3d .fe-gate li { padding:3px 0 3px 20px; position:relative; color:#6b7480; font-size:12px; }
+.nb-flowedit3d .fe-gate li::before { content:"○"; position:absolute; left:2px; }
+.nb-flowedit3d .fe-gate li.pass { color:#2f9e63; } .nb-flowedit3d .fe-gate li.pass::before { content:"●"; }
+.nb-flowedit3d .fe-gate li.fail { color:#c0392b; } .nb-flowedit3d .fe-gate li.fail::before { content:"●"; }
+.nb-flowedit3d .fe-ro, .nb-flowedit3d .fe-keys-list { font-size:11px; color:#6b7480; }
+.nb-flowedit3d .fe-keys-list { list-style:none; margin:0; padding:0; }
+.nb-flowedit3d kbd { background:#eef0f2; border:1px solid #dfe3e8; border-radius:4px;
+  padding:0 4px; font-size:10px; }
+.nb-flowedit3d .fe-journal-list { list-style:none; margin:0; padding:0; font-size:11px; }
+.nb-flowedit3d .fe-journal-list li { padding:2px 0; border-bottom:1px solid #f0f2f4; color:#4a525c; }
