@@ -144,7 +144,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   function redo() {
     const cmd = redoStack.pop(); if (!cmd) return;
-    try { cmd.redo ? cmd.redo() : cmd.undo && null; } catch (e) {}
+    try { if (cmd.redo) cmd.redo(); } catch (e) {}
     undoStack.push(cmd);
     dirty = true;
     $(".fe-undo").disabled = false;
