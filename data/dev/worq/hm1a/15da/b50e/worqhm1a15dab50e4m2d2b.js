@@ -200,6 +200,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     try { cmd.undo(); } catch (e) {}
     redoStack.push(cmd);
     dirty = true;
+    // the save label names what the save CHANGES: an undone unsaved edit drops
+    // out; undoing already-saved work is itself the change ("undo X")
+    { const lb = cmd.label || "edit", li = pendingLabels.lastIndexOf(lb); if (li >= 0) pendingLabels.splice(li, 1); else pendingLabels.push("undo " + lb); }
     $(".fe-undo").disabled = !undoStack.length;
     pushJournal("undo " + (cmd.label || ""));
     afterMutation();
@@ -211,6 +214,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     try { if (cmd.redo) cmd.redo(); } catch (e) {}
     undoStack.push(cmd);
     dirty = true;
+    { const lb = cmd.label || "edit", li = pendingLabels.lastIndexOf("undo " + lb); if (li >= 0) pendingLabels.splice(li, 1); else pendingLabels.push(lb); }
     $(".fe-undo").disabled = false;
     pushJournal("redo " + (cmd.label || ""));
     afterMutation();
