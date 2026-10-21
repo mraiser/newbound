@@ -29,7 +29,7 @@
     <div class="data-control fe-host" data-control="app:scenehost:{}"></div>
 
     <aside class="fe-rail">
-      <span class="lbl">P4 · run tokens + journal ride scenehost</span>
+      <span class="lbl">flow editor</span>
       <div class="fe-palette">
         <span class="lbl">node kinds — click to add · with a wire selected, splice</span>
         <div class="fe-pal-col">
@@ -56,12 +56,12 @@
         <li class="fe-g-diff">changes since save (diffFlow) — <b>pending</b></li>
         <li class="fe-g-journal">server journal + entry diff — <b>pending</b></li>
       </ul>
-      <p class="fe-ro"><b>editing on</b> — wiring gestures are flownode
-        behaviors on the host; the palette + layout author the FlowDoc. Tap an
-        output socket (or <kbd>W</kbd>) to wire; click a palette op to add it
-        (with a wire selected, to splice it in); <kbd>Del</kbd> unwires a wire
-        / deletes an op; tidy/untangle auto-layout; <b>save</b> persists the
-        body via <code>write_flow_body</code> (base-hash → conflict). <kbd>⌘Z</kbd>/<kbd>⇧⌘Z</kbd> undo/redo.</p>
+      <p class="fe-ro">Tap an output socket (or press <kbd>W</kbd>) to start a
+        wire, then tap an input to connect it. Click a node kind to add it; with
+        a wire selected, the new node is spliced into that wire. <kbd>Del</kbd>
+        removes the selected wire or node; <b>tidy</b>/<b>untangle</b> lay the
+        case out; <b>save</b> writes the flow body (if it changed on the server
+        meanwhile you choose whose version wins). <kbd>⌘Z</kbd>/<kbd>⇧⌘Z</kbd> undo/redo.</p>
       <p class="fe-keys lbl">keys</p>
       <ul class="fe-keys-list">
         <li><kbd>2</kbd> front-ortho · <kbd>3</kbd> perspective · <kbd>A</kbd> frame deck</li>
