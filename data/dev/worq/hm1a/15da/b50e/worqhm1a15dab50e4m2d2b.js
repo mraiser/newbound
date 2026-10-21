@@ -240,8 +240,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       s.params = n.params || (n.text ? n.text : undefined);
       return s;
     });
-    // re-attach the ghost specs if a wire is armed (they ride the facade scene)
-    stage.setScene(specs.concat(ghostSpecs()), { lights: "default", grid: true, camera: null });
+    // re-attach the ghost specs if a wire is armed (they ride the facade scene).
+    // setScene is a WHOLE-scene replace on the real GL stage: it would destroy
+    // every spec the scenehost owns (the flownode instances, host links, run
+    // tokens) along with the facade - nothing pickable until renderInstances
+    // re-adds them, and never when only the facade re-renders. Carry the
+    // host-owned (non-fx_) specs through so the facade replaces only itself.
+    // (The headless null stage's setScene is a no-op, which hid this.)
+    const hostOwned = stage.objects
+      ? [...stage.objects.values()].filter((o) => o && o.spec && !String(o.spec.id).startsWith("fx_")).map((o) => o.spec)
+      : [];
+    stage.setScene(specs.concat(ghostSpecs(), hostOwned), { lights: "default", grid: true, camera: null });
     return sceneDoc;
   }
 
@@ -366,9 +375,19 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     ];
   }
   let ghostTip = null;
-  function showGhost(at) { ghostTip = at; renderFacade(); }
-  function moveGhost(at) { ghostTip = at; if (armSrc || wireMode) renderFacade(); }
-  function cancelWireGhost() { armSrc = null; wireMode = null; ghostTip = null; if (hostApi) hostApi.setState("wireSrc", null); }
+  // the ghost touches ONLY its own two specs: upsert while armed, remove when
+  // not. (It used to re-render the whole facade - a setScene per pointer move
+  // that, on the real GL stage, also destroyed every hosted flownode, so the
+  // input you were wiring TO was no longer pickable.)
+  function syncGhost() {
+    if (!stage) return;
+    const g = ghostSpecs();
+    if (g.length) { for (const s of g) stage.upsert(s); }
+    else { stage.removeObject("fx_ghostwire"); stage.removeObject("fx_ghosttip"); }
+  }
+  function showGhost(at) { ghostTip = at; syncGhost(); }
+  function moveGhost(at) { ghostTip = at; if (armSrc || wireMode) syncGhost(); }
+  function cancelWireGhost() { armSrc = null; wireMode = null; ghostTip = null; syncGhost(); if (hostApi) hostApi.setState("wireSrc", null); }
 
   // pointer move on the stage tracks the ghost tip + previews legal targets
   function onStageMove(ev) {
@@ -1103,7 +1122,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const c = focusedCase(); if (!c) return null;
     const { rounds, unreached } = propagationRounds(c);
     if (!rounds.length) { status("nothing to run — no wire can fire", "bad"); return null; }
-    if (armSrc || wireMode) { cancelWireGhost(); renderFacade(); }
+    if (armSrc || wireMode) { cancelWireGhost(); }
     running = true;
     const runBtn = $(".fe-run"); if (runBtn) { runBtn.disabled = true; runBtn.classList.add("running"); runBtn.textContent = "running…"; }
     const runId = ++runSeq;
@@ -1516,7 +1535,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
           if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "Tab") { e.preventDefault(); moveWireCandidate(1); return; }
           if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); moveWireCandidate(-1); return; }
           if (e.key === "Enter") { e.preventDefault(); commitKeyboardWire(); return; }
-          if (e.key === "Escape") { e.preventDefault(); cancelWireGhost(); renderFacade(); status("wiring cancelled"); return; }
+          if (e.key === "Escape") { e.preventDefault(); cancelWireGhost(); status("wiring cancelled"); return; }
         }
         // Enter edits the selection (floweditor3d's popover key): focus the op
         // editor's first field, or the params-bar name field with no selection
@@ -1536,7 +1555,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         else if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSelectedWire(); }
         else if (e.key === "Escape") {
           const hasSel = (hostApi && hostApi.state && hostApi.state.selectedKey) || selWire != null;
-          if (armSrc) { cancelWireGhost(); renderFacade(); status("wiring cancelled"); }
+          if (armSrc) { cancelWireGhost(); status("wiring cancelled"); }
           else if (focusPath.length > 1) drillBack();
           else if (hasSel || harness || typeof PROPS.onBack !== "function") clearSelection();
           else PROPS.onBack();
