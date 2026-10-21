@@ -497,7 +497,23 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         else if (e.key === "]") setActiveDeck((activeDeck + 1) % deckCount);
       });
 
-      return { dispose() {} };
+      // programmatic P2 surface for the headless/live gate: drive the exact
+      // behavior routes (onSocketTap/onOpDrag) without a raycaster.
+      const wireTest = (srcKey, srcOrd, destKey, destOrd) => {
+        const sm = /^d(\d+)_op(\d+)$/.exec(srcKey), dm = /^d(\d+)_op(\d+)$/.exec(destKey);
+        if (!sm || !dm) return false;
+        onSocketTap({ key: srcKey, opIndex: +sm[2], which: "out", ord: srcOrd });
+        onSocketTap({ key: destKey, opIndex: +dm[2], which: "in", ord: destOrd });
+        const c = activeCase();
+        return !!(c && c.cons.some((w) => w.src[0] === +sm[2] && w.dest[0] === +dm[2] && w.dest[1] === inTermOf(c, +dm[2], destOrd)));
+      };
+      return {
+        dispose() {},
+        wireTest,
+        armOutput: (key, ord) => { const m = /^d(\d+)_op(\d+)$/.exec(key); if (m) onSocketTap({ key, opIndex: +m[2], which: "out", ord }); },
+        tapSocket: (key, which, ord) => { const m = /^d(\d+)_op(\d+)$/.exec(key); if (m) onSocketTap({ key, opIndex: +m[2], which, ord }); },
+        wireState: () => ({ wireSrc: hostApi.state && hostApi.state.wireSrc, cons: (activeCase() ? activeCase().cons.length : 0), legal: legalTargets().length }),
+      };
     }).catch((e) => { status("boot failed: " + (e && e.message ? e.message : e)); return null; });
   }
 
