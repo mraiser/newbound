@@ -215,7 +215,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     pushJournal("redo " + (cmd.label || ""));
     afterMutation();
   }
-  function afterMutation() { cancelWireGhost(); renderAll(); refreshSaveUi(); renderChanges(); }
+  function afterMutation() { cancelWireGhost(); renderAll(); refreshSaveUi(); renderChanges(); refreshInspector(); }
 
   function pushJournal(text) {
     const ul = $(".fe-journal-list"); if (!ul) return;
@@ -242,9 +242,18 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
   // ── instances: host each op of the ACTIVE deck as a flownode ─────────────
   async function renderInstances() {
+    // flownode.dispose clears host.state.selectedKey when its instance is the
+    // selection — right for a real removal, wrong for this re-render. Carry
+    // the selection across when that op still exists on the active deck
+    // (restored synchronously, before the first await, so the inspector
+    // refresh that follows a mutation still sees it).
+    const keep = hostApi && hostApi.state ? hostApi.state.selectedKey : null;
     for (const inst of instances) { try { hostApi.removeControl(inst.key); } catch (e) {} }
     instances = [];
     const c = focusedCase(); if (!c) return;
+    const km = keep && /^d(\d+)_op(\d+)$/.exec(keep);
+    const sameFlow = renderInstances.root === focusRoot(); renderInstances.root = focusRoot();
+    if (km && sameFlow && +km[1] === activeDeck && +km[2] < c.cmds.length && hostApi.state.selectedKey !== keep) hostApi.setState("selectedKey", keep);
     for (let i = 0; i < c.cmds.length; i++) {
       const op = c.cmds[i];
       const key = `d${activeDeck}_op${i}`;
@@ -458,6 +467,56 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   function frameDeck() { if (stage && stage.frameAll) stage.frameAll(); }
 
+  // ── P5 step 4: op editor + terminal editor + signature bars ─────────────
+  // floweditor3d's edit popovers (§5.5) docked in the inspector. Every control
+  // commits ONE FlowDoc mutation through commitApplied (undoable, journaled;
+  // read-only / mid-run refusals honored). inspTerm = the terminal being
+  // edited {key, idx, which, term}; it applies only to its own selection key
+  // (an op key d<k>_op<i>, or bar:params / bar:return for the signature).
+  let inspTerm = null;
+  const CTYPES_CONST = ["int", "decimal", "boolean", "string", "object", "array"];
+  const CTYPES_MATCH = ["int", "decimal", "boolean", "string", "null"];
+  function chainHasNext() { return activeDeck < caseChain(focusRoot()).length - 1; }
+  function conditionSentence(rule, value) {
+    const act = { next: "run the next case", terminate: "end the flow", fail: "fail (a match-failure of the caller)", finish: "end the loop iteration" }[rule] || rule;
+    return `when this op’s match = ${value} → ${act}.`;
+  }
+  const nextTermName = (map) => { for (const ch of "abcdefghijklmnopqrstuvwxyz") if (!(ch in map)) return ch; return `t${Object.keys(map).length}`; };
+  function refreshInspector() { renderInspector(hostApi && hostApi.state ? hostApi.state.selectedKey : null); }
+  /** Apply one editor mutation; refusals land in the status line. */
+  function commitEdit(cmd) {
+    if (!cmd || cmd.error) { status("✗ " + ((cmd && cmd.error) || "no change"), "bad"); refreshInspector(); return false; }
+    if (!commitApplied(cmd)) { refreshInspector(); return false; }
+    status((cmd.label || "edited") + " — ⌘Z undoes", "ok");
+    return true;
+  }
+  function edRow(parent, label, control) {
+    const row = document.createElement("label"); row.className = "fe-ed-row";
+    const sp = document.createElement("span"); sp.textContent = label;
+    row.append(sp, control); parent.appendChild(row); return control;
+  }
+  function edSelect(options, value) {
+    const s = document.createElement("select");
+    for (const o of options) { const el = document.createElement("option"); el.value = o; el.textContent = o || "—"; s.appendChild(el); }
+    s.value = value ?? options[0]; if (s.selectedIndex < 0) s.value = options[0]; return s;
+  }
+  function edInput(value, placeholder) {
+    const i = document.createElement("input"); i.value = value ?? ""; if (placeholder) i.placeholder = placeholder;
+    i.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); i.blur(); }
+      else if (e.key === "Escape") { e.preventDefault(); i.value = value ?? ""; i.blur(); }
+      e.stopPropagation();
+    });
+    return i;
+  }
+  function edButton(parent, text, cls, fn) {
+    const b = document.createElement("button"); b.className = cls || ""; b.textContent = text;
+    b.addEventListener("click", fn); parent.appendChild(b); return b;
+  }
+  function edNote(parent, text) { const p = document.createElement("p"); p.className = "fe-empty"; p.textContent = text; parent.appendChild(p); return p; }
+  function edLbl(parent, text) { const s = document.createElement("span"); s.className = "lbl"; s.textContent = text; parent.appendChild(s); return s; }
+  function edBtns(parent) { const d = document.createElement("div"); d.className = "fe-ed-btns"; parent.appendChild(d); return d; }
+
   function renderInspector(key) {
     const body = $(".fe-inspect-body"); if (!body) return;
     if (selWire != null) {
@@ -468,19 +527,141 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     }
     const m = key && /^d(\d+)_op(\d+)$/.exec(key);
     const c = focusedCase();
-    if (m && c && c.cmds[+m[2]]) {
-      const oi = +m[2]; const op = c.cmds[oi];
-      body.innerHTML = `<p><b>${op.name || op.type}</b> <span class="lbl">${op.type}</span></p>` +
-        `<p>in: ${Object.keys(op.in || {}).join(", ") || "—"}<br>out: ${Object.keys(op.out || {}).join(", ") || "—"}</p>` +
-        `<p><button class="fe-ren">rename</button> <button class="fe-del">delete</button></p>` +
-        (op.type === "local" ? `<p class="fe-empty">dblclick to drill in</p>` : `<p class="fe-empty"><kbd>W</kbd> wires from its first output · drag body moves</p>`);
-      const ren = body.querySelector(".fe-ren"), del = body.querySelector(".fe-del");
-      if (ren) ren.addEventListener("click", () => {
-        const nn = window.prompt("rename op", op.name || "");
-        if (nn && nn !== op.name) { const cmd = doc.renameOp(c, oi, nn); if (cmd && !cmd.error && commitApplied(cmd)) status("renamed → " + nn, "ok"); }
+    if (m && c && c.cmds[+m[2]]) renderOpEditor(body, c, +m[2], key);
+    else if (c) renderSignatureEditor(body, c);
+    else body.innerHTML = `<p class="fe-empty">Select an element. Output sockets start wires.</p>`;
+  }
+
+  /** The op popover: literal/slot/name, ctype + matcher toggle, condition,
+      terminals (+ in/out, click to edit), drill, delete. */
+  function renderOpEditor(body, c, oi, key) {
+    const op = c.cmds[oi];
+    body.replaceChildren();
+    const head = document.createElement("p"); head.className = "fe-ed-head";
+    head.innerHTML = `<b>${esc(op.name || op.type)}</b> <span class="lbl">${esc(op.type)} · edit</span>`;
+    body.appendChild(head);
+    const isConst = op.type === "constant" || op.type === "match";
+    const nameLabel = isConst ? "literal" : op.type === "persistent" ? "slot" : "name";
+    const nameIn = edRow(body, nameLabel, edInput(op.name, nameLabel)); nameIn.className = "fe-ed-name";
+    nameIn.addEventListener("change", () => { if (nameIn.value !== op.name) commitEdit(doc.renameOp(c, oi, nameIn.value)); });
+    if (isConst) {
+      const ct = edRow(body, "ctype", edSelect(op.type === "match" ? CTYPES_MATCH : CTYPES_CONST, op.ctype)); ct.className = "fe-ed-ctype";
+      ct.addEventListener("change", () => commitEdit(doc.setCtype(c, oi, ct.value)));
+      edButton(edBtns(body), op.type === "match" ? "→ constant (drop the input)" : "→ matcher (gains input a)", "fe-ed-matcher",
+        () => commitEdit(doc.setMatcher(c, oi, op.type !== "match")));
+    }
+    if (op.type === "command" && op.cmd) edNote(body, "calls " + op.cmd);
+    if (op.type !== "constant") {
+      const hasNext = chainHasNext();
+      const rule = edRow(body, "condition", edSelect(["", "next", "terminate", "fail", "finish"], op.condition ? op.condition.rule : "")); rule.className = "fe-ed-rule";
+      const nextOpt = [...rule.options].find((o) => o.value === "next"); if (!hasNext && nextOpt) nextOpt.disabled = true; // I-4: unrepresentable
+      const val = edRow(body, "fires when", edSelect(["true", "false"], String(op.condition ? op.condition.value : true))); val.className = "fe-ed-fires";
+      const sent = edNote(body, ""); sent.classList.add("fe-ed-sentence");
+      const upd = () => { sent.textContent = rule.value ? conditionSentence(rule.value, val.value) : "no condition — evaluates and passes through."; };
+      upd();
+      const applyCond = () => commitEdit(doc.setCondition(c, oi, rule.value ? { rule: rule.value, value: val.value === "true" } : null, { chainHasNext: hasNext }));
+      rule.addEventListener("change", applyCond);
+      val.addEventListener("change", () => { if (rule.value) applyCond(); else upd(); });
+    }
+    edLbl(body, "terminals");
+    const tw = document.createElement("div"); tw.className = "fe-ed-terms"; body.appendChild(tw);
+    const termBtn = (which, term) => {
+      const n = (which === "in" ? op.in : op.out)[term] || {};
+      const on = inspTerm && inspTerm.key === key && inspTerm.which === which && inspTerm.term === term;
+      const b = edButton(tw, `${which} ${term}${n.mode === "list" || n.mode === "loop" ? " · " + n.mode : ""}`, "fe-ed-term" + (on ? " active" : ""),
+        () => { inspTerm = { key, idx: oi, which, term }; refreshInspector(); });
+      b.dataset.which = which; b.dataset.term = term;
+    };
+    for (const t of Object.keys(op.in || {})) termBtn("in", t);
+    for (const t of Object.keys(op.out || {})) termBtn("out", t);
+    const addRow = edBtns(body);
+    edButton(addRow, "+ input", "fe-ed-addin", () => commitEdit(doc.addTerminal(c, oi, "in", nextTermName(op.in || {}))));
+    edButton(addRow, "+ output", "fe-ed-addout", () => commitEdit(doc.addTerminal(c, oi, "out", nextTermName(op.out || {}))));
+    if (inspTerm && inspTerm.key === key) renderTermEditor(body, c, inspTerm);
+    else edNote(body, "click a terminal to rename it, type it, set list/loop mode, or delete it");
+    const foot = edBtns(body);
+    if (op.type === "local") edButton(foot, "drill ▸ into the sub-flow", "fe-ed-drill", () => drillInto(op));
+    const wires = doc.wiresTouching(c, oi);
+    edButton(foot, `delete op${wires ? ` · removes ${wires} wire${wires > 1 ? "s" : ""}` : ""}`, "fe-del danger", deleteSelectedOp);
+    edNote(body, op.type === "local" ? "dblclick to drill in" : "W wires from its first output · drag body moves · Enter edits");
+  }
+
+  /** The terminal popover — op terminals AND bar terminals (the signature). */
+  function renderTermEditor(body, c, t) {
+    const isBar = t.idx < 0;
+    const op = t.idx >= 0 ? c.cmds[t.idx] : null;
+    const map = t.idx === -1 ? c.input : t.idx === -2 ? c.output : (op ? (t.which === "in" ? op.in : op.out) : null);
+    const node = map && map[t.term];
+    if (!node) { inspTerm = null; return; }
+    const box = document.createElement("div"); box.className = "fe-ed-term-box"; body.appendChild(box);
+    edLbl(box, `terminal · ${isBar ? (t.idx === -1 ? "parameter" : "return") : (t.which === "in" ? "input" : "output")}`);
+    const nameIn = edRow(box, "name", edInput(t.term)); nameIn.className = "fe-ed-tname";
+    nameIn.addEventListener("change", () => {
+      const nn = nameIn.value.trim();
+      if (!nn || nn === t.term) { nameIn.value = t.term; return; }
+      const was = { ...t };
+      inspTerm = { ...t, term: nn };            // the editor follows the rename
+      if (!commitEdit(doc.renameTerminal(c, t.idx, t.which, t.term, nn))) { inspTerm = was; refreshInspector(); }
+    });
+    const typeIn = edRow(box, "type", edInput(node.type, "object · integer · string · …")); typeIn.className = "fe-ed-ttype";
+    typeIn.addEventListener("change", () => { const v = typeIn.value.trim(); if (v !== (node.type || "")) commitEdit(doc.setTerminalType(c, t.idx, t.which, t.term, v)); });
+    if (!isBar) {
+      const mode = edRow(box, "mode", edSelect(["regular", "list", "loop"], node.mode || "regular")); mode.className = "fe-ed-tmode";
+      let pair = null;
+      if (t.which === "out") {
+        const ins = Object.keys(op.in || {});
+        pair = edRow(box, "loop ⟲ input", edSelect(ins.length ? ins : [""], node.loop)); pair.className = "fe-ed-tpair";
+        pair.disabled = mode.value !== "loop";
+      }
+      // "regular" persists as the empty-string mode (the from_data default)
+      const applyMode = () => {
+        if (pair) pair.disabled = mode.value !== "loop";
+        commitEdit(doc.setTerminalMode(c, t.idx, t.which, t.term, mode.value === "regular" ? "" : mode.value, pair ? pair.value : undefined));
+      };
+      mode.addEventListener("change", applyMode);
+      if (pair) pair.addEventListener("change", () => { if (mode.value === "loop") applyMode(); });
+    } else edNote(box, "the bars are the signature — renaming or retyping this renames the command’s " + (t.idx === -1 ? "parameter" : "return"));
+    const row = edBtns(box);
+    edButton(row, "delete terminal", "fe-ed-tdel danger", () => {
+      const was = inspTerm; inspTerm = null;
+      if (!commitEdit(doc.removeTerminal(c, t.idx, t.which, t.term))) { inspTerm = was; refreshInspector(); }
+    });
+    edButton(row, "done", "fe-ed-tdone", () => { inspTerm = null; refreshInspector(); });
+  }
+
+  /** Nothing selected: the focused case's signature — the params and return
+      bars (floweditor3d's bar popover + barterm). Params are the bar's
+      outputs, returns its inputs (FlowDoc termMap/sideOf convention). */
+  function renderSignatureEditor(body, c) {
+    body.replaceChildren();
+    edNote(body, "Select an element. Output sockets start wires.");
+    for (const [idx, label, bar] of [[-1, "params — the signature", "params"], [-2, "return — the signature", "return"]]) {
+      const map = (idx === -1 ? c.input : c.output) || {};
+      const which = idx === -1 ? "out" : "in";
+      const key = "bar:" + bar;
+      edLbl(body, label);
+      const tw = document.createElement("div"); tw.className = "fe-ed-terms"; tw.dataset.bar = bar; body.appendChild(tw);
+      for (const term of Object.keys(map)) {
+        const n = map[term] || {};
+        const on = inspTerm && inspTerm.key === key && inspTerm.term === term;
+        const b = edButton(tw, `${term}${n.type ? " : " + n.type : ""}`, "fe-ed-term" + (on ? " active" : ""),
+          () => { inspTerm = { key, idx, which, term }; refreshInspector(); });
+        b.dataset.term = term;
+      }
+      if (!Object.keys(map).length) edNote(tw, "none");
+      const row = document.createElement("div"); row.className = "fe-ed-add"; row.dataset.bar = bar; body.appendChild(row);
+      const nIn = edInput("", "name"), tIn = edInput("", "type");
+      nIn.className = "fe-ed-bname"; tIn.className = "fe-ed-btype";
+      row.append(nIn, tIn);
+      const addB = edButton(row, "add", "fe-ed-badd", () => {
+        const nm = nIn.value.trim(); if (!nm) { nIn.focus(); return; }
+        commitEdit(doc.addTerminal(c, idx, which, nm, tIn.value.trim()));
       });
-      if (del) del.addEventListener("click", deleteSelectedOp);
-    } else body.innerHTML = `<p class="fe-empty">Select an element. Output sockets start wires.</p>`;
+      for (const inp of [nIn, tIn]) inp.addEventListener("keydown", (e) => { if (e.key === "Enter") addB.click(); });
+      if (inspTerm && inspTerm.key === key) renderTermEditor(body, c, inspTerm);
+    }
+    edNote(body, source ? "adding a parameter allocates the next free slot; the save derives the command’s params from this bar"
+      : "read-only view — the signature is shown, edits are refused");
   }
 
   // ── P3: authoring (create / splice / delete op) ───────────────────────────
@@ -1160,6 +1341,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
           if (e.key === "Enter") { e.preventDefault(); commitKeyboardWire(); return; }
           if (e.key === "Escape") { e.preventDefault(); cancelWireGhost(); renderFacade(); status("wiring cancelled"); return; }
         }
+        // Enter edits the selection (floweditor3d's popover key): focus the op
+        // editor's first field, or the params-bar name field with no selection
+        if (e.key === "Enter" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+          const f = $(".fe-inspect-body .fe-ed-name") || $(".fe-inspect-body .fe-ed-bname");
+          if (f) { e.preventDefault(); f.focus(); if (f.select) f.select(); return; }
+        }
         if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); startRun(); return; }
         if (e.key === "2") setProj("front");
         else if (e.key === "3") setProj("persp");
@@ -1197,6 +1384,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         opAt: (i) => { const c = focusedCase(); return c && c.cmds[i] ? JSON.parse(JSON.stringify(c.cmds[i])) : null; },
         opCount: () => { const c = focusedCase(); return c ? c.cmds.length : 0; },
         selectWire: (i) => { selWire = i; renderInspector(null); },
+        // P5 step 4 surface (op / terminal / signature editor)
+        refreshInspector, inspTerm: () => inspTerm,
+        editTerm: (key, idx, which, term) => { inspTerm = { key, idx, which, term }; refreshInspector(); },
+        caseIO: () => { const c = focusedCase(); return c ? JSON.parse(JSON.stringify({ input: c.input, output: c.output })) : null; },
         selectedOp: () => { const k = hostApi.state && hostApi.state.selectedKey; const m = k && /^d(\d+)_op(\d+)$/.exec(k); return m ? +m[2] : null; },
         dirty: () => dirty, serialize: () => doc.serialize(),
         // P5 surface (cutover: the floweditor3d props contract)

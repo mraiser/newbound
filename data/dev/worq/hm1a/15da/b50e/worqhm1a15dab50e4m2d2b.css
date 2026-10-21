@@ -104,3 +104,22 @@
   border-radius:6px; font:11px/1.35 ui-monospace, Menlo, monospace; white-space:pre-wrap; word-break:break-word; }
 .nb-flowedit3d .fe-run-pre.bad { color:#b3261e; border-color:#f0c4c0; background:#fdf3f2; }
 .nb-flowedit3d .fe-run-note { font-size:11px; color:#6b737c; margin:4px 0; }
+/* P5 step 4: op / terminal / signature editor (floweditor3d's popovers, docked) */
+.nb-flowedit3d .fe-ed-head { margin:0 0 4px; }
+.nb-flowedit3d .fe-ed-row { display:flex; align-items:center; gap:6px; margin:4px 0; font-size:11px; color:#4a525c; }
+.nb-flowedit3d .fe-ed-row > span { width:62px; flex:none; }
+.nb-flowedit3d .fe-ed-row input, .nb-flowedit3d .fe-ed-row select, .nb-flowedit3d .fe-ed-add input {
+  flex:1; min-width:0; border:1px solid #dfe3e8; border-radius:6px; padding:3px 6px; font:inherit; font-size:12px; background:#fff; }
+.nb-flowedit3d .fe-ed-row input:focus, .nb-flowedit3d .fe-ed-row select:focus, .nb-flowedit3d .fe-ed-add input:focus {
+  outline:none; border-color:#62bd8c; }
+.nb-flowedit3d .fe-ed-row select:disabled { opacity:.5; }
+.nb-flowedit3d .fe-ed-btns { display:flex; flex-wrap:wrap; gap:4px; margin:6px 0; }
+.nb-flowedit3d .fe-ed-terms { display:flex; flex-wrap:wrap; gap:3px; }
+.nb-flowedit3d .fe-ed-terms .fe-empty { margin:0; }
+.nb-flowedit3d .fe-ed-term { font:11px ui-monospace, Menlo, monospace; padding:1px 6px; }
+.nb-flowedit3d .fe-ed-term.active { background:#62bd8c; border-color:#62bd8c; color:#fff; }
+.nb-flowedit3d .fe-ed-term-box { margin:8px 0; padding:4px 8px; border:1px solid #e6e9ec; border-radius:8px; background:#fbfcfd; }
+.nb-flowedit3d .fe-ed-add { display:flex; gap:4px; margin:4px 0 6px; }
+.nb-flowedit3d .fe-ed-add input { width:0; }
+.nb-flowedit3d .fe-ed-sentence { font-style:italic; }
+.nb-flowedit3d button.danger { color:#c0392b; border-color:#f0c4c0; }
