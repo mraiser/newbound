@@ -171,7 +171,7 @@ async function init(host) {
           title: { prefix: `${lib} ▸ ${ctlName} ▸`, name: cmdName, suffix: "(flowlang)" },
           graph: typeof raw === "string" ? JSON.parse(raw) : raw,
           // names (not ids) — the flow-body pair resolves ctl/cmd by name,
-          // like the rest of dev.code. floweditor3d enables editing once it
+          // like the rest of dev.code. flowedit3d enables editing once it
           // reads the body back.
           source: { lib, ctl: ctlName, cmd: cmdName },
           onBack: () => { location.hash = `#/bench/${lib}/${ctlIdF}`; },
