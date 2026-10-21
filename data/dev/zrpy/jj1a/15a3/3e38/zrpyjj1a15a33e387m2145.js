@@ -21,6 +21,7 @@ me.ready = function () {
       animate(ctx) {
         ctx.me.opType = kind;
         ctx.me.opName = d.name || "op";
+        ctx.me.opIndex = (typeof d.opIndex === "number") ? d.opIndex : -1;
         // stagger by phase so a deck of nodes doesn't bob in lockstep
         ctx.me._phase = phase;
         // front-ortho anchor: the seeded flow position is the rest height
@@ -30,9 +31,7 @@ me.ready = function () {
       },
 
       // every frame: a gentle bob — the visible proof that the scenehost frame
-      // loop drives a control-scene behavior (the P0 gate). Also stamps a
-      // heartbeat into host.state._beats so the gate can CONFIRM the loop
-      // reaches behaviors headlessly.
+      // loop drives a control-scene behavior. Selected nodes hold still & lift.
       render(ctx, dt) {
         if (!ctx || !ctx.rig) return;
         const t = ctx.t || 0;
@@ -42,25 +41,35 @@ me.ready = function () {
         }
         const base = (ctx.me.baseY !== undefined) ? ctx.me.baseY : (ctx.me.baseY = ctx.rig.pos.y);
         const sel = ctx.host && ctx.host.state && ctx.host.state.selectedKey === ctx.key;
-        // selected nodes hold still & lift; the rest breathe
-        ctx.rig.pos.y = sel ? base + 0.15 : base + Math.sin(t * 1.4 + ctx.me._phase) * 0.04;
+        // a node mid wire-gesture freezes; the rest breathe
+        const wiring = ctx.host && ctx.host.state && ctx.host.state.wireSrc;
+        ctx.rig.pos.y = sel ? base + 0.15 : (wiring ? base : base + Math.sin(t * 1.4 + ctx.me._phase) * 0.04);
       },
 
-      // tap → the host's raycast hit. hit = { node, specId, key }.
+      // tap → the host's raycast hit. hit = { node, specId, key }. A tap on a
+      // TERMINAL node is a WIRING gesture (delegated to the editor via the
+      // host's shared onPortTap hook); a tap on the BODY is selection.
       click(ctx, hit) {
         if (!ctx.host) return;
+        const node = hit && hit.node;
+        // route a terminal tap to the editor's wiring logic (P2)
+        if (node && /^(in|out)\d+$/.test(node) && typeof ctx.host.state.onPortTap === "function") {
+          ctx.host.state.onPortTap({ key: ctx.key, opIndex: ctx.me.opIndex, node, opType: ctx.me.opType });
+          return;
+        }
         ctx.host.setState("lastClick", {
-          key: ctx.key, node: hit && hit.node, opType: ctx.me.opType, name: ctx.me.opName, t: Date.now(),
+          key: ctx.key, node, opType: ctx.me.opType, name: ctx.me.opName, t: Date.now(),
         });
-        // selection emphasis rides the shared state (decision 1: per-deck
-        // grouping via host.state, not per-instance shape swaps)
+        // selection emphasis rides the shared state (decision 1)
         ctx.host.setState("selectedKey", ctx.key);
       },
 
-      // drag gestures (P2 will turn this into op-move / wire-ghost). For P0 it
-      // just follows the pointer in the front plane so we can feel the affordance.
+      // drag gestures. A drag that began on an output socket is a WIRE drag
+      // (the editor moves the ghost tip + previews legal targets); any other
+      // drag is an op-move in the front plane.
       drag(ctx, evt) {
         if (!ctx || !ctx.rig || !evt) return;
+        if (typeof ctx.host.state.onOpDrag === "function") { ctx.host.state.onOpDrag(ctx.me.opIndex, evt); return; }
         if (evt.phase === "move" && typeof evt.x === "number") {
           ctx.rig.pos.x = evt.x;
           if (typeof evt.y === "number") ctx.me.baseY = evt.y;
