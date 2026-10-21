@@ -41,6 +41,34 @@
 .nb-flowedit3d .fe-pal-row { display:flex; gap:4px; flex-wrap:wrap; }
 .nb-flowedit3d .fe-pal-item { flex:1; min-width:0; background:#2d343c; color:#fff; border-color:#2d343c; }
 .nb-flowedit3d .fe-pal-item:hover { background:#3c4650; }
+/* P5 palette parity: floweditor3d's node kinds + pickers */
+.nb-flowedit3d .fe-pal-col { display:flex; flex-direction:column; gap:3px; }
+.nb-flowedit3d .fe-pal-col .fe-pal-item { display:flex; align-items:center; gap:8px; text-align:left;
+  background:#fff; color:#2d343c; border-color:#dfe3e8; padding:4px 8px; }
+.nb-flowedit3d .fe-pal-col .fe-pal-item:hover { background:#eef7f2; border-color:#62bd8c; }
+.nb-flowedit3d .fe-pal-item .glyph { width:16px; text-align:center; color:#62bd8c; }
+.nb-flowedit3d .fe-picker { position:absolute; inset:0; z-index:30; display:flex; align-items:flex-start;
+  justify-content:center; padding-top:36px; background:rgba(45,52,60,.18); }
+.nb-flowedit3d .fe-picker-panel { width:min(420px, 92%); max-height:72%; display:flex; flex-direction:column; gap:6px;
+  background:#fff; border:1px solid #dfe3e8; border-radius:10px; padding:10px 12px; box-shadow:0 8px 28px rgba(0,0,0,.18); }
+.nb-flowedit3d .fe-picker-head { display:flex; align-items:center; gap:6px; }
+.nb-flowedit3d .fe-picker-head .lbl { flex:1; margin:0; }
+.nb-flowedit3d .fe-picker-x { padding:0 7px; }
+.nb-flowedit3d .fe-picker-search, .nb-flowedit3d .fe-picker select { border:1px solid #dfe3e8; border-radius:6px;
+  padding:5px 7px; font:inherit; font-size:12px; background:#fff; }
+.nb-flowedit3d .fe-picker-search:focus, .nb-flowedit3d .fe-picker select:focus { outline:none; border-color:#62bd8c; }
+.nb-flowedit3d .fe-picker-tabs { display:flex; flex-wrap:wrap; gap:3px; }
+.nb-flowedit3d .fe-picker-tab { padding:1px 7px; font-size:11px; }
+.nb-flowedit3d .fe-picker-tab.active { background:#62bd8c; border-color:#62bd8c; color:#fff; }
+.nb-flowedit3d .fe-picker-list { overflow:auto; min-height:80px; }
+.nb-flowedit3d .fe-picker-list .fam { margin:8px 0 3px; }
+.nb-flowedit3d .fe-prim { display:flex; width:100%; justify-content:space-between; gap:10px; border:none;
+  border-radius:5px; padding:3px 6px; text-align:left; }
+.nb-flowedit3d .fe-prim:hover { background:#eef7f2; }
+.nb-flowedit3d .fe-prim .sig { color:#8a929c; font:11px ui-monospace, Menlo, monospace; }
+.nb-flowedit3d .fe-picker-foot { display:flex; justify-content:flex-end; gap:4px; margin-top:4px; }
+.nb-flowedit3d .fe-pk-go:not(:disabled) { border-color:#62bd8c; color:#2f9e63; }
+.nb-flowedit3d [hidden] { display:none !important; }
 .nb-flowedit3d .fe-conflict { display:flex; align-items:center; gap:8px; padding:8px 12px;
   background:#fdecea; border-bottom:1px solid #f5c6c0; color:#8a2f22; font-size:12px; }
 .nb-flowedit3d .fe-conflict-msg { flex:1; }

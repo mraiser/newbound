@@ -266,7 +266,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (!inst || !inst.ctx || !inst.ctx.setRig) return;
     const c = focusedCase(); if (!c) return;
     const inT = Object.keys(op.in || {}), outT = Object.keys(op.out || {});
-    for (let k = 0; k < 4; k++) {
+    for (let k = 0; k < SOCKET_POOL; k++) {
       const iid = "in" + k, oid = "out" + k;
       if (k < inT.length) {
         const w = terminalWorld(c, opIndex, "in", inT[k]);
@@ -490,36 +490,191 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     let maxX = -3; for (const op of c.cmds) maxX = Math.max(maxX, (op.pos && op.pos.x) || 0);
     return { x: maxX + 1.8, y: 1.4, z: 0 };
   }
+  // P5 palette parity: a palette kind → an op. primitive / command open their
+  // picker unless the caller passes the pick (opts.pick = primitive name, or
+  // {lib, ctl, cmd} for a command call). With a wire selected the new op is
+  // SPLICED into it — floweditor3d's drop-onto-a-wire — as ONE undo unit.
   function addOpFromPalette(entry, opts = {}) {
-    const c = focusedCase(); if (!c) return null;
-    const raw = JSON.parse(JSON.stringify(entry.raw));
-    raw.pos = freshPos(c);
-    // de-dupe the name against the deck
-    let nm = raw.name, n = 1; while (c.cmds.some((o) => o.name === nm)) nm = raw.name + (++n);
-    raw.name = nm;
-    const cmd = doc.addOp(c, raw);
-    if (cmd.error) { status("add refused: " + cmd.error, "bad"); return cmd; }
-    if (!commitApplied(cmd)) return cmd;
-    status(`added ${nm} (${entry.type})`, "ok");
-    gate(".fe-g-create", true, `add ${entry.type}`);
-    return cmd;
+    const c = focusedCase(); if (!c || !entry) return null;
+    const wireIdx = opts.wireIdx !== undefined ? opts.wireIdx : selWire;
+    if (entry.kind === "primitive") {
+      if (opts.pick == null) { openPrimitivePicker(wireIdx); return null; }
+      const prim = PRIMS.find((p) => p.name === opts.pick);
+      if (!prim) { status("no primitive named " + opts.pick, "bad"); return null; }
+      return createOp(primOp(prim), wireIdx, "primitive");
+    }
+    if (entry.kind === "command") {
+      if (!opts.pick) { openCommandPicker(wireIdx); return null; }
+      return createCommandOp(opts.pick, wireIdx);          // async: a Promise
+    }
+    const raw = opOfKind(entry.kind);
+    if (!raw) { status("unknown palette kind " + entry.kind, "bad"); return null; }
+    return createOp(raw, wireIdx, entry.kind);
   }
-  // splice a fresh palette op into the currently-selected wire (I: it takes the
-  // wire's source into its first input, its first output to the wire's dest).
-  function spliceIntoSelectedWire(entry) {
-    const c = focusedCase(); if (!c || selWire == null) { status("select a wire to splice into", "bad"); return null; }
-    const add = doc.addOp(c, (() => { const r = JSON.parse(JSON.stringify(entry.raw)); r.pos = freshPos(c); return r; })());
+  function spliceIntoSelectedWire(entry, opts = {}) {
+    if (selWire == null) { status("select a wire to splice into", "bad"); return null; }
+    return addOpFromPalette(entry, { ...opts, wireIdx: selWire });
+  }
+  // add (and optionally splice) one op; floweditor3d's createOp semantics: a
+  // splice the op cannot take (no input / no output) still creates the op and
+  // says so. The new op becomes the selection so the inspector can edit it.
+  function createOp(rawOp, wireIdx, kind) {
+    const c = focusedCase(); if (!c) return null;
+    const raw = JSON.parse(JSON.stringify(rawOp));
+    if (!raw.pos) raw.pos = freshPos(c);
+    const add = doc.addOp(c, raw);
     if (add.error) { status("add refused: " + add.error, "bad"); return add; }
-    const sp = doc.spliceIntoWire(c, selWire, add.index);
-    if (sp.error) { try { add.undo(); } catch (e) {} status("splice refused: " + sp.error, "bad"); return sp; }
-    // compose the two into ONE undo unit (add + splice revert together)
-    if (!commitApplied({ label: sp.label,
-      undo: () => { sp.undo(); add.undo(); },
-      redo: () => { add.redo(); sp.redo(); } })) return null;
+    let unit = add, spliced = false, why = "";
+    if (wireIdx != null && c.cons[wireIdx]) {
+      const sp = doc.spliceIntoWire(c, wireIdx, add.index);
+      if (sp.error) why = sp.error;
+      else { spliced = true; unit = { label: sp.label, index: add.index, undo: () => { sp.undo(); add.undo(); }, redo: () => { add.redo(); sp.redo(); } }; }
+    }
+    if (!commitApplied(unit)) return null;
     selWire = null;
-    status(sp.label, "ok");
-    gate(".fe-g-splice", true, "splice into wire");
-    return sp;
+    const key = `d${activeDeck}_op${add.index}`;
+    if (hostApi) hostApi.setState("selectedKey", key);
+    renderInspector(key);
+    const nm = raw.name || raw.type;
+    if (spliced) { status(unit.label, "ok"); gate(".fe-g-splice", true, `splice ${kind}`); }
+    else if (why) status(`added ${nm} — not spliced: ${why}`, "bad");
+    else status(`added ${nm} (${kind})`, "ok");
+    gate(".fe-g-create", true, `add ${kind}`);
+    return { label: unit.label, index: add.index, spliced, why };
+  }
+  // a command-call op from {lib, ctl, cmd} (names or ids): terminals from the
+  // callee's signature; outputs map by position, so non-flow callees expose
+  // the single key `a`, flow callees their output bar (design §1.3 / I-7).
+  async function createCommandOp(pick, wireIdx) {
+    let { lib, ctl, cmd, ctlId, cmdId } = pick || {};
+    if (!lib || !ctl || !cmd) { status("command call needs lib, ctl and cmd", "bad"); return null; }
+    if (!ctlId || !cmdId) {
+      const ctls = await controlsOf(lib);
+      const cr = Array.isArray(ctls) ? ctls.find((r) => r.name === ctl || r.id === ctl) : null;
+      if (!cr) { status(`no control ${lib}:${ctl}`, "bad"); return null; }
+      ctlId = cr.id; ctl = cr.name;
+      const rec = await readRec(lib, ctlId);
+      const cm = rec && !(rec instanceof Error) ? (rec.cmd || []).find((m) => m.name === cmd || m.id === cmd) : null;
+      if (!cm) { status(`no command ${lib}:${ctl}:${cmd}`, "bad"); return null; }
+      cmdId = cm.id; cmd = cm.name;
+    }
+    const rc = await readCommand(lib, ctl, cmd);
+    const ins = rc && rc.status === "ok" && Array.isArray(rc.params) ? rc.params.map((p) => p.name) : [];
+    let outs = ["a"];
+    if (rc && rc.status === "ok" && rc.type === "flow") {
+      const fb = await readFlowBody(lib, ctl, cmd);
+      if (fb && fb.status === "ok" && fb.exists && fb.body && fb.body.output) outs = Object.keys(fb.body.output);
+    }
+    const width = Math.max(1.75, cmd.length * 0.12 + 0.8);
+    return createOp({ name: cmd, type: "command", cmd: `${lib}:${ctlId}:${cmdId}`, width,
+      in: spread(ins, width), out: spread(outs.length ? outs : ["a"], width) }, wireIdx, "command");
+  }
+
+  // ── pickers (DOM overlay on the stage, floweditor3d's 3D-3 pickers) ───────
+  let pickerEl = null;
+  function closePicker() { if (pickerEl) { pickerEl.remove(); pickerEl = null; } }
+  function openPicker(title) {
+    closePicker();
+    const el = document.createElement("div"); el.className = "fe-picker";
+    const panel = document.createElement("div"); panel.className = "fe-picker-panel";
+    const head = document.createElement("div"); head.className = "fe-picker-head";
+    const lbl = document.createElement("span"); lbl.className = "lbl"; lbl.textContent = title;
+    const x = document.createElement("button"); x.className = "fe-picker-x"; x.textContent = "×"; x.title = "close (Esc)";
+    x.addEventListener("click", closePicker);
+    head.append(lbl, x); panel.appendChild(head); el.appendChild(panel);
+    el.addEventListener("pointerdown", (e) => { if (e.target === el) closePicker(); });
+    el.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closePicker(); const s = ME.querySelector(".nb-flowedit3d"); if (s) s.focus(); } });
+    $(".fe-main").appendChild(el);
+    pickerEl = el;
+    return panel;
+  }
+  function openPrimitivePicker(wireIdx) {
+    const panel = openPicker(`primitive — ${PRIMS.length}, from the registry` + (wireIdx != null ? " · splices into the selected wire" : ""));
+    const search = document.createElement("input"); search.className = "fe-picker-search"; search.placeholder = "search primitives…";
+    const tabs = document.createElement("div"); tabs.className = "fe-picker-tabs"; tabs.setAttribute("role", "tablist");
+    const list = document.createElement("div"); list.className = "fe-picker-list";
+    let fam = "";                          // "" = every family
+    const renderTabs = () => {
+      tabs.replaceChildren(...["", ...FAMILIES].map((f) => {
+        const b = document.createElement("button"); b.className = "fe-picker-tab" + (f === fam ? " active" : "");
+        b.textContent = f || "all"; b.dataset.fam = f; b.setAttribute("role", "tab"); b.setAttribute("aria-selected", f === fam ? "true" : "false");
+        b.addEventListener("click", () => { fam = f; renderTabs(); renderList(); search.focus(); });
+        return b;
+      }));
+    };
+    const renderList = () => {
+      const q = search.value.trim().toLowerCase();
+      list.replaceChildren();
+      let n = 0;
+      for (const f of FAMILIES) {
+        if (fam && f !== fam) continue;
+        const prims = PRIMS.filter((p) => p.family === f && (!q || p.name.toLowerCase().includes(q) || f.includes(q)));
+        if (!prims.length) continue;
+        const h = document.createElement("div"); h.className = "fam lbl"; h.textContent = f; list.appendChild(h);
+        for (const prim of prims) {
+          const b = document.createElement("button"); b.className = "fe-prim"; b.dataset.prim = prim.name;
+          const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = "⚙ " + prim.name;
+          const sig = document.createElement("span"); sig.className = "sig"; sig.textContent = signature(prim);
+          b.append(nm, sig);
+          b.addEventListener("click", () => { closePicker(); createOp(primOp(prim), wireIdx, "primitive"); });
+          list.appendChild(b); n++;
+        }
+      }
+      if (!n) { const p = document.createElement("p"); p.className = "fe-empty"; p.textContent = "no primitive matches"; list.appendChild(p); }
+    };
+    search.addEventListener("input", renderList);
+    search.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); const b = list.querySelector(".fe-prim"); if (b) b.click(); } });
+    panel.append(search, tabs, list);
+    renderTabs(); renderList();
+    search.focus();
+  }
+  async function openCommandPicker(wireIdx) {
+    const panel = openPicker("command call — the callee" + (wireIdx != null ? " · splices into the selected wire" : ""));
+    const mine = pickerEl;
+    const libSel = document.createElement("select"); libSel.className = "fe-pk-lib";
+    const ctlSel = document.createElement("select"); ctlSel.className = "fe-pk-ctl";
+    const cmdSel = document.createElement("select"); cmdSel.className = "fe-pk-cmd";
+    const foot = document.createElement("div"); foot.className = "fe-picker-foot";
+    const cancel = document.createElement("button"); cancel.className = "fe-pk-cancel"; cancel.textContent = "cancel";
+    const go = document.createElement("button"); go.className = "fe-pk-go"; go.textContent = "add call"; go.disabled = true;
+    cancel.addEventListener("click", closePicker);
+    foot.append(cancel, go);
+    panel.append(libSel, ctlSel, cmdSel, foot);
+    const fill = (sel, rows, value) => {
+      sel.replaceChildren(...rows.map((r) => { const o = document.createElement("option"); o.value = r.value; o.textContent = r.text; return o; }));
+      if (value && rows.some((r) => r.value === value)) sel.value = value;
+    };
+    const libs = await libsOf();
+    if (pickerEl !== mine) return;          // closed while loading
+    if (libs instanceof Error) { status("cannot list libraries", "bad"); closePicker(); return; }
+    fill(libSel, libs.map((l) => ({ value: l.id, text: l.id })), source ? source.lib : null);
+    let ctlRows = [];
+    const loadCmds = async () => {
+      const rec = ctlSel.value ? await readRec(libSel.value, ctlSel.value) : null;
+      const cmds = rec && !(rec instanceof Error) ? (rec.cmd || []) : [];
+      fill(cmdSel, cmds.map((cm) => ({ value: cm.id, text: cm.name })));
+      go.disabled = !cmdSel.value;
+    };
+    const loadCtls = async () => {
+      const ctls = await controlsOf(libSel.value);
+      ctlRows = ctls instanceof Error ? [] : ctls;
+      fill(ctlSel, ctlRows.map((cr) => ({ value: cr.id, text: cr.name })), source ? (ctlRows.find((r) => r.name === source.ctl) || {}).id : null);
+      await loadCmds();
+    };
+    libSel.addEventListener("change", loadCtls);
+    ctlSel.addEventListener("change", loadCmds);
+    cmdSel.addEventListener("change", () => { go.disabled = !cmdSel.value; });
+    mine.dataset.loading = "1";
+    await loadCtls();
+    if (pickerEl === mine) delete mine.dataset.loading;
+    go.addEventListener("click", () => {
+      const lib = libSel.value, ctlId = ctlSel.value, cmdId = cmdSel.value;
+      if (!lib || !ctlId || !cmdId) return;
+      const ctlName = (ctlRows.find((r) => r.id === ctlId) || {}).name;
+      const cmdName = cmdSel.options[cmdSel.selectedIndex] ? cmdSel.options[cmdSel.selectedIndex].textContent : "";
+      closePicker();
+      createCommandOp({ lib, ctl: ctlName, cmd: cmdName, ctlId, cmdId }, wireIdx);
+    });
   }
   // delete the selected op: FlowDoc.removeOp removes it + every wire touching
   // it AND renumbers the surviving wires' op indices — one undoable mutation.
@@ -978,11 +1133,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       const saveBtn = $(".fe-save"); if (saveBtn) saveBtn.addEventListener("click", saveFlow);
       const tidyBtn = $(".fe-tidy"); if (tidyBtn) tidyBtn.addEventListener("click", () => applyLayoutProposal("tidy"));
       const untBtn = $(".fe-untangle"); if (untBtn) untBtn.addEventListener("click", () => applyLayoutProposal("untangle"));
-      // palette: click = add op; with a wire selected = splice into that wire
+      // palette: click = add op (primitive/command open a picker); with a wire
+      // selected the new op splices into that wire
       ME.querySelectorAll(".fe-pal-item").forEach((el) => {
         el.addEventListener("click", () => {
           const entry = PALETTE[+el.dataset.pi]; if (!entry) return;
-          if (selWire != null) spliceIntoSelectedWire(entry); else addOpFromPalette(entry);
+          addOpFromPalette(entry);
         });
       });
       refreshSaveUi();
@@ -1031,9 +1187,15 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         removeWire: (i) => { const cmd = doc.removeWire(focusedCase(), i); if (!cmd.error) commitApplied(cmd); return cmd; },
         cons: () => focusedCase().cons.length,
         // P3 surface
-        redo, addOpFromPalette: (i) => addOpFromPalette(PALETTE[i] || PALETTE[0]),
-        spliceIntoSelectedWire: (i) => spliceIntoSelectedWire(PALETTE[i] || PALETTE[0]),
+        redo, addOpFromPalette: (i, pick) => addOpFromPalette(PALETTE[i] || PALETTE[0], pick !== undefined ? { pick } : {}),
+        spliceIntoSelectedWire: (i, pick) => spliceIntoSelectedWire(PALETTE[i] || PALETTE[0], pick !== undefined ? { pick } : {}),
         deleteSelectedOp, applyLayoutProposal, saveFlow, PALETTE,
+        // P5 palette parity surface
+        addPrimitive: (name) => addOpFromPalette(PALETTE[0], { pick: name }),
+        addCommandCall: (pick) => addOpFromPalette(PALETTE[1], { pick }),
+        picker: () => pickerEl, closePicker, primCount: () => PRIMS.length, families: () => FAMILIES.slice(),
+        opAt: (i) => { const c = focusedCase(); return c && c.cmds[i] ? JSON.parse(JSON.stringify(c.cmds[i])) : null; },
+        opCount: () => { const c = focusedCase(); return c ? c.cmds.length : 0; },
         selectWire: (i) => { selWire = i; renderInspector(null); },
         selectedOp: () => { const k = hostApi.state && hostApi.state.selectedKey; const m = k && /^d(\d+)_op(\d+)$/.exec(k); return m ? +m[2] : null; },
         dirty: () => dirty, serialize: () => doc.serialize(),

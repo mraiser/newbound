@@ -31,12 +31,14 @@
     <aside class="fe-rail">
       <span class="lbl">P4 · run tokens + journal ride scenehost</span>
       <div class="fe-palette">
-        <span class="lbl">palette — click to add · with a wire selected, splice</span>
-        <div class="fe-pal-row">
-          <button class="fe-pal-item" data-pi="0" title="primitive +">+ op</button>
-          <button class="fe-pal-item" data-pi="1" title="constant">const</button>
-          <button class="fe-pal-item" data-pi="2" title="match">match</button>
-          <button class="fe-pal-item" data-pi="3" title="local sub-flow">local</button>
+        <span class="lbl">node kinds — click to add · with a wire selected, splice</span>
+        <div class="fe-pal-col">
+          <button class="fe-pal-item" data-pi="0" data-kind="primitive" title="pick from the primitive registry"><span class="glyph" aria-hidden="true">⚙</span>primitive</button>
+          <button class="fe-pal-item" data-pi="1" data-kind="command" title="call a command (lib / ctl / cmd)"><span class="glyph" aria-hidden="true">▤</span>command call</button>
+          <button class="fe-pal-item" data-pi="2" data-kind="local" title="a drillable local sub-flow"><span class="glyph" aria-hidden="true">▣</span>local sub-flow</button>
+          <button class="fe-pal-item" data-pi="3" data-kind="constant" title="constant value / matcher"><span class="glyph" aria-hidden="true">◇</span>constant / matcher</button>
+          <button class="fe-pal-item" data-pi="4" data-kind="persistent" title="a persistent slot"><span class="glyph" aria-hidden="true">⛃</span>persistent slot</button>
+          <button class="fe-pal-item" data-pi="5" data-kind="undefined" title="a blank op"><span class="glyph" aria-hidden="true">▢</span>blank (undefined)</button>
         </div>
       </div>
       <ul class="fe-gate">
@@ -92,4 +94,5 @@
 </section>
 <div class="data-control" data-control="dev:flowdoc" hidden></div>
 <div class="data-control" data-control="dev:flowproject" hidden></div>
+<div class="data-control" data-control="dev:flowprims" hidden></div>
 <div class="data-control" data-control="dev:flowlayout" hidden></div>
