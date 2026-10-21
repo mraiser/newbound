@@ -127,6 +127,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // ── P4: run tokens + journal state ────────────────────────────────────────
   let savedBody = null;           // JSON snapshot of the last loaded/saved body (diff baseline)
   let running = false, runSeq = 0, lastRun = null;
+  let disposed = false;           // P5 cutover: dev.frame tears the editor down on navigation
   let journalRows = [];           // the server journal's flow entries for this command
   const snap = () => { const b = doc.serialize(); return typeof b === "string" ? b : JSON.stringify(b); };
   // P5 CUTOVER: the SAME props contract as floweditor3d's init(host, {title,
@@ -246,6 +247,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
   // ── instances: host each op of the ACTIVE deck as a flownode ─────────────
   async function renderInstances() {
+    if (disposed) return;          // a late loadBody/mutation after teardown must not re-host
     // flownode.dispose clears host.state.selectedKey when its instance is the
     // selection — right for a real removal, wrong for this re-render. Carry
     // the selection across when that op still exists on the active deck
@@ -265,6 +267,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         opType: op.type, name: op.name, width: op.width, pos: op.pos, opIndex: i,
         inTerms: Object.keys(op.in || {}), outTerms: Object.keys(op.out || {}), phase: i * 0.7,
       }, key);
+      if (disposed) { try { hostApi.removeControl(key); } catch (e) {} return; }
       instances.push(inst);
       if (inst && inst.rig) { inst.rig.pos.x = op.pos.x; inst.rig.pos.y = op.pos.y; inst.rig.pos.z = op.pos.z; }
       seatSockets(inst, op, i);
@@ -1524,7 +1527,22 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
       // expose a tiny api for the gate + future phases
       return {
-        dispose() { cancelWireGhost(); },
+        // dev.frame calls dispose() on every navigation away. The scenehost
+        // runs a rAF frame loop + a WebGL stage that outlive the dropped DOM
+        // (floweditor3d's own dispose was stage.dispose()), so: cancel the
+        // gesture, close overlays, end any run, remove every hosted instance
+        // (their dispose behaviors run), then stop the host. Idempotent.
+        dispose() {
+          if (disposed) return;
+          disposed = true;
+          cancelWireGhost(); closePicker();
+          try { hostApi.setState("onTokenDelivered", null); hostApi.setState("run", null); } catch (e) {}
+          for (const ch of (hostApi.children || []).slice()) { try { hostApi.removeControl(ch.key); } catch (e) {} }
+          instances = [];
+          try { if (hostApi.dispose) hostApi.dispose(); } catch (e) {}
+        },
+        disposed: () => disposed,
+        hostedCount: () => (hostApi && hostApi.children ? hostApi.children.length : 0),
         // test/gate surface (headless drives these)
         onPortTap, startKeyboardWiring, moveWireCandidate, commitKeyboardWire,
         armWire, undo, doc: () => doc, focusedCase, canWire: (s, d2) => doc.canWire(focusedCase(), s, d2),
