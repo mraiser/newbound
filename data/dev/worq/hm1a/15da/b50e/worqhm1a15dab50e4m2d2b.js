@@ -219,7 +219,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     pushJournal("redo " + (cmd.label || ""));
     afterMutation();
   }
-  function afterMutation() { cancelWireGhost(); renderAll(); refreshSaveUi(); renderChanges(); refreshInspector(); }
+  function afterMutation() { reconcileFocus(); cancelWireGhost(); renderAll(); refreshSaveUi(); renderChanges(); refreshInspector(); }
 
   function pushJournal(text) {
     const ul = $(".fe-journal-list"); if (!ul) return;
@@ -443,9 +443,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       const tn = document.createElement("span"); tn.className = "t"; tn.textContent = current.t.name || "flow";
       tEl.append(tn, ` ${current.t.suffix ?? "(flowlang · 3D)"}`);
     } else tEl.textContent = current.title;
-    const crumbs = focusPath.slice(0, -1).map((f, k) => `<span class="fe-crumb" data-k="${k}">${f.title}</span>`).join("");
-    $(".fe-crumbs").innerHTML = crumbs;
-    ME.querySelectorAll(".fe-crumb").forEach((el) => el.addEventListener("click", () => drillTo(+el.dataset.k)));
+    // crumbs: ancestors of the focused level; a drilled level names its op
+    // LIVE (f.op.name) so a rename shows at once; text nodes, never raw HTML
+    const crumbsEl = $(".fe-crumbs"); crumbsEl.replaceChildren();
+    focusPath.slice(0, -1).forEach((f, k) => {
+      const sp = document.createElement("span"); sp.className = "fe-crumb"; sp.dataset.k = String(k);
+      sp.textContent = f.op ? (f.op.name || "local") : f.title;
+      sp.addEventListener("click", () => drillTo(k));
+      crumbsEl.append(sp);
+    });
+    if (focusPath.length > 1) { const cur = focusPath[focusPath.length - 1]; const sp = document.createElement("span"); sp.className = "fe-crumb cur"; sp.textContent = "local: " + ((cur.op && cur.op.name) || cur.title); crumbsEl.append(sp); }
     const decks = $(".fe-decks"); decks.innerHTML = "";
     chain.forEach((c, k) => {
       const b = document.createElement("button");
@@ -457,7 +464,27 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
 
   function setActiveDeck(k) { activeDeck = k; cancelWireGhost(); selWire = null; if (hostApi) hostApi.setState("selectedKey", null); renderAll(); }
-  function drillInto(op) { if (op && op.type === "local" && op.localdata) { focusPath.push({ root: parseFlow(op.localdata).root, title: op.name }); activeDeck = 0; cancelWireGhost(); renderAll(); } }
+  // P5 4b DRILL WRITE-BACK: drill IN PLACE. FlowDoc.parse/addOp already
+  // normalize op.localdata into the doc tree (normOp → normCase), so the
+  // drilled case IS the authoritative sub-case: every mutation made while
+  // drilled lands in doc.root's tree, serialize() emits it, save journals it
+  // (floweditor3d's drill does the same: stack.push({case: op.localdata})).
+  // The previous parseFlow(op.localdata).root built a DETACHED copy whose
+  // edits never reached the doc. `op` is kept so the crumb follows renames
+  // and reconcileFocus can tell when undo detaches the drilled op.
+  function drillInto(op) { if (op && op.type === "local" && op.localdata) { focusPath.push({ root: op.localdata, op, title: op.name }); activeDeck = 0; cancelWireGhost(); renderAll(); } }
+  // after undo/redo/delete the drilled op may no longer be in the tree (e.g.
+  // undoing the add of the local op you are inside): pop to the deepest level
+  // still reachable so the editor never edits a detached case.
+  function reconcileFocus() {
+    if (!focusPath.length || focusPath[0].root !== doc.root) { focusPath = [{ root: doc.root, title: "case 1" }]; activeDeck = 0; return; }
+    for (let k = 1; k < focusPath.length; k++) {
+      const f = focusPath[k];
+      const live = caseChain(focusPath[k - 1].root).some((c) => c.cmds.includes(f.op)) && f.op.localdata === f.root;
+      if (!live) { focusPath = focusPath.slice(0, k); activeDeck = 0; selWire = null; if (hostApi) hostApi.setState("selectedKey", null); status("the drilled sub-flow left the graph — back at " + (k === 1 ? "the root" : focusPath[k - 1].title), "bad"); return; }
+    }
+    const n = caseChain(focusRoot()).length; if (activeDeck >= n) activeDeck = Math.max(0, n - 1);
+  }
   function drillTo(k) { focusPath = focusPath.slice(0, k + 1); activeDeck = 0; cancelWireGhost(); renderAll(); }
   function drillBack() { if (focusPath.length > 1) { focusPath.pop(); activeDeck = 0; cancelWireGhost(); renderAll(); } }
   function clearSelection() { if (hostApi) hostApi.setState("selectedKey", null); selWire = null; renderInspector(null); }
