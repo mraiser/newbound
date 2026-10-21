@@ -194,12 +194,13 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (which === "out") { armWire({ idx: p.opIndex, term, key: p.key }); return; }
     // an INPUT tap: commit the armed wire if legal (I-1/I-2 via canWire)
     if (armSrc) {
-      const chk = doc.canWire(c, [armSrc.idx, armSrc.term], [p.opIndex, term]);
+      const from = { idx: armSrc.idx, term: armSrc.term };   // capture: commitApplied nulls armSrc
+      const chk = doc.canWire(c, [from.idx, from.term], [p.opIndex, term]);
       if (!chk.ok) { status("✗ " + chk.reason, "bad"); gate(".fe-g-i1i2", true, chk.reason); return; }
-      const cmd = doc.addWire(c, { src: [armSrc.idx, armSrc.term], dest: [p.opIndex, term] });
+      const cmd = doc.addWire(c, { src: [from.idx, from.term], dest: [p.opIndex, term] });
       if (cmd.error) return status("wire refused: " + cmd.error, "bad");
       commitApplied(cmd);
-      status(`wired ${nameOf(c, armSrc.idx)}.${armSrc.term} → ${nameOf(c, p.opIndex)}.${term} — ⌘Z undoes`, "ok");
+      status(`wired ${nameOf(c, from.idx)}.${from.term} → ${nameOf(c, p.opIndex)}.${term} — ⌘Z undoes`, "ok");
       gate(".fe-g-wiretap", true, "port-tap wire committed");
       armSrc = null;
     }
