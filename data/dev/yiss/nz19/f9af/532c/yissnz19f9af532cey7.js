@@ -111,10 +111,12 @@ async function init(host) {
     }
 
     if (location.hash.startsWith("#/flow")) {
-      // The 3D editor (floweditor3d) is the flow surface when WebGL is
-      // available; the read-only 2D viewer (floweditor) is the no-WebGL
-      // fallback.
-      const flowControl = hasWebGL() ? "floweditor3d" : "floweditor";
+      // The 3D editor is the flow surface when WebGL is available — since the
+      // P5 cutover that is dev.flowedit3d (the flow as scenehost-hosted
+      // dev:flownode instances; same props contract {title, graph, source,
+      // onBack} as the retired floweditor3d). The read-only 2D viewer
+      // (floweditor) stays the no-WebGL fallback.
+      const flowControl = hasWebGL() ? "flowedit3d" : "floweditor";
       // #/flow/sample — the bundled specimen; #/flow/<lib>/<ctl>/<cmd> when
       // real flow commands exist (none in this store yet).
       shelfApi = null;
