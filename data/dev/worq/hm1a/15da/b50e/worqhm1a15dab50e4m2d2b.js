@@ -134,13 +134,14 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (!cmd || cmd.error) return;
     // a run owns the stage: an edit mid-run would re-project the facade under
     // the tokens — revert it at once (the doc stays exactly as before)
-    if (running) { try { cmd.undo(); } catch (e) {} status("running — edit refused until the run delivers", "bad"); return; }
+    if (running) { try { cmd.undo(); } catch (e) {} status("running — edit refused until the run delivers", "bad"); return false; }
     undoStack.push(cmd);
     redoStack = [];                       // a fresh mutation invalidates redo
     dirty = true; pendingLabels.push(cmd.label || "edit");
     $(".fe-undo").disabled = false;
     pushJournal(cmd.label);
     afterMutation();
+    return true;
   }
   function undo() {
     if (running) return;
@@ -247,7 +248,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       if (!chk.ok) { status("✗ " + chk.reason, "bad"); gate(".fe-g-i1i2", true, chk.reason); return; }
       const cmd = doc.addWire(c, { src: [from.idx, from.term], dest: [p.opIndex, term] });
       if (cmd.error) return status("wire refused: " + cmd.error, "bad");
-      commitApplied(cmd);
+      if (!commitApplied(cmd)) return;
       status(`wired ${nameOf(c, from.idx)}.${from.term} → ${nameOf(c, p.opIndex)}.${term} — ⌘Z undoes`, "ok");
       gate(".fe-g-wiretap", true, "port-tap wire committed");
       armSrc = null;
@@ -350,7 +351,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const cmd = doc.addWire(c, { src: [src.idx, src.term], dest: [dest.idx, dest.term] });
     cancelWireGhost();
     if (cmd.error) return status("wire refused: " + cmd.error, "bad");
-    commitApplied(cmd);
+    if (!commitApplied(cmd)) return;
     status(`wired → ${nameOf(c, dest.idx)}.${dest.term} — ⌘Z undoes`, "ok");
     gate(".fe-g-kbd", true, "keyboard wire committed");
   }
@@ -362,7 +363,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const cmd = doc.removeWire(c, selWire);
     selWire = null;
     if (cmd.error) return status(cmd.error, "bad");
-    commitApplied(cmd);
+    if (!commitApplied(cmd)) return;
     status("unwired — ⌘Z undoes", "ok");
   }
 
@@ -420,7 +421,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       const ren = body.querySelector(".fe-ren"), del = body.querySelector(".fe-del");
       if (ren) ren.addEventListener("click", () => {
         const nn = window.prompt("rename op", op.name || "");
-        if (nn && nn !== op.name) { const cmd = doc.renameOp(c, oi, nn); if (cmd && !cmd.error) { commitApplied(cmd); status("renamed → " + nn, "ok"); } }
+        if (nn && nn !== op.name) { const cmd = doc.renameOp(c, oi, nn); if (cmd && !cmd.error && commitApplied(cmd)) status("renamed → " + nn, "ok"); }
       });
       if (del) del.addEventListener("click", deleteSelectedOp);
     } else body.innerHTML = `<p class="fe-empty">Select an element. Output sockets start wires.</p>`;
@@ -442,7 +443,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     raw.name = nm;
     const cmd = doc.addOp(c, raw);
     if (cmd.error) { status("add refused: " + cmd.error, "bad"); return cmd; }
-    commitApplied(cmd);
+    if (!commitApplied(cmd)) return cmd;
     status(`added ${nm} (${entry.type})`, "ok");
     gate(".fe-g-create", true, `add ${entry.type}`);
     return cmd;
@@ -456,9 +457,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const sp = doc.spliceIntoWire(c, selWire, add.index);
     if (sp.error) { try { add.undo(); } catch (e) {} status("splice refused: " + sp.error, "bad"); return sp; }
     // compose the two into ONE undo unit (add + splice revert together)
-    commitApplied({ label: sp.label,
+    if (!commitApplied({ label: sp.label,
       undo: () => { sp.undo(); add.undo(); },
-      redo: () => { add.redo(); sp.redo(); } });
+      redo: () => { add.redo(); sp.redo(); } })) return null;
     selWire = null;
     status(sp.label, "ok");
     gate(".fe-g-splice", true, "splice into wire");
@@ -473,7 +474,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const i = +m[2]; const op = c.cmds[i]; if (!op) return;
     const cmd = doc.removeOp(c, i);
     if (cmd.error) { status("delete refused: " + cmd.error, "bad"); return; }
-    commitApplied(cmd);
+    if (!commitApplied(cmd)) return;
     clearSelection();
     status(`deleted ${op.name || op.type}`, "ok");
     gate(".fe-g-delop", true, "op removed with its wires");
@@ -486,7 +487,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (!prop || !prop.positions || !prop.positions.length) { status("nothing to lay out", "bad"); return; }
     const cmd = doc.applyLayout(c, prop.positions, prop.label || ("auto-layout: " + which));
     if (cmd.error) { status("layout refused: " + cmd.error, "bad"); return; }
-    commitApplied(cmd);
+    if (!commitApplied(cmd)) return;
     status(prop.label || ("layout: " + which), "ok");
     gate(".fe-g-layout", true, which);
   }
