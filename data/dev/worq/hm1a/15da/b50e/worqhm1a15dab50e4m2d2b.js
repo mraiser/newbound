@@ -719,19 +719,22 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     liveCall = false;
     if (runBtn) { runBtn.disabled = false; runBtn.classList.remove("running"); runBtn.textContent = "run ▸"; }
     const ok = r.status === "ok";
-    lastResult = { args, ok, result: r, ms, unsaved, source: src,
+    // a server panic arrives as an HTML 500 page in msg; show its words
+    const rawMsg = String(r.msg == null ? "" : r.msg);
+    const msg = /^\s*</.test(rawMsg) ? rawMsg.replace(/<title>[\s\S]*?<\/title>/i, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : rawMsg;
+    lastResult = { args, ok, result: r, msg, ms, unsaved, source: src,
       tokens: R ? { complete: !!R.complete, inOrder: !!R.inOrder, delivered: R.delivered.length } : null };
-    pushJournal(ok ? `ran ${src.cmd} · ${ms}ms` : `run failed: ${r.msg}`);
-    if (ok) status(`ran · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} deliveries in order` : ""), "ok");
-    else status(`run failed: ${r.msg}`, "bad");
+    pushJournal(ok ? `ran ${src.cmd} · ${ms}ms` : `run failed: ${msg}`);
+    if (ok) status(`ran · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} ${R.delivered.length === 1 ? "delivery" : "deliveries"} in order` : ""), "ok");
+    else status(`run failed: ${msg}`, "bad");
     renderRunResult(lastResult, R);
     return lastResult;
   }
   function renderRunResult(L, R) {
     const body = $(".fe-inspect-body"); if (!body || !L) return;
     const r = L.result || {};
-    const payload = Object.assign({}, r); delete payload.status; delete payload.pid;
-    const shown = L.ok ? ("data" in payload && Object.keys(payload).length === 1 ? payload.data : payload) : (r.msg != null ? r.msg : payload);
+    const payload = Object.assign({}, r); delete payload.status; delete payload.pid; delete payload.nn_return_type;
+    const shown = L.ok ? ("data" in payload && Object.keys(payload).length === 1 ? payload.data : payload) : (L.msg || payload);
     let h = `<p><b>run result</b> <span class="lbl">${L.ok ? "ok" : "failed"} · ${L.ms}ms</span></p>`;
     h += `<pre class="fe-run-pre${L.ok ? "" : " bad"}">${esc(typeof shown === "string" ? shown : JSON.stringify(shown, null, 1))}</pre>`;
     h += `<p class="fe-run-note">args: ${esc(JSON.stringify(L.args))} — the tokens replay the propagation ORDER; per-wire values aren't reported by the platform.</p>`;
