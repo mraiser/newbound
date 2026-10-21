@@ -111,10 +111,18 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   let running = false, runSeq = 0, lastRun = null;
   let journalRows = [];           // the server journal's flow entries for this command
   const snap = () => { const b = doc.serialize(); return typeof b === "string" ? b : JSON.stringify(b); };
-  // the flow body this editor edits (the specimen doubles as the live source;
-  // on save we persist the serialized body back to a real command — dev:scratch
-  // flowedit3d_body — exercising the base-hash → stale_base → conflict path).
-  let source = { lib: "scratch", ctl: "skills", cmd: "flowedit3d_body" };
+  // P5 CUTOVER: the SAME props contract as floweditor3d's init(host, {title,
+  // graph, source, onBack}) — dev.frame mounts either control with one call.
+  //   graph  — the flow body as loaded (object or JSON string); shown at once
+  //   source — {lib, ctl, cmd} by NAME; the body is re-read via read_flow_body
+  //            (authoritative, sets baseHash) and saves journal back to it.
+  //            null = a read-only view (no save/journal/revert).
+  //   title  — {prefix, name, suffix}; onBack — leaving the editor's root.
+  // With NO props at all this stays the P2-P4 gate harness: the specimen
+  // doubles as the live body and saves exercise scratch.skills.flowedit3d_body.
+  const PROPS = ME.DATA || {};
+  const harness = !PROPS.graph && !PROPS.source;
+  let source = harness ? { lib: "scratch", ctl: "skills", cmd: "flowedit3d_body" } : (PROPS.source || null);
   const PALETTE = [
     { type: "primitive", label: "+ op",  raw: { name: "op", type: "primitive", width: 1, in: { a: { mode: "in", type: "int", x: -0.2 }, b: { mode: "in", type: "int", x: 0.2 } }, out: { r: { mode: "out", type: "int", x: 0 } } } },
     { type: "constant",  label: "const", raw: { name: "k", type: "constant", ctype: "int", width: 1, in: {}, out: { v: { mode: "out", type: "int", x: 0 } } } },
@@ -135,6 +143,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // a run owns the stage: an edit mid-run would re-project the facade under
     // the tokens — revert it at once (the doc stays exactly as before)
     if (running) { try { cmd.undo(); } catch (e) {} status("running — edit refused until the run delivers", "bad"); return false; }
+    // a read-only view (graph without a source command) cannot keep edits
+    if (!source) { try { cmd.undo(); } catch (e) {} status("read-only view — no source command to save edits to", "bad"); return false; }
     undoStack.push(cmd);
     redoStack = [];                       // a fresh mutation invalidates redo
     dirty = true; pendingLabels.push(cmd.label || "edit");
@@ -373,7 +383,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   function renderChrome() {
     const chain = caseChain(focusRoot());
     deckCount = chain.length;
-    $(".fe-title").textContent = current.title;
+    const tEl = $(".fe-title");
+    if (current.t) {
+      tEl.replaceChildren(document.createTextNode((current.t.prefix || "") + " "));
+      const tn = document.createElement("span"); tn.className = "t"; tn.textContent = current.t.name || "flow";
+      tEl.append(tn, ` ${current.t.suffix ?? "(flowlang · 3D)"}`);
+    } else tEl.textContent = current.title;
     const crumbs = focusPath.slice(0, -1).map((f, k) => `<span class="fe-crumb" data-k="${k}">${f.title}</span>`).join("");
     $(".fe-crumbs").innerHTML = crumbs;
     ME.querySelectorAll(".fe-crumb").forEach((el) => el.addEventListener("click", () => drillTo(+el.dataset.k)));
@@ -384,7 +399,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       b.setAttribute("role", "tab"); b.addEventListener("click", () => setActiveDeck(k));
       decks.appendChild(b);
     });
-    status(`${deckCount} deck${deckCount === 1 ? "" : "s"} · ${focusedCase() ? focusedCase().cmds.length : 0} ops · editing on`);
+    status(`${deckCount} deck${deckCount === 1 ? "" : "s"} · ${focusedCase() ? focusedCase().cmds.length : 0} ops · ${source ? "editing on" : "read-only (no source command)"}`);
   }
 
   function setActiveDeck(k) { activeDeck = k; cancelWireGhost(); selWire = null; if (hostApi) hostApi.setState("selectedKey", null); renderAll(); }
@@ -494,10 +509,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
   // ── P3: save via write_flow_body (base-hash → stale_base → conflict) ──────
   function refreshSaveUi() {
-    const b = $(".fe-save"); if (b) { b.disabled = !dirty || saving; b.textContent = saving ? "saving…" : (dirty ? "save*" : "save"); }
+    const b = $(".fe-save"); if (b) { b.disabled = !source || !dirty || saving; b.textContent = !source ? "read-only" : saving ? "saving…" : (dirty ? "save*" : "save"); }
   }
   async function saveFlow() {
-    if (!dirty || saving) return;
+    if (!source || !dirty || saving) return;
     saving = true; refreshSaveUi();
     const label = pendingLabels.slice(-8).join("; ") || "flow edit";
     const body = doc.serialize();
@@ -656,6 +671,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
   async function refreshJournal() {
     const ul = $(".fe-sjournal-list"); if (!ul) return [];
+    if (!source) { ul.replaceChildren(noteEl("read-only view — no source command, no journal", "li")); journalRows = []; return []; }
     const r = await listPatches(source.lib, source.ctl, 40);
     if (!r || r.status !== "ok") { ul.replaceChildren(noteEl("journal unavailable: " + ((r && r.msg) || "no response"), "li")); journalRows = []; return []; }
     journalRows = (r.patches || []).filter((p) => p.facet === "flow" && p.cmd === source.cmd).slice(0, 12);
@@ -724,7 +740,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     renderAll(); refreshSaveUi(); renderChanges();
   }
   async function revertTo(p) {
-    if (running || saving) return null;
+    if (!source || running || saving) return null;
     let body;
     try { body = typeof p.old === "string" ? JSON.parse(p.old) : p.old; }
     catch (e) { status("journal entry has no readable body", "bad"); return null; }
@@ -747,10 +763,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       if (!hostApi || !hostApi.addControl) { gate(".fe-g-host", false, "no addControl"); return null; }
       gate(".fe-g-host", true, scenehost.headless ? "headless (no WebGL)" : "webgl");
 
-      doc = parseFlow(SPECIMEN);
+      let initial = SPECIMEN;
+      if (PROPS.graph) {
+        try { initial = typeof PROPS.graph === "string" ? JSON.parse(PROPS.graph) : PROPS.graph; }
+        catch (e) { status("graph prop unreadable: " + e.message, "bad"); }
+      }
+      doc = parseFlow(initial);
       focusPath = [{ root: doc.root, title: "case 1" }];
-      current = { title: "specimen" };
+      current = PROPS.title ? { t: PROPS.title, title: PROPS.title.name || "flow" } : { title: harness ? "specimen" : "flow" };
       savedBody = snap();             // the diff baseline: the body as loaded
+      if (!harness) { const gl = $(".fe-gate"); if (gl) gl.hidden = true; ME.classList.add("fe-live"); }
 
       // wire the flownode behavior hooks into the editor (shared host state)
       hostApi.setState("onPortTap", onPortTap);
@@ -765,6 +787,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       });
 
       renderAll();
+
+      // the body re-read from dev.code is AUTHORITATIVE (floweditor3d's
+      // enableEditing): it replaces the graph prop and sets baseHash, so the
+      // first save is base-guarded (stale_base → conflict). Unreadable ⇒ the
+      // view drops to read-only rather than save over an unknown body.
+      if (!harness && source) {
+        const rb = await readFlowBody(source.lib, source.ctl, source.cmd);
+        if (rb && rb.status === "ok" && rb.exists && rb.body) loadBody(rb.body, rb.hash || "");
+        else { const why = (rb && rb.msg) || (rb && rb.exists === false ? "no body yet" : "no response"); source = null; renderAll(); refreshSaveUi(); status("flow body did not read back (" + why + ") — read-only", "bad"); }
+      }
 
       // selection / wire-pick inspector
       hostApi.setState && (function poll() {
@@ -792,7 +824,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       // toolbar + keys
       $(".fe-proj").addEventListener("click", () => setProj(projMode === "front" ? "persp" : "front"));
       $(".fe-frame").addEventListener("click", frameDeck);
-      $(".fe-back").addEventListener("click", () => { if (focusPath.length > 1) drillBack(); });
+      $(".fe-back").addEventListener("click", () => { if (focusPath.length > 1) drillBack(); else if (typeof PROPS.onBack === "function") PROPS.onBack(); });
       $(".fe-undo").addEventListener("click", undo);
       const redoBtn = $(".fe-redo"); if (redoBtn) redoBtn.addEventListener("click", redo);
       const saveBtn = $(".fe-save"); if (saveBtn) saveBtn.addEventListener("click", saveFlow);
@@ -828,7 +860,13 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         else if (e.key === "]") setActiveDeck((activeDeck + 1) % deckCount);
         else if (e.key === "w" || e.key === "W") { e.preventDefault(); startKeyboardWiring(); }
         else if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSelectedWire(); }
-        else if (e.key === "Escape") { if (armSrc) { cancelWireGhost(); renderFacade(); status("wiring cancelled"); } else if (focusPath.length > 1) drillBack(); else clearSelection(); }
+        else if (e.key === "Escape") {
+          const hasSel = (hostApi && hostApi.state && hostApi.state.selectedKey) || selWire != null;
+          if (armSrc) { cancelWireGhost(); renderFacade(); status("wiring cancelled"); }
+          else if (focusPath.length > 1) drillBack();
+          else if (hasSel || harness || typeof PROPS.onBack !== "function") clearSelection();
+          else PROPS.onBack();
+        }
       });
 
       // expose a tiny api for the gate + future phases
@@ -847,6 +885,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         selectWire: (i) => { selWire = i; renderInspector(null); },
         selectedOp: () => { const k = hostApi.state && hostApi.state.selectedKey; const m = k && /^d(\d+)_op(\d+)$/.exec(k); return m ? +m[2] : null; },
         dirty: () => dirty, serialize: () => doc.serialize(),
+        // P5 surface (cutover: the floweditor3d props contract)
+        source: () => source, baseHash: () => baseHash, harness: () => harness, titleText: () => $(".fe-title").textContent,
         // P4 surface
         runFlow, lastRun: () => lastRun, running: () => running,
         rounds: () => propagationRounds(focusedCase()),
