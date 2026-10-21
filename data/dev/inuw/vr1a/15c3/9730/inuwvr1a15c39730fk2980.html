@@ -1,0 +1,50 @@
+<section class="nb-flowview3d" tabindex="0">
+  <div class="fv-head">
+    <button class="fv-back" title="Back (Esc)">←</button>
+    <span class="fv-title"></span>
+    <span class="fv-crumbs"></span>
+    <span class="fv-spacer"></span>
+    <span class="fv-status" role="status">booting…</span>
+    <span class="fv-decks" role="tablist" aria-label="case chain"></span>
+    <button class="fv-proj" aria-pressed="false" title="Front-orthographic (2) / perspective (3)">persp</button>
+    <button class="fv-frame" title="Frame the deck (A)">frame</button>
+  </div>
+
+  <div class="fv-main">
+    <!-- the ONE runtime: an app:scenehost; ops are addControl'd into it and
+         the deck's scene facet (toSceneDoc) rides the stage. editing OFF. -->
+    <div class="data-control fv-host" data-control="app:scenehost:{}"></div>
+
+    <aside class="fv-rail">
+      <span class="lbl">P1 gate · read-only viewer rides scenehost</span>
+      <ul class="fv-gate">
+        <li class="fv-g-host">host booted — <b>pending</b></li>
+        <li class="fv-g-deck">decks projected — <b>pending</b></li>
+        <li class="fv-g-select">selection emphasis — <b>pending</b></li>
+        <li class="fv-g-camera">camera toolbar — <b>pending</b></li>
+        <li class="fv-g-drill">drill — <b>pending</b></li>
+      </ul>
+      <p class="fv-ro"><b>read-only</b> — the gate that proves app:scenehost can
+        carry the editor. Decks, selection emphasis, drill, and the camera
+        toolbar ride the host; the scene facet is derived from the flow body
+        (toSceneDoc). Editing arrives in P2 as flownode behaviors.</p>
+      <p class="fv-keys lbl">keys</p>
+      <ul class="fv-keys-list">
+        <li><kbd>2</kbd> front-ortho · <kbd>3</kbd> perspective · <kbd>A</kbd> frame deck</li>
+        <li><kbd>[</kbd> <kbd>]</kbd> walk case chain · <kbd>Esc</kbd> back / clear</li>
+        <li><kbd>click</kbd> select · <kbd>dblclick</kbd> drill a local sub-flow</li>
+      </ul>
+    </aside>
+
+    <aside class="fv-inspect">
+      <span class="lbl">inspector</span>
+      <div class="fv-inspect-body">
+        <p class="fv-empty">Select an element. Local sub-flows drill in on
+          double-click — you are inside the program, not looking at a picture
+          of it.</p>
+      </div>
+    </aside>
+  </div>
+</section>
+<div class="data-control" data-control="dev:flowdoc" hidden></div>
+<div class="data-control" data-control="dev:flowproject" hidden></div>
