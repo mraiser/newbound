@@ -9,6 +9,16 @@
     <button class="fe-proj" aria-pressed="false" title="Front-orthographic (2) / perspective (3)">persp</button>
     <button class="fe-frame" title="Frame the deck (A)">frame</button>
     <button class="fe-undo" title="Undo (⌘Z)" disabled>undo</button>
+    <button class="fe-redo" title="Redo (⇧⌘Z)">redo</button>
+    <button class="fe-tidy" title="Auto-layout: tidy (longest-path layers)">tidy</button>
+    <button class="fe-untangle" title="Auto-layout: untangle (resolve crossings in z)">untangle</button>
+    <button class="fe-save" title="Save the flow body (write_flow_body)" disabled>save</button>
+  </div>
+  <div class="fe-conflict" hidden>
+    <span class="fe-conflict-msg">this flow changed on the server since you loaded it</span>
+    <button class="fe-c-theirs">load theirs</button>
+    <button class="fe-c-mine">keep mine</button>
+    <button class="fe-c-cancel">cancel</button>
   </div>
 
   <div class="fe-main">
@@ -18,25 +28,40 @@
     <div class="data-control fe-host" data-control="app:scenehost:{}"></div>
 
     <aside class="fe-rail">
-      <span class="lbl">P2 · wiring gestures ride scenehost</span>
+      <span class="lbl">P3 · authoring + save ride scenehost</span>
+      <div class="fe-palette">
+        <span class="lbl">palette — click to add · with a wire selected, splice</span>
+        <div class="fe-pal-row">
+          <button class="fe-pal-item" data-pi="0" title="primitive +">+ op</button>
+          <button class="fe-pal-item" data-pi="1" title="constant">const</button>
+          <button class="fe-pal-item" data-pi="2" title="match">match</button>
+          <button class="fe-pal-item" data-pi="3" title="local sub-flow">local</button>
+        </div>
+      </div>
       <ul class="fe-gate">
         <li class="fe-g-host">host booted — <b>pending</b></li>
         <li class="fe-g-wiretap">port-tap wire — <b>pending</b></li>
         <li class="fe-g-i1i2">I-1/I-2 refused — <b>pending</b></li>
         <li class="fe-g-kbd">keyboard wire (W/→/Enter) — <b>pending</b></li>
         <li class="fe-g-undo">undo restores — <b>pending</b></li>
+        <li class="fe-g-create">palette create — <b>pending</b></li>
+        <li class="fe-g-splice">splice into wire — <b>pending</b></li>
+        <li class="fe-g-delop">delete op — <b>pending</b></li>
+        <li class="fe-g-layout">layout tidy/untangle — <b>pending</b></li>
+        <li class="fe-g-save">save (write_flow_body) — <b>pending</b></li>
       </ul>
       <p class="fe-ro"><b>editing on</b> — wiring gestures are flownode
-        behaviors on the host. Tap an output socket (or select an op and press
-        <kbd>W</kbd>) to start a wire; legal input targets preview; tap / Enter
-        commits, <kbd>Esc</kbd> cancels. The flow body is authoritative — every
-        wire is a FlowDoc mutation; the facade re-derives. <kbd>⌘Z</kbd> undoes.</p>
+        behaviors on the host; the palette + layout author the FlowDoc. Tap an
+        output socket (or <kbd>W</kbd>) to wire; click a palette op to add it
+        (with a wire selected, to splice it in); <kbd>Del</kbd> unwires a wire
+        / deletes an op; tidy/untangle auto-layout; <b>save</b> persists the
+        body via <code>write_flow_body</code> (base-hash → conflict). <kbd>⌘Z</kbd>/<kbd>⇧⌘Z</kbd> undo/redo.</p>
       <p class="fe-keys lbl">keys</p>
       <ul class="fe-keys-list">
         <li><kbd>2</kbd> front-ortho · <kbd>3</kbd> perspective · <kbd>A</kbd> frame deck</li>
         <li><kbd>[</kbd> <kbd>]</kbd> walk case chain · <kbd>Esc</kbd> back / cancel</li>
         <li><kbd>W</kbd> wire from selection · <kbd>←</kbd><kbd>→</kbd> choose target · <kbd>Enter</kbd> commit</li>
-        <li><kbd>Del</kbd> unwires the selected wire · <kbd>⌘Z</kbd> undo</li>
+        <li><kbd>Del</kbd> unwires a wire / deletes an op · <kbd>⌘Z</kbd>/<kbd>⇧⌘Z</kbd> undo/redo</li>
       </ul>
     </aside>
 
@@ -54,3 +79,4 @@
 </section>
 <div class="data-control" data-control="dev:flowdoc" hidden></div>
 <div class="data-control" data-control="dev:flowproject" hidden></div>
+<div class="data-control" data-control="dev:flowlayout" hidden></div>
