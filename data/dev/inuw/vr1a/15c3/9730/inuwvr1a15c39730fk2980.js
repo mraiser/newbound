@@ -30,7 +30,7 @@ var me = this;
 var ME = document.getElementById(me.UUID);
 
 var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
-  const { parse: parseFlow } = document.querySelector('[data-control="dev:flowdoc"]').api;
+  const { parse: parseFlow, FlowDoc: doc } = document.querySelector('[data-control="dev:flowdoc"]').api;
   const { toSceneDoc, frontOrtho, GEO } = document.querySelector('[data-control="dev:flowproject"]').api;
 
   const $ = (s) => ME.querySelector(s);
@@ -98,7 +98,185 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   let deckCount = 0;
   let instances = [];          // live flownode instances for the active deck
   let projMode = "persp";      // "persp" | "front"
+  let opDrag = null;           // active op-move: {opIndex, from} (P2)
+  let wireDragState = null;    // active wire drag (P2, reserved; commit is tap/keyboard)
+  const ACCENT = "#62bd8c";
   const slug = (sid) => String(sid).replace(/[^a-zA-Z0-9_]/g, "_").toLowerCase().replace(/^([^a-z])/, "n_$1");
+
+  const activeCase = () => caseChain(current.flow)[activeDeck];
+  const nameOf = (c, i) => i === -1 ? "params" : i === -2 ? "return" : (c.cmds[i] && c.cmds[i].name) || `op${i}`;
+  const firstKey = (o) => Object.keys(o || {})[0];
+  // the input terminal name an op-input ordinal addresses (flownode lays its
+  // in<N>/out<N> sockets in Object.keys order — see the seed in renderInstances)
+  const inTermOf = (c, opIdx, ord) => Object.keys((c.cmds[opIdx] && c.cmds[opIdx].in) || {})[ord];
+
+  // ── P2 wiring engine (rides host.state; I-1/I-2 enforced by flowdoc.canWire) ─
+  // A wire SOURCE is {idx,term} — an op output ordinal (srcOrdinal 0-based into
+  // the op's `out` keys) or the params bar. A wire DEST is {idx,term} — an op
+  // input terminal or the return bar. The flow body stays authoritative: every
+  // commit is a flowdoc.addWire on the parsed case, then rebuild() re-derives
+  // the scene facet + instances from the mutated body.
+  function setWireSrc(s) { if (hostApi) hostApi.setState("wireSrc", s); status(s ? `wire from ${s.label} — tap a green-lit input (I-1/I-2), Esc cancels` : "ready"); }
+
+  // the legal targets for the current wire source: [{opIndex, ord, key, dest}]
+  function legalTargets() {
+    const st = hostApi && hostApi.state, src = st && st.wireSrc;
+    if (!src) return [];
+    const c = activeCase(); if (!c) return [];
+    const out = [];
+    for (const inst of instances) {
+      const d = inst.data || {};
+      (d.inTerms || []).forEach((t, ord) => {
+        const dest = [d.opIndex, t];
+        if (doc.canWire(c, [src.idx, src.term], dest).ok) out.push({ opIndex: d.opIndex, ord, key: inst.key, dest });
+      });
+    }
+    // the return bar is a dest (its input terminals); not an instance — surface
+    // it via keyboard only (§5.6 candidates). Pointer targets are op inputs.
+    return out;
+  }
+
+  function commitWire(dest /* [idx,term] */) {
+    const st = hostApi && hostApi.state, src = st && st.wireSrc;
+    if (!src) return false;
+    const c = activeCase(); if (!c) return false;
+    const cmd = doc.addWire(c, { src: [src.idx, src.term], dest: [dest[0], dest[1]] });
+    if (cmd.error) { status(`wire refused: ${cmd.error}`, "bad"); setWireSrc(null); return false; }
+    setWireSrc(null);
+    status(`wired ${src.label} → ${nameOf(c, dest[0])}.${dest[1]}`, "ok");
+    gate(".fv-g-wire", true, `${src.label} → ${nameOf(c, dest[0])}.${dest[1]}`);
+    rebuild();               // the derived facet re-projects with the new wire
+    return true;
+  }
+
+  // socket tap from a flownode behavior (click on in<N>/out<N>)
+  function onSocketTap(p) {
+    const c = activeCase(); if (!c) return;
+    const op = c.cmds[p.opIndex];
+    const st = hostApi.state || (hostApi.state = {});
+    if (p.which === "out") {
+      const term = Object.keys((op && op.out) || {})[p.ord];
+      if (term === undefined) return;
+      setWireSrc({ idx: p.opIndex, term, srcOrdinal: p.ord, label: `${nameOf(c, p.opIndex)}.${term}`, key: p.key });
+      renderLegalGlow();
+    } else {
+      const term = inTermOf(c, p.opIndex, p.ord);
+      if (term === undefined) return;
+      if (st.wireSrc) {
+        const chk = doc.canWire(c, [st.wireSrc.idx, st.wireSrc.term], [p.opIndex, term]);
+        if (chk.ok) commitWire([p.opIndex, term]);
+        else { status(`✗ ${chk.reason}`, "bad"); flashIllegal(p.key); }
+      } else {
+        status(`${nameOf(c, p.opIndex)}.${term} — tap an output to start a wire`, "");
+      }
+    }
+  }
+
+  // op/socket drag from a flownode behavior
+  function onOpDrag(p) {
+    const c = activeCase(); if (!c) return;
+    const op = c.cmds[p.opIndex]; if (!op) return;
+    const inst = instances.find((i) => i.key === p.key);
+    if (p.phase === "start") {
+      if (p.which === "out") {           // grab an output → arm the wire source
+        const term = Object.keys(op.out || {})[p.ord];
+        if (term !== undefined) { setWireSrc({ idx: p.opIndex, term, srcOrdinal: p.ord, label: `${nameOf(c, p.opIndex)}.${term}`, key: p.key }); renderLegalGlow(); }
+        wireDragState = { key: p.key };
+        return;
+      }
+      if (p.which === "in") return;      // input drags don't start gestures (tap wires)
+      opDrag = { opIndex: p.opIndex, key: p.key, from: { x: op.pos.x, y: op.pos.y, z: op.pos.z } };
+      return;
+    }
+    if (opDrag && p.key === opDrag.key && inst) {
+      if (p.phase === "move") {
+        const e = p.evt || {};
+        if (typeof e.x === "number") { inst.rig.pos.x = e.x; op.pos.x = Math.round(e.x / 0.05) * 0.05; }
+        if (typeof e.y === "number") { inst.rig.pos.y = e.y; op.pos.y = Math.round(e.y / 0.05) * 0.05; }
+        if (typeof e.z === "number") { inst.rig.pos.z = e.z; op.pos.z = Math.round(e.z / 0.05) * 0.05; }
+      } else if (p.phase === "end") { const d = opDrag; opDrag = null; rebuild(); }
+      return;
+    }
+    if (p.phase === "end" && wireDragState && p.key === wireDragState.key) wireDragState = null;
+  }
+
+  // legal-target glow (green = legal, red pulse = the refused socket) via setRig
+  function renderLegalGlow() {
+    const legal = new Set(legalTargets().map((t) => `${t.key}:in${t.ord}`));
+    for (const inst of instances) {
+      (inst.data.inTerms || []).forEach((t, ord) => {
+        const ok = legal.has(`${inst.key}:in${ord}`);
+        inst.ctx.setRig(`in${ord}`, "material", { color: ok ? "#2bd97c" : "#f0a63c", emissive: ok });
+        inst.ctx.setRig(`in${ord}`, "scale", ok ? { x: 1.5, y: 1.5, z: 1.5 } : { x: 1, y: 1, z: 1 });
+      });
+    }
+  }
+  function clearLegalGlow() {
+    for (const inst of instances) {
+      (inst.data.inTerms || []).forEach((t, ord) => {
+        inst.ctx.setRig(`in${ord}`, "material", { color: "#f0a63c", emissive: false });
+        inst.ctx.setRig(`in${ord}`, "scale", { x: 1, y: 1, z: 1 });
+      });
+    }
+  }
+  function flashIllegal(key) {
+    const inst = instances.find((i) => i.key === key); if (!inst) return;
+    inst.ctx.setRig("body", "material", { token: "paper", color: "#e05555" });
+    setTimeout(() => inst.ctx.setRig("body", "material", { token: "paper", color: null }), 220);
+  }
+
+  // ── P2 keyboard wiring (§5.6): W arms the selected op's first output, arrows
+  //    walk ONLY the legal targets (canWire-filtered up front), Enter commits. ─
+  let wireKb = null;   // {cands:[{opIndex,ord,key,dest}], k}
+  function startKeyboardWiring() {
+    const st = hostApi.state || {};
+    if (!st.wireSrc) { status("no wire source — tap an output socket (or select an op + W)", "bad"); return false; }
+    const cands = legalTargets().sort((a, b) => (a.opIndex - b.opIndex) || (a.ord - b.ord));
+    if (!cands.length) { status("no legal target for this output (I-1/I-2)", "bad"); return false; }
+    wireKb = { cands, k: 0 };
+    showWireCandidate();
+    return true;
+  }
+  function showWireCandidate() {
+    if (!wireKb) return;
+    const { cands, k } = wireKb;
+    const t = cands[k];
+    clearLegalGlow(); renderLegalGlow();
+    const inst = instances.find((i) => i.key === t.key);
+    if (inst) inst.ctx.setRig(`in${t.ord}`, "scale", { x: 2.2, y: 2.2, z: 2.2 });
+    if (stage && stage.emphasize) stage.emphasize(`${t.key}:in${t.ord}`);
+    status(`wire → ${nameOf(activeCase(), t.dest[0])}.${t.dest[1]} · ${k + 1}/${cands.length} · ←→ choose · Enter wires · Esc cancels`, "ok");
+  }
+  function moveWireCandidate(dir) { if (!wireKb) return; wireKb.k = (wireKb.k + dir + wireKb.cands.length) % wireKb.cands.length; showWireCandidate(); }
+  function commitKeyboardWire() {
+    if (!wireKb) return;
+    const t = wireKb.cands[wireKb.k];
+    wireKb = null;
+    if (stage && stage.emphasize) stage.emphasize(null);
+    commitWire(t.dest);
+  }
+  function cancelWiring() {
+    wireKb = null;
+    clearLegalGlow();
+    if (stage && stage.emphasize) stage.emphasize(null);
+    setWireSrc(null);
+  }
+  // W on a selected op arms its first output as the wire source (the §5.6 entry)
+  function armSelectedOutput() {
+    const st = hostApi.state || {};
+    const m = st.selectedKey && /^d(\d+)_op(\d+)$/.exec(st.selectedKey);
+    if (m) {
+      const c = activeCase(); const op = c && c.cmds[+m[2]];
+      const term = op && firstKey(op.out);
+      if (term !== undefined) {
+        setWireSrc({ idx: +m[2], term, srcOrdinal: 0, label: `${nameOf(c, +m[2])}.${term}`, key: st.selectedKey });
+        renderLegalGlow(); startKeyboardWiring(); return;
+      }
+    }
+    if (st.wireSrc) startKeyboardWiring();
+    else status("select an op (or tap an output) to wire from", "bad");
+  }
+
 
   // chain the active deck's cases (a FlowDoc Case linked by nextcase)
   function caseChain(rootCase) { const o = []; let c = rootCase; while (c) { o.push(c); c = c.nextcase; } return o; }
@@ -135,6 +313,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       const key = `d${activeDeck}_op${i}`;
       const inst = await hostApi.addControl("dev", "flownode", {
         opType: op.type, name: op.name, width: op.width, pos: op.pos,
+        opIndex: i,
         inTerms: Object.keys(op.in || {}), outTerms: Object.keys(op.out || {}),
         phase: i * 0.7,
       }, key);
@@ -146,6 +325,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // host state the behaviors read (decision 1: shared per-deck state)
     hostApi.setState("activeDeck", activeDeck);
     hostApi.setState("deckCount", deckCount);
+    // P2 gesture hooks: flownode behaviors route socket taps + drags here.
+    hostApi.setState("onSocketTap", onSocketTap);
+    hostApi.setState("onOpDrag", onOpDrag);
   }
 
   // ── chrome: decks / crumbs / title / status ──────────────────────────────
@@ -250,10 +432,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
   // ── rebuild the whole view (deck / drill / load) ─────────────────────────
   async function rebuild() {
+    opDrag = null; wireDragState = null; wireKb = null;   // drop in-flight gestures
+    if (hostApi && hostApi.state) hostApi.setState("wireSrc", null);
     renderFacade();
     await renderInstances();
     frameDeck();
-    status(`${deckCount} deck${deckCount === 1 ? "" : "s"} · ${caseChain(current.flow)[activeDeck].cmds.length} ops · read-only`);
+    status(`${deckCount} deck${deckCount === 1 ? "" : "s"} · ${caseChain(current.flow)[activeDeck].cmds.length} ops · editing (P2 wiring)`);
   }
 
   // ── boot: mount the host, then build ──────────────────────────────────────
@@ -292,12 +476,25 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       $(".fv-frame").addEventListener("click", frameDeck);
       $(".fv-back").addEventListener("click", drillBack);
       ME.addEventListener("keydown", (e) => {
-        if (e.key === "2") setProj("front");
+        if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+        // keyboard wire mode owns arrows/Enter/Esc while it is up (§5.6)
+        if (wireKb) {
+          if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "Tab") { e.preventDefault(); moveWireCandidate(e.shiftKey ? -1 : 1); return; }
+          if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); moveWireCandidate(-1); return; }
+          if (e.key === "Enter") { e.preventDefault(); commitKeyboardWire(); return; }
+          if (e.key === "Escape") { e.preventDefault(); cancelWiring(); status("wiring cancelled"); return; }
+        }
+        if (e.key === "w" || e.key === "W") { e.preventDefault(); armSelectedOutput(); }
+        else if (e.key === "Escape") {
+          if (hostApi.state && hostApi.state.wireSrc) cancelWiring();
+          else if (drillStack.length) drillBack();
+          else clearSelection();
+        }
+        else if (e.key === "2") setProj("front");
         else if (e.key === "3") setProj("persp");
         else if (e.key === "a" || e.key === "A") frameDeck();
         else if (e.key === "[") setActiveDeck((activeDeck - 1 + deckCount) % deckCount);
         else if (e.key === "]") setActiveDeck((activeDeck + 1) % deckCount);
-        else if (e.key === "Escape") { if (drillStack.length) drillBack(); else clearSelection(); }
       });
 
       return { dispose() {} };

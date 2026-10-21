@@ -23,11 +23,14 @@
         <li class="fv-g-select">selection emphasis — <b>pending</b></li>
         <li class="fv-g-camera">camera toolbar — <b>pending</b></li>
         <li class="fv-g-drill">drill — <b>pending</b></li>
+        <li class="fv-g-wire">P2 wire (I-1/I-2) — <b>pending</b></li>
       </ul>
-      <p class="fv-ro"><b>read-only</b> — the gate that proves app:scenehost can
-        carry the editor. Decks, selection emphasis, drill, and the camera
-        toolbar ride the host; the scene facet is derived from the flow body
-        (toSceneDoc). Editing arrives in P2 as flownode behaviors.</p>
+      <p class="fv-ro"><b>P2 · wiring on the host.</b> Tap an output socket (green)
+          to arm a wire, then a legal input. Keyboard: <kbd>W</kbd> arms the
+          selected op's output, <kbd>←</kbd><kbd>→</kbd> walk only legal targets
+          (canWire-filtered), <kbd>Enter</kbd> commits, <kbd>Esc</kbd> cancels.
+          I-1 (fan-in 1) + I-2 (no cycle) are enforced by flowdoc.canWire; the
+          flow body stays authoritative and the facet re-derives on commit.</p>
       <p class="fv-keys lbl">keys</p>
       <ul class="fv-keys-list">
         <li><kbd>2</kbd> front-ortho · <kbd>3</kbd> perspective · <kbd>A</kbd> frame deck</li>
