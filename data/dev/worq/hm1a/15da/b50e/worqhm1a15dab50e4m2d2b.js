@@ -35,6 +35,24 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     codeCmd("write_flow_body", { lib: l2, ctl: c2, cmd: m2, body: b2, base, label, author: "", nn_sessionid: "" });
   const readFlowBody = (l2, c2, m2) => codeCmd("read_flow_body", { lib: l2, ctl: c2, cmd: m2 });
   const listPatches = (l2, c2, n2) => codeCmd("list_control_patches", { lib: l2, ctl: c2, limit: n2 || 0 });
+  // P5 palette parity: the real primitive catalog + the command picker's reads
+  // (same idiom as floweditor3d: app/read for records, app/libs for libraries)
+  const { PRIMS, FAMILIES, signature } = document.querySelector('[data-control="dev:flowprims"]').api;
+  const jsonP = (c2, v2) => new Promise((res2) => json(c2, v2, res2));
+  const readRec = async (l2, id2) => {
+    const r2 = await jsonP("../app/read", "lib=" + encodeURIComponent(l2) + "&id=" + encodeURIComponent(id2));
+    return r2 && r2.status === "ok" ? r2.data : new Error((r2 && r2.msg) || "read failed");
+  };
+  const controlsOf = async (l2) => { const d2 = await readRec(l2, "controls"); return d2 instanceof Error ? d2 : ((d2 && d2.list) || []); };
+  const libsOf = async () => { const r2 = await jsonP("../app/libs", null); return r2 && r2.status === "ok" ? (r2.data || []) : new Error((r2 && r2.msg) || "libs failed"); };
+  // read_command is FLAT (params/type at the top level); accept a data-wrapped
+  // reply too so a transport that wraps it still yields the signature
+  const readCommand = async (l2, c2, m2) => {
+    const r2 = await codeCmd("read_command", { lib: l2, ctl: c2, cmd: m2 });
+    if (!r2 || r2.status !== "ok") return r2 || { status: "err" };
+    const d2 = (r2.data && typeof r2.data === "object" && !Array.isArray(r2.data)) ? r2.data : r2;
+    return { ...d2, status: "ok" };
+  };
 
   const $ = (s) => ME.querySelector(s);
   const status = (t, cls) => { const el = $(".fe-status"); if (el) { el.textContent = t; el.className = "fe-status " + (cls || ""); } };
@@ -123,13 +141,36 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   const PROPS = ME.DATA || {};
   const harness = !PROPS.graph && !PROPS.source;
   let source = harness ? { lib: "scratch", ctl: "skills", cmd: "flowedit3d_body" } : (PROPS.source || null);
+  // P5 palette parity: floweditor3d's node kinds (its .fx-pal-item data-kind
+  // set). primitive / command open a picker — the op's terminals come from the
+  // chosen signature; the rest create at once with floweditor3d's op shapes.
+  // (params/return bar editing is the terminal-popover work, not a palette kind.)
   const PALETTE = [
-    { type: "primitive", label: "+ op",  raw: { name: "op", type: "primitive", width: 1, in: { a: { mode: "in", type: "int", x: -0.2 }, b: { mode: "in", type: "int", x: 0.2 } }, out: { r: { mode: "out", type: "int", x: 0 } } } },
-    { type: "constant",  label: "const", raw: { name: "k", type: "constant", ctype: "int", width: 1, in: {}, out: { v: { mode: "out", type: "int", x: 0 } } } },
-    { type: "match",     label: "match", raw: { name: "m", type: "match", width: 1, in: { v: { mode: "in", type: "int", x: 0 } }, out: {} } },
-    { type: "local",     label: "local", raw: { name: "sub", type: "local", width: 1, in: { v: { mode: "in", type: "int", x: 0 } }, out: { r: { mode: "out", type: "int", x: 0 } },
-        localdata: { input: { v: { mode: "in", type: "int", x: 0 } }, output: { r: { mode: "out", type: "int", x: 0 } }, cmds: [], cons: [] } } },
+    { kind: "primitive",  label: "primitive",          glyph: "⚙" },
+    { kind: "command",    label: "command call",       glyph: "▤" },
+    { kind: "local",      label: "local sub-flow",     glyph: "▣" },
+    { kind: "constant",   label: "constant / matcher", glyph: "◇" },
+    { kind: "persistent", label: "persistent slot",    glyph: "⛃" },
+    { kind: "undefined",  label: "blank (undefined)",  glyph: "▢" },
   ];
+  const SOCKET_POOL = 8;                  // flownode's in0..7 / out0..7 sockets
+  const node0 = () => ({ mode: "", type: "", x: 0 });
+  const spread = (names, width) => {
+    const n = names.length, gap = n > 1 ? Math.min(0.6, (width - 0.5) / (n - 1)) : 0;
+    return Object.fromEntries(names.map((nm, i) => [nm, { mode: "", type: "", x: (i - (n - 1) / 2) * gap }]));
+  };
+  function opOfKind(kind) {
+    if (kind === "constant")   return { name: "", type: "constant", ctype: "string", width: 1.5, in: {}, out: { a: node0() } };
+    if (kind === "persistent") return { name: "slot", type: "persistent", width: 1.4, in: {}, out: { a: node0() } };
+    if (kind === "local")      return { name: "local", type: "local", width: 2.2, in: { a: node0() }, out: { a: node0() },
+                                        localdata: { input: { a: node0() }, output: { a: node0() }, cmds: [], cons: [] } };
+    if (kind === "undefined")  return { name: "", type: "undefined", width: 1.5, in: {}, out: {} };
+    return null;
+  }
+  function primOp(prim) {
+    const width = Math.max(1.75, prim.name.length * 0.14 + 0.7);
+    return { name: prim.name, type: "primitive", width, in: spread(prim.ins, width), out: spread(prim.outs, width) };
+  }
 
   // chain the focused case's decks
   function focusRoot() { return focusPath.length ? focusPath[focusPath.length - 1].root : doc.root; }
