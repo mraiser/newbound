@@ -246,7 +246,24 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
 
   // ── instances: host each op of the ACTIVE deck as a flownode ─────────────
-  async function renderInstances() {
+  // ONE pass at a time. renderAll fires renderInstances without awaiting, and
+  // a live mount renders twice back-to-back (graph prop, then the
+  // authoritative loadBody) — two overlapping passes each removed only the
+  // instances pushed so far and then BOTH addControl'd every op under the same
+  // key, so every op was hosted twice (scenehost keeps both; byKey only the
+  // last, so the first became unremovable). Calls during a pass coalesce into
+  // one more pass that reads the doc as it is by then.
+  let renderBusy = null, renderAgain = false;
+  function renderInstances() {
+    if (renderBusy) { renderAgain = true; return renderBusy; }
+    renderBusy = (async () => {
+      try { do { renderAgain = false; await renderInstancesOnce(); } while (renderAgain && !disposed); }
+      catch (e) { status("render failed: " + (e && e.message ? e.message : e), "bad"); }
+      finally { renderBusy = null; }
+    })();
+    return renderBusy;
+  }
+  async function renderInstancesOnce() {
     if (disposed) return;          // a late loadBody/mutation after teardown must not re-host
     // flownode.dispose clears host.state.selectedKey when its instance is the
     // selection — right for a real removal, wrong for this re-render. Carry
@@ -262,6 +279,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (km && sameFlow && +km[1] === activeDeck && +km[2] < c.cmds.length && hostApi.state.selectedKey !== keep) hostApi.setState("selectedKey", keep);
     for (let i = 0; i < c.cmds.length; i++) {
       const op = c.cmds[i];
+      if (!op || renderAgain) break;   // outrun by a mutation: the coalesced next pass redoes it
       const key = `d${activeDeck}_op${i}`;
       const inst = await hostApi.addControl("dev", "flownode", {
         opType: op.type, name: op.name, width: op.width, pos: op.pos, opIndex: i,
