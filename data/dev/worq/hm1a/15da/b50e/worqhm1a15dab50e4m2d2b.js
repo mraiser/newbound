@@ -1474,11 +1474,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         // "r"/Backspace/arrows fire editor shortcuts
         const tg = e.target;
         const inField = tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName || ""));
-        // ⌘S saves from anywhere in the editor: a focused field is blurred
-        // first so its change event commits the edit, then the save runs
+        // ⌘S saves from anywhere in the editor. A focused text field's pending
+        // value is committed EXPLICITLY (a change event — blur alone does not
+        // fire change when the value was not set by real typing, and some
+        // engines skip it on removal); every inspector change handler is
+        // guarded on "value differs", so a second change from the blur is a
+        // no-op. Then the save runs on the next tick, after the commit.
         if ((e.metaKey || e.ctrlKey) && (e.key === "s" || e.key === "S")) {
           e.preventDefault();
-          if (inField && tg.blur) tg.blur();
+          if (inField && /^(INPUT|TEXTAREA)$/.test(tg.tagName || "")) tg.dispatchEvent(new Event("change", { bubbles: true }));
+          if (inField && tg.isConnected && tg.blur) tg.blur();
           setTimeout(() => { saveFlow(); }, 0);
           return;
         }
