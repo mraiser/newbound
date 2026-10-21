@@ -26,6 +26,14 @@ var ME = document.getElementById(me.UUID);
 var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   const { parse: parseFlow } = document.querySelector('[data-control="dev:flowdoc"]').api;
   const { toSceneDoc, terminalWorld, GEO } = document.querySelector('[data-control="dev:flowproject"]').api;
+  const { tidy, untangle } = document.querySelector('[data-control="dev:flowlayout"]').api;
+
+  // ── backend plumbing (same ajax idiom as floweditor3d) ────────────────────
+  const invokeP = (l2, c2, m2, a2) => new Promise((res2) => invokeCommand(l2, c2, m2, a2, res2));
+  const codeCmd = (m2, a2) => invokeP("dev", "code", m2, a2);
+  const writeFlowBody = (l2, c2, m2, b2, { base = "", label = "" } = {}) =>
+    codeCmd("write_flow_body", { lib: l2, ctl: c2, cmd: m2, body: b2, base, label, author: "", nn_sessionid: "" });
+  const readFlowBody = (l2, c2, m2) => codeCmd("read_flow_body", { lib: l2, ctl: c2, cmd: m2 });
 
   const $ = (s) => ME.querySelector(s);
   const status = (t, cls) => { const el = $(".fe-status"); if (el) { el.textContent = t; el.className = "fe-status " + (cls || ""); } };
@@ -93,6 +101,21 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   let ghostIds = [];              // facade ghost specs (tip + hang link)
   let selWire = null;             // a selected wire's cons index (for Del)
 
+  // ── P3: authoring + save state ────────────────────────────────────────────
+  let dirty = false, saving = false, baseHash = "", pendingLabels = [];
+  let redoStack = [];
+  // the flow body this editor edits (the specimen doubles as the live source;
+  // on save we persist the serialized body back to a real command — dev:scratch
+  // flowedit3d_body — exercising the base-hash → stale_base → conflict path).
+  let source = { lib: "scratch", ctl: "skills", cmd: "flowedit3d_body" };
+  const PALETTE = [
+    { type: "primitive", label: "+ op",  raw: { name: "op", type: "primitive", width: 1, in: { a: { mode: "in", type: "int", x: -0.2 }, b: { mode: "in", type: "int", x: 0.2 } }, out: { r: { mode: "out", type: "int", x: 0 } } } },
+    { type: "constant",  label: "const", raw: { name: "k", type: "constant", ctype: "int", width: 1, in: {}, out: { v: { mode: "out", type: "int", x: 0 } } } },
+    { type: "match",     label: "match", raw: { name: "m", type: "match", width: 1, in: { v: { mode: "in", type: "int", x: 0 } }, out: {} } },
+    { type: "local",     label: "local", raw: { name: "sub", type: "local", width: 1, in: { v: { mode: "in", type: "int", x: 0 } }, out: { r: { mode: "out", type: "int", x: 0 } },
+        localdata: { input: { v: { mode: "in", type: "int", x: 0 } }, output: { r: { mode: "out", type: "int", x: 0 } }, cmds: [], cons: [] } } },
+  ];
+
   // chain the focused case's decks
   function focusRoot() { return focusPath.length ? focusPath[focusPath.length - 1].root : doc.root; }
   function caseChain(rootCase) { const o = []; let c = rootCase; while (c) { o.push(c); c = c.nextcase; } return o; }
@@ -103,6 +126,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   function commitApplied(cmd) {
     if (!cmd || cmd.error) return;
     undoStack.push(cmd);
+    redoStack = [];                       // a fresh mutation invalidates redo
+    dirty = true; pendingLabels.push(cmd.label || "edit");
     $(".fe-undo").disabled = false;
     pushJournal(cmd.label);
     afterMutation();
@@ -110,12 +135,23 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   function undo() {
     const cmd = undoStack.pop(); if (!cmd) return;
     try { cmd.undo(); } catch (e) {}
+    redoStack.push(cmd);
+    dirty = true;
     $(".fe-undo").disabled = !undoStack.length;
     pushJournal("undo " + (cmd.label || ""));
     afterMutation();
     gate(".fe-g-undo", true, "inverse applied");
   }
-  function afterMutation() { cancelWireGhost(); renderAll(); }
+  function redo() {
+    const cmd = redoStack.pop(); if (!cmd) return;
+    try { cmd.redo ? cmd.redo() : cmd.undo && null; } catch (e) {}
+    undoStack.push(cmd);
+    dirty = true;
+    $(".fe-undo").disabled = false;
+    pushJournal("redo " + (cmd.label || ""));
+    afterMutation();
+  }
+  function afterMutation() { cancelWireGhost(); renderAll(); refreshSaveUi(); }
 
   function pushJournal(text) {
     const ul = $(".fe-journal-list"); if (!ul) return;
@@ -357,17 +393,139 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const body = $(".fe-inspect-body"); if (!body) return;
     if (selWire != null) {
       const c = focusedCase(); const w = c.cons[selWire];
-      body.innerHTML = w ? `<p><b>wire</b> ${nameOf(c, w.src[0])}.${w.src[1]} → ${nameOf(c, w.dest[0])}.${w.dest[1]}</p><p class="fe-empty"><kbd>Del</kbd> unwires</p>` : "";
+      body.innerHTML = w ? `<p><b>wire</b> ${nameOf(c, w.src[0])}.${w.src[1]} → ${nameOf(c, w.dest[0])}.${w.dest[1]}</p>` +
+        `<p class="fe-empty"><kbd>Del</kbd> unwires · click a palette op to <b>splice</b> it into this wire</p>` : "";
       return;
     }
     const m = key && /^d(\d+)_op(\d+)$/.exec(key);
     const c = focusedCase();
     if (m && c && c.cmds[+m[2]]) {
-      const op = c.cmds[+m[2]];
+      const oi = +m[2]; const op = c.cmds[oi];
       body.innerHTML = `<p><b>${op.name || op.type}</b> <span class="lbl">${op.type}</span></p>` +
         `<p>in: ${Object.keys(op.in || {}).join(", ") || "—"}<br>out: ${Object.keys(op.out || {}).join(", ") || "—"}</p>` +
-        (op.type === "local" ? `<p class="fe-empty">dblclick to drill in</p>` : `<p class="fe-empty"><kbd>W</kbd> wires from its first output</p>`);
+        `<p><button class="fe-ren">rename</button> <button class="fe-del">delete</button></p>` +
+        (op.type === "local" ? `<p class="fe-empty">dblclick to drill in</p>` : `<p class="fe-empty"><kbd>W</kbd> wires from its first output · drag body moves</p>`);
+      const ren = body.querySelector(".fe-ren"), del = body.querySelector(".fe-del");
+      if (ren) ren.addEventListener("click", () => {
+        const nn = window.prompt("rename op", op.name || "");
+        if (nn && nn !== op.name) { const cmd = doc.renameOp(c, oi, nn); if (cmd && !cmd.error) { commitApplied(cmd); status("renamed → " + nn, "ok"); } }
+      });
+      if (del) del.addEventListener("click", deleteSelectedOp);
     } else body.innerHTML = `<p class="fe-empty">Select an element. Output sockets start wires.</p>`;
+  }
+
+  // ── P3: authoring (create / splice / delete op) ───────────────────────────
+  // A free spot for a new op: right of the rightmost op on the active deck,
+  // at the top layer — the layout proposals (below) tidy it after.
+  function freshPos(c) {
+    let maxX = -3; for (const op of c.cmds) maxX = Math.max(maxX, (op.pos && op.pos.x) || 0);
+    return { x: maxX + 1.8, y: 1.4, z: 0 };
+  }
+  function addOpFromPalette(entry, opts = {}) {
+    const c = focusedCase(); if (!c) return null;
+    const raw = JSON.parse(JSON.stringify(entry.raw));
+    raw.pos = freshPos(c);
+    // de-dupe the name against the deck
+    let nm = raw.name, n = 1; while (c.cmds.some((o) => o.name === nm)) nm = raw.name + (++n);
+    raw.name = nm;
+    const cmd = doc.addOp(c, raw);
+    if (cmd.error) { status("add refused: " + cmd.error, "bad"); return cmd; }
+    commitApplied(cmd);
+    status(`added ${nm} (${entry.type})`, "ok");
+    gate(".fe-g-create", true, `add ${entry.type}`);
+    return cmd;
+  }
+  // splice a fresh palette op into the currently-selected wire (I: it takes the
+  // wire's source into its first input, its first output to the wire's dest).
+  function spliceIntoSelectedWire(entry) {
+    const c = focusedCase(); if (!c || selWire == null) { status("select a wire to splice into", "bad"); return null; }
+    const add = doc.addOp(c, (() => { const r = JSON.parse(JSON.stringify(entry.raw)); r.pos = freshPos(c); return r; })());
+    if (add.error) { status("add refused: " + add.error, "bad"); return add; }
+    const sp = doc.spliceIntoWire(c, selWire, add.index);
+    if (sp.error) { try { add.undo(); } catch (e) {} status("splice refused: " + sp.error, "bad"); return sp; }
+    // compose the two into ONE undo unit (add + splice revert together)
+    commitApplied({ label: sp.label,
+      undo: () => { sp.undo(); add.undo(); },
+      redo: () => { add.redo(); sp.redo(); } });
+    selWire = null;
+    status(sp.label, "ok");
+    gate(".fe-g-splice", true, "splice into wire");
+    return sp;
+  }
+  // delete the selected op: removes it + every wire touching it, as one undo.
+  function deleteSelectedOp() {
+    const key = hostApi.state && hostApi.state.selectedKey;
+    const m = key && /^d(\d+)_op(\d+)$/.exec(key);
+    const c = focusedCase(); if (!m || !c) return;
+    const i = +m[2]; const op = c.cmds[i]; if (!op) return;
+    const touching = doc.wiresTouching ? doc.wiresTouching(c, i) : [];
+    const removed = [];
+    // remove wires touching it, highest cons index first so indices stay valid
+    const idxs = (touching || []).map((t) => (t.wireIndex !== undefined ? t.wireIndex : t)).sort((a, b) => b - a);
+    for (const wi of idxs) {
+      const w = c.cons[wi]; if (!w) continue;
+      removed.push({ wi, wire: { src: [w.src[0], w.src[1]], dest: [w.dest[0], w.dest[1]] } });
+      c.cons.splice(wi, 1);
+    }
+    const [gone] = c.cmds.splice(i, 1);
+    commitApplied({ label: `delete ${op.name || op.type}`,
+      undo: () => { c.cmds.splice(i, 0, gone); removed.sort((a, b) => a.wi - b.wi).forEach((r) => c.cons.splice(r.wi, 0, r.wire)); },
+      redo: () => { removed.slice().sort((a, b) => b.wi - a.wi).forEach((r) => c.cons.splice(r.wi, 1)); c.cmds.splice(i, 1); } });
+    clearSelection();
+    status(`deleted ${op.name || op.type}`, "ok");
+    gate(".fe-g-delop", true, "op removed with its wires");
+  }
+
+  // ── P3: layout preview → apply as ONE journaled mutation ─────────────────
+  function applyLayoutProposal(which) {
+    const c = focusedCase(); if (!c) return;
+    const prop = which === "untangle" ? untangle(c) : tidy(c);
+    if (!prop || !prop.positions || !prop.positions.length) { status("nothing to lay out", "bad"); return; }
+    const cmd = doc.applyLayout(c, prop.positions, prop.label || ("auto-layout: " + which));
+    if (cmd.error) { status("layout refused: " + cmd.error, "bad"); return; }
+    commitApplied(cmd);
+    status(prop.label || ("layout: " + which), "ok");
+    gate(".fe-g-layout", true, which);
+  }
+
+  // ── P3: save via write_flow_body (base-hash → stale_base → conflict) ──────
+  function refreshSaveUi() {
+    const b = $(".fe-save"); if (b) { b.disabled = !dirty || saving; b.textContent = saving ? "saving…" : (dirty ? "save*" : "save"); }
+  }
+  async function saveFlow() {
+    if (!dirty || saving) return;
+    saving = true; refreshSaveUi();
+    const label = pendingLabels.slice(-8).join("; ") || "flow edit";
+    const body = doc.serialize();
+    const r = await writeFlowBody(source.lib, source.ctl, source.cmd, body, { base: baseHash, label });
+    saving = false;
+    if (r && r.status === "ok") { baseHash = r.hash || baseHash; dirty = false; pendingLabels = []; status(`saved · ${r.patch_id || "ok"}`, "ok"); pushJournal("saved"); gate(".fe-g-save", true, "write_flow_body ok"); }
+    else if (r && r.msg === "stale_base") { showConflict(); gate(".fe-g-save", true, "stale_base → conflict ui"); }
+    else status("save failed: " + (r && r.msg ? r.msg : "no response"), "bad");
+    refreshSaveUi();
+  }
+  function showConflict() {
+    const el = $(".fe-conflict"); if (!el) return;
+    el.hidden = false;
+    el.querySelector(".fe-c-theirs").onclick = async () => {
+      const r = await readFlowBody(source.lib, source.ctl, source.cmd);
+      if (r && r.status === "ok" && r.exists) {
+        doc = parseFlow(r.body); baseHash = r.hash || "";
+        focusPath = [{ root: doc.root, title: "case 1" }]; activeDeck = 0;
+        undoStack = []; redoStack = []; pendingLabels = []; dirty = false;
+        el.hidden = true; renderAll(); refreshSaveUi(); status("loaded theirs — your edits discarded", "bad");
+      }
+    };
+    el.querySelector(".fe-c-mine").onclick = async () => {
+      const r = await readFlowBody(source.lib, source.ctl, source.cmd);
+      baseHash = (r && r.hash) || "";
+      el.hidden = true;
+      const body = doc.serialize();
+      const w = await writeFlowBody(source.lib, source.ctl, source.cmd, body, { base: baseHash, label: "overwrite (conflict: keep mine)" });
+      if (w && w.status === "ok") { baseHash = w.hash || baseHash; dirty = false; pendingLabels = []; status("saved mine over theirs", "ok"); pushJournal("saved (overwrite)"); }
+      refreshSaveUi();
+    };
+    el.querySelector(".fe-c-cancel").onclick = () => { el.hidden = true; };
   }
 
   // ── init ──────────────────────────────────────────────────────────────────
@@ -385,7 +543,15 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
       // wire the flownode behavior hooks into the editor (shared host state)
       hostApi.setState("onPortTap", onPortTap);
-      hostApi.setState("onOpDrag", (opIndex, evt) => { /* P2 keeps move minimal; drag gestures ride P3 */ });
+      hostApi.setState("onOpDrag", (opIndex, evt) => {
+        // drag an op body to move it (front-ortho plane, z kept). Undoable.
+        const c = focusedCase(); const op = c && c.cmds[opIndex]; if (!op) return;
+        const w = evt && evt.world ? evt.world : (evt && evt.clientX !== undefined ? clientToWorld(evt) : null);
+        if (!w) return;
+        const to = { x: Math.round(w.x * 2) / 2, y: Math.round(w.y * 2) / 2, z: op.pos.z };
+        const cmd = doc.moveOp(c, opIndex, to);
+        if (cmd && !cmd.error) commitApplied(cmd);
+      });
 
       renderAll();
 
@@ -417,8 +583,21 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       $(".fe-frame").addEventListener("click", frameDeck);
       $(".fe-back").addEventListener("click", () => { if (focusPath.length > 1) drillBack(); });
       $(".fe-undo").addEventListener("click", undo);
+      const redoBtn = $(".fe-redo"); if (redoBtn) redoBtn.addEventListener("click", redo);
+      const saveBtn = $(".fe-save"); if (saveBtn) saveBtn.addEventListener("click", saveFlow);
+      const tidyBtn = $(".fe-tidy"); if (tidyBtn) tidyBtn.addEventListener("click", () => applyLayoutProposal("tidy"));
+      const untBtn = $(".fe-untangle"); if (untBtn) untBtn.addEventListener("click", () => applyLayoutProposal("untangle"));
+      // palette: click = add op; with a wire selected = splice into that wire
+      ME.querySelectorAll(".fe-pal-item").forEach((el) => {
+        el.addEventListener("click", () => {
+          const entry = PALETTE[+el.dataset.pi]; if (!entry) return;
+          if (selWire != null) spliceIntoSelectedWire(entry); else addOpFromPalette(entry);
+        });
+      });
+      refreshSaveUi();
       ME.addEventListener("keydown", (e) => {
-        if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z")) { e.preventDefault(); undo(); return; }
+        if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z")) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+        if ((e.metaKey || e.ctrlKey) && (e.key === "y" || e.key === "Y")) { e.preventDefault(); redo(); return; }
         // wire mode owns arrows/Enter/Esc while it is up
         if (wireMode) {
           if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "Tab") { e.preventDefault(); moveWireCandidate(1); return; }
@@ -445,6 +624,13 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         addWire: (s, d2) => { const cmd = doc.addWire(focusedCase(), { src: s, dest: d2 }); if (!cmd.error) commitApplied(cmd); return cmd; },
         removeWire: (i) => { const cmd = doc.removeWire(focusedCase(), i); if (!cmd.error) commitApplied(cmd); return cmd; },
         cons: () => focusedCase().cons.length,
+        // P3 surface
+        redo, addOpFromPalette: (i) => addOpFromPalette(PALETTE[i] || PALETTE[0]),
+        spliceIntoSelectedWire: (i) => spliceIntoSelectedWire(PALETTE[i] || PALETTE[0]),
+        deleteSelectedOp, applyLayoutProposal, saveFlow, PALETTE,
+        selectWire: (i) => { selWire = i; renderInspector(null); },
+        selectedOp: () => { const k = hostApi.state && hostApi.state.selectedKey; const m = k && /^d(\d+)_op(\d+)$/.exec(k); return m ? +m[2] : null; },
+        dirty: () => dirty, serialize: () => doc.serialize(),
       };
     }).catch((e) => { status("boot failed: " + (e && e.message ? e.message : e), "bad"); return null; });
   }
