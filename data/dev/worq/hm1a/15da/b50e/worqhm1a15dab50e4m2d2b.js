@@ -24,7 +24,7 @@ var me = this;
 var ME = document.getElementById(me.UUID);
 
 var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
-  const { parse: parseFlow } = document.querySelector('[data-control="dev:flowdoc"]').api;
+  const { parse: parseFlow, propagationRounds, diffFlow } = document.querySelector('[data-control="dev:flowdoc"]').api;
   const { toSceneDoc, terminalWorld, GEO } = document.querySelector('[data-control="dev:flowproject"]').api;
   const { tidy, untangle } = document.querySelector('[data-control="dev:flowlayout"]').api;
 
@@ -34,6 +34,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   const writeFlowBody = (l2, c2, m2, b2, { base = "", label = "" } = {}) =>
     codeCmd("write_flow_body", { lib: l2, ctl: c2, cmd: m2, body: b2, base, label, author: "", nn_sessionid: "" });
   const readFlowBody = (l2, c2, m2) => codeCmd("read_flow_body", { lib: l2, ctl: c2, cmd: m2 });
+  const listPatches = (l2, c2, n2) => codeCmd("list_control_patches", { lib: l2, ctl: c2, limit: n2 || 0 });
 
   const $ = (s) => ME.querySelector(s);
   const status = (t, cls) => { const el = $(".fe-status"); if (el) { el.textContent = t; el.className = "fe-status " + (cls || ""); } };
@@ -104,6 +105,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // ── P3: authoring + save state ────────────────────────────────────────────
   let dirty = false, saving = false, baseHash = "", pendingLabels = [];
   let redoStack = [];
+
+  // ── P4: run tokens + journal state ────────────────────────────────────────
+  let savedBody = null;           // JSON snapshot of the last loaded/saved body (diff baseline)
+  let running = false, runSeq = 0, lastRun = null;
+  let journalRows = [];           // the server journal's flow entries for this command
+  const snap = () => { const b = doc.serialize(); return typeof b === "string" ? b : JSON.stringify(b); };
   // the flow body this editor edits (the specimen doubles as the live source;
   // on save we persist the serialized body back to a real command — dev:scratch
   // flowedit3d_body — exercising the base-hash → stale_base → conflict path).
@@ -125,6 +132,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // ── mutations: apply + record the inverse (the undo stack) ────────────────
   function commitApplied(cmd) {
     if (!cmd || cmd.error) return;
+    // a run owns the stage: an edit mid-run would re-project the facade under
+    // the tokens — revert it at once (the doc stays exactly as before)
+    if (running) { try { cmd.undo(); } catch (e) {} status("running — edit refused until the run delivers", "bad"); return; }
     undoStack.push(cmd);
     redoStack = [];                       // a fresh mutation invalidates redo
     dirty = true; pendingLabels.push(cmd.label || "edit");
@@ -133,6 +143,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     afterMutation();
   }
   function undo() {
+    if (running) return;
     const cmd = undoStack.pop(); if (!cmd) return;
     try { cmd.undo(); } catch (e) {}
     redoStack.push(cmd);
@@ -143,6 +154,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     gate(".fe-g-undo", true, "inverse applied");
   }
   function redo() {
+    if (running) return;
     const cmd = redoStack.pop(); if (!cmd) return;
     try { if (cmd.redo) cmd.redo(); } catch (e) {}
     undoStack.push(cmd);
@@ -151,7 +163,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     pushJournal("redo " + (cmd.label || ""));
     afterMutation();
   }
-  function afterMutation() { cancelWireGhost(); renderAll(); refreshSaveUi(); }
+  function afterMutation() { cancelWireGhost(); renderAll(); refreshSaveUi(); renderChanges(); }
 
   function pushJournal(text) {
     const ul = $(".fe-journal-list"); if (!ul) return;
@@ -490,7 +502,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const body = doc.serialize();
     const r = await writeFlowBody(source.lib, source.ctl, source.cmd, body, { base: baseHash, label });
     saving = false;
-    if (r && r.status === "ok") { baseHash = r.hash || baseHash; dirty = false; pendingLabels = []; status(`saved · ${r.patch_id || "ok"}`, "ok"); pushJournal("saved"); gate(".fe-g-save", true, "write_flow_body ok"); }
+    if (r && r.status === "ok") { baseHash = r.hash || baseHash; dirty = false; pendingLabels = []; savedBody = JSON.stringify(body); status(`saved · ${r.patch_id || "ok"}`, "ok"); pushJournal("saved"); gate(".fe-g-save", true, "write_flow_body ok"); renderChanges(); refreshJournal(); }
     else if (r && r.msg === "stale_base") { showConflict(); gate(".fe-g-save", true, "stale_base → conflict ui"); }
     else status("save failed: " + (r && r.msg ? r.msg : "no response"), "bad");
     refreshSaveUi();
@@ -501,10 +513,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     el.querySelector(".fe-c-theirs").onclick = async () => {
       const r = await readFlowBody(source.lib, source.ctl, source.cmd);
       if (r && r.status === "ok" && r.exists) {
-        doc = parseFlow(r.body); baseHash = r.hash || "";
-        focusPath = [{ root: doc.root, title: "case 1" }]; activeDeck = 0;
-        undoStack = []; redoStack = []; pendingLabels = []; dirty = false;
-        el.hidden = true; renderAll(); refreshSaveUi(); status("loaded theirs — your edits discarded", "bad");
+        loadBody(r.body, r.hash || "");
+        el.hidden = true; status("loaded theirs — your edits discarded", "bad"); refreshJournal();
       }
     };
     el.querySelector(".fe-c-mine").onclick = async () => {
@@ -513,13 +523,221 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       el.hidden = true;
       const body = doc.serialize();
       const w = await writeFlowBody(source.lib, source.ctl, source.cmd, body, { base: baseHash, label: "overwrite (conflict: keep mine)" });
-      if (w && w.status === "ok") { baseHash = w.hash || baseHash; dirty = false; pendingLabels = []; status("saved mine over theirs", "ok"); pushJournal("saved (overwrite)"); }
+      if (w && w.status === "ok") { baseHash = w.hash || baseHash; dirty = false; pendingLabels = []; savedBody = JSON.stringify(body); status("saved mine over theirs", "ok"); pushJournal("saved (overwrite)"); renderChanges(); refreshJournal(); }
       refreshSaveUi();
     };
     el.querySelector(".fe-c-cancel").onclick = () => { el.hidden = true; };
   }
 
   // ── init ──────────────────────────────────────────────────────────────────
+  // ── P4: run tokens — deliveries ride a flowtoken BEHAVIOR on the host ─────
+  // The schedule is local and pure (design §3.5 — the platform returns only
+  // the result): flowdoc.propagationRounds gives the focused case's firing
+  // order. One dev:flowtoken instance per wire is addControl'd into the
+  // scenehost, seeded with its round; ONE shared clock (host.state.run.t0)
+  // starts them together, so the token behaviors deliver round by round and
+  // report via host.state.onTokenDelivered. The editor schedules and audits;
+  // the motion is the behavior's.
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+  function wireEnd(c, end, which) {
+    return terminalWorld(c, end[0], which, end[1]) || terminalWorld(c, end[0], which === "out" ? "in" : "out", end[1]) || null;
+  }
+  async function runFlow() {
+    if (running || !hostApi) return null;
+    const c = focusedCase(); if (!c) return null;
+    const { rounds, unreached } = propagationRounds(c);
+    if (!rounds.length) { status("nothing to run — no wire can fire", "bad"); return null; }
+    if (armSrc || wireMode) { cancelWireGhost(); renderFacade(); }
+    running = true;
+    const runBtn = $(".fe-run"); if (runBtn) { runBtn.disabled = true; runBtn.classList.add("running"); runBtn.textContent = "running…"; }
+    const runId = ++runSeq;
+    const reduced = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const dur = reduced ? 0.34 : 0.42;
+    const expected = rounds.reduce((n, r) => n + r.length, 0);
+    const delivered = [], keys = [];
+    let finish; const allDone = new Promise((res) => { finish = res; });
+    hostApi.setState("run", { id: runId, t0: null });
+    hostApi.setState("onTokenDelivered", (ev) => {
+      if (!ev || ev.runId !== runId) return;
+      delivered.push({ k: ev.k, round: ev.round });
+      if (delivered.length >= expected) finish(true);
+    });
+    const started = performance.now();
+    try {
+      for (let r = 0; r < rounds.length; r++) {
+        for (const k of rounds[r]) {
+          const w = c.cons[k]; if (!w) continue;
+          const key = `run${runId}_w${k}`;
+          await hostApi.addControl("dev", "flowtoken", {
+            runId, k, round: r, dur, reduced,
+            wire: "fx_" + slug(`d${activeDeck}/wire/${k}`),
+            from: wireEnd(c, w.src, "out"), to: wireEnd(c, w.dest, "in"),
+          }, key);
+          keys.push(key);
+        }
+      }
+      // every token is booted — start the ONE clock they all ride
+      hostApi.setState("run", { id: runId, t0: performance.now() });
+      const budget = (rounds.length * dur + 3) * 1000;
+      const complete = await Promise.race([allDone, new Promise((res) => setTimeout(() => res(false), budget))]);
+      lastRun = auditRun(runId, rounds, unreached, delivered, !!complete, Math.round(performance.now() - started));
+    } catch (e) {
+      lastRun = { runId, error: String(e && e.message ? e.message : e), rounds, unreached, delivered: delivered.slice(), order: delivered.map((d) => d.k), complete: false, inOrder: false, ms: null };
+    } finally {
+      for (const key of keys) { try { hostApi.removeControl(key); } catch (e) {} }
+      hostApi.setState("run", null);
+      hostApi.setState("onTokenDelivered", null);
+      running = false;
+      if (runBtn) { runBtn.disabled = false; runBtn.classList.remove("running"); runBtn.textContent = "run ▸"; }
+    }
+    const R = lastRun;
+    R.tokensHosted = keys.length;
+    pushJournal(`run · ${R.delivered.length}/${expected} deliveries · ${rounds.length} round${rounds.length === 1 ? "" : "s"}` + (unreached.length ? ` · ${unreached.length} unreached` : ""));
+    if (R.complete && R.inOrder) status(`ran · ${expected} deliveries in ${rounds.length} rounds · ${R.ms}ms`, "ok");
+    else status(R.error ? "run failed: " + R.error : `run incomplete · ${R.delivered.length}/${expected} delivered`, "bad");
+    gate(".fe-g-run", !!(R.complete && R.inOrder), R.complete ? `${expected} deliveries, ${rounds.length} rounds, in order` : "incomplete");
+    renderRunInspector(R);
+    return R;
+  }
+  // audit: every scheduled wire delivered exactly once, in its own round,
+  // rounds non-decreasing in delivery order
+  function auditRun(runId, rounds, unreached, delivered, complete, ms) {
+    const order = delivered.map((d) => d.k);
+    const want = [].concat(...rounds);
+    const once = order.length === want.length && new Set(order).size === order.length && want.every((k) => order.includes(k));
+    const monotone = delivered.every((d, i) => i === 0 || d.round >= delivered[i - 1].round);
+    const ownRound = delivered.every((d) => rounds[d.round] && rounds[d.round].includes(d.k));
+    return { runId, rounds, unreached, delivered, order, complete, inOrder: once && monotone && ownRound, ms };
+  }
+  function renderRunInspector(R) {
+    const body = $(".fe-inspect-body"); if (!body || !R) return;
+    const c = focusedCase();
+    const wl = (k) => { const w = c && c.cons[k]; return esc(w ? `${nameOf(c, w.src[0])}.${w.src[1]} → ${nameOf(c, w.dest[0])}.${w.dest[1]}` : `wire ${k}`); };
+    let h = `<p><b>run</b> <span class="lbl">${R.complete && R.inOrder ? "delivered in propagation order" : "incomplete"}${R.ms != null ? ` · ${R.ms}ms` : ""}</span></p><ul class="fe-run-list">`;
+    R.rounds.forEach((round, r) => { h += `<li><span class="rd">${r + 1}</span>${round.map(wl).join(" · ")}</li>`; });
+    h += `</ul>`;
+    if (R.unreached.length) h += `<p class="fe-empty">never fires (I-1/I-2): ${R.unreached.map(wl).join(" · ")}</p>`;
+    body.innerHTML = h;
+  }
+
+  // ── P4: the in-editor journal + diff ─────────────────────────────────────
+  // Two views, both speaking the GRAPH's vocabulary via flowdoc.diffFlow:
+  //   unsaved changes — diffFlow(last loaded/saved body, the working body),
+  //                     refreshed on every mutation;
+  //   server journal  — the control's _patches flow entries for this command
+  //                     (write_flow_body history), each expandable to its
+  //                     structural diff, revertible as a NEW journaled write.
+  const DIFF_GLYPH = { "op+": "+", "op-": "−", "op~": "~", "wire+": "⌁", "wire-": "⌁", sig: "▤", "deck+": "▤", "deck-": "▤" };
+  const DIFF_CLASS = { "op+": "add", "op-": "del", "op~": "mod", "wire+": "add", "wire-": "del", sig: "mod", "deck+": "add", "deck-": "del" };
+  const noteEl = (t, tag) => { const el = document.createElement(tag || "p"); el.className = tag === "li" ? "fe-empty" : "jl-note"; el.textContent = t; return el; };
+  function changeItems(changes, max) {
+    const multi = changes.some((x) => x.deck !== changes[0].deck);
+    const out = changes.slice(0, max).map((ch) => {
+      const li = document.createElement("li"); li.className = "jl-ch jl-" + (DIFF_CLASS[ch.kind] || "mod");
+      const g = document.createElement("span"); g.className = "jl-g"; g.textContent = DIFF_GLYPH[ch.kind] || "·";
+      const t = document.createElement("span"); t.textContent = (multi ? `case ${ch.deck + 1}: ` : "") + ch.text;
+      li.append(g, t); return li;
+    });
+    if (changes.length > max) out.push(noteEl(`…and ${changes.length - max} more`, "li"));
+    return out;
+  }
+  let lastChanges = null;
+  function renderChanges() {
+    const ul = $(".fe-changes-list"), cnt = $(".fe-changes-count");
+    if (!ul || savedBody == null || !doc) return null;
+    let d; try { d = diffFlow(savedBody, snap()); } catch (e) { if (cnt) cnt.textContent = "diff failed"; return null; }
+    lastChanges = d;
+    if (cnt) cnt.textContent = d.changes.length ? `+${d.counts.added} −${d.counts.removed} ~${d.counts.changed}` : "none";
+    ul.replaceChildren(...(d.changes.length ? changeItems(d.changes, 14) : [noteEl("no structural change", "li")]));
+    if (d.changes.length) gate(".fe-g-diff", true, `${d.changes.length} change${d.changes.length === 1 ? "" : "s"} vs saved`);
+    return d;
+  }
+
+  async function refreshJournal() {
+    const ul = $(".fe-sjournal-list"); if (!ul) return [];
+    const r = await listPatches(source.lib, source.ctl, 40);
+    if (!r || r.status !== "ok") { ul.replaceChildren(noteEl("journal unavailable: " + ((r && r.msg) || "no response"), "li")); journalRows = []; return []; }
+    journalRows = (r.patches || []).filter((p) => p.facet === "flow" && p.cmd === source.cmd).slice(0, 12);
+    ul.replaceChildren();
+    if (!journalRows.length) { ul.appendChild(noteEl("no saved history yet", "li")); return journalRows; }
+    journalRows.forEach((p, i) => {
+      const li = document.createElement("li"); li.dataset.ji = String(i);
+      const row = document.createElement("div"); row.className = "jl-row";
+      // the label is the disclosure: an entry's real content is WHAT CHANGED
+      const label = document.createElement("button"); label.className = "jl-label";
+      label.setAttribute("aria-expanded", "false");
+      label.innerHTML = `<span class="jl-caret" aria-hidden="true">▸</span> <span>${esc(p.label || p.patch_id || "—")}</span>`;
+      const author = document.createElement("span"); author.className = "jl-author"; author.textContent = p.author || "";
+      row.append(label, author);
+      if (p.old) { // no `old` = the creation entry — nothing to revert to
+        const rv = document.createElement("button"); rv.className = "jl-revert"; rv.textContent = "revert";
+        rv.title = "write this entry's before-state as a NEW journaled patch";
+        rv.addEventListener("click", () => revertTo(p));
+        row.appendChild(rv);
+      }
+      const box = document.createElement("div"); box.className = "jl-diff"; box.hidden = true;
+      li.append(row, box);
+      label.addEventListener("click", () => toggleJournalDiff(i));
+      ul.appendChild(li);
+    });
+    return journalRows;
+  }
+  function toggleJournalDiff(i) {
+    const ul = $(".fe-sjournal-list"); const li = ul && ul.querySelector(`li[data-ji="${i}"]`); const p = journalRows[i];
+    if (!li || !p) return null;
+    const label = li.querySelector(".jl-label"), box = li.querySelector(".jl-diff");
+    const open = label.getAttribute("aria-expanded") === "true";
+    // accordion: one entry open at a time
+    for (const other of ul.querySelectorAll(".jl-label[aria-expanded='true']")) {
+      other.setAttribute("aria-expanded", "false");
+      other.querySelector(".jl-caret").textContent = "▸";
+      other.closest("li").querySelector(".jl-diff").hidden = true;
+    }
+    if (open) return null;
+    label.setAttribute("aria-expanded", "true");
+    label.querySelector(".jl-caret").textContent = "▾";
+    box.hidden = false;
+    if (!box.dataset.built) { box.dataset.built = "1"; box.replaceChildren(...renderEntryDiff(p)); }
+    gate(".fe-g-journal", true, `${journalRows.length} entr${journalRows.length === 1 ? "y" : "ies"}, diff shown`);
+    return box.textContent;
+  }
+  function renderEntryDiff(p) {
+    if (!p.new) return [noteEl("this entry recorded no body")];
+    if (!p.old) {
+      const c = parseFlow(p.new).root;
+      return [noteEl(`created · ${c.cmds.length} op${c.cmds.length === 1 ? "" : "s"}, ${c.cons.length} wire${c.cons.length === 1 ? "" : "s"}`)];
+    }
+    const { changes, counts } = diffFlow(p.old, p.new);
+    if (!changes.length) return [noteEl("no structural change (formatting or identical bodies)")];
+    const ul = document.createElement("ul"); ul.className = "jl-diff-list";
+    ul.append(...changeItems(changes, 12));
+    return [noteEl(`+${counts.added} −${counts.removed} ~${counts.changed}`), ul];
+  }
+  // (re)load a body as the authoritative doc — the diff baseline moves with it
+  function loadBody(body, hash) {
+    doc = parseFlow(body); baseHash = hash || "";
+    focusPath = [{ root: doc.root, title: "case 1" }]; activeDeck = 0;
+    undoStack = []; redoStack = []; pendingLabels = []; dirty = false;
+    $(".fe-undo").disabled = true;
+    savedBody = snap();
+    renderAll(); refreshSaveUi(); renderChanges();
+  }
+  async function revertTo(p) {
+    if (running || saving) return null;
+    let body;
+    try { body = typeof p.old === "string" ? JSON.parse(p.old) : p.old; }
+    catch (e) { status("journal entry has no readable body", "bad"); return null; }
+    const cur = await readFlowBody(source.lib, source.ctl, source.cmd);
+    const w = await writeFlowBody(source.lib, source.ctl, source.cmd, body,
+      { base: cur && cur.status === "ok" ? (cur.hash || "") : "", label: `revert: ${p.label || p.patch_id}` });
+    if (!w || w.status !== "ok") { status(`revert failed: ${(w && w.msg) || "no response"}`, "bad"); return w; }
+    loadBody(body, w.hash);
+    pushJournal(`reverted to before ${p.patch_id}`);
+    status("reverted — as a new journal entry", "ok");
+    await refreshJournal();
+    return w;
+  }
+
   function init() {
     const hostEl = $(".fe-host");
     if (!hostEl || !hostEl.api) { status("scenehost not mounted", "bad"); return null; }
@@ -531,6 +749,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       doc = parseFlow(SPECIMEN);
       focusPath = [{ root: doc.root, title: "case 1" }];
       current = { title: "specimen" };
+      savedBody = snap();             // the diff baseline: the body as loaded
 
       // wire the flownode behavior hooks into the editor (shared host state)
       hostApi.setState("onPortTap", onPortTap);
@@ -586,6 +805,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         });
       });
       refreshSaveUi();
+      const runB = $(".fe-run"); if (runB) runB.addEventListener("click", () => { runFlow(); });
+      const sjB = $(".fe-sj-refresh"); if (sjB) sjB.addEventListener("click", () => { refreshJournal(); });
+      renderChanges();
+      refreshJournal();
       ME.addEventListener("keydown", (e) => {
         if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z")) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
         if ((e.metaKey || e.ctrlKey) && (e.key === "y" || e.key === "Y")) { e.preventDefault(); redo(); return; }
@@ -596,6 +819,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
           if (e.key === "Enter") { e.preventDefault(); commitKeyboardWire(); return; }
           if (e.key === "Escape") { e.preventDefault(); cancelWireGhost(); renderFacade(); status("wiring cancelled"); return; }
         }
+        if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); runFlow(); return; }
         if (e.key === "2") setProj("front");
         else if (e.key === "3") setProj("persp");
         else if (e.key === "a" || e.key === "A") frameDeck();
@@ -622,6 +846,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         selectWire: (i) => { selWire = i; renderInspector(null); },
         selectedOp: () => { const k = hostApi.state && hostApi.state.selectedKey; const m = k && /^d(\d+)_op(\d+)$/.exec(k); return m ? +m[2] : null; },
         dirty: () => dirty, serialize: () => doc.serialize(),
+        // P4 surface
+        runFlow, lastRun: () => lastRun, running: () => running,
+        rounds: () => propagationRounds(focusedCase()),
+        changes: () => renderChanges(), refreshJournal, journalRows: () => journalRows,
+        toggleJournalDiff, revertTo: (i) => journalRows[i] ? revertTo(journalRows[i]) : null,
+        tokens: () => hostApi.children.filter((ch) => ch.ctl === "flowtoken").length,
       };
     }).catch((e) => { status("boot failed: " + (e && e.message ? e.message : e), "bad"); return null; });
   }

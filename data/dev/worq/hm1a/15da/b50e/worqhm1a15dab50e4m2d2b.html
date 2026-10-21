@@ -12,6 +12,7 @@
     <button class="fe-redo" title="Redo (⇧⌘Z)">redo</button>
     <button class="fe-tidy" title="Auto-layout: tidy (longest-path layers)">tidy</button>
     <button class="fe-untangle" title="Auto-layout: untangle (resolve crossings in z)">untangle</button>
+    <button class="fe-run" title="Run: tokens deliver along the wires in propagation order (R)">run ▸</button>
     <button class="fe-save" title="Save the flow body (write_flow_body)" disabled>save</button>
   </div>
   <div class="fe-conflict" hidden>
@@ -28,7 +29,7 @@
     <div class="data-control fe-host" data-control="app:scenehost:{}"></div>
 
     <aside class="fe-rail">
-      <span class="lbl">P3 · authoring + save ride scenehost</span>
+      <span class="lbl">P4 · run tokens + journal ride scenehost</span>
       <div class="fe-palette">
         <span class="lbl">palette — click to add · with a wire selected, splice</span>
         <div class="fe-pal-row">
@@ -49,6 +50,9 @@
         <li class="fe-g-delop">delete op — <b>pending</b></li>
         <li class="fe-g-layout">layout tidy/untangle — <b>pending</b></li>
         <li class="fe-g-save">save (write_flow_body) — <b>pending</b></li>
+        <li class="fe-g-run">run tokens in propagation order — <b>pending</b></li>
+        <li class="fe-g-diff">changes since save (diffFlow) — <b>pending</b></li>
+        <li class="fe-g-journal">server journal + entry diff — <b>pending</b></li>
       </ul>
       <p class="fe-ro"><b>editing on</b> — wiring gestures are flownode
         behaviors on the host; the palette + layout author the FlowDoc. Tap an
@@ -62,6 +66,7 @@
         <li><kbd>[</kbd> <kbd>]</kbd> walk case chain · <kbd>Esc</kbd> back / cancel</li>
         <li><kbd>W</kbd> wire from selection · <kbd>←</kbd><kbd>→</kbd> choose target · <kbd>Enter</kbd> commit</li>
         <li><kbd>Del</kbd> unwires a wire / deletes an op · <kbd>⌘Z</kbd>/<kbd>⇧⌘Z</kbd> undo/redo</li>
+        <li><kbd>R</kbd> run — tokens deliver along each wire, round by round</li>
       </ul>
     </aside>
 
@@ -73,6 +78,14 @@
       <div class="fe-journal">
         <span class="lbl">mutations · this session</span>
         <ul class="fe-journal-list"></ul>
+      </div>
+      <div class="fe-changes">
+        <span class="lbl">unsaved changes (vs load/save) · <span class="fe-changes-count">—</span></span>
+        <ul class="fe-changes-list"></ul>
+      </div>
+      <div class="fe-sjournal">
+        <span class="lbl">journal · write_flow_body history <button class="fe-sj-refresh" title="Reload the server journal">↻</button></span>
+        <ul class="fe-sjournal-list"><li class="fe-empty">loading…</li></ul>
       </div>
     </aside>
   </div>

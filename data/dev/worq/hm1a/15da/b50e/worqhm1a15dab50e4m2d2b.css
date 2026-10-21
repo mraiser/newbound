@@ -45,3 +45,24 @@
   background:#fdecea; border-bottom:1px solid #f5c6c0; color:#8a2f22; font-size:12px; }
 .nb-flowedit3d .fe-conflict-msg { flex:1; }
 .nb-flowedit3d .fe-inspect-body button { margin-right:4px; }
+/* P4 */
+.nb-flowedit3d .fe-run { border-color:#62bd8c; color:#2f9e63; }
+.nb-flowedit3d .fe-run.running { background:#62bd8c; color:#fff; }
+.nb-flowedit3d .fe-changes, .nb-flowedit3d .fe-sjournal { margin-top:8px; }
+.nb-flowedit3d .fe-changes-list, .nb-flowedit3d .fe-sjournal-list, .nb-flowedit3d .fe-run-list,
+.nb-flowedit3d .jl-diff-list { list-style:none; margin:0; padding:0; font-size:11px; }
+.nb-flowedit3d .fe-changes-list li, .nb-flowedit3d .jl-diff-list li { padding:1px 0; color:#4a525c; }
+.nb-flowedit3d .jl-g { display:inline-block; width:14px; font-weight:600; }
+.nb-flowedit3d .jl-add .jl-g { color:#2f9e63; } .nb-flowedit3d .jl-del .jl-g { color:#c0392b; }
+.nb-flowedit3d .jl-mod .jl-g { color:#b7791f; }
+.nb-flowedit3d .fe-sjournal-list > li { border-bottom:1px solid #f0f2f4; padding:2px 0; }
+.nb-flowedit3d .jl-row { display:flex; align-items:center; gap:4px; }
+.nb-flowedit3d .jl-label { flex:1; min-width:0; text-align:left; border:none; background:none; padding:1px 0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#2d343c; }
+.nb-flowedit3d .jl-author { font-size:10px; color:#8a929c; max-width:9ch; overflow:hidden; white-space:nowrap; }
+.nb-flowedit3d .jl-revert { padding:0 5px; font-size:10px; }
+.nb-flowedit3d .jl-diff { padding:2px 0 4px 14px; }
+.nb-flowedit3d .jl-note { margin:2px 0; font-size:11px; color:#6b7480; }
+.nb-flowedit3d .fe-sj-refresh { padding:0 4px; font-size:10px; margin-left:4px; text-transform:none; }
+.nb-flowedit3d .fe-run-list li { padding:1px 0; color:#4a525c; }
+.nb-flowedit3d .fe-run-list .rd { color:#2f9e63; font-weight:600; margin-right:4px; }
