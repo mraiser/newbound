@@ -454,12 +454,27 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     });
     if (focusPath.length > 1) { const cur = focusPath[focusPath.length - 1]; const sp = document.createElement("span"); sp.className = "fe-crumb cur"; sp.textContent = "local: " + ((cur.op && cur.op.name) || cur.title); crumbsEl.append(sp); }
     const decks = $(".fe-decks"); decks.innerHTML = "";
+    const editable = !!source;
     chain.forEach((c, k) => {
       const b = document.createElement("button");
       b.textContent = "case " + (k + 1); b.className = k === activeDeck ? "active" : "";
-      b.setAttribute("role", "tab"); b.addEventListener("click", () => setActiveDeck(k));
+      b.setAttribute("role", "tab"); b.setAttribute("aria-selected", String(k === activeDeck));
+      b.addEventListener("click", () => setActiveDeck(k));
+      if (editable && k === activeDeck && chain.length > 1) {
+        const x = document.createElement("span"); x.className = "x"; x.textContent = "×";
+        x.title = "delete this case (splices the chain; I-4 guarded)";
+        x.addEventListener("click", (e) => { e.stopPropagation(); removeDeck(k); });
+        b.appendChild(x);
+      }
       decks.appendChild(b);
     });
+    if (editable) {
+      const add = document.createElement("button"); add.className = "fe-deck-add"; add.textContent = "+";
+      add.title = "add a case — the fall-through program (“next” jumps here)";
+      add.addEventListener("click", () => addDeck());
+      decks.appendChild(add);
+    }
+    renderDiagnostics();
     status(`${deckCount} deck${deckCount === 1 ? "" : "s"} · ${focusedCase() ? focusedCase().cmds.length : 0} ops · ${source ? "editing on" : "read-only (no source command)"}`);
   }
 
@@ -497,6 +512,99 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (stage && stage.frameAll) stage.frameAll();
   }
   function frameDeck() { if (stage && stage.frameAll) stage.frameAll(); }
+
+  // ── P5 step 4c: case chain authoring, diagnostics, walk + frame ──────────
+  // The FlowDoc diagnostics path of the focused case, in walkCases' own
+  // vocabulary: root "case", deck k appends ".next" k times, a drilled level
+  // appends ".cmds[i].local" under the deck holding its op. Computed LIVE from
+  // the drilled op's identity (floweditor3d stored it at drill time, so an
+  // upstream op delete left its path stale) — null if the op left the tree.
+  function focusedPath() {
+    let p = "case";
+    for (let k = 1; k < focusPath.length; k++) {
+      const f = focusPath[k]; let hit = null;
+      caseChain(focusPath[k - 1].root).some((c, j) => { const i = c.cmds.indexOf(f.op); if (i >= 0) { hit = { j, i }; return true; } return false; });
+      if (!hit) return null;
+      p += ".next".repeat(hit.j) + `.cmds[${hit.i}].local`;
+    }
+    return p + ".next".repeat(activeDeck);
+  }
+  // the focused case's lints (I-1…I-10 + structural) under the inspector;
+  // a row naming an op selects it
+  let lastDiags = [];
+  function renderDiagnostics() {
+    const box = $(".fe-diag"), list = $(".fe-diag-list"); if (!box || !list || !doc) return;
+    const path = focusedPath();
+    lastDiags = path ? doc.diagnosticsFor(path) : [];
+    list.replaceChildren();
+    box.hidden = !lastDiags.length;
+    for (const d of lastDiags) {
+      const li = document.createElement("li"); li.className = d.severity || "info";
+      const code = document.createElement("span"); code.className = "code"; code.textContent = d.code;
+      const msg = document.createElement("span"); msg.textContent = d.message;
+      li.append(code, msg);
+      if (d.opIndex != null) { li.classList.add("go"); li.title = "select the op"; li.addEventListener("click", () => selectOp(d.opIndex)); }
+      list.appendChild(li);
+    }
+  }
+  // add / delete a case in the FOCUSED chain (FlowDoc.addCase/removeCase, one
+  // undo unit each). activeDeck moves BEFORE the commit so afterMutation's one
+  // render lands on the right deck (no second racing renderInstances); a
+  // refused commit (read-only / mid-run) restores it.
+  function addDeck() {
+    const prev = activeDeck, root = focusRoot();
+    const cmd = doc.addCase(root);
+    if (!cmd || cmd.error) return commitEdit(cmd);
+    activeDeck = caseChain(root).length - 1; selWire = null; if (hostApi) hostApi.setState("selectedKey", null);
+    if (!commitEdit(cmd)) { activeDeck = prev; return false; }
+    status(`added case ${activeDeck + 1} — the fall-through program (“next” jumps here) · ⌘Z undoes`, "ok");
+    return true;
+  }
+  function removeDeck(k) {
+    const prev = activeDeck, root = focusRoot();
+    if (k == null) k = activeDeck;
+    const cmd = doc.removeCase(root, k);
+    if (!cmd || cmd.error) return commitEdit(cmd);
+    activeDeck = Math.max(0, k - 1); selWire = null; if (hostApi) hostApi.setState("selectedKey", null);
+    if (!commitEdit(cmd)) { activeDeck = prev; return false; }
+    status(`deleted case ${k + 1} — ⌘Z undoes`, "ok");
+    return true;
+  }
+  // Tab walks the focused deck's ops in topological (firing) order
+  function topoOrder(c) {
+    const N = c.cmds.length, indeg = new Array(N).fill(0), adj = new Map();
+    for (const w of c.cons) { const s = w.src[0], d = w.dest[0]; if (s >= 0 && d >= 0) { indeg[d]++; (adj.get(s) || adj.set(s, []).get(s)).push(d); } }
+    const q = []; for (let i = 0; i < N; i++) if (!indeg[i]) q.push(i);
+    const order = [];
+    while (q.length) { const u = q.shift(); order.push(u); for (const v of adj.get(u) || []) if (--indeg[v] === 0) q.push(v); }
+    for (let i = 0; i < N; i++) if (!order.includes(i)) order.push(i);
+    return order;
+  }
+  function selectedOpIndex() { const k = hostApi && hostApi.state ? hostApi.state.selectedKey : null; const m = k && /^d(\d+)_op(\d+)$/.exec(k); return m && +m[1] === activeDeck ? +m[2] : null; }
+  function selectOp(i) {
+    const c = focusedCase(); if (!c || !c.cmds[i] || !hostApi) return null;
+    selWire = null; hostApi.setState("selectedKey", `d${activeDeck}_op${i}`);
+    refreshInspector();
+    return i;
+  }
+  function walkOps(dir) {
+    const c = focusedCase(); if (!c || !c.cmds.length) return null;
+    const order = topoOrder(c), pos = order.indexOf(selectedOpIndex());
+    const k = pos < 0 ? (dir > 0 ? 0 : order.length - 1) : (pos + dir + order.length) % order.length;
+    selectOp(order[k]); frameSelection();
+    return order[k];
+  }
+  // F: fly the orbit to the selected op (scenestage.flyTo keeps dist/angles);
+  // nothing selected (or the headless null stage) frames the whole deck
+  let lastFrame = null;
+  function frameSelection() {
+    const c = focusedCase(), i = selectedOpIndex(), op = c && i != null ? c.cmds[i] : null;
+    if (!op) { lastFrame = { kind: "deck" }; frameDeck(); return lastFrame; }
+    const target = { x: op.pos.x, y: op.pos.y, z: op.pos.z || 0 };
+    lastFrame = { kind: "op", opIndex: i, target, flew: !!(stage && stage.flyTo) };
+    if (stage && stage.flyTo) stage.flyTo({ target }, 240); else frameDeck();
+    return lastFrame;
+  }
 
   // ── P5 step 4: op editor + terminal editor + signature bars ─────────────
   // floweditor3d's edit popovers (§5.5) docked in the inspector. Every control
@@ -536,6 +644,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     i.addEventListener("keydown", (e) => {
       if (e.key === "Enter") { e.preventDefault(); i.blur(); }
       else if (e.key === "Escape") { e.preventDefault(); i.value = value ?? ""; i.blur(); }
+      // ⌘S must reach the editor's keydown (it blurs this field so the edit
+      // commits, then saves); every other key stays the field's own
+      if ((e.metaKey || e.ctrlKey) && (e.key === "s" || e.key === "S")) return;
       e.stopPropagation();
     });
     return i;
@@ -1362,7 +1473,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         // a form field (run args, popovers) owns its keys: never let typing
         // "r"/Backspace/arrows fire editor shortcuts
         const tg = e.target;
-        if (tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName || ""))) return;
+        const inField = tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName || ""));
+        // ⌘S saves from anywhere in the editor: a focused field is blurred
+        // first so its change event commits the edit, then the save runs
+        if ((e.metaKey || e.ctrlKey) && (e.key === "s" || e.key === "S")) {
+          e.preventDefault();
+          if (inField && tg.blur) tg.blur();
+          setTimeout(() => { saveFlow(); }, 0);
+          return;
+        }
+        if (inField) return;
         if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z")) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
         if ((e.metaKey || e.ctrlKey) && (e.key === "y" || e.key === "Y")) { e.preventDefault(); redo(); return; }
         // wire mode owns arrows/Enter/Esc while it is up
@@ -1382,6 +1502,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         if (e.key === "2") setProj("front");
         else if (e.key === "3") setProj("persp");
         else if (e.key === "a" || e.key === "A") frameDeck();
+        else if ((e.key === "f" || e.key === "F") && !e.metaKey && !e.ctrlKey && !e.altKey) frameSelection();
+        else if (e.key === "Tab" && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); walkOps(e.shiftKey ? -1 : 1); }
         else if (e.key === "[") setActiveDeck((activeDeck - 1 + deckCount) % deckCount);
         else if (e.key === "]") setActiveDeck((activeDeck + 1) % deckCount);
         else if (e.key === "w" || e.key === "W") { e.preventDefault(); startKeyboardWiring(); }
@@ -1431,6 +1553,11 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         changes: () => renderChanges(), refreshJournal, journalRows: () => journalRows,
         toggleJournalDiff, revertTo: (i) => journalRows[i] ? revertTo(journalRows[i]) : null,
         tokens: () => hostApi.children.filter((ch) => ch.ctl === "flowtoken").length,
+        // P5 step 4c surface (case chain authoring, diagnostics, walk, frame)
+        addDeck, removeDeck, setActiveDeck, activeDeck: () => activeDeck, deckCount: () => caseChain(focusRoot()).length,
+        focusedPath, diagnostics: () => lastDiags.map((d) => ({ code: d.code, severity: d.severity, opIndex: d.opIndex, message: d.message })),
+        walkOps, selectOp, selectedOpIndex, frameSelection, lastFrame: () => lastFrame,
+        pose: () => (stage && stage.getPose ? stage.getPose() : null),
       };
     }).catch((e) => { status("boot failed: " + (e && e.message ? e.message : e), "bad"); return null; });
   }

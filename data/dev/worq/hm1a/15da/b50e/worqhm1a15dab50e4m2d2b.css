@@ -14,6 +14,18 @@
 .nb-flowedit3d .fe-decks button { border:1px solid #dfe3e8; background:#fff; border-radius:6px;
   padding:2px 8px; cursor:pointer; font-size:12px; }
 .nb-flowedit3d .fe-decks button.active { background:#62bd8c; color:#fff; border-color:#62bd8c; }
+.nb-flowedit3d .fe-decks button .x { margin-left:6px; opacity:.75; cursor:pointer; }
+.nb-flowedit3d .fe-decks button .x:hover { opacity:1; }
+.nb-flowedit3d .fe-decks button.fe-deck-add { color:#8a929c; }
+.nb-flowedit3d .fe-decks button.fe-deck-add:hover { color:#62bd8c; border-color:#62bd8c; }
+.nb-flowedit3d .fe-diag { margin-top:10px; border-top:1px solid #f0f2f4; padding-top:8px; }
+.nb-flowedit3d .fe-diag-list { list-style:none; margin:4px 0 0; padding:0; font:10.5px ui-monospace, monospace; line-height:1.5; }
+.nb-flowedit3d .fe-diag-list li { display:flex; gap:8px; padding:2px 0; color:#4a525c; }
+.nb-flowedit3d .fe-diag-list li.go { cursor:pointer; }
+.nb-flowedit3d .fe-diag-list li.go:hover { background:#f5f7f9; }
+.nb-flowedit3d .fe-diag-list .code { flex:none; color:#8a929c; }
+.nb-flowedit3d .fe-diag-list li.error .code { color:#d0503c; }
+.nb-flowedit3d .fe-diag-list li.warn .code { color:#c08a1e; }
 .nb-flowedit3d button { border:1px solid #dfe3e8; background:#fff; border-radius:6px;
   padding:3px 9px; cursor:pointer; font-size:12px; }
 .nb-flowedit3d button:disabled { opacity:.4; cursor:default; }
