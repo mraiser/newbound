@@ -1442,14 +1442,29 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
       // wire the flownode behavior hooks into the editor (shared host state)
       hostApi.setState("onPortTap", onPortTap);
-      hostApi.setState("onOpDrag", (opIndex, evt) => {
+      hostApi.setState("onOpDrag", (p) => {
         // drag an op body to move it (front-ortho plane, z kept). Undoable.
-        const c = focusedCase(); const op = c && c.cmds[opIndex]; if (!op) return;
-        const w = evt && evt.world ? evt.world : (evt && evt.clientX !== undefined ? clientToWorld(evt) : null);
-        if (!w) return;
-        const to = { x: Math.round(w.x * 2) / 2, y: Math.round(w.y * 2) / 2, z: op.pos.z };
-        const cmd = doc.moveOp(c, opIndex, to);
-        if (cmd && !cmd.error) commitApplied(cmd);
+        // flownode hands ONE payload {phase, key, opIndex, evt, which?, ord?}
+        // (it used to be read as (opIndex, evt), so no drag ever committed);
+        // the node live-follows the pointer itself, the move commits on end.
+        if (!p || p.which) return;                 // socket drags: not an op move
+        if (p.phase !== "end" || running) return;
+        const c = focusedCase(); const op = c && c.cmds[p.opIndex]; if (!op || !op.pos) return;
+        const evt = p.evt || {};
+        let to;
+        if (typeof evt.dx === "number" && typeof evt.dy === "number") {
+          if (Math.hypot(evt.dx, evt.dy) < 1e-6) return;
+          to = { x: op.pos.x + evt.dx, y: op.pos.y + evt.dy };
+        } else {
+          const w = evt.world ? evt.world : (evt.clientX !== undefined ? clientToWorld(evt) : null);
+          if (!w) return;
+          to = { x: w.x, y: w.y };
+        }
+        to = { x: Math.round(to.x * 2) / 2, y: Math.round(to.y * 2) / 2, z: op.pos.z };
+        if (to.x === op.pos.x && to.y === op.pos.y) { renderAll(); return; }   // snapped back: re-seat the node
+        const cmd = doc.moveOp(c, p.opIndex, to);
+        if (cmd && !cmd.error) { commitApplied(cmd); status(`moved ${nameOf(c, p.opIndex)} — ⌘Z undoes`, "ok"); }
+        else { renderAll(); status("move refused" + (cmd && cmd.error ? ": " + cmd.error : ""), "bad"); }
       });
 
       renderAll();
