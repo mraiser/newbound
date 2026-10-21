@@ -66,3 +66,13 @@
 .nb-flowedit3d .fe-sj-refresh { padding:0 4px; font-size:10px; margin-left:4px; text-transform:none; }
 .nb-flowedit3d .fe-run-list li { padding:1px 0; color:#4a525c; }
 .nb-flowedit3d .fe-run-list .rd { color:#2f9e63; font-weight:600; margin-right:4px; }
+.nb-flowedit3d .fe-run-args { display:flex; flex-direction:column; gap:6px; margin:6px 0; }
+.nb-flowedit3d .fe-run-arg { display:flex; flex-direction:column; gap:2px; font-size:11px; color:#4a525c; }
+.nb-flowedit3d .fe-run-arg input { border:1px solid #dfe3e8; border-radius:6px; padding:4px 6px; font:inherit; font-size:12px; }
+.nb-flowedit3d .fe-run-arg input:focus { outline:none; border-color:#62bd8c; }
+.nb-flowedit3d .fe-run-foot { display:flex; justify-content:flex-end; gap:4px; margin-top:4px; }
+.nb-flowedit3d .fe-run-go { border-color:#62bd8c; color:#2f9e63; }
+.nb-flowedit3d .fe-run-pre { margin:6px 0; padding:6px; max-height:180px; overflow:auto; background:#f6f8fa; border:1px solid #e6e9ec;
+  border-radius:6px; font:11px/1.35 ui-monospace, Menlo, monospace; white-space:pre-wrap; word-break:break-word; }
+.nb-flowedit3d .fe-run-pre.bad { color:#b3261e; border-color:#f0c4c0; background:#fdf3f2; }
+.nb-flowedit3d .fe-run-note { font-size:11px; color:#6b737c; margin:4px 0; }

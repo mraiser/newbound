@@ -625,14 +625,118 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const ownRound = delivered.every((d) => rounds[d.round] && rounds[d.round].includes(d.k));
     return { runId, rounds, unreached, delivered, order, complete, inOrder: once && monotone && ownRound, ms };
   }
-  function renderRunInspector(R) {
-    const body = $(".fe-inspect-body"); if (!body || !R) return;
+  function runRoundsHtml(R) {
     const c = focusedCase();
     const wl = (k) => { const w = c && c.cons[k]; return esc(w ? `${nameOf(c, w.src[0])}.${w.src[1]} → ${nameOf(c, w.dest[0])}.${w.dest[1]}` : `wire ${k}`); };
     let h = `<p><b>run</b> <span class="lbl">${R.complete && R.inOrder ? "delivered in propagation order" : "incomplete"}${R.ms != null ? ` · ${R.ms}ms` : ""}</span></p><ul class="fe-run-list">`;
     R.rounds.forEach((round, r) => { h += `<li><span class="rd">${r + 1}</span>${round.map(wl).join(" · ")}</li>`; });
     h += `</ul>`;
     if (R.unreached.length) h += `<p class="fe-empty">never fires (I-1/I-2): ${R.unreached.map(wl).join(" · ")}</p>`;
+    return h;
+  }
+  function renderRunInspector(R) {
+    const body = $(".fe-inspect-body"); if (!body || !R) return;
+    body.innerHTML = runRoundsHtml(R);
+  }
+
+  // ── P5 run parity: a LIVE editor runs the REAL command ───────────────────
+  // Ported from floweditor3d's openRunPicker/doRun/inspectRunResult. When the
+  // editor has a source (and is not the harness), the run button or R key
+  // opens an args form over the params bar (doc.root.input, coerced by bar
+  // type; no params means run at once). invoke runs the SAVED command
+  // CONCURRENTLY with the flowtoken run: the animation never blocks or fails
+  // the result. The payload (status/pid stripped) goes to the inspector with
+  // an args sentence. Tokens animate only on the root case's first deck,
+  // because that is where the server starts. The harness keeps the
+  // token-only run.
+  let lastResult = null, liveCall = false;
+  function coerceArg(raw, type) {
+    const t = (type || "").toLowerCase();
+    if (t === "integer" || t === "int") { const n = parseInt(raw, 10); return isNaN(n) ? raw : n; }
+    if (t === "decimal" || t === "float") { const n = parseFloat(raw); return isNaN(n) ? raw : n; }
+    if (t === "boolean" || t === "bool") return raw === "true";
+    if (t === "object" || t === "array" || t === "jsonobject" || t === "jsonarray") { try { return JSON.parse(raw); } catch (e) { return raw; } }
+    return raw;
+  }
+  function startRun() {
+    if (running || liveCall) return null;
+    if (harness || !source) return runFlow();
+    const params = Object.entries((doc && doc.root && doc.root.input) || {});
+    if (!params.length) return runLive({});
+    return openRunPicker(params);
+  }
+  function openRunPicker(params) {
+    const body = $(".fe-inspect-body"); if (!body) return runLive({});
+    body.innerHTML = `<p><b>run</b> <span class="lbl">arguments — the params bar</span></p>`;
+    const form = document.createElement("form"); form.className = "fe-run-args";
+    const inputs = [];
+    for (const [name, node] of params) {
+      const type = node && node.type;
+      const row = document.createElement("label"); row.className = "fe-run-arg";
+      const lab = document.createElement("span"); lab.textContent = `${name} : ${type || "any"}`;
+      const inp = document.createElement("input"); inp.name = name; inp.placeholder = type || "value"; inp.autocomplete = "off";
+      inputs.push({ name, inp, type });
+      row.append(lab, inp); form.appendChild(row);
+    }
+    const foot = document.createElement("div"); foot.className = "fe-run-foot";
+    const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "fe-run-cancel"; cancel.textContent = "cancel";
+    const go = document.createElement("button"); go.type = "submit"; go.className = "fe-run-go"; go.textContent = "run ▸";
+    foot.append(cancel, go); form.appendChild(foot);
+    const close = () => { renderInspector(hostApi && hostApi.state ? hostApi.state.selectedKey : null); if (ME.tabIndex >= 0) ME.focus(); status("run cancelled"); };
+    cancel.addEventListener("click", close);
+    form.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); } });
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const args = {};
+      for (const { name, inp, type } of inputs) args[name] = coerceArg(inp.value, type);
+      runLive(args);
+    });
+    body.appendChild(form);
+    const first = form.querySelector("input"); if (first) first.focus();
+    status("run — fill in the params bar");
+    return form;
+  }
+  async function runLive(args) {
+    if (running || liveCall || !source) return null;
+    liveCall = true;
+    const src = { lib: source.lib, ctl: source.ctl, cmd: source.cmd };
+    const unsaved = dirty ? Math.max(1, ((renderChanges() || {}).changes || []).length) : 0;
+    const runBtn = $(".fe-run");
+    const busy = () => { if (runBtn) { runBtn.disabled = true; runBtn.classList.add("running"); runBtn.textContent = "running…"; } };
+    busy();
+    status(`running ${src.cmd}…`);
+    const started = performance.now();
+    const resP = invokeP(src.lib, src.ctl, src.cmd, args)
+      .then((r) => r || { status: "err", msg: "no response" }, (e) => ({ status: "err", msg: String(e && e.message ? e.message : e) }));
+    let R = null;
+    // animate while the call flies (never block or fail the result on it)
+    if (focusPath.length === 1 && activeDeck === 0) {
+      try { R = await runFlow(); } catch (e) { R = null; }
+      busy();   // runFlow restores the button; the call may still be in flight
+    }
+    const r = await resP;
+    const ms = Math.round(performance.now() - started);
+    liveCall = false;
+    if (runBtn) { runBtn.disabled = false; runBtn.classList.remove("running"); runBtn.textContent = "run ▸"; }
+    const ok = r.status === "ok";
+    lastResult = { args, ok, result: r, ms, unsaved, source: src,
+      tokens: R ? { complete: !!R.complete, inOrder: !!R.inOrder, delivered: R.delivered.length } : null };
+    pushJournal(ok ? `ran ${src.cmd} · ${ms}ms` : `run failed: ${r.msg}`);
+    if (ok) status(`ran · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} deliveries in order` : ""), "ok");
+    else status(`run failed: ${r.msg}`, "bad");
+    renderRunResult(lastResult, R);
+    return lastResult;
+  }
+  function renderRunResult(L, R) {
+    const body = $(".fe-inspect-body"); if (!body || !L) return;
+    const r = L.result || {};
+    const payload = Object.assign({}, r); delete payload.status; delete payload.pid;
+    const shown = L.ok ? ("data" in payload && Object.keys(payload).length === 1 ? payload.data : payload) : (r.msg != null ? r.msg : payload);
+    let h = `<p><b>run result</b> <span class="lbl">${L.ok ? "ok" : "failed"} · ${L.ms}ms</span></p>`;
+    h += `<pre class="fe-run-pre${L.ok ? "" : " bad"}">${esc(typeof shown === "string" ? shown : JSON.stringify(shown, null, 1))}</pre>`;
+    h += `<p class="fe-run-note">args: ${esc(JSON.stringify(L.args))} — the tokens replay the propagation ORDER; per-wire values aren't reported by the platform.</p>`;
+    if (L.unsaved) h += `<p class="fe-empty">ran the SAVED body — ${L.unsaved} unsaved change${L.unsaved === 1 ? "" : "s"} not included; save to run them</p>`;
+    if (R && R.rounds) h += runRoundsHtml(R);
     body.innerHTML = h;
   }
 
@@ -838,11 +942,15 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         });
       });
       refreshSaveUi();
-      const runB = $(".fe-run"); if (runB) runB.addEventListener("click", () => { runFlow(); });
+      const runB = $(".fe-run"); if (runB) runB.addEventListener("click", () => { startRun(); });
       const sjB = $(".fe-sj-refresh"); if (sjB) sjB.addEventListener("click", () => { refreshJournal(); });
       renderChanges();
       refreshJournal();
       ME.addEventListener("keydown", (e) => {
+        // a form field (run args, popovers) owns its keys: never let typing
+        // "r"/Backspace/arrows fire editor shortcuts
+        const tg = e.target;
+        if (tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName || ""))) return;
         if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z")) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
         if ((e.metaKey || e.ctrlKey) && (e.key === "y" || e.key === "Y")) { e.preventDefault(); redo(); return; }
         // wire mode owns arrows/Enter/Esc while it is up
@@ -852,7 +960,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
           if (e.key === "Enter") { e.preventDefault(); commitKeyboardWire(); return; }
           if (e.key === "Escape") { e.preventDefault(); cancelWireGhost(); renderFacade(); status("wiring cancelled"); return; }
         }
-        if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); runFlow(); return; }
+        if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); startRun(); return; }
         if (e.key === "2") setProj("front");
         else if (e.key === "3") setProj("persp");
         else if (e.key === "a" || e.key === "A") frameDeck();
@@ -889,6 +997,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         source: () => source, baseHash: () => baseHash, harness: () => harness, titleText: () => $(".fe-title").textContent,
         // P4 surface
         runFlow, lastRun: () => lastRun, running: () => running,
+        // P5 run parity surface
+        startRun, runLive, lastResult: () => lastResult, liveCall: () => liveCall, coerceArg,
         rounds: () => propagationRounds(focusedCase()),
         changes: () => renderChanges(), refreshJournal, journalRows: () => journalRows,
         toggleJournalDiff, revertTo: (i) => journalRows[i] ? revertTo(journalRows[i]) : null,
