@@ -493,117 +493,61 @@ function toScene(rootCase, opts = {}) {
 // decks receding −Z at GEO.deckPitch.
 //
 // Output shape is a scene facet (app:scenedoc Part II): {env, nodes, state}.
-// Nodes are scenedoc-vocabulary entries — group decks, box/capsule/glass/
-// cylinder op bodies, sphere sockets, and hang LINKS between socket ids (the
-// scene stack re-resolves endpoints each frame, so wires follow drags free).
-// ids mirror toScene's (`deck0/op/3/in/term`) so behavior code maps a scene
-// node back to (deck, idx, which, term) exactly as the legacy editor does —
-// that mapping IS the P2 gesture bridge. `editable` switches socket drag
-// affordances on, as in toScene.
-function toSceneDoc(flow, { editable = false } = {}) {
+// Nodes are scenedoc-vocabulary entries — group decks, per-type op bodies
+// (box / rotated-cylinder constant / glass local / cylinder persistent),
+// command spines, text tags, sphere sockets, and hang LINKS between socket
+// ids (the scene stack re-resolves endpoints each frame, so wires follow
+// drags free).
+//
+// IMPLEMENTATION — parity by construction: toSceneDoc DELEGATES to toScene
+// (the R-4 spec path) and converts its flat spec list into scenedoc nodes.
+// toScene's spec shapes are already scenedoc-native (box size.x/y/z, cylinder
+// radius/height, cone radius/height, sphere radius, text text/size, link
+// from/to), so the op bodies, terminals, bars, and wires land at IDENTICAL
+// world positions on both paths — the front-ortho parity check (acceptance 2)
+// compares these two projections and they agree to the last decimal because
+// they ARE the same geometry. ids mirror toScene's (`d0/op/3/in/term`), so
+// behavior code maps a scene node back to (deck, idx, which, term) exactly as
+// the legacy editor does — that mapping IS the P2 gesture bridge.
+//
+// `editable` switches socket/op drag affordances on, `activeDeck` picks the
+// deck that carries bars, terminals, wires, tags, and miniatures (the rest
+// ghost) — the same semantics toScene gives the legacy editor.
+function toSceneDoc(flow, { editable = false, activeDeck = 0 } = {}) {
   const c = flow && flow.root ? flow.root : flow;   // accept a FlowDoc or a Case
-  const nodes = [];
-  const push = (n) => { nodes.push(n); return n; };
+  const { specs, deckCount } = toScene(c, { activeDeck, editable });
 
-  // deck chain
-  const chain = []; { let cc = c; while (cc) { chain.push(cc); cc = cc.nextcase; } }
-
-  const nodesOut = [];
-  const emit = (n) => { nodesOut.push(n); return n; };
-
-  chain.forEach((cs, di) => {
-    const deckZ = -di * GEO.deckPitch;
-    const prefix = `deck${di}`;
-    const deckId = `${prefix}`;
-    emit({ id: deckId, kind: "group", pos: { x: 0, y: 0, z: deckZ },
-      meta: { role: "deck", deck: di } });
-
-    const bars = barGeometry(cs);
-
-    // op bodies + their sockets (children of the deck group, so the deck's
-    // −Z pitch carries them — parity with toScene's parent: deckId)
-    cs.cmds.forEach((op, oi) => {
-      const opId = `${prefix}/op/${oi}`;
-      const kind = KIND_OF[op.type] || "box";
-      emit({ id: opId, parent: deckId, kind: "box",
-        pos: { x: op.pos.x, y: op.pos.y, z: op.pos.z },
-        params: opBodyParams(op),
-        material: { token: opMaterial(op) },
-        affordances: editable ? { tap: true, hover: true, drag: { plane: "xy", altPlane: "zy" } }
-                              : { tap: true, hover: true },
-        meta: { role: "op", deck: di, idx: oi, opType: op.type, name: op.name, width: op.width } });
-
-      for (const [term, nd] of Object.entries(op.in || {})) {
-        emit({ id: `${opId}/in/${term}`, parent: deckId, kind: "sphere",
-          pos: { x: op.pos.x + (nd.x || 0), y: op.pos.y + halfH(op.type), z: op.pos.z },
-          params: { radius: GEO.socketR },
-          material: { color: SCENE_COLORS.socket, emissive: true },
-          affordances: editable ? { tap: true, hover: true, drag: { plane: "xy", altPlane: "xy" } }
-                                : { tap: true, hover: true },
-          meta: { role: "terminal", deck: di, idx: oi, which: "in", term } });
-      }
-      for (const [term, nd] of Object.entries(op.out || {})) {
-        emit({ id: `${opId}/out/${term}`, parent: deckId, kind: "sphere",
-          pos: { x: op.pos.x + (nd.x || 0), y: op.pos.y - halfH(op.type), z: op.pos.z },
-          params: { radius: GEO.socketR },
-          material: { color: SCENE_COLORS.socket, emissive: true },
-          affordances: editable ? { tap: true, hover: true }
-                                : { tap: true, hover: true },
-          meta: { role: "terminal", deck: di, idx: oi, which: "out", term } });
-      }
-    });
-
-    // bars + bar terminals (derived frames — no persisted position, §3.1)
-    emit({ id: `${prefix}/bar-in`, parent: deckId, kind: "box",
-      pos: { x: bars.inX, y: bars.inY, z: 0 },
-      params: { w: bars.inW, h: GEO.socketR * 1.4, d: GEO.socketR * 1.4 },
-      material: { token: "wire" },
-      meta: { role: "bar", deck: di, which: "in" } });
-    emit({ id: `${prefix}/bar-out`, parent: deckId, kind: "box",
-      pos: { x: bars.outX, y: bars.outY, z: 0 },
-      params: { w: bars.outW, h: GEO.socketR * 1.4, d: GEO.socketR * 1.4 },
-      material: { token: "wire" },
-      meta: { role: "bar", deck: di, which: "out" } });
-
-    for (const [term, n] of Object.entries(cs.input || {})) emit({
-      id: `${prefix}/bt-in/${term}`, parent: deckId, kind: "sphere",
-      pos: { x: n.x || 0, y: bars.inY, z: 0 }, params: { radius: GEO.socketR },
-      material: { color: SCENE_COLORS.socket, emissive: true },
-      affordances: editable ? { tap: true, hover: true }
-                            : { tap: true, hover: true },
-      meta: { role: "terminal", deck: di, idx: -1, which: "out", term } });
-    for (const [term, n] of Object.entries(cs.output || {})) emit({
-      id: `${prefix}/bt-out/${term}`, parent: deckId, kind: "sphere",
-      pos: { x: n.x || 0, y: bars.outY, z: 0 }, params: { radius: GEO.socketR },
-      material: { color: SCENE_COLORS.socket, emissive: true },
-      affordances: editable ? { tap: true, hover: true, drag: { plane: "xy", altPlane: "xy" } }
-                            : { tap: true, hover: true },
-      meta: { role: "terminal", deck: di, idx: -2, which: "in", term } });
-
-    // wires: hang LINKS between socket ids; endpoint tracking is the stack's job
-    const socketId = (idx2, which, term) =>
-      idx2 === -1 ? `${prefix}/bt-in/${term}`
-      : idx2 === -2 ? `${prefix}/bt-out/${term}`
-      : `${prefix}/op/${idx2}/${which}/${term}`;
-    (cs.cons || []).forEach((wr, wi) => {
-      emit({ id: `${prefix}/wire/${wi}`, parent: deckId, kind: "link", curve: "hang",
-        from: socketId(wr.src[0], "out", wr.src[1]),
-        to: socketId(wr.dest[0], "in", wr.dest[1]),
-        r: GEO.wireR,
-        material: { color: SCENE_COLORS.wire, opacity: 0.75 },
-        affordances: { tap: true, hover: true },
-        meta: { role: "wire", deck: di, index: wi, con: wr } });
-    });
+  // spec → scenedoc node. Verbatim copy of the scenedoc-native fields; the
+  // only transform is the deck placeholder, which becomes a scenedoc GROUP
+  // (a pure transform holder — its tiny box gizmo was a stage-only shim).
+  const nodes = specs.map((s) => {
+    if (s.meta && s.meta.role === "deck") {
+      return { id: s.id, kind: "group", pos: s.pos, meta: s.meta };
+    }
+    const n = { id: s.id, kind: s.kind };
+    if (s.parent !== undefined) n.parent = s.parent;
+    if (s.pos) n.pos = s.pos;
+    if (s.rot) n.rot = s.rot;
+    if (s.scale) n.scale = s.scale;
+    if (s.params) n.params = s.params;
+    if (s.text) n.text = s.text;
+    if (s.kind === "link") { n.from = s.from; n.to = s.to;
+      if (s.curve !== undefined) n.curve = s.curve;
+      if (s.r !== undefined) n.r = s.r; }
+    if (s.material) n.material = s.material;
+    if (s.affordances) n.affordances = s.affordances;
+    if (s.meta) n.meta = s.meta;
+    return n;
   });
 
   // derived scene facet. state carries the chain geometry a host/camera needs.
   return {
     env: { camera: { pos: { x: 0, y: 0, z: 12 }, target: { x: 0, y: 0, z: 0 } },
       grid: true, lights: "default" },
-    nodes: nodesOut,
+    nodes,
     state: {
-      deckCount: { type: "number", default: chain.length },
-      activeDeck: { type: "number", default: 0 },
+      deckCount: { type: "number", default: deckCount },
+      activeDeck: { type: "number", default: activeDeck },
     },
   };
 }
