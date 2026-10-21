@@ -81,14 +81,31 @@ me.ready = function () {
       drag(ctx, evt) {
         if (!ctx || !ctx.rig || !evt) return;
         const st = ctx.host.state || (ctx.host.state = {});
+        // the real stage names the gesture phase evt.type (start/move/end);
+        // older harnesses sent evt.phase - accept either, hand on .phase
+        const phase = evt.phase || evt.type;
         if (typeof st.onOpDrag === "function") {
           const m = /^([^:]+):(in|out)(\d+)$/.exec(evt.id || "");
-          const payload = { phase: evt.phase, key: ctx.key, opIndex: ctx.me.opIndex, evt };
+          const payload = { phase, key: ctx.key, opIndex: ctx.me.opIndex, evt };
           if (m) { payload.which = m[2]; payload.ord = +m[3]; payload.node = m[2] + m[3]; }
+          else {
+            // a BODY drag moves the op: follow the pointer live by the plane
+            // delta (dx/dy from the grab point - no jump to the cursor); the
+            // editor commits the snapped move on end and re-hosts the node
+            if (phase === "start") {
+              ctx.me._drag0 = { x: ctx.rig.pos.x, y: (ctx.me.baseY !== undefined) ? ctx.me.baseY : ctx.rig.pos.y };
+              ctx.host.setState("selectedKey", ctx.key);
+            } else if (phase === "move" && ctx.me._drag0 && typeof evt.dx === "number") {
+              ctx.rig.pos.x = ctx.me._drag0.x + evt.dx;
+              ctx.me.baseY = ctx.me._drag0.y + (evt.dy || 0);
+            } else if (phase === "end") {
+              ctx.me._drag0 = null;
+            }
+          }
           st.onOpDrag(payload);
           return;
         }
-        if (evt.phase === "move" && typeof evt.x === "number") {
+        if (phase === "move" && typeof evt.x === "number") {
           ctx.rig.pos.x = evt.x;
           if (typeof evt.y === "number") ctx.me.baseY = evt.y;
         }
