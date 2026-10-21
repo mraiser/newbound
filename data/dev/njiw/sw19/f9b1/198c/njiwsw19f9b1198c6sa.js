@@ -517,38 +517,55 @@ function toSceneDoc(flow, { editable = false, activeDeck = 0 } = {}) {
   const c = flow && flow.root ? flow.root : flow;   // accept a FlowDoc or a Case
   const { specs, deckCount } = toScene(c, { activeDeck, editable });
 
+  // scenedoc node ids must satisfy NAME_RE (^[a-z][a-z0-9_]*$) — no slashes.
+  // Slug toScene's hierarchical spec id (`d0/op/3/in/term`) into a flat,
+  // collision-free scenedoc id (`d0_op_3_in_term`), remapping id, parent, and
+  // link from/to through the SAME transform so the graph stays connected. The
+  // original spec id rides along as meta.sid — behavior code maps a scene node
+  // back to (deck, idx, which, term) exactly as the legacy editor does (the
+  // P2 gesture bridge reads meta, and meta.sid is its stable handle).
+  const NAME_RE = /^[a-z][a-z0-9_]*$/;
+  const slug = (sid) => {
+    let s = String(sid).replace(/[^a-zA-Z0-9_]/g, "_").toLowerCase();
+    if (!/^[a-z]/.test(s)) s = "n_" + s;
+    return NAME_RE.test(s) ? s : s.replace(/[^a-z0-9_]/g, "_");
+  };
+
   // spec → scenedoc node. Verbatim copy of the scenedoc-native fields; the
-  // only transform is the deck placeholder, which becomes a scenedoc GROUP
-  // (a pure transform holder — its tiny box gizmo was a stage-only shim).
+  // only structural transform is the deck placeholder, which becomes a
+  // scenedoc GROUP (a pure transform holder — its tiny box gizmo was a
+  // stage-only shim). Ids/parents/endpoints are slugged per above.
   const nodes = specs.map((s) => {
+    const meta = s.meta ? { ...s.meta, sid: s.id } : { sid: s.id };
     if (s.meta && s.meta.role === "deck") {
-      return { id: s.id, kind: "group", pos: s.pos, meta: s.meta };
+      return { id: slug(s.id), kind: "group", pos: s.pos, meta };
     }
-    const n = { id: s.id, kind: s.kind };
-    if (s.parent !== undefined) n.parent = s.parent;
+    const n = { id: slug(s.id), kind: s.kind };
+    if (s.parent !== undefined) n.parent = slug(s.parent);
     if (s.pos) n.pos = s.pos;
     if (s.rot) n.rot = s.rot;
     if (s.scale) n.scale = s.scale;
     if (s.params) n.params = s.params;
     if (s.text) n.text = s.text;
-    if (s.kind === "link") { n.from = s.from; n.to = s.to;
+    if (s.kind === "link") { n.from = slug(s.from); n.to = slug(s.to);
       if (s.curve !== undefined) n.curve = s.curve;
       if (s.r !== undefined) n.r = s.r; }
     if (s.material) n.material = s.material;
     if (s.affordances) n.affordances = s.affordances;
-    if (s.meta) n.meta = s.meta;
+    n.meta = meta;
     return n;
   });
 
-  // derived scene facet. state carries the chain geometry a host/camera needs.
+  // derived scene facet. state (a scenedoc FIELD ARRAY) carries the chain
+  // geometry a host/camera needs.
   return {
     env: { camera: { pos: { x: 0, y: 0, z: 12 }, target: { x: 0, y: 0, z: 0 } },
       grid: true, lights: "default" },
     nodes,
-    state: {
-      deckCount: { type: "number", default: deckCount },
-      activeDeck: { type: "number", default: activeDeck },
-    },
+    state: [
+      { name: "deckCount", type: "number", value: deckCount },
+      { name: "activeDeck", type: "number", value: activeDeck },
+    ],
   };
 }
 
