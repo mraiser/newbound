@@ -563,8 +563,8 @@ function toSceneDoc(flow, { editable = false, activeDeck = 0 } = {}) {
       grid: true, lights: "default" },
     nodes,
     state: [
-      { name: "deckCount", type: "number", value: deckCount },
-      { name: "activeDeck", type: "number", value: activeDeck },
+      { name: "deck_count", type: "number", value: deckCount },
+      { name: "active_deck", type: "number", value: activeDeck },
     ],
   };
 }
