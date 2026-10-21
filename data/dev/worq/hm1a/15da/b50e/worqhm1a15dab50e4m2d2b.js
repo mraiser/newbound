@@ -452,25 +452,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     gate(".fe-g-splice", true, "splice into wire");
     return sp;
   }
-  // delete the selected op: removes it + every wire touching it, as one undo.
+  // delete the selected op: FlowDoc.removeOp removes it + every wire touching
+  // it AND renumbers the surviving wires' op indices — one undoable mutation.
   function deleteSelectedOp() {
     const key = hostApi.state && hostApi.state.selectedKey;
     const m = key && /^d(\d+)_op(\d+)$/.exec(key);
     const c = focusedCase(); if (!m || !c) return;
     const i = +m[2]; const op = c.cmds[i]; if (!op) return;
-    const touching = doc.wiresTouching ? doc.wiresTouching(c, i) : [];
-    const removed = [];
-    // remove wires touching it, highest cons index first so indices stay valid
-    const idxs = (touching || []).map((t) => (t.wireIndex !== undefined ? t.wireIndex : t)).sort((a, b) => b - a);
-    for (const wi of idxs) {
-      const w = c.cons[wi]; if (!w) continue;
-      removed.push({ wi, wire: { src: [w.src[0], w.src[1]], dest: [w.dest[0], w.dest[1]] } });
-      c.cons.splice(wi, 1);
-    }
-    const [gone] = c.cmds.splice(i, 1);
-    commitApplied({ label: `delete ${op.name || op.type}`,
-      undo: () => { c.cmds.splice(i, 0, gone); removed.sort((a, b) => a.wi - b.wi).forEach((r) => c.cons.splice(r.wi, 0, r.wire)); },
-      redo: () => { removed.slice().sort((a, b) => b.wi - a.wi).forEach((r) => c.cons.splice(r.wi, 1)); c.cmds.splice(i, 1); } });
+    const cmd = doc.removeOp(c, i);
+    if (cmd.error) { status("delete refused: " + cmd.error, "bad"); return; }
+    commitApplied(cmd);
     clearSelection();
     status(`deleted ${op.name || op.type}`, "ok");
     gate(".fe-g-delop", true, "op removed with its wires");
