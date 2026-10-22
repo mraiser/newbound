@@ -119,12 +119,13 @@ me.ready = function () {
       },
 
       // drag gestures. The editor owns the interpretation via host.state.onOpDrag
-      // (P2): it sees the start socket (out<N> → begin a wire from that output;
-      // anything else → begin an op move) and routes move/end accordingly —
-      // wire-source latch + I-1/I-2 target preview on socket moves, op-position
-      // live update on body moves. The evt carries {phase, id, x, y, z, dx, dy,
-      // dz, clientX, clientY, alt}; evt.id is the stage spec id "<key>:<node>".
-      // The P0/P1 fallback (direct rig move) keeps the older harness working.
+      // (P2): it sees the start socket (in<N> → begin a wire FROM that input,
+      // committed on release over an output; anything else → begin an op
+      // move) and routes move/end accordingly — ghost + I-1/I-2 target
+      // preview on socket moves, op-position live update on body moves. The
+      // evt carries {phase, id, x, y, z, dx, dy, dz, clientX, clientY, alt};
+      // evt.id is the stage spec id "<key>:<node>". The P0/P1 fallback
+      // (direct rig move) keeps the older harness working — body drags only.
       drag(ctx, evt) {
         if (!ctx || !ctx.rig || !evt) return;
         const st = ctx.host.state || (ctx.host.state = {});
@@ -152,7 +153,7 @@ me.ready = function () {
           st.onOpDrag(payload);
           return;
         }
-        if (phase === "move" && typeof evt.x === "number") {
+        if (phase === "move" && typeof evt.x === "number" && !/:(in|out)\d+$/.test(evt.id || "")) {
           ctx.rig.pos.x = evt.x;
           if (typeof evt.y === "number") ctx.me.baseY = evt.y;
         }
