@@ -231,7 +231,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
   // ── facade: project the derived scene facet onto the stage ────────────────
   function renderFacade() {
-    const sceneDoc = toSceneDoc(focusRoot(), { editable: true, activeDeck });
+    // colours follow the live bench tokens (app:tokens) — the dev app's theme
+    const tokens = (n) => getComputedStyle(ME).getPropertyValue(n);
+    const sceneDoc = toSceneDoc(focusRoot(), { editable: true, activeDeck, tokens });
     const specs = sceneDoc.nodes.map((n) => {
       const s = { ...n, id: "fx_" + n.id };
       if (n.parent !== undefined) s.parent = "fx_" + n.parent;
@@ -250,7 +252,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const hostOwned = stage.objects
       ? [...stage.objects.values()].filter((o) => o && o.spec && !String(o.spec.id).startsWith("fx_")).map((o) => o.spec)
       : [];
-    stage.setScene(specs.concat(ghostSpecs(), hostOwned), { lights: "default", grid: true, camera: null });
+    stage.setScene(specs.concat(ghostSpecs(), hostOwned), { lights: "default", grid: false, camera: null });
     styleFacadeLabels();
     return sceneDoc;
   }
