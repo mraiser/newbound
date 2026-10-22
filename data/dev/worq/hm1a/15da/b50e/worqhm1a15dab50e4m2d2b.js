@@ -7,10 +7,13 @@
 // mutation. Nothing here writes a second source of truth.
 //
 // Gestures ported (design §5.4, pointer AND keyboard):
-//   port tap   — tap an output socket to arm a wire; tap a legal input to
-//                commit. Taps dispatch to flownode.click → host.state.onPortTap.
-//   drag ghost — dragging from an output socket rides a REAL hang link whose
-//                tip tracks the pointer; legal input targets preview (I-1/I-2).
+//   wire drag  — press an INPUT socket, drag to an OUTPUT (an op's out socket
+//                or a params-bar terminal), release: the wire commits. The
+//                ghost is a REAL hang link from the pointer into the input;
+//                over a legal output it snaps there and the status previews
+//                the wire (I-1/I-2 via canWire). Socket drags dispatch
+//                flownode.drag → host.state.onOpDrag → onSocketDrag. A plain
+//                socket TAP wires nothing (onPortTap just says how).
 //   keyboard   — W arms wiring from the selection; ←→ cycle the legal targets
 //                (reading order, nearest-first); Enter commits; Esc cancels.
 //   select     — tap a WIRE: its facade link keeps a tap affordance, the
@@ -125,7 +128,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   let projMode = "persp";
   let undoStack = [];
   let wireMode = null;            // keyboard wiring { src:{idx,term}, cands, k }
-  let armSrc = null;              // pointer wiring: the armed output { idx, term, key }
+  let armSrc = null;              // pointer wiring: the INPUT being dragged { idx, term, key }
   let ghostIds = [];              // facade ghost specs (tip + hang link)
   let selWire = null;             // a selected wire's cons index (for Del)
   let selWireRef = null;          // ...and the cons OBJECT, so the selection survives re-indexing
@@ -390,39 +393,99 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (inst.rig) { /* force a rig sync so setRig overrides apply */ const p = inst.rig.pos; inst.rig.pos = { x: p.x, y: p.y, z: p.z }; }
   }
 
-  // ── wiring: port tap → arm / commit ───────────────────────────────────────
-  // A tap on an outN socket arms wiring from that terminal; a tap on a legal
-  // inN socket commits via doc.addWire. Taps route here from flownode.click.
+  // ── wiring: DRAG from an input socket to an output terminal ──────────────
+  // The pointer wiring gesture: press an op's input socket, drag, release over
+  // an output — an op's out socket or a params-bar terminal. Socket drags
+  // route here from flownode.drag (host.state.onOpDrag → onSocketDrag).
+  // armSrc holds the input being dragged; the ghost hangs from the pointer
+  // into it, snapping onto a legal output under the pointer while the status
+  // previews the wire (I-1/I-2 via canWire). Release over a legal output
+  // commits ONE doc.addWire (⌘Z undoes); anywhere else cancels; Esc cancels
+  // mid-drag. A plain TAP on a socket wires nothing — it says how.
   function onPortTap(p) {
-    const c = focusedCase(); if (!c) return;
-    const m = /^(in|out)(\d+)$/.exec(p.node); if (!m) return;
-    const which = m[1], k = +m[2];
-    const op = c.cmds[p.opIndex]; if (!op) return;
-    const terms = which === "in" ? Object.keys(op.in || {}) : Object.keys(op.out || {});
-    const term = terms[k]; if (term === undefined) return;
-
-    if (which === "out") { armWire({ idx: p.opIndex, term, key: p.key }); return; }
-    // an INPUT tap: commit the armed wire if legal (I-1/I-2 via canWire)
-    if (armSrc) {
-      const from = { idx: armSrc.idx, term: armSrc.term };   // capture: commitApplied nulls armSrc
-      const chk = doc.canWire(c, [from.idx, from.term], [p.opIndex, term]);
-      if (!chk.ok) { status("✗ " + chk.reason, "bad"); gate(".fe-g-i1i2", true, chk.reason); return; }
-      const cmd = doc.addWire(c, { src: [from.idx, from.term], dest: [p.opIndex, term] });
-      if (cmd.error) return status("wire refused: " + cmd.error, "bad");
-      if (!commitApplied(cmd)) return;
-      status(`wired ${nameOf(c, from.idx)}.${from.term} → ${nameOf(c, p.opIndex)}.${term} — ⌘Z undoes`, "ok");
-      gate(".fe-g-wiretap", true, "port-tap wire committed");
-      armSrc = null;
-    }
+    const m = p && /^(in|out)(\d+)$/.exec(p.node || ""); if (!m) return;
+    status(m[1] === "in" ? "drag from this input to an output to wire it"
+      : "drag from an input to this output to wire it", "ok");
   }
 
-  function armWire(src) {
-    armSrc = src; selWire = null;
-    const c = focusedCase();
-    const from = terminalWorld(c, src.idx, "out", src.term);
-    if (from) showGhost(from);
-    hostApi.setState("wireSrc", src);
-    status(`wiring from ${nameOf(c, src.idx)}.${src.term} — tap a legal input (or Esc)`, "ok");
+  // the drag's point on its plane (world); the front-ortho fallback otherwise
+  function dragPoint(evt) {
+    if (evt && typeof evt.x === "number" && typeof evt.y === "number") return { x: evt.x, y: evt.y, z: typeof evt.z === "number" ? evt.z : 0 };
+    return evt && typeof evt.clientX === "number" ? clientToWorld(evt) : null;
+  }
+
+  // the output terminal under the pointer: the out socket the stage picks
+  // there (a hosted op on the active deck), else the nearest output terminal
+  // — op outs and params-bar terminals (bars are facade scenery, never
+  // picked) — within DROP_PX on screen (DROP_WORLD units when headless).
+  const DROP_PX = 24, DROP_WORLD = 0.3;
+  function outTerminalAt(c, evt) {
+    if (!c || !evt) return null;
+    const hasClient = typeof evt.clientX === "number" && typeof evt.clientY === "number";
+    if (hasClient && stage && stage.pickAt) {
+      const m = /^d(\d+)_op(\d+):out(\d+)$/.exec(String(stage.pickAt(evt.clientX, evt.clientY) || ""));
+      if (m && +m[1] === activeDeck) {
+        const op = c.cmds[+m[2]]; const term = op && Object.keys(op.out || {})[+m[3]];
+        if (term !== undefined) return { idx: +m[2], term };
+      }
+    }
+    const cands = [];
+    c.cmds.forEach((op, i) => Object.keys((op && op.out) || {}).forEach((term) => cands.push({ idx: i, term })));
+    Object.keys(c.input || {}).forEach((term) => cands.push({ idx: -1, term }));
+    const screen = hasClient && stage && stage.anchor && stage.canvas;
+    const r = screen ? stage.canvas.getBoundingClientRect() : null;
+    const pt = screen ? null : dragPoint(evt);
+    let best = null, bd = Infinity;
+    for (const t of cands) {
+      const w = terminalWorld(c, t.idx, "out", t.term); if (!w) continue;
+      let d;
+      if (screen) { const a = stage.anchor(w); if (!a.visible) continue; d = Math.hypot(a.x - (evt.clientX - r.left), a.y - (evt.clientY - r.top)) / DROP_PX; }
+      else if (pt) d = Math.hypot(w.x - pt.x, w.y - pt.y) / DROP_WORLD;
+      else continue;
+      if (d < bd) { bd = d; best = t; }
+    }
+    return bd <= 1 ? best : null;
+  }
+
+  function onSocketDrag(p) {
+    const c = focusedCase(); if (!c || !p) return;
+    const evt = p.evt || {};
+    if (p.phase === "start") {
+      if (p.which !== "in" || running) return;      // only an INPUT starts a wire
+      const op = c.cmds[p.opIndex]; const term = op && Object.keys(op.in || {})[p.ord];
+      if (term === undefined) return;
+      if (c.cons.some((w) => w.dest[0] === p.opIndex && w.dest[1] === term)) {
+        status(`✗ ${nameOf(c, p.opIndex)}.${term} is already wired (I-1) — select its wire and Del first`, "bad");
+        return;
+      }
+      if (wireMode) cancelWireGhost();
+      armSrc = { idx: p.opIndex, term, key: p.key }; selWire = null;
+      hostApi.setState("wireSrc", armSrc);
+      showGhost(dragPoint(evt) || terminalWorld(c, p.opIndex, "in", term));
+      status(`wiring ${nameOf(c, p.opIndex)}.${term} — drag to an output and release (Esc cancels)`, "ok");
+      return;
+    }
+    if (!armSrc || p.key !== armSrc.key) return;    // not our gesture (or Esc'd)
+    const dest = [armSrc.idx, armSrc.term];
+    const label = `${nameOf(c, dest[0])}.${dest[1]}`;
+    const tgt = outTerminalAt(c, evt);
+    const chk = tgt ? doc.canWire(c, [tgt.idx, tgt.term], dest) : null;
+    if (p.phase === "move") {
+      moveGhost((chk && chk.ok && terminalWorld(c, tgt.idx, "out", tgt.term)) || dragPoint(evt) || ghostTip);
+      if (!tgt) status(`wiring ${label} — drag to an output and release (Esc cancels)`, "ok");
+      else if (chk.ok) status(`release to wire ${nameOf(c, tgt.idx)}.${tgt.term} → ${label}`, "ok");
+      else status("✗ " + chk.reason, "bad");
+      return;
+    }
+    if (p.phase !== "end") return;
+    cancelWireGhost();
+    if (!tgt) return status("wiring cancelled — release over an output to wire");
+    if (!chk.ok) { status("✗ " + chk.reason, "bad"); gate(".fe-g-i1i2", true, chk.reason); return; }
+    const cmd = doc.addWire(c, { src: [tgt.idx, tgt.term], dest });
+    if (cmd.error) return status("wire refused: " + cmd.error, "bad");
+    if (!commitApplied(cmd)) return;
+    status(`wired ${nameOf(c, tgt.idx)}.${tgt.term} → ${label} — ⌘Z undoes`, "ok");
+    gate(".fe-g-wiretap", true, "drag wire committed");
   }
 
   // ── the wire ghost: facade tip sphere + hang link tracking the pointer ────
