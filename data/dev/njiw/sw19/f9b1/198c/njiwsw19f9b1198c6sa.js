@@ -20,20 +20,24 @@ var ME = document.getElementById(me.UUID);
 const GEO = {
   deckPitch: 8,          // nextcase decks recede in −Z at this pitch (§2.4)
   barGap: 1.2,           // bar sits this far beyond the outermost op (§3.1)
-  socketR: 0.055,
-  // the PROGRAPH ICON: one family for every op kind. An ink SHELL (its rim
-  // reads as the icon's outline) with a paper FACE standing proud of it
-  // front and back; the kind rides Prograph's own marks on the face (see
+  socketR: 0.065,
+  // the PROGRAPH ICON, extruded: one family for every op kind. A SHELL (its
+  // rim reads as the icon's outline) with a FACE standing proud of it front
+  // and back; the kind rides Prograph's own marks on the face (see
   // opSceneNode). opH/opD are the OUTER extents — terminals straddle the
-  // shell's top edge and roots its bottom edge (±opH/2) for every kind.
-  opH: 0.5, opD: 0.26, rim: 0.03,
-  inlay: 0.012,          // depth of face-mounted ink (primitive posts, local frame)
-  barH: 0.16,            // input/output bars: inked strips, sockets on the inner edge
+  // shell's top edge and roots its bottom edge (±opH/2) for every kind. The
+  // icon is nearly as deep as it is tall: a block, not a card.
+  opH: 0.5, opD: 0.42, rim: 0.035,
+  inlay: 0.014,          // depth of face-mounted marks (primitive posts, local frame)
+  barH: 0.16,            // input/output bars: strips spanning the case, sockets on the inner edge
   ctlS: 0.3,             // a condition's control tab, set at the op's right end
+  // the CASE WINDOW: a plate behind each deck that the ops stand off and drop
+  // an offset shadow onto (shadow offset = this × the standoff)
+  plateGap: 0.32, plateT: 0.08, plateMargin: 0.45, shadow: 0.2,
   // legacy project() body sizes — kept equal to the icon so both paths agree
-  boxH: 0.5, boxD: 0.26,
+  boxH: 0.5, boxD: 0.42,
   capH: 0.5, capR: 0.25,
-  glassH: 0.5, glassD: 0.26,
+  glassH: 0.5, glassD: 0.42,
   cylH: 0.5,
   flagH: 0.35,
   wireR: 0.035,
@@ -328,21 +332,47 @@ function wireCurvePoint(from, to, t) {
 // yet projected, and miniature wires (LOD "full") are omitted — the mid-LOD
 // miniature boxes ride along parented to their glass op.
 
-// Op look (PROGRAPH, extruded). Every kind is the same inked icon — a dark
-// SHELL whose rim reads as the outline, a paper FACE proud of it — and the
-// kind is told by Prograph's own marks on that face: a primitive's ‖ end
+// Op look (PROGRAPH, extruded). Every kind is the same icon — a SHELL whose
+// rim reads as the outline, a FACE standing proud of it front and back —
+// told apart by Prograph's own marks on that face: a primitive's ‖ end
 // posts, a constant's solid lid (nothing comes in), a matcher's solid sill
 // (nothing goes out), a local's double outline (a case lives inside), a
-// persistent's oval. Faces are unlit (emissive) so they stay paper-white at
-// any angle; the shell is lit, which is what gives the icon its depth. A
-// condition is Prograph's CONTROL: a small inked box at the op's right end,
+// persistent's oval. The icon is a BLOCK and every part is lit and
+// flat-shaded, so its top, sides and front each catch the light differently;
+// ops stand off the deck's case-window plate and drop an offset shadow onto
+// it. A condition is Prograph's CONTROL: a small box at the op's right end,
 // ✓/✗ for the outcome it fires on, tinted by the rule it raises.
-const SCENE_COLORS = {
-  paper: "#fbfaf5", ink: "#252b33", ghost: "#3a424c",
-  undefInk: "#a3abb5", undefPaper: "#eef0f2",
-  graphite: "#2d343c", wire: "#5d6773", socket: "#252b33", flag: "#c15a5a",
+//
+// Colours are ROLES resolved from the bench tokens (app:tokens, where the
+// dev app's colours live): each role names the tokens.css property it
+// tracks, with that token's v1 value as the fallback. The module stays pure
+// — a DOM-side caller passes opts.tokens = (name) => value to follow the
+// live tokens; without it the v1 values (the dark bench) apply.
+const SCENE_TOKENS = {
+  face: ["--panel-3", "#2d343c"],      // the icon face
+  rim: ["--text-dim", "#8a94a0"],      // the shell — the icon's outline
+  ink: ["--text", "#d8dee6"],          // kind marks, sockets
+  faint: ["--text-faint", "#5c6672"],  // an undefined op's outline
+  plate: ["--panel", "#1f242a"],       // the case window
+  plateRim: ["--line", "#333b44"],
+  wire: ["--text-dim", "#8a94a0"],
+  ghost: ["--panel-3", "#2d343c"],     // background decks
+  shadow: ["--ground", "#171a1e"],
+  next: ["--f-3d", "#62bd8c"], terminate: ["--danger", "#c15a5a"],
+  fail: ["--f-js", "#ead16c"], finish: ["--f-css", "#56a3d9"],
 };
-const RULE_TINT = { next: "#62bd8c", terminate: "#c15a5a", fail: "#e08a3c", finish: "#56a3d9" };
+
+/** The scene palette: every SCENE_TOKENS role resolved through read(name)
+    (e.g. a getComputedStyle getPropertyValue), else its v1 value. */
+function scenePalette(read) {
+  const pal = {};
+  for (const [role, [name, v1]] of Object.entries(SCENE_TOKENS)) {
+    let v = "";
+    if (typeof read === "function") { try { v = String(read(name) || "").trim(); } catch (e) { v = ""; } }
+    pal[role] = /^#[0-9a-f]{3,8}$/i.test(v) ? v : v1;
+  }
+  return pal;
+}
 
 /** The text an op's icon shows: constants/matchers show their LITERAL
     (strings quoted, as Prograph does), every other kind its name. */
@@ -356,18 +386,20 @@ function opLabel(op) {
   return v;
 }
 
-function opSceneNode(op, i, deckId, prefix, active, editable, push) {
+function opSceneNode(op, i, deckId, prefix, active, editable, push, pal, plateZ) {
+  pal = pal || scenePalette();
   const id = `${prefix}/op/${i}`;
   const H = GEO.opH, D = GEO.opD, r = GEO.rim, h = halfH(op.type);
   const W = opBox(op).x;
   const fw = W - 2 * r, fh = H - 2 * r;
-  const zf = D / 2 + GEO.inlay / 2;          // face-mounted ink sits ON the face
+  const zf = D / 2 + GEO.inlay / 2;          // face-mounted marks sit ON the face
+  const z0 = (op.pos && op.pos.z) || 0;
   // the op node is a pure TRANSFORM HOLDER (the deck-node idiom): the icon's
-  // parts, sockets, label and control tab all parent to it, axis-aligned
+  // parts, sockets, label, shadow and control tab all parent to it
   push({ id, parent: deckId, kind: "box",
     pos: { x: op.pos.x, y: op.pos.y, z: op.pos.z },
     params: { size: { x: 0.001, y: 0.001, z: 0.001 } },
-    material: { color: SCENE_COLORS.graphite, flat: true },
+    material: { color: pal.rim, flat: true },
     affordances: active
       ? (editable ? { tap: true, drag: { plane: "xy", altPlane: "xz" }, hover: true }
                   : { tap: true, hover: true })
@@ -376,48 +408,51 @@ function opSceneNode(op, i, deckId, prefix, active, editable, push) {
       hasLocal: !!op.localdata, ctype: op.ctype, cmd: op.cmd } });
   const part = (sfx, kind, pos, params, material, rot) => push({ id: `${id}/${sfx}`, parent: id,
     kind, pos, ...(rot ? { rot } : {}), params, material, meta: { role: "op-part", opIndex: i, part: sfx } });
+  const lit = (color, extra) => ({ color, flat: true, ...(extra || {}) });
+  const ROUND = { x: Math.PI / 2, y: 0, z: 0 };   // a cylinder turned to face +z: a round end
+  // a w×hh×d slab at `at`: a box, or (oval) a stadium — a box between two
+  // z-facing round caps, the persistent's shape
+  const slab = (sfx, w, hh, d, at, mat, oval) => {
+    if (!oval) { part(sfx, "box", { ...at }, { size: { x: w, y: hh, z: d } }, mat); return; }
+    const cx = (w - hh) / 2;
+    part(sfx, "box", { ...at }, { size: { x: Math.max(0.001, w - hh), y: hh, z: d } }, mat);
+    part(sfx + "l", "cylinder", { x: at.x - cx, y: at.y, z: at.z }, { radius: hh / 2, height: d }, mat, ROUND);
+    part(sfx + "r", "cylinder", { x: at.x + cx, y: at.y, z: at.z }, { radius: hh / 2, height: d }, mat, ROUND);
+  };
+  const O = { x: 0, y: 0, z: 0 };
+  const oval = op.type === "persistent";
   // background decks: one ghosted silhouette per op, nothing else
   if (!active) {
-    part("face", "box", { x: 0, y: 0, z: 0 }, { size: { x: W, y: H, z: D } },
-      { color: SCENE_COLORS.ghost, flat: true, opacity: 0.3 });
+    slab("face", W, H, D, O, lit(pal.ghost, { opacity: 0.35 }), oval);
     return h;
   }
   const undef = op.type === "undefined";
-  const ink = () => ({ color: SCENE_COLORS.ink, flat: true });
-  const shell = { color: undef ? SCENE_COLORS.undefInk : SCENE_COLORS.ink, flat: true };
-  const face = { color: undef ? SCENE_COLORS.undefPaper : SCENE_COLORS.paper, emissive: true };
-  const ROUND = { x: Math.PI / 2, y: 0, z: 0 };   // a cylinder turned to face +z: a round end
-  if (op.type === "persistent") {
-    // the OVAL: a stadium — a box between two z-facing round caps
-    const cx = (W - H) / 2;
-    part("ink", "box", { x: 0, y: 0, z: 0 }, { size: { x: W - H, y: H, z: D - 0.04 } }, shell);
-    part("inkl", "cylinder", { x: -cx, y: 0, z: 0 }, { radius: H / 2, height: D - 0.04 }, shell, ROUND);
-    part("inkr", "cylinder", { x: cx, y: 0, z: 0 }, { radius: H / 2, height: D - 0.04 }, shell, ROUND);
-    part("face", "box", { x: 0, y: 0, z: 0 }, { size: { x: W - H, y: fh, z: D } }, face);
-    part("facel", "cylinder", { x: -cx, y: 0, z: 0 }, { radius: fh / 2, height: D }, face, ROUND);
-    part("facer", "cylinder", { x: cx, y: 0, z: 0 }, { radius: fh / 2, height: D }, face, ROUND);
-  } else {
-    part("ink", "box", { x: 0, y: 0, z: 0 }, { size: { x: W, y: H, z: D - 0.04 } }, shell);
-    part("face", "box", { x: 0, y: 0, z: 0 }, { size: { x: fw, y: fh, z: D } }, face);
+  slab("ink", W, H, D - 0.04, O, lit(undef ? pal.faint : pal.rim), oval);
+  slab("face", fw, fh, D, O, lit(pal.face), oval);
+  if (typeof plateZ === "number") {
+    // the offset shadow on the case-window plate — a child of the op, so it
+    // rides a drag; the offset grows with the op's standoff from the plate
+    const o = GEO.shadow * Math.max(0, z0 - plateZ);
+    slab("shadow", W, H, 0.004, { x: o, y: -o, z: plateZ - z0 + 0.012 }, lit(pal.shadow, { opacity: 0.6 }), oval);
   }
   let labelY = 0;
-  const inlay = (sfx, x, y, sx, sy) => {        // ink set on the face, front AND back
-    part(sfx, "box", { x, y, z: zf }, { size: { x: sx, y: sy, z: GEO.inlay } }, ink());
-    part(sfx + "_b", "box", { x, y, z: -zf }, { size: { x: sx, y: sy, z: GEO.inlay } }, ink());
+  const inlay = (sfx, x, y, sx, sy) => {        // a mark set on the face, front AND back
+    part(sfx, "box", { x, y, z: zf }, { size: { x: sx, y: sy, z: GEO.inlay } }, lit(pal.ink));
+    part(sfx + "_b", "box", { x, y, z: -zf }, { size: { x: sx, y: sy, z: GEO.inlay } }, lit(pal.ink));
   };
   switch (op.type) {
-    case "primitive": {            // ‖ name ‖ — an ink post set in from each end
+    case "primitive": {            // ‖ name ‖ — a post set in from each end
       const px = fw / 2 - 0.075;
       inlay("postl", -px, 0, 0.03, fh);
       inlay("postr", px, 0, 0.03, fh);
       break;
     }
-    case "constant":               // nothing comes in: a solid ink LID
-      part("lid", "box", { x: 0, y: h - 0.055, z: 0 }, { size: { x: W, y: 0.11, z: D + 0.004 } }, ink());
+    case "constant":               // nothing comes in: a solid LID
+      part("lid", "box", { x: 0, y: h - 0.055, z: 0 }, { size: { x: W, y: 0.11, z: D + 0.004 } }, lit(pal.ink));
       labelY = -0.04;
       break;
-    case "match":                  // nothing goes out: a solid ink SILL
-      part("sill", "box", { x: 0, y: -h + 0.055, z: 0 }, { size: { x: W, y: 0.11, z: D + 0.004 } }, ink());
+    case "match":                  // nothing goes out: a solid SILL
+      part("sill", "box", { x: 0, y: -h + 0.055, z: 0 }, { size: { x: W, y: 0.11, z: D + 0.004 } }, lit(pal.ink));
       labelY = 0.04;
       break;
     case "local": {                // a case lives inside: a DOUBLE outline
@@ -437,9 +472,9 @@ function opSceneNode(op, i, deckId, prefix, active, editable, push) {
     meta: { role: "label", opIndex: i, opType: op.type, lit: op.type === "constant" || op.type === "match" } });
   if (op.condition && op.condition.rule) {
     const s = GEO.ctlS, tx = W / 2 + 0.05 + s / 2;
-    part("ctl", "box", { x: tx, y: 0, z: 0 }, { size: { x: s, y: s, z: D - 0.04 } }, ink());
+    part("ctl", "box", { x: tx, y: 0, z: 0 }, { size: { x: s, y: s, z: D - 0.04 } }, lit(pal.rim));
     part("ctlface", "box", { x: tx, y: 0, z: 0 }, { size: { x: s - 2 * r, y: s - 2 * r, z: D } },
-      { color: RULE_TINT[op.condition.rule] || SCENE_COLORS.flag, emissive: true });
+      lit(pal[op.condition.rule] || pal.terminate));
     push({ id: `${id}/flag`, parent: id, kind: "text",
       pos: { x: tx, y: 0, z: D / 2 + 0.02 },
       text: { text: op.condition.value ? "✓" : "✗", size: 0.85 },
@@ -449,11 +484,12 @@ function opSceneNode(op, i, deckId, prefix, active, editable, push) {
 }
 
 /** One socket — Prograph's terminal (top edge) or root (bottom edge): a small
-    ink bead — plus its multiplex annotation, drawn OUTSIDE the edge: a list
+    bead — plus its multiplex annotation, drawn OUTSIDE the edge: a list
     terminal's "…" (three dots), a loop terminal's arrowhead. */
-function pushSocket(push, id, parent, pos, node, editable, meta) {
+function pushSocket(push, id, parent, pos, node, editable, meta, pal) {
+  pal = pal || scenePalette();
   push({ id, parent, kind: "sphere", pos, params: { radius: GEO.socketR },
-    material: { color: SCENE_COLORS.socket, flat: true },
+    material: { color: pal.ink },
     affordances: editable ? { tap: true, hover: true, drag: { plane: "xy", altPlane: "xy" } }
                           : { tap: true, hover: true },
     meta });
@@ -461,13 +497,13 @@ function pushSocket(push, id, parent, pos, node, editable, meta) {
   const away = meta.which === "in" ? 1 : -1;    // terminals: above the edge; roots: below
   if (mode === "list") {
     for (const k of [-1, 0, 1]) push({ id: `${id}/mux${k + 1}`, parent, kind: "sphere",
-      pos: { x: pos.x + k * 0.05, y: pos.y + away * 0.11, z: pos.z }, params: { radius: 0.018 },
-      material: { color: SCENE_COLORS.ink, flat: true }, meta: { role: "mux", mode } });
+      pos: { x: pos.x + k * 0.05, y: pos.y + away * 0.12, z: pos.z }, params: { radius: 0.018 },
+      material: { color: pal.ink }, meta: { role: "mux", mode } });
   } else if (mode === "loop") {
     push({ id: `${id}/mux`, parent, kind: "cone",
-      pos: { x: pos.x + 0.11, y: pos.y, z: pos.z }, rot: { x: 0, y: 0, z: away > 0 ? Math.PI : 0 },
+      pos: { x: pos.x + 0.12, y: pos.y, z: pos.z }, rot: { x: 0, y: 0, z: away > 0 ? Math.PI : 0 },
       params: { radius: 0.04, height: 0.09 },
-      material: { color: SCENE_COLORS.ink, flat: true }, meta: { role: "mux", mode } });
+      material: { color: pal.ink, flat: true }, meta: { role: "mux", mode } });
   }
 }
 
@@ -479,6 +515,7 @@ function pushSocket(push, id, parent, pos, node, editable, meta) {
 function toScene(rootCase, opts = {}) {
   const activeDeck = opts.activeDeck ?? 0;
   const editable = opts.editable ?? true;
+  const pal = scenePalette(opts.tokens);
   const specs = [];
   const push = (s) => specs.push(s);
   let bounds = null;
@@ -493,47 +530,74 @@ function toScene(rootCase, opts = {}) {
     const bars = barGeometry(c);
     push({ id: deckId, kind: "box", pos: { x: 0, y: 0, z: deckZ },
       params: { size: { x: 0.001, y: 0.001, z: 0.001 } },
-      material: { color: SCENE_COLORS.graphite },
+      material: { color: pal.plateRim },
       meta: { role: "deck", index: idx } });
 
-    // bars (the signature) — Prograph's input/output bars: inked strips
-    // spanning the case, their sockets on the inner edge (deck children)
+    // the CASE WINDOW: a plate behind the deck (sized to the bars, which span
+    // every op) that the ops stand off and shadow onto. plateZ is its FRONT
+    // face, deck-local, behind the rearmost op whatever untangle did to z.
+    let backZ = 0;
+    for (const op of c.cmds) backZ = Math.min(backZ, (op.pos && op.pos.z) || 0);
+    const plateZ = backZ - GEO.opD / 2 - GEO.plateGap;
+    const pw = bars.len + 2 * GEO.plateMargin;
+    const ph = bars.inY - bars.outY + GEO.barH + 2 * GEO.plateMargin;
+    const pid = `${prefix}/plate`;
+    push({ id: pid, parent: deckId, kind: "box",
+      pos: { x: bars.x, y: (bars.inY + bars.outY) / 2, z: plateZ - GEO.plateT / 2 },
+      params: { size: { x: pw, y: ph, z: GEO.plateT } },
+      material: { color: pal.plateRim, flat: true, ...(active ? {} : { opacity: 0.3 }) },
+      meta: { role: "plate" } });
+    if (active) push({ id: `${pid}/face`, parent: pid, kind: "box",
+      pos: { x: 0, y: 0, z: 0.004 },
+      params: { size: { x: pw - 0.08, y: ph - 0.08, z: GEO.plateT } },
+      material: { color: pal.plate, flat: true },
+      meta: { role: "plate-face" } });
+
+    // bars (the signature) — Prograph's input/output bars: strips spanning
+    // the case, built like the icons, their sockets on the inner edge
     const rail = (which, y) => {
       const bid = `${prefix}/bar-${which}`;
       push({ id: bid, parent: deckId, kind: "box",
         pos: { x: bars.x, y, z: 0 },
         params: { size: { x: bars.len, y: GEO.barH, z: GEO.opD - 0.04 } },
-        material: { color: SCENE_COLORS.ink, flat: true, ...(active ? {} : { opacity: 0.35 }) },
+        material: { color: pal.rim, flat: true, ...(active ? {} : { opacity: 0.35 }) },
         affordances: active ? { tap: true } : undefined,
         meta: { role: "bar", which: which === "in" ? "input" : "output" } });
-      if (active) push({ id: `${bid}/face`, parent: bid, kind: "box",
+      if (!active) return;
+      push({ id: `${bid}/face`, parent: bid, kind: "box",
         pos: { x: 0, y: 0, z: 0 },
         params: { size: { x: bars.len - 2 * GEO.rim, y: GEO.barH - 2 * GEO.rim, z: GEO.opD } },
-        material: { color: SCENE_COLORS.paper, emissive: true },
+        material: { color: pal.face, flat: true },
         meta: { role: "bar-face", which: which === "in" ? "input" : "output" } });
+      const o = GEO.shadow * -plateZ;
+      push({ id: `${bid}/shadow`, parent: bid, kind: "box",
+        pos: { x: o, y: -o, z: plateZ + 0.012 },
+        params: { size: { x: bars.len, y: GEO.barH, z: 0.004 } },
+        material: { color: pal.shadow, flat: true, opacity: 0.6 },
+        meta: { role: "shadow" } });
     };
     rail("in", bars.inY);
     rail("out", bars.outY);
 
     c.cmds.forEach((op, i) => {
-      const h = opSceneNode(op, i, deckId, prefix, active, editable, push);
+      const h = opSceneNode(op, i, deckId, prefix, active, editable, push, pal, plateZ);
       if (!active) return;
       const opId = `${prefix}/op/${i}`;
       for (const [term, n] of Object.entries(op.in))
         pushSocket(push, `${opId}/in/${term}`, opId, { x: n.x || 0, y: h, z: 0 }, n, editable,
-          { role: "terminal", idx: i, which: "in", term });
+          { role: "terminal", idx: i, which: "in", term }, pal);
       for (const [term, n] of Object.entries(op.out))
         pushSocket(push, `${opId}/out/${term}`, opId, { x: n.x || 0, y: -h, z: 0 }, n, editable,
-          { role: "terminal", idx: i, which: "out", term });
+          { role: "terminal", idx: i, which: "out", term }, pal);
     });
 
     if (active) {
       for (const [term, n] of Object.entries(c.input))
         pushSocket(push, `${prefix}/bt-in/${term}`, deckId, { x: n.x || 0, y: bars.inSockY, z: 0 }, n, editable,
-          { role: "terminal", idx: -1, which: "out", term });
+          { role: "terminal", idx: -1, which: "out", term }, pal);
       for (const [term, n] of Object.entries(c.output))
         pushSocket(push, `${prefix}/bt-out/${term}`, deckId, { x: n.x || 0, y: bars.outSockY, z: 0 }, n, editable,
-          { role: "terminal", idx: -2, which: "in", term });
+          { role: "terminal", idx: -2, which: "in", term }, pal);
 
       // wires: hang links BETWEEN SOCKET NODES — endpoint tracking is the
       // scene stack's own job (loop pairs render as hang links; see notes)
@@ -546,7 +610,7 @@ function toScene(rootCase, opts = {}) {
         const to = socketId(wr.dest[0], "in", wr.dest[1]);
         push({ id: `${prefix}/wire/${wi}`, kind: "link", curve: "hang",
           from, to, r: GEO.wireR,
-          material: { color: SCENE_COLORS.wire },
+          material: { color: pal.wire },
           affordances: { tap: true, hover: true },
           meta: { role: "wire", index: wi, con: wr } });
       });
