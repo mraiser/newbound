@@ -33,6 +33,9 @@
 //      frameAll(), dispose(), waitReady(cb).
 // hook: state.onSceneTap(specId|null) — set by the host's js to receive taps no
 //      hosted instance claims (its own tappable specs; null = background).
+// hook: state.onSceneDrag(evt) — the same for drags of the host's own
+//      draggable specs (evt = the stage's {type, id, x, y, z, dx, dy, dz,
+//      clientX, clientY, alt}).
 
 var me = this;
 var ME = document.getElementById(me.UUID);
@@ -436,7 +439,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
   function handleDrag(evt) {
     const inst = instForSpec(evt.id);
-    if (!inst) return;
+    if (!inst) {
+      // a drag NO hosted instance claims — a spec the host's own js put on
+      // the stage with a drag affordance (the flow editor's bar sockets) —
+      // goes to host.state.onSceneDrag(evt), the drag twin of onSceneTap.
+      // Unset ⇒ ignored, as before.
+      const hook = me.state && me.state.onSceneDrag;
+      if (typeof hook === "function") {
+        try { hook(evt); } catch (e) { diag(`onSceneDrag: ${e && e.message ? e.message : e}`); }
+      }
+      return;
+    }
     const fn = inst.me && (inst.me.drag || (inst.me.sceneBehaviors && inst.me.sceneBehaviors.default && inst.me.sceneBehaviors.default.drag));
     if (typeof fn === "function") {
       try { fn.call(inst.me, inst.ctx, evt); } catch (e) { diag(`${inst.key}.drag: ${e && e.message ? e.message : e}`); }
