@@ -16,8 +16,10 @@
 //   select     — tap a WIRE: its facade link keeps a tap affordance, the
 //                host forwards the unclaimed tap (host.state.onSceneTap) and
 //                the wire highlights; one selection at a time (op XOR wire).
-//   delete     — Del/Backspace or the inspector's "unwire" button removes the
-//                selected wire (FlowDoc.removeWire — frees its input, I-1).
+//   delete     — Del/Backspace deletes THE selection: a selected wire unwires
+//                (FlowDoc.removeWire — frees its input, I-1); a selected op is
+//                removed with its wires (FlowDoc.removeOp). The inspector's
+//                "unwire" / "delete op" buttons do the same.
 //   undo       — ⌘Z runs the mutation's inverse (commitApplied's undo stack).
 //
 // The facade (toSceneDoc) is the rendered picture; the instances are the pick
@@ -572,6 +574,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     selWire = null; selWireRef = null;
     status("unwired — ⌘Z undoes", "ok");
   }
+  // Del/Backspace deletes THE selection. There is one selection at a time
+  // (op XOR wire), so the key routes to whichever is held: a selected wire
+  // unwires; a selected op is removed with every wire touching it
+  // (deleteSelectedOp → FlowDoc.removeOp, one undoable mutation).
+  function deleteSelection() {
+    if (armSrc || wireMode) return status("finish or Esc the wiring first", "bad");
+    if (selWire != null) return deleteSelectedWire();
+    if (selectedOpIndex() != null) return deleteSelectedOp();
+    status("select an op or a wire first (click it)", "bad");
+  }
 
   // ── render: facade + instances + chrome ───────────────────────────────────
   function renderAll() { renderFacade(); renderInstances(); renderChrome(); }
@@ -874,7 +886,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (op.type === "local") edButton(foot, "drill ▸ into the sub-flow", "fe-ed-drill", () => drillInto(op));
     const wires = doc.wiresTouching(c, oi);
     edButton(foot, `delete op${wires ? ` · removes ${wires} wire${wires > 1 ? "s" : ""}` : ""}`, "fe-del danger", deleteSelectedOp);
-    edNote(body, op.type === "local" ? "dblclick to drill in" : "W wires from its first output · drag body moves · Enter edits");
+    edNote(body, op.type === "local" ? "dblclick to drill in · Del deletes" : "W wires from its first output · drag body moves · Enter edits · Del deletes");
   }
 
   /** The terminal popover — op terminals AND bar terminals (the signature). */
@@ -1151,10 +1163,11 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // delete the selected op: FlowDoc.removeOp removes it + every wire touching
   // it AND renumbers the surviving wires' op indices — one undoable mutation.
   function deleteSelectedOp() {
-    const key = hostApi.state && hostApi.state.selectedKey;
-    const m = key && /^d(\d+)_op(\d+)$/.exec(key);
-    const c = focusedCase(); if (!m || !c) return;
-    const i = +m[2]; const op = c.cmds[i]; if (!op) return;
+    // selectedOpIndex is deck-aware: a selection key from another deck
+    // (d<k>_op<i>, k ≠ activeDeck) must never delete op i of the focused case
+    const c = focusedCase(); const i = selectedOpIndex();
+    if (i == null || !c) return;
+    const op = c.cmds[i]; if (!op) return;
     const cmd = doc.removeOp(c, i);
     if (cmd.error) { status("delete refused: " + cmd.error, "bad"); return; }
     if (!commitApplied(cmd)) return;
@@ -1715,7 +1728,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         else if (e.key === "[") setActiveDeck((activeDeck - 1 + deckCount) % deckCount);
         else if (e.key === "]") setActiveDeck((activeDeck + 1) % deckCount);
         else if (e.key === "w" || e.key === "W") { e.preventDefault(); startKeyboardWiring(); }
-        else if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSelectedWire(); }
+        else if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSelection(); }
         else if (e.key === "Escape") {
           const hasSel = (hostApi && hostApi.state && hostApi.state.selectedKey) || selWire != null;
           if (armSrc) { cancelWireGhost(); status("wiring cancelled"); }
@@ -1759,7 +1772,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         picker: () => pickerEl, closePicker, primCount: () => PRIMS.length, families: () => FAMILIES.slice(),
         opAt: (i) => { const c = focusedCase(); return c && c.cmds[i] ? JSON.parse(JSON.stringify(c.cmds[i])) : null; },
         opCount: () => { const c = focusedCase(); return c ? c.cmds.length : 0; },
-        selectWire, selectedWire: () => selWire, sceneTap: onSceneTap, deleteSelectedWire,
+        selectWire, selectedWire: () => selWire, sceneTap: onSceneTap, deleteSelectedWire, deleteSelection,
         // P5 step 4 surface (op / terminal / signature editor)
         refreshInspector, inspTerm: () => inspTerm,
         editTerm: (key, idx, which, term) => { inspTerm = { key, idx, which, term }; refreshInspector(); },
