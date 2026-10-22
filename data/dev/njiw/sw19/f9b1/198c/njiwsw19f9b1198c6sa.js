@@ -306,6 +306,21 @@ function terminalWorld(c, idx, which, term) {
   return terminalPos(c, idx, which, term, barGeometry(c), 0);
 }
 
+/** The JUMP PIPE's anchors for op i of case c, whose next case is nextC, in
+    the case's deck-local frame (deckZ = 0 on the active deck): tab — the
+    centre of the op's condition tab (opSceneNode's ctl part); bead — hung
+    halfway to the next deck, above both input bars; entry — the next case's
+    input bar, one deck back. The scene draws the pipe through these (toScene)
+    and the run animation's jump token rides it. */
+function jumpPoints(c, i, nextC) {
+  const op = c.cmds[i];
+  const tab = { x: op.pos.x + opBox(op).x / 2 + 0.05 + GEO.ctlS / 2, y: op.pos.y, z: op.pos.z || 0 };
+  const b0 = barGeometry(c), b1 = nextC ? barGeometry(nextC) : b0;
+  const bead = { x: tab.x, y: Math.max(b0.inY, b1.inY) + 0.9, z: -GEO.deckPitch / 2 };
+  const entry = { x: b1.x, y: b1.inY, z: -GEO.deckPitch };
+  return { tab, bead, entry };
+}
+
 /** A point on a wire's spline at t ∈ [0,1] — the SAME vertical-tangent cubic
     the stage builds its tubes from (§3.2: tangent magnitude 0.4·length,
     clamped 0.5–2), replicated as pure math so execution tokens (3D-5) ride
@@ -332,7 +347,8 @@ function wireCurvePoint(from, to, t) {
 // coordinates, so the receding stack is one transform per deck.
 //
 // Fidelity notes (honest, DEVIATIONS 19): loop helixes render as hang links
-// (not side helixes), jump pipes and the deck ground grid/outline are not
+// (not side helixes), jump pipes render as a bead-hung arch of two hang links
+// (not the legacy jump-pipe geometry), the deck ground grid/outline is not
 // yet projected, and miniature wires (LOD "full") are omitted — the mid-LOD
 // miniature boxes ride along parented to their glass op.
 
@@ -625,6 +641,26 @@ function toScene(rootCase, opts = {}) {
           meta: { role: "wire", index: wi, con: wr } });
       });
 
+      // a `next` rule's JUMP PIPE (§2.4): it rises out of the op's condition
+      // tab to a bead hung between the decks, then dives into the next case's
+      // input bar. Two hang links, both FROM the bead (a hang link always
+      // leaves its `from` downward and enters its `to` from above — so each
+      // leg hangs from the bead and the pair reads as one arch), in the next
+      // rule's colour. A constant never evaluates its condition: no pipe.
+      const nextC = chain[idx + 1];
+      if (nextC) c.cmds.forEach((op, i) => {
+        if (!op || op.type === "constant" || !op.condition || op.condition.rule !== "next") return;
+        const jp = jumpPoints(c, i, nextC);
+        const oid = `${prefix}/op/${i}`;
+        push({ id: `${oid}/jump`, parent: deckId, kind: "sphere", pos: jp.bead,
+          params: { radius: 0.07 }, material: { color: pal.next, emissive: true },
+          meta: { role: "jump", opIndex: i, part: "bead" } });
+        push({ id: `${oid}/jumpup`, kind: "link", curve: "hang", from: `${oid}/jump`, to: `${oid}/ctl`,
+          r: GEO.wireR * 1.3, material: { color: pal.next }, meta: { role: "jump", opIndex: i, part: "up" } });
+        push({ id: `${oid}/jumpdn`, kind: "link", curve: "hang", from: `${oid}/jump`, to: `d${idx + 1}/bar-in`,
+          r: GEO.wireR * 1.3, material: { color: pal.next }, meta: { role: "jump", opIndex: i, part: "down" } });
+      });
+
       let minX = -1.5, maxX = 1.5, minY = bars.outY, maxY = bars.inY;
       for (const op of c.cmds) {
         minX = Math.min(minX, op.pos.x - op.width / 2); maxX = Math.max(maxX, op.pos.x + op.width / 2);
@@ -723,5 +759,5 @@ function toSceneDoc(flow, { editable = false, activeDeck = 0, tokens = null } = 
   };
 }
 
-    Object.assign(me, { GEO, halfH, opBox, opLabel, scenePalette, SCENE_TOKENS, project, frontOrtho, terminalWorld, wireCurvePoint, toScene, toSceneDoc });
+    Object.assign(me, { GEO, halfH, opBox, opLabel, scenePalette, SCENE_TOKENS, project, frontOrtho, terminalWorld, jumpPoints, wireCurvePoint, toScene, toSceneDoc });
   })();
