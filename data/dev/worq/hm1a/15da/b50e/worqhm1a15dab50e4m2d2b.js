@@ -247,8 +247,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // colours follow the live bench tokens (app:tokens) — the dev app's theme
     const tokens = (n) => getComputedStyle(ME).getPropertyValue(n);
     const sceneDoc = toSceneDoc(focusRoot(), { editable: true, activeDeck, tokens });
-    const selTok = String(tokens("--f-3d") || "").trim();
-    const selColor = /^#[0-9a-f]{3,8}$/i.test(selTok) ? selTok : "#62bd8c";   // = the op halo's colour
+    // selection = the bench accent, read exactly as flownode's halo reads it
+    const selTok = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+    const selColor = /^#[0-9a-f]{3,8}$/i.test(selTok) ? selTok : "#f0a63c";
     const specs = sceneDoc.nodes.map((n) => {
       const s = { ...n, id: "fx_" + n.id };
       if (n.parent !== undefined) s.parent = "fx_" + n.parent;
