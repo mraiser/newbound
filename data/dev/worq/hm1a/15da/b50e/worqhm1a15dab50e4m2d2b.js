@@ -16,6 +16,9 @@
 //   select     — tap a WIRE: its facade link keeps a tap affordance, the
 //                host forwards the unclaimed tap (host.state.onSceneTap) and
 //                the wire highlights; one selection at a time (op XOR wire).
+//                Tap an OP body: flownode.click → host.state.onOpSelect →
+//                selectOp (halo + inspector + "Del deletes" status) — the
+//                same path, so an op is selected exactly like a wire.
 //   delete     — Del/Backspace deletes THE selection: a selected wire unwires
 //                (FlowDoc.removeWire — frees its input, I-1); a selected op is
 //                removed with its wires (FlowDoc.removeOp). The inspector's
@@ -740,7 +743,20 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (selWire != null) { selWire = null; selWireRef = null; renderFacade(); }
     hostApi.setState("selectedKey", `d${activeDeck}_op${i}`);
     refreshInspector();
+    const op = c.cmds[i];
+    status(`op ${op.name || op.type} selected — Del deletes it (and its wires)`, "ok");
     return i;
+  }
+  // a tap on an op BODY: flownode.click hands it here via host.state.onOpSelect
+  // — the op twin of onSceneTap's wire pick, so op selection takes the SAME
+  // path as wire selection (one selection, op XOR wire; inspector + status
+  // follow; Del then deletes it). Mid wiring gesture the tap only moves the
+  // emphasis, as before; a key from another deck never selects op i here.
+  function onOpSelect(p) {
+    const key = p && p.key; if (!key || !hostApi) return null;
+    const m = /^d(\d+)_op(\d+)$/.exec(key);
+    if (armSrc || wireMode || !m || +m[1] !== activeDeck) { hostApi.setState("selectedKey", key); return null; }
+    return selectOp(+m[2]);
   }
   function walkOps(dir) {
     const c = focusedCase(); if (!c || !c.cmds.length) return null;
@@ -1566,6 +1582,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       hostApi.setState("onPortTap", onPortTap);
       // taps no flownode claims (facade wires; null = background) → wire selection
       hostApi.setState("onSceneTap", onSceneTap);
+      // taps on an op BODY (flownode.click) → op selection, the same path as wires
+      hostApi.setState("onOpSelect", onOpSelect);
       hostApi.setState("onOpDrag", (p) => {
         // drag an op body to move it (front-ortho plane, z kept). Undoable.
         // flownode hands ONE payload {phase, key, opIndex, evt, which?, ord?}
@@ -1772,7 +1790,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         picker: () => pickerEl, closePicker, primCount: () => PRIMS.length, families: () => FAMILIES.slice(),
         opAt: (i) => { const c = focusedCase(); return c && c.cmds[i] ? JSON.parse(JSON.stringify(c.cmds[i])) : null; },
         opCount: () => { const c = focusedCase(); return c ? c.cmds.length : 0; },
-        selectWire, selectedWire: () => selWire, sceneTap: onSceneTap, deleteSelectedWire, deleteSelection,
+        selectWire, selectedWire: () => selWire, sceneTap: onSceneTap, opSelect: onOpSelect, deleteSelectedWire, deleteSelection,
         // P5 step 4 surface (op / terminal / signature editor)
         refreshInspector, inspTerm: () => inspTerm,
         editTerm: (key, idx, which, term) => { inspTerm = { key, idx, which, term }; refreshInspector(); },
