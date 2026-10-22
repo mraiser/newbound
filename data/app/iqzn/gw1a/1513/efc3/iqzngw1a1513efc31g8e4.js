@@ -31,6 +31,8 @@
 // api: addControl(lib, ctl, data?, key?) → Promise<instance>,
 //      removeControl(key), children (live array), stage, state/setState,
 //      frameAll(), dispose(), waitReady(cb).
+// hook: state.onSceneTap(specId|null) — set by the host's js to receive taps no
+//      hosted instance claims (its own tappable specs; null = background).
 
 var me = this;
 var ME = document.getElementById(me.UUID);
@@ -415,7 +417,18 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
   function handleTap(specId) {
     const inst = instForSpec(specId);
-    if (!inst || !inst.clickFn) return;
+    if (!inst) {
+      // a tap NO hosted instance claims — a spec the host's own js put on the
+      // stage with a tap affordance (the flow editor's facade wires), or the
+      // background (null) — goes to the host js's opt-in hook
+      // host.state.onSceneTap(specId|null). Unset ⇒ ignored, as before.
+      const hook = me.state && me.state.onSceneTap;
+      if (typeof hook === "function") {
+        try { hook(specId || null); } catch (e) { diag(`onSceneTap: ${e && e.message ? e.message : e}`); }
+      }
+      return;
+    }
+    if (!inst.clickFn) return;
     const nodeId = specId.indexOf(":") < 0 ? specId : specId.slice(specId.indexOf(":") + 1);
     try { inst.clickFn.call(inst.me, inst.ctx, { node: nodeId, specId, key: inst.key }); }
     catch (e) { diag(`${inst.key}.click: ${e && e.message ? e.message : e}`); }
