@@ -13,7 +13,11 @@
 //                tip tracks the pointer; legal input targets preview (I-1/I-2).
 //   keyboard   — W arms wiring from the selection; ←→ cycle the legal targets
 //                (reading order, nearest-first); Enter commits; Esc cancels.
-//   delete     — Del unwires the selected wire (frees its input, I-1).
+//   select     — tap a WIRE: its facade link keeps a tap affordance, the
+//                host forwards the unclaimed tap (host.state.onSceneTap) and
+//                the wire highlights; one selection at a time (op XOR wire).
+//   delete     — Del/Backspace or the inspector's "unwire" button removes the
+//                selected wire (FlowDoc.removeWire — frees its input, I-1).
 //   undo       — ⌘Z runs the mutation's inverse (commitApplied's undo stack).
 //
 // The facade (toSceneDoc) is the rendered picture; the instances are the pick
@@ -119,6 +123,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   let armSrc = null;              // pointer wiring: the armed output { idx, term, key }
   let ghostIds = [];              // facade ghost specs (tip + hang link)
   let selWire = null;             // a selected wire's cons index (for Del)
+  let selWireRef = null;          // ...and the cons OBJECT, so the selection survives re-indexing
 
   // ── P3: authoring + save state ────────────────────────────────────────────
   let dirty = false, saving = false, baseHash = "", pendingLabels = [];
@@ -220,7 +225,15 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     pushJournal("redo " + (cmd.label || ""));
     afterMutation();
   }
-  function afterMutation() { reconcileFocus(); cancelWireGhost(); renderAll(); refreshSaveUi(); renderChanges(); refreshInspector(); }
+  function afterMutation() { reconcileFocus(); reconcileSelWire(); cancelWireGhost(); renderAll(); refreshSaveUi(); renderChanges(); refreshInspector(); }
+  // a mutation can re-index cons (removeWire/removeOp/undo): follow the
+  // selected wire OBJECT to its new index, or drop the selection if it is gone
+  function reconcileSelWire() {
+    if (selWire == null) return;
+    const c = focusedCase();
+    const i = c && selWireRef ? c.cons.indexOf(selWireRef) : -1;
+    if (i >= 0) selWire = i; else { selWire = null; selWireRef = null; }
+  }
 
   function pushJournal(text) {
     const ul = $(".fe-journal-list"); if (!ul) return;
@@ -234,11 +247,24 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // colours follow the live bench tokens (app:tokens) — the dev app's theme
     const tokens = (n) => getComputedStyle(ME).getPropertyValue(n);
     const sceneDoc = toSceneDoc(focusRoot(), { editable: true, activeDeck, tokens });
+    const selTok = String(tokens("--f-3d") || "").trim();
+    const selColor = /^#[0-9a-f]{3,8}$/i.test(selTok) ? selTok : "#62bd8c";   // = the op halo's colour
     const specs = sceneDoc.nodes.map((n) => {
       const s = { ...n, id: "fx_" + n.id };
       if (n.parent !== undefined) s.parent = "fx_" + n.parent;
       if (n.kind === "link") { s.from = "fx_" + n.from; s.to = "fx_" + n.to; }
-      delete s.affordances;                 // facade is scenery; instances are picked
+      delete s.affordances;                 // facade is scenery; instances are picked —
+      // EXCEPT wires: a wire is no instance, so its facade link stays tappable
+      // (the host forwards the tap to onSceneTap → selectWire), and the
+      // selected wire draws in the selection colour, thicker
+      if (n.kind === "link" && n.meta && n.meta.role === "wire") {
+        s.affordances = { tap: true, hover: true };
+        if (selWire != null && n.meta.index === selWire) {
+          s.material = { ...(n.material || {}), color: selColor };
+          s.r = (n.r || 0.035) * 1.8;
+          s.meta = { ...n.meta, selected: true };
+        }
+      }
       s.params = n.params || (n.text ? n.text : undefined);
       return s;
     });
@@ -495,14 +521,54 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     gate(".fe-g-kbd", true, "keyboard wire committed");
   }
 
+  // ── select: a tap on a facade wire (host.state.onSceneTap) ───────────────
+  // The facade wire's spec carries meta {role:"wire", index}; the id is the
+  // fallback (fx_ + slug(`d<deck>/wire/<i>`)) — the headless null stage keeps
+  // no objects, and the id math is the same slug the facade is built with.
+  function wireIndexOfSpec(specId) {
+    if (!specId) return null;
+    const o = stage && stage.objects && stage.objects.get ? stage.objects.get(specId) : null;
+    const m = o && o.spec && o.spec.meta;
+    if (m && m.role === "wire" && typeof m.index === "number") return m.index;
+    const r = /^fx_d(\d+)_wire_(\d+)$/.exec(String(specId));
+    return r && +r[1] === activeDeck ? +r[2] : null;
+  }
+  // select wire i of the focused case (null/absent clears). ONE selection:
+  // a wire selection clears the op selection (and renderInspector drops the
+  // wire when an op is selected after it).
+  function selectWire(i) {
+    const c = focusedCase();
+    if (i == null || !c || !c.cons[i]) {
+      const had = selWire != null;
+      selWire = null; selWireRef = null;
+      if (had) renderFacade();
+      refreshInspector();
+      return null;
+    }
+    selWire = i; selWireRef = c.cons[i];
+    if (hostApi && hostApi.state && hostApi.state.selectedKey) hostApi.setState("selectedKey", null);
+    renderFacade(); renderInspector(null);
+    const w = c.cons[i];
+    status(`wire ${nameOf(c, w.src[0])}.${w.src[1]} → ${nameOf(c, w.dest[0])}.${w.dest[1]} selected — Del unwires`, "ok");
+    return i;
+  }
+  function onSceneTap(specId) {
+    if (armSrc || wireMode) return;            // mid wiring gesture: not a selection
+    const wi = wireIndexOfSpec(specId);
+    if (wi != null) { selectWire(wi); return; }
+    if (specId == null && selWire != null) selectWire(null);   // background tap drops it
+  }
+
   // ── delete: Del unwires the selected wire (frees its input, I-1) ─────────
   function deleteSelectedWire() {
     const c = focusedCase(); if (!c) return;
     if (selWire == null) return status("select a wire first (click it)", "bad");
     const cmd = doc.removeWire(c, selWire);
-    selWire = null;
     if (cmd.error) return status(cmd.error, "bad");
+    // a committed unwire: afterMutation's reconcileSelWire drops the selection
+    // (its wire is gone); a refused one (read-only / mid-run) keeps it
     if (!commitApplied(cmd)) return;
+    selWire = null; selWireRef = null;
     status("unwired — ⌘Z undoes", "ok");
   }
 
@@ -736,10 +802,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
   function renderInspector(key) {
     const body = $(".fe-inspect-body"); if (!body) return;
+    // ONE selection: selecting a wire clears selectedKey, so a key alongside
+    // a wire means an op was selected AFTER it — the op wins
+    if (selWire != null && key) { selWire = null; selWireRef = null; renderFacade(); }
     if (selWire != null) {
-      const c = focusedCase(); const w = c.cons[selWire];
-      body.innerHTML = w ? `<p><b>wire</b> ${nameOf(c, w.src[0])}.${w.src[1]} → ${nameOf(c, w.dest[0])}.${w.dest[1]}</p>` +
-        `<p class="fe-empty"><kbd>Del</kbd> unwires · click a palette op to <b>splice</b> it into this wire</p>` : "";
+      const c = focusedCase(); const w = c && c.cons[selWire];
+      if (!w) { selWire = null; selWireRef = null; body.innerHTML = ""; return; }
+      body.innerHTML = `<p class="fe-ed-head"><b>wire</b> ${esc(nameOf(c, w.src[0]))}.${esc(w.src[1])} → ${esc(nameOf(c, w.dest[0]))}.${esc(w.dest[1])}</p>` +
+        `<p class="fe-empty"><kbd>Del</kbd> unwires · click a palette op to <b>splice</b> it into this wire</p>`;
+      const btns = edBtns(body);
+      edButton(btns, "unwire", "fe-del fe-unwire danger", deleteSelectedWire);
       return;
     }
     const m = key && /^d(\d+)_op(\d+)$/.exec(key);
@@ -1477,6 +1549,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
       // wire the flownode behavior hooks into the editor (shared host state)
       hostApi.setState("onPortTap", onPortTap);
+      // taps no flownode claims (facade wires; null = background) → wire selection
+      hostApi.setState("onSceneTap", onSceneTap);
       hostApi.setState("onOpDrag", (p) => {
         // drag an op body to move it (front-ortho plane, z kept). Undoable.
         // flownode hands ONE payload {phase, key, opIndex, evt, which?, ord?}
@@ -1662,7 +1736,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         picker: () => pickerEl, closePicker, primCount: () => PRIMS.length, families: () => FAMILIES.slice(),
         opAt: (i) => { const c = focusedCase(); return c && c.cmds[i] ? JSON.parse(JSON.stringify(c.cmds[i])) : null; },
         opCount: () => { const c = focusedCase(); return c ? c.cmds.length : 0; },
-        selectWire: (i) => { selWire = i; renderInspector(null); },
+        selectWire, selectedWire: () => selWire, sceneTap: onSceneTap, deleteSelectedWire,
         // P5 step 4 surface (op / terminal / signature editor)
         refreshInspector, inspTerm: () => inspTerm,
         editTerm: (key, idx, which, term) => { inspTerm = { key, idx, which, term }; refreshInspector(); },
