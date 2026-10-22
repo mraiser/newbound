@@ -41,7 +41,7 @@ var ME = document.getElementById(me.UUID);
 
 var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   const { parse: parseFlow, propagationRounds, diffFlow } = document.querySelector('[data-control="dev:flowdoc"]').api;
-  const { toSceneDoc, terminalWorld, GEO } = document.querySelector('[data-control="dev:flowproject"]').api;
+  const { toSceneDoc, terminalWorld, jumpPoints, GEO } = document.querySelector('[data-control="dev:flowproject"]').api;
   const { tidy, untangle } = document.querySelector('[data-control="dev:flowlayout"]').api;
 
   // ── backend plumbing (same ajax idiom as floweditor3d) ────────────────────
@@ -1354,9 +1354,11 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
   // ── init ──────────────────────────────────────────────────────────────────
   // ── P4: run tokens — deliveries ride a flowtoken BEHAVIOR on the host ─────
-  // The schedule is local and pure (design §3.5 — the platform returns only
-  // the result): flowdoc.propagationRounds gives the focused case's firing
-  // order. One dev:flowtoken instance per wire is addControl'd into the
+  // The schedule is local and pure (design §3.5 — the platform returns no
+  // per-wire values): flowdoc.propagationRounds gives each case's firing
+  // order. Which CASES a live run went through is the server's to say
+  // (dev.code.trace_flow); see the case-path section below. One dev:flowtoken
+  // instance per wire is addControl'd into the
   // scenehost, seeded with its round; ONE shared clock (host.state.run.t0)
   // starts them together, so the token behaviors deliver round by round and
   // report via host.state.onTokenDelivered. The editor schedules and audits;
@@ -1365,60 +1367,174 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   function wireEnd(c, end, which) {
     return terminalWorld(c, end[0], which, end[1]) || terminalWorld(c, end[0], which === "out" ? "in" : "out", end[1]) || null;
   }
-  async function runFlow() {
-    if (running || !hostApi) return null;
-    const c = focusedCase(); if (!c) return null;
-    const { rounds, unreached } = propagationRounds(c);
-    if (!rounds.length) { status("nothing to run — no wire can fire", "bad"); return null; }
-    if (armSrc || wireMode) { cancelWireGhost(); }
-    running = true;
-    const runBtn = $(".fe-run"); if (runBtn) { runBtn.disabled = true; runBtn.classList.add("running"); runBtn.textContent = "running…"; }
-    const runId = ++runSeq;
-    const reduced = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const dur = reduced ? 0.34 : 0.42;
-    const expected = rounds.reduce((n, r) => n + r.length, 0);
+  // ── the run's CASE PATH (a `next` rule moves the run to the next case) ────
+  // A run is a list of SEGMENTS, one per case it executes, root first:
+  // {deck, end, stopAt, inferred}. end is how that case ended — next (the
+  // jump rides the pipe into the next deck), done, terminate, fail; stopAt is
+  // the op whose rule ended it (its schedule is cut there). A LIVE run's path
+  // is the server's (dev.code.trace_flow runs the real interpreter case by
+  // case); the interpreter does not say WHICH op's rule fired, so it is the
+  // first op carrying that rule in evaluation order — exact when the case has
+  // one such rule, marked `inferred` when it has more. A DRY run (no source)
+  // has no values: it assumes every op succeeds, so a non-match op's rule
+  // fires when its value is true; a match op's rule is unknown (noted, not
+  // taken).
+  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+  const frames = (n) => new Promise((res) => { const step = () => (n-- <= 0 ? res() : requestAnimationFrame(step)); step(); });
+  function ruleOp(c, rule) {
+    const cands = c.cmds.map((op, i) => (op && op.type !== "constant" && op.condition && op.condition.rule === rule ? i : -1)).filter((i) => i >= 0);
+    if (!cands.length) return null;
+    const order = propagationRounds(c).order || [];
+    const first = order.find((i) => cands.includes(i));
+    return { opIndex: first !== undefined ? first : cands[0], inferred: cands.length > 1 };
+  }
+  function livePlan(path) {
+    const chain = caseChain(focusRoot());
+    const segments = [];
+    for (const step of path || []) {
+      if (!chain[step.case]) break;            // the saved body outran the working one
+      const seg = { deck: step.case, end: step.end, ms: step.ms, stopAt: null, inferred: false };
+      if (step.end === "next" || step.end === "terminate" || step.end === "fail") {
+        const r = ruleOp(chain[step.case], step.end);
+        if (r) { seg.stopAt = r.opIndex; seg.inferred = r.inferred; }
+      }
+      segments.push(seg);
+    }
+    return { mode: "live", segments, notes: [] };
+  }
+  function dryPlan() {
+    const chain = caseChain(focusRoot());
+    const segments = [], notes = [];
+    for (let d = activeDeck; d < chain.length; d++) {
+      const c = chain[d];
+      const seg = { deck: d, end: "done", stopAt: null, inferred: false };
+      for (const i of propagationRounds(c).order || []) {
+        const op = c.cmds[i]; const cond = op && op.type !== "constant" && op.condition;
+        if (!cond || !["next", "terminate", "fail"].includes(cond.rule)) continue;
+        if (op.type === "match") { notes.push(`case ${d + 1}: ${nameOf(c, i)}'s ${cond.rule} rule depends on values — a live run follows it`); continue; }
+        if (cond.value === true) { seg.end = cond.rule; seg.stopAt = i; break; }
+      }
+      segments.push(seg);
+      if (seg.end !== "next") break;
+      if (!chain[d + 1]) { seg.end = "next-missing"; notes.push(`case ${d + 1}: a next rule fires but there is no next case (I-4)`); break; }
+    }
+    return { mode: "dry", segments, notes };
+  }
+  // the jump pipe's two legs for op i of the focused case (flowproject.toScene
+  // draws them): rise tab → bead (that link hangs FROM the bead, so it is
+  // ridden in reverse), then dive bead → the next case's input bar
+  function jumpLegs(c, i) {
+    const jp = jumpPoints(c, i, caseChain(focusRoot())[activeDeck + 1]);
+    const id = (sfx) => "fx_" + slug(`d${activeDeck}/op/${i}/${sfx}`);
+    return [
+      { wire: id("jumpup"), from: jp.bead, to: jp.tab, reverse: true },
+      { wire: id("jumpdn"), from: jp.bead, to: jp.entry },
+    ];
+  }
+  // animate ONE case: its wires round by round (sched is already cut at the
+  // rule's op), then the jump legs as two more rounds — on its own clock id.
+  async function animateSegment(c, sched, jumpOp, dur, reduced) {
+    const rid = ++runSeq;
+    const { rounds, unreached } = sched;
+    const legs = jumpOp == null ? [] : jumpLegs(c, jumpOp);
+    const expected = rounds.reduce((n, r) => n + r.length, 0) + legs.length;
+    const started = performance.now();
     const delivered = [], keys = [];
+    if (!expected) {                           // nothing travels: let the case be seen
+      await sleep(reduced ? 150 : 400);
+      return Object.assign(auditRun(rid, rounds, unreached, [], true, Math.round(performance.now() - started)), { skipped: sched.skipped || [], jumped: false, tokensHosted: 0 });
+    }
     let finish; const allDone = new Promise((res) => { finish = res; });
-    hostApi.setState("run", { id: runId, t0: null });
+    hostApi.setState("run", { id: rid, t0: null });
     hostApi.setState("onTokenDelivered", (ev) => {
-      if (!ev || ev.runId !== runId) return;
+      if (!ev || ev.runId !== rid) return;
       delivered.push({ k: ev.k, round: ev.round });
       if (delivered.length >= expected) finish(true);
     });
-    const started = performance.now();
     try {
       for (let r = 0; r < rounds.length; r++) {
         for (const k of rounds[r]) {
           const w = c.cons[k]; if (!w) continue;
-          const key = `run${runId}_w${k}`;
+          const key = `run${rid}_w${k}`;
           await hostApi.addControl("dev", "flowtoken", {
-            runId, k, round: r, dur, reduced,
+            runId: rid, k, round: r, dur, reduced,
             wire: "fx_" + slug(`d${activeDeck}/wire/${k}`),
             from: wireEnd(c, w.src, "out"), to: wireEnd(c, w.dest, "in"),
           }, key);
           keys.push(key);
         }
       }
+      for (let j = 0; j < legs.length; j++) {
+        const key = `run${rid}_j${j}`;
+        await hostApi.addControl("dev", "flowtoken", Object.assign({ runId: rid, k: "jump" + j, round: rounds.length + j, dur, reduced }, legs[j]), key);
+        keys.push(key);
+      }
       // every token is booted — start the ONE clock they all ride
-      hostApi.setState("run", { id: runId, t0: performance.now() });
-      const budget = (rounds.length * dur + 3) * 1000;
+      hostApi.setState("run", { id: rid, t0: performance.now() });
+      const budget = ((rounds.length + legs.length) * dur + 3) * 1000;
       const complete = await Promise.race([allDone, new Promise((res) => setTimeout(() => res(false), budget))]);
-      lastRun = auditRun(runId, rounds, unreached, delivered, !!complete, Math.round(performance.now() - started));
-    } catch (e) {
-      lastRun = { runId, error: String(e && e.message ? e.message : e), rounds, unreached, delivered: delivered.slice(), order: delivered.map((d) => d.k), complete: false, inOrder: false, ms: null };
+      const wires = delivered.filter((d) => typeof d.k === "number");
+      const A = auditRun(rid, rounds, unreached, wires, !!complete, Math.round(performance.now() - started));
+      A.skipped = sched.skipped || [];
+      A.jumped = legs.length > 0 && delivered.length - wires.length === legs.length;
+      A.tokensHosted = keys.length;
+      return A;
     } finally {
       for (const key of keys) { try { hostApi.removeControl(key); } catch (e) {} }
       hostApi.setState("run", null);
       hostApi.setState("onTokenDelivered", null);
+    }
+  }
+  const pathText = (segs) => segs.map((s) => `case ${s.deck + 1}`).join(" → ")
+    + ({ terminate: " (terminated)", fail: " (failed)", panic: " (panicked)", "next-missing": " (next with no next case, I-4)" }[segs.length ? segs[segs.length - 1].end : ""] || "");
+  async function runFlow(plan) {
+    if (running || !hostApi) return null;
+    plan = plan || dryPlan();
+    if (!plan.segments.length) { status("nothing to run", "bad"); return null; }
+    if (armSrc || wireMode) { cancelWireGhost(); }
+    running = true;
+    const runBtn = $(".fe-run"); if (runBtn) { runBtn.disabled = true; runBtn.classList.add("running"); runBtn.textContent = "running…"; }
+    const reduced = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const dur = reduced ? 0.34 : 0.42;
+    const started = performance.now();
+    const segments = [];
+    let error = null;
+    try {
+      for (const seg of plan.segments) {
+        if (seg.deck !== activeDeck) {         // follow the run into the case it moved to
+          setActiveDeck(seg.deck);
+          await frames(2);                     // the new facade's links resolve their ends
+          await sleep(reduced ? 120 : 300);
+        }
+        const c = focusedCase(); if (!c) break;
+        const sched = propagationRounds(c, seg.stopAt != null ? { stopAt: seg.stopAt } : {});
+        const jumpOp = seg.end === "next" && seg.stopAt != null && caseChain(focusRoot())[seg.deck + 1] ? seg.stopAt : null;
+        const A = await animateSegment(c, sched, jumpOp, dur, reduced);
+        segments.push(Object.assign({}, seg, A));
+      }
+    } catch (e) {
+      error = String(e && e.message ? e.message : e);
+    } finally {
       running = false;
       if (runBtn) { runBtn.disabled = false; runBtn.classList.remove("running"); runBtn.textContent = "run ▸"; }
     }
-    const R = lastRun;
-    R.tokensHosted = keys.length;
-    pushJournal(`run · ${R.delivered.length}/${expected} deliveries · ${rounds.length} round${rounds.length === 1 ? "" : "s"}` + (unreached.length ? ` · ${unreached.length} unreached` : ""));
-    if (R.complete && R.inOrder) status(`ran · ${expected} deliveries in ${rounds.length} rounds · ${R.ms}ms`, "ok");
-    else status(R.error ? "run failed: " + R.error : `run incomplete · ${R.delivered.length}/${expected} delivered`, "bad");
-    gate(".fe-g-run", !!(R.complete && R.inOrder), R.complete ? `${expected} deliveries, ${rounds.length} rounds, in order` : "incomplete");
+    const R = lastRun = {
+      mode: plan.mode, segments, notes: plan.notes || [], untraced: plan.untraced || null, error,
+      path: segments.map((s) => ({ deck: s.deck, end: s.end, stopAt: s.stopAt, inferred: s.inferred, jumped: !!s.jumped })),
+      rounds: [].concat(...segments.map((s) => s.rounds)),
+      unreached: [].concat(...segments.map((s) => s.unreached)),
+      delivered: [].concat(...segments.map((s) => s.delivered)),
+      complete: !error && segments.length === plan.segments.length && segments.every((s) => s.complete),
+      inOrder: !error && segments.length > 0 && segments.every((s) => s.inOrder),
+      ms: Math.round(performance.now() - started),
+    };
+    R.tokensHosted = segments.reduce((n, s) => n + (s.tokensHosted || 0), 0);
+    const n = R.delivered.length, deliveries = `${n} deliver${n === 1 ? "y" : "ies"}`;
+    pushJournal(`${plan.mode === "dry" ? "dry run" : "run"} · ${pathText(segments)} · ${deliveries}` + (R.unreached.length ? ` · ${R.unreached.length} unreached` : ""));
+    if (error) status("run failed: " + error, "bad");
+    else if (R.complete && R.inOrder) status(`${plan.mode === "dry" ? "dry run" : "ran"} · ${pathText(segments)} · ${deliveries} · ${R.ms}ms`, "ok");
+    else status(`run incomplete · ${n} delivered`, "bad");
+    gate(".fe-g-run", !!(R.complete && R.inOrder), R.complete ? `${deliveries}, ${R.rounds.length} rounds, ${pathText(segments)}, in order` : "incomplete");
     renderRunInspector(R);
     return R;
   }
@@ -1433,12 +1549,28 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     return { runId, rounds, unreached, delivered, order, complete, inOrder: once && monotone && ownRound, ms };
   }
   function runRoundsHtml(R) {
-    const c = focusedCase();
-    const wl = (k) => { const w = c && c.cons[k]; return esc(w ? `${nameOf(c, w.src[0])}.${w.src[1]} → ${nameOf(c, w.dest[0])}.${w.dest[1]}` : `wire ${k}`); };
-    let h = `<p><b>run</b> <span class="lbl">${R.complete && R.inOrder ? "delivered in propagation order" : "incomplete"}${R.ms != null ? ` · ${R.ms}ms` : ""}</span></p><ul class="fe-run-list">`;
-    R.rounds.forEach((round, r) => { h += `<li><span class="rd">${r + 1}</span>${round.map(wl).join(" · ")}</li>`; });
-    h += `</ul>`;
-    if (R.unreached.length) h += `<p class="fe-empty">never fires (I-1/I-2): ${R.unreached.map(wl).join(" · ")}</p>`;
+    const chain = caseChain(focusRoot());
+    const wl = (c, k) => { const w = c && c.cons[k]; return esc(w ? `${nameOf(c, w.src[0])}.${w.src[1]} → ${nameOf(c, w.dest[0])}.${w.dest[1]}` : `wire ${k}`); };
+    const segs = R.segments && R.segments.length ? R.segments
+      : [{ deck: activeDeck, end: "done", stopAt: null, rounds: R.rounds || [], unreached: R.unreached || [] }];
+    const lbl = R.complete && R.inOrder ? (segs.length > 1 || segs[0].end !== "done" ? esc(pathText(segs)) : "delivered in propagation order") : "incomplete";
+    let h = `<p><b>${R.mode === "dry" ? "dry run" : "run"}</b> <span class="lbl">${lbl}${R.ms != null ? ` · ${R.ms}ms` : ""}</span></p>`;
+    segs.forEach((s) => {
+      const c = chain[s.deck];
+      if (segs.length > 1 || s.end !== "done") {
+        const at = s.stopAt != null ? esc(nameOf(c, s.stopAt)) + (s.inferred ? " (inferred: this case has more than one such rule)" : "") : "?";
+        const how = { done: "done", next: `next at ${at} → case ${s.deck + 2}`, terminate: `terminated at ${at}`, fail: `failed at ${at}`,
+          panic: "panicked", "next-missing": `next at ${at}, but there is no next case (I-4)` }[s.end] || esc(s.end);
+        h += `<p class="fe-run-case"><b>case ${s.deck + 1}</b> <span class="lbl">${how}</span></p>`;
+      }
+      h += `<ul class="fe-run-list">`;
+      (s.rounds || []).forEach((round, r) => { h += `<li><span class="rd">${r + 1}</span>${round.map((k) => wl(c, k)).join(" · ")}</li>`; });
+      if (s.jumped) h += `<li><span class="rd">↳</span>jump pipe → case ${s.deck + 2}</li>`;
+      h += `</ul>`;
+      if (s.unreached && s.unreached.length) h += `<p class="fe-empty">never fires (I-1/I-2): ${s.unreached.map((k) => wl(c, k)).join(" · ")}</p>`;
+    });
+    if (R.untraced) h += `<p class="fe-empty">no case path (${esc(R.untraced)}): showing case 1's schedule only</p>`;
+    for (const note of R.notes || []) h += `<p class="fe-empty">${esc(note)}</p>`;
     return h;
   }
   function renderRunInspector(R) {
@@ -1450,12 +1582,13 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // Ported from floweditor3d's openRunPicker/doRun/inspectRunResult. When the
   // editor has a source (and is not the harness), the run button or R key
   // opens an args form over the params bar (doc.root.input, coerced by bar
-  // type; no params means run at once). invoke runs the SAVED command
-  // CONCURRENTLY with the flowtoken run: the animation never blocks or fails
-  // the result. The payload (status/pid stripped) goes to the inspector with
-  // an args sentence. Tokens animate only on the root case's first deck,
-  // because that is where the server starts. The harness keeps the
-  // token-only run.
+  // type; no params means run at once). The run is ONE execution of the SAVED
+  // command via dev.code.trace_flow, which also reports the case path; the
+  // flowtoken animation then REPLAYS that path from the root case's first
+  // deck — following each `next` along its jump pipe into the next case —
+  // and never blocks or fails the result. The payload (status/pid stripped)
+  // goes to the inspector with an args sentence. The harness keeps the
+  // token-only (dry) run.
   let lastResult = null, liveCall = false;
   function coerceArg(raw, type) {
     const t = (type || "").toLowerCase();
@@ -1513,26 +1646,40 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     busy();
     status(`running ${src.cmd}…`);
     const started = performance.now();
-    const resP = invokeP(src.lib, src.ctl, src.cmd, args)
-      .then((r) => r || { status: "err", msg: "no response" }, (e) => ({ status: "err", msg: String(e && e.message ? e.message : e) }));
-    let R = null;
-    // animate while the call flies (never block or fail the result on it)
-    if (focusPath.length === 1 && activeDeck === 0) {
-      try { R = await runFlow(); } catch (e) { R = null; }
-      busy();   // runFlow restores the button; the call may still be in flight
+    const settle = (p) => p.then((r) => r || { status: "err", msg: "no response" }, (e) => ({ status: "err", msg: String(e && e.message ? e.message : e) }));
+    // ONE execution that also reports the case path: dev.code.trace_flow runs
+    // the saved command through the real interpreter, case by case. Only when
+    // the trace command itself is unavailable (a host that predates it — dev
+    // does not hot-swap — or no access) is the plain run made instead, with no
+    // path; trace_flow's other errors arrive before anything ran or ARE the
+    // run's result, so they are shown as-is — never a second execution.
+    const t = await settle(invokeP("dev", "code", "trace_flow", { lib: src.lib, ctl: src.ctl, cmd: src.cmd, args, nn_sessionid: "" }));
+    let r, path = null, untraced = null;
+    if (t.status === "ok" && t.result) { r = t.result; path = t.path || []; }
+    else if (/no such command|unauthorized|not found/i.test(String(t.msg || ""))) {
+      untraced = String(t.msg || "trace unavailable").slice(0, 120);
+      r = await settle(invokeP(src.lib, src.ctl, src.cmd, args));
     }
-    const r = await resP;
+    else r = t;
     const ms = Math.round(performance.now() - started);
+    // replay the run from the ROOT case's first deck, where the server starts
+    let R = null;
+    if (focusPath.length === 1 && (path || untraced)) {
+      const plan = path ? livePlan(path)
+        : { mode: "live", segments: [{ deck: 0, end: "done", stopAt: null, inferred: false }], notes: [], untraced };
+      try { R = await runFlow(plan); } catch (e) { R = null; }
+    }
     liveCall = false;
     if (runBtn) { runBtn.disabled = false; runBtn.classList.remove("running"); runBtn.textContent = "run ▸"; }
     const ok = r.status === "ok";
     // a server panic arrives as an HTML 500 page in msg; show its words
     const rawMsg = String(r.msg == null ? "" : r.msg);
     const msg = /^\s*</.test(rawMsg) ? rawMsg.replace(/<title>[\s\S]*?<\/title>/i, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : rawMsg;
-    lastResult = { args, ok, result: r, msg, ms, unsaved, source: src,
+    lastResult = { args, ok, result: r, msg, ms, unsaved, source: src, path, untraced,
       tokens: R ? { complete: !!R.complete, inOrder: !!R.inOrder, delivered: R.delivered.length } : null };
-    pushJournal(ok ? `ran ${src.cmd} · ${ms}ms` : `run failed: ${msg}`);
-    if (ok) status(`ran · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} ${R.delivered.length === 1 ? "delivery" : "deliveries"} in order` : ""), "ok");
+    const via = R && R.segments && R.segments.length ? ` · ${pathText(R.segments)}` : "";
+    pushJournal(ok ? `ran ${src.cmd}${via} · ${ms}ms` : `run failed: ${msg}`);
+    if (ok) status(`ran${via} · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} ${R.delivered.length === 1 ? "delivery" : "deliveries"} in order` : ""), "ok");
     else status(`run failed: ${msg}`, "bad");
     renderRunResult(lastResult, R);
     return lastResult;
@@ -1915,7 +2062,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         runFlow, lastRun: () => lastRun, running: () => running,
         // P5 run parity surface
         startRun, runLive, lastResult: () => lastResult, liveCall: () => liveCall, coerceArg,
-        rounds: () => propagationRounds(focusedCase()),
+        rounds: () => propagationRounds(focusedCase()), dryPlan, livePlan,
         changes: () => renderChanges(), refreshJournal, journalRows: () => journalRows,
         toggleJournalDiff, revertTo: (i) => journalRows[i] ? revertTo(journalRows[i]) : null,
         tokens: () => hostApi.children.filter((ch) => ch.ctl === "flowtoken").length,
