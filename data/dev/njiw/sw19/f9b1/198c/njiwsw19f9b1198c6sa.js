@@ -28,6 +28,10 @@ const GEO = {
   // shell's top edge and roots its bottom edge (±opH/2) for every kind. The
   // icon is nearly as deep as it is tall: a block, not a card.
   opH: 0.5, opD: 0.42, rim: 0.035,
+  // sockets sit on the block's FRONT edges (z = opD/2), straddling the top
+  // (terminals) and bottom (roots) edge of the face: at mid-depth a deep
+  // block hides its bottom sockets from any raised camera
+  sockZ: 0.21,
   inlay: 0.014,          // depth of face-mounted marks (primitive posts, local frame)
   barH: 0.16,            // input/output bars: strips spanning the case, sockets on the inner edge
   ctlS: 0.3,             // a condition's control tab, set at the op's right end
@@ -84,14 +88,14 @@ const opMaterial = (op) =>
 /** World position of a terminal socket. idx: op index, or -1 (input bar) /
     -2 (output bar). which: "in" | "out". Returns {x,y,z} or null. */
 function terminalPos(c, idx, which, term, bars, deckZ) {
-  if (idx === -1) { const n = c.input[term]; return n ? { x: n.x, y: bars.inSockY, z: deckZ } : null; }
-  if (idx === -2) { const n = c.output[term]; return n ? { x: n.x, y: bars.outSockY, z: deckZ } : null; }
+  if (idx === -1) { const n = c.input[term]; return n ? { x: n.x, y: bars.inSockY, z: deckZ + GEO.sockZ } : null; }
+  if (idx === -2) { const n = c.output[term]; return n ? { x: n.x, y: bars.outSockY, z: deckZ + GEO.sockZ } : null; }
   const op = c.cmds[idx];
   if (!op) return null;
   const node = which === "in" ? op.in[term] : op.out[term];
   if (!node) return null;
   const h = halfH(op.type);
-  return { x: op.pos.x + (node.x || 0), y: op.pos.y + (which === "in" ? h : -h), z: op.pos.z + deckZ };
+  return { x: op.pos.x + (node.x || 0), y: op.pos.y + (which === "in" ? h : -h), z: op.pos.z + deckZ + GEO.sockZ };
 }
 
 function barGeometry(c) {
@@ -348,13 +352,18 @@ function wireCurvePoint(from, to, t) {
 // tracks, with that token's v1 value as the fallback. The module stays pure
 // — a DOM-side caller passes opts.tokens = (name) => value to follow the
 // live tokens; without it the v1 values (the dark bench) apply.
+// The scene is LIT: measured on the default stage lights, a front face
+// renders at about ½ its colour and a top face at about ⅔ — so each surface
+// role names the token one step lighter than where it should land on screen
+// (faces land near --panel-3, the plate near --panel, above --ground).
 const SCENE_TOKENS = {
-  face: ["--panel-3", "#2d343c"],      // the icon face
+  face: ["--text-faint", "#5c6672"],   // the icon face
+  undefFace: ["--panel-3", "#2d343c"], // an undefined op: an empty slot
   rim: ["--text-dim", "#8a94a0"],      // the shell — the icon's outline
   ink: ["--text", "#d8dee6"],          // kind marks, sockets
   faint: ["--text-faint", "#5c6672"],  // an undefined op's outline
-  plate: ["--panel", "#1f242a"],       // the case window
-  plateRim: ["--line", "#333b44"],
+  plate: ["--line", "#333b44"],        // the case window
+  plateRim: ["--text-faint", "#5c6672"],
   wire: ["--text-dim", "#8a94a0"],
   ghost: ["--panel-3", "#2d343c"],     // background decks
   shadow: ["--ground", "#171a1e"],
@@ -428,12 +437,12 @@ function opSceneNode(op, i, deckId, prefix, active, editable, push, pal, plateZ)
   }
   const undef = op.type === "undefined";
   slab("ink", W, H, D - 0.04, O, lit(undef ? pal.faint : pal.rim), oval);
-  slab("face", fw, fh, D, O, lit(pal.face), oval);
+  slab("face", fw, fh, D, O, lit(undef ? pal.undefFace : pal.face), oval);
   if (typeof plateZ === "number") {
     // the offset shadow on the case-window plate — a child of the op, so it
     // rides a drag; the offset grows with the op's standoff from the plate
     const o = GEO.shadow * Math.max(0, z0 - plateZ);
-    slab("shadow", W, H, 0.004, { x: o, y: -o, z: plateZ - z0 + 0.012 }, lit(pal.shadow, { opacity: 0.6 }), oval);
+    slab("shadow", W, H, 0.004, { x: o, y: -o, z: plateZ - z0 + 0.012 }, lit(pal.shadow, { opacity: 0.75 }), oval);
   }
   let labelY = 0;
   const inlay = (sfx, x, y, sx, sy) => {        // a mark set on the face, front AND back
@@ -447,12 +456,12 @@ function opSceneNode(op, i, deckId, prefix, active, editable, push, pal, plateZ)
       inlay("postr", px, 0, 0.03, fh);
       break;
     }
-    case "constant":               // nothing comes in: a solid LID
-      part("lid", "box", { x: 0, y: h - 0.055, z: 0 }, { size: { x: W, y: 0.11, z: D + 0.004 } }, lit(pal.ink));
+    case "constant":               // nothing comes in: a solid LID (proud of the shell, no z-fight)
+      part("lid", "box", { x: 0, y: h - 0.052, z: 0 }, { size: { x: W + 0.004, y: 0.116, z: D + 0.004 } }, lit(pal.ink));
       labelY = -0.04;
       break;
     case "match":                  // nothing goes out: a solid SILL
-      part("sill", "box", { x: 0, y: -h + 0.055, z: 0 }, { size: { x: W, y: 0.11, z: D + 0.004 } }, lit(pal.ink));
+      part("sill", "box", { x: 0, y: -h + 0.052, z: 0 }, { size: { x: W + 0.004, y: 0.116, z: D + 0.004 } }, lit(pal.ink));
       labelY = 0.04;
       break;
     case "local": {                // a case lives inside: a DOUBLE outline
@@ -473,8 +482,9 @@ function opSceneNode(op, i, deckId, prefix, active, editable, push, pal, plateZ)
   if (op.condition && op.condition.rule) {
     const s = GEO.ctlS, tx = W / 2 + 0.05 + s / 2;
     part("ctl", "box", { x: tx, y: 0, z: 0 }, { size: { x: s, y: s, z: D - 0.04 } }, lit(pal.rim));
+    // the tab's face is unlit so the rule colour reads true at any angle
     part("ctlface", "box", { x: tx, y: 0, z: 0 }, { size: { x: s - 2 * r, y: s - 2 * r, z: D } },
-      lit(pal[op.condition.rule] || pal.terminate));
+      { color: pal[op.condition.rule] || pal.terminate, emissive: true });
     push({ id: `${id}/flag`, parent: id, kind: "text",
       pos: { x: tx, y: 0, z: D / 2 + 0.02 },
       text: { text: op.condition.value ? "✓" : "✗", size: 0.85 },
@@ -573,7 +583,7 @@ function toScene(rootCase, opts = {}) {
       push({ id: `${bid}/shadow`, parent: bid, kind: "box",
         pos: { x: o, y: -o, z: plateZ + 0.012 },
         params: { size: { x: bars.len, y: GEO.barH, z: 0.004 } },
-        material: { color: pal.shadow, flat: true, opacity: 0.6 },
+        material: { color: pal.shadow, flat: true, opacity: 0.75 },
         meta: { role: "shadow" } });
     };
     rail("in", bars.inY);
@@ -584,19 +594,19 @@ function toScene(rootCase, opts = {}) {
       if (!active) return;
       const opId = `${prefix}/op/${i}`;
       for (const [term, n] of Object.entries(op.in))
-        pushSocket(push, `${opId}/in/${term}`, opId, { x: n.x || 0, y: h, z: 0 }, n, editable,
+        pushSocket(push, `${opId}/in/${term}`, opId, { x: n.x || 0, y: h, z: GEO.sockZ }, n, editable,
           { role: "terminal", idx: i, which: "in", term }, pal);
       for (const [term, n] of Object.entries(op.out))
-        pushSocket(push, `${opId}/out/${term}`, opId, { x: n.x || 0, y: -h, z: 0 }, n, editable,
+        pushSocket(push, `${opId}/out/${term}`, opId, { x: n.x || 0, y: -h, z: GEO.sockZ }, n, editable,
           { role: "terminal", idx: i, which: "out", term }, pal);
     });
 
     if (active) {
       for (const [term, n] of Object.entries(c.input))
-        pushSocket(push, `${prefix}/bt-in/${term}`, deckId, { x: n.x || 0, y: bars.inSockY, z: 0 }, n, editable,
+        pushSocket(push, `${prefix}/bt-in/${term}`, deckId, { x: n.x || 0, y: bars.inSockY, z: GEO.sockZ }, n, editable,
           { role: "terminal", idx: -1, which: "out", term }, pal);
       for (const [term, n] of Object.entries(c.output))
-        pushSocket(push, `${prefix}/bt-out/${term}`, deckId, { x: n.x || 0, y: bars.outSockY, z: 0 }, n, editable,
+        pushSocket(push, `${prefix}/bt-out/${term}`, deckId, { x: n.x || 0, y: bars.outSockY, z: GEO.sockZ }, n, editable,
           { role: "terminal", idx: -2, which: "in", term }, pal);
 
       // wires: hang links BETWEEN SOCKET NODES — endpoint tracking is the
