@@ -644,7 +644,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   function drillTo(k) { focusPath = focusPath.slice(0, k + 1); activeDeck = 0; cancelWireGhost(); renderAll(); }
   function drillBack() { if (focusPath.length > 1) { focusPath.pop(); activeDeck = 0; cancelWireGhost(); renderAll(); } }
-  function clearSelection() { if (hostApi) hostApi.setState("selectedKey", null); selWire = null; renderInspector(null); }
+  function clearSelection() { if (hostApi) hostApi.setState("selectedKey", null); const had = selWire != null; selWire = null; selWireRef = null; if (had) renderFacade(); renderInspector(null); }
 
   function setProj(mode) {
     projMode = mode;
@@ -725,7 +725,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   function selectedOpIndex() { const k = hostApi && hostApi.state ? hostApi.state.selectedKey : null; const m = k && /^d(\d+)_op(\d+)$/.exec(k); return m && +m[1] === activeDeck ? +m[2] : null; }
   function selectOp(i) {
     const c = focusedCase(); if (!c || !c.cmds[i] || !hostApi) return null;
-    selWire = null; hostApi.setState("selectedKey", `d${activeDeck}_op${i}`);
+    if (selWire != null) { selWire = null; selWireRef = null; renderFacade(); }
+    hostApi.setState("selectedKey", `d${activeDeck}_op${i}`);
     refreshInspector();
     return i;
   }
@@ -1611,6 +1612,27 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         renderInspector(sk);
       })();
       hostEl.addEventListener("click", () => renderInspector(hostApi.state.selectedKey));
+      // a BACKGROUND tap drops a wire selection. The GL stage emits no tap for
+      // empty space (a press there is an orbit gesture), so the editor reads
+      // it here: a press inside the canvas box over NOTHING pickable, released
+      // without travelling (not an orbit/pan). "Nothing" is judged at
+      // pointerdown — the stage's own orbit-vs-node moment — never at click:
+      // by then a tap may have rebuilt the facade (selectWire → setScene), and
+      // a rebuilt wire has no tube until the next frame re-resolves its ends.
+      let bgDown = null;
+      hostEl.addEventListener("pointerdown", (e) => {
+        bgDown = null;
+        if (!stage || !stage.pickAt || !stage.canvas) return;
+        const box = stage.canvas.parentElement;
+        if (!box || !box.contains(e.target)) return;
+        if (stage.pickAt(e.clientX, e.clientY) == null) bgDown = { x: e.clientX, y: e.clientY };
+      });
+      hostEl.addEventListener("click", (e) => {
+        const d = bgDown; bgDown = null;
+        if (!d || selWire == null) return;
+        if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) return;
+        onSceneTap(null);
+      });
 
       // stage pointer moves track the wire ghost
       hostEl.addEventListener("pointermove", onStageMove);
