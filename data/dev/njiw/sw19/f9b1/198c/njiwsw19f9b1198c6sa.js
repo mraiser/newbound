@@ -20,11 +20,29 @@ var ME = document.getElementById(me.UUID);
 const GEO = {
   deckPitch: 8,          // nextcase decks recede in −Z at this pitch (§2.4)
   barGap: 1.2,           // bar sits this far beyond the outermost op (§3.1)
-  socketR: 0.06,
-  boxH: 0.6, boxD: 0.6,          // primitive/command/undefined
-  capH: 0.5, capR: 0.25,         // constant/match
-  glassH: 0.7, glassD: 0.7,      // local
-  cylH: 0.7,                     // persistent
+  socketR: 0.065,
+  // the PROGRAPH ICON, extruded: one family for every op kind. A SHELL (its
+  // rim reads as the icon's outline) with a FACE standing proud of it front
+  // and back; the kind rides Prograph's own marks on the face (see
+  // opSceneNode). opH/opD are the OUTER extents — terminals straddle the
+  // shell's top edge and roots its bottom edge (±opH/2) for every kind. The
+  // icon is nearly as deep as it is tall: a block, not a card.
+  opH: 0.5, opD: 0.42, rim: 0.035,
+  // sockets sit on the block's FRONT edges (z = opD/2), straddling the top
+  // (terminals) and bottom (roots) edge of the face: at mid-depth a deep
+  // block hides its bottom sockets from any raised camera
+  sockZ: 0.21,
+  inlay: 0.014,          // depth of face-mounted marks (primitive posts, local frame)
+  barH: 0.16,            // input/output bars: strips spanning the case, sockets on the inner edge
+  ctlS: 0.3,             // a condition's control tab, set at the op's right end
+  // the CASE WINDOW: a plate behind each deck that the ops stand off and drop
+  // an offset shadow onto (shadow offset = this × the standoff)
+  plateGap: 0.32, plateT: 0.08, plateMargin: 0.45, shadow: 0.2,
+  // legacy project() body sizes — kept equal to the icon so both paths agree
+  boxH: 0.5, boxD: 0.42,
+  capH: 0.5, capR: 0.25,
+  glassH: 0.5, glassD: 0.42,
+  cylH: 0.5,
   flagH: 0.35,
   wireR: 0.035,
   miniPad: 0.86,         // miniature fills this fraction of the glass box
@@ -40,13 +58,18 @@ const GLYPH_OF = {
   match: "◇", persistent: "⛃", undefined: "▢",
 };
 
-/** Half the world height of an op body by type — where its top/bottom edges
-    (and thus its sockets) sit. */
+/** Half the world height of an op body — where its top/bottom edges (and
+    thus its sockets) sit. Prograph icons share ONE height across kinds; the
+    type stays in the signature for callers. */
 function halfH(opType) {
-  if (opType === "constant" || opType === "match") return GEO.capH / 2;
-  if (opType === "local") return GEO.glassH / 2;
-  if (opType === "persistent") return GEO.cylH / 2;
-  return GEO.boxH / 2;
+  return GEO.opH / 2;
+}
+
+/** The outer box {x,y,z} of an op's icon — what a dev:flownode pick proxy
+    sizes itself to, so a tap lands exactly on the drawn icon. */
+function opBox(op) {
+  const w = Math.max((op && op.width) || 1, op && op.type === "persistent" ? GEO.opH + 0.1 : 0.4);
+  return { x: w, y: GEO.opH, z: GEO.opD };
 }
 
 function opBodyParams(op) {
@@ -65,14 +88,14 @@ const opMaterial = (op) =>
 /** World position of a terminal socket. idx: op index, or -1 (input bar) /
     -2 (output bar). which: "in" | "out". Returns {x,y,z} or null. */
 function terminalPos(c, idx, which, term, bars, deckZ) {
-  if (idx === -1) { const n = c.input[term]; return n ? { x: n.x, y: bars.inY, z: deckZ } : null; }
-  if (idx === -2) { const n = c.output[term]; return n ? { x: n.x, y: bars.outY, z: deckZ } : null; }
+  if (idx === -1) { const n = c.input[term]; return n ? { x: n.x, y: bars.inSockY, z: deckZ + GEO.sockZ } : null; }
+  if (idx === -2) { const n = c.output[term]; return n ? { x: n.x, y: bars.outSockY, z: deckZ + GEO.sockZ } : null; }
   const op = c.cmds[idx];
   if (!op) return null;
   const node = which === "in" ? op.in[term] : op.out[term];
   if (!node) return null;
   const h = halfH(op.type);
-  return { x: op.pos.x + (node.x || 0), y: op.pos.y + (which === "in" ? h : -h), z: op.pos.z + deckZ };
+  return { x: op.pos.x + (node.x || 0), y: op.pos.y + (which === "in" ? h : -h), z: op.pos.z + deckZ + GEO.sockZ };
 }
 
 function barGeometry(c) {
@@ -92,7 +115,22 @@ function barGeometry(c) {
     const xs = Object.values(nodes).map((n) => n.x || 0);
     return xs.length ? Math.max(...xs) - Math.min(...xs) : 0;
   };
-  return { inY, outY, inLen: span(c.input) + 1, outLen: span(c.output) + 1 };
+  // Prograph's bars span the whole case: centred over every op (control
+  // tabs included) and the bar's own terminals, with a margin
+  let lo = Infinity, hi = -Infinity;
+  for (const op of c.cmds) {
+    const w = op.width || 1;
+    lo = Math.min(lo, op.pos.x - w / 2);
+    hi = Math.max(hi, op.pos.x + w / 2 + (op.condition && op.condition.rule ? GEO.ctlS + 0.05 : 0));
+  }
+  for (const n of [...Object.values(c.input), ...Object.values(c.output)]) { lo = Math.min(lo, n.x || 0); hi = Math.max(hi, n.x || 0); }
+  if (!isFinite(lo)) { lo = -1; hi = 1; }
+  lo -= 0.4; hi += 0.4;
+  if (hi - lo < 2) { const m = (lo + hi) / 2; lo = m - 1; hi = m + 1; }
+  // inSockY/outSockY: the bar sockets sit on the bar's INNER edge — the input
+  // bar's roots hang beneath it, the output bar's terminals stand on it
+  return { inY, outY, inLen: span(c.input) + 1, outLen: span(c.output) + 1,
+    inSockY: inY - GEO.barH / 2, outSockY: outY + GEO.barH / 2, x: (lo + hi) / 2, len: hi - lo };
 }
 
 /** Project one case at a given deck depth into `out`. `active` decks get
@@ -125,9 +163,9 @@ function projectCase(c, deckZ, active, out, prefix, casePath) {
     meta: { role: "bar", which: "output", casePath } });
   if (active) {
     for (const [term, n] of Object.entries(c.input))
-      push({ id: `${prefix}/bt-in/${term}`, kind: "socket", position: { x: n.x, y: bars.inY, z: deckZ }, params: { r: GEO.socketR, wired: true, mode: n.mode }, pickable: true, meta: { role: "terminal", idx: -1, which: "out", term, casePath } });
+      push({ id: `${prefix}/bt-in/${term}`, kind: "socket", position: { x: n.x, y: bars.inSockY, z: deckZ }, params: { r: GEO.socketR, wired: true, mode: n.mode }, pickable: true, meta: { role: "terminal", idx: -1, which: "out", term, casePath } });
     for (const [term, n] of Object.entries(c.output))
-      push({ id: `${prefix}/bt-out/${term}`, kind: "socket", position: { x: n.x, y: bars.outY, z: deckZ }, params: { r: GEO.socketR, wired: true, mode: n.mode }, pickable: true, meta: { role: "terminal", idx: -2, which: "in", term, casePath } });
+      push({ id: `${prefix}/bt-out/${term}`, kind: "socket", position: { x: n.x, y: bars.outSockY, z: deckZ }, params: { r: GEO.socketR, wired: true, mode: n.mode }, pickable: true, meta: { role: "terminal", idx: -2, which: "in", term, casePath } });
   }
 
   // ── operations ──
@@ -268,6 +306,21 @@ function terminalWorld(c, idx, which, term) {
   return terminalPos(c, idx, which, term, barGeometry(c), 0);
 }
 
+/** The JUMP PIPE's anchors for op i of case c, whose next case is nextC, in
+    the case's deck-local frame (deckZ = 0 on the active deck): tab — the
+    centre of the op's condition tab (opSceneNode's ctl part); bead — hung
+    halfway to the next deck, above both input bars; entry — the next case's
+    input bar, one deck back. The scene draws the pipe through these (toScene)
+    and the run animation's jump token rides it. */
+function jumpPoints(c, i, nextC) {
+  const op = c.cmds[i];
+  const tab = { x: op.pos.x + opBox(op).x / 2 + 0.05 + GEO.ctlS / 2, y: op.pos.y, z: op.pos.z || 0 };
+  const b0 = barGeometry(c), b1 = nextC ? barGeometry(nextC) : b0;
+  const bead = { x: tab.x, y: Math.max(b0.inY, b1.inY) + 0.9, z: -GEO.deckPitch / 2 };
+  const entry = { x: b1.x, y: b1.inY, z: -GEO.deckPitch };
+  return { tab, bead, entry };
+}
+
 /** A point on a wire's spline at t ∈ [0,1] — the SAME vertical-tangent cubic
     the stage builds its tubes from (§3.2: tangent magnitude 0.4·length,
     clamped 0.5–2), replicated as pure math so execution tokens (3D-5) ride
@@ -294,86 +347,190 @@ function wireCurvePoint(from, to, t) {
 // coordinates, so the receding stack is one transform per deck.
 //
 // Fidelity notes (honest, DEVIATIONS 19): loop helixes render as hang links
-// (not side helixes), jump pipes and the deck ground grid/outline are not
+// (not side helixes), jump pipes render as a bead-hung arch of two hang links
+// (not the legacy jump-pipe geometry), the deck ground grid/outline is not
 // yet projected, and miniature wires (LOD "full") are omitted — the mid-LOD
 // miniature boxes ride along parented to their glass op.
 
-const SCENE_COLORS = {
-  paper: "#f6f4ee", ghost: "#3a424c", glassTint: "#62bd8c",
-  graphite: "#2d343c", wire: "#8a94a0", socket: "#f0a63c", flag: "#c15a5a",
+// Op look (PROGRAPH, extruded). Every kind is the same icon — a SHELL whose
+// rim reads as the outline, a FACE standing proud of it front and back —
+// told apart by Prograph's own marks on that face: a primitive's ‖ end
+// posts, a constant's solid lid (nothing comes in), a matcher's solid sill
+// (nothing goes out), a local's double outline (a case lives inside), a
+// persistent's oval. The icon is a BLOCK and every part is lit and
+// flat-shaded, so its top, sides and front each catch the light differently;
+// ops stand off the deck's case-window plate and drop an offset shadow onto
+// it. A condition is Prograph's CONTROL: a small box at the op's right end,
+// ✓/✗ for the outcome it fires on, tinted by the rule it raises.
+//
+// Colours are ROLES resolved from the bench tokens (app:tokens, where the
+// dev app's colours live): each role names the tokens.css property it
+// tracks, with that token's v1 value as the fallback. The module stays pure
+// — a DOM-side caller passes opts.tokens = (name) => value to follow the
+// live tokens; without it the v1 values (the dark bench) apply.
+// The scene is LIT: measured on the default stage lights, a front face
+// renders at about ½ its colour and a top face at about ⅔ — so each surface
+// role names the token one step lighter than where it should land on screen
+// (faces land near --panel-3, the plate near --panel, above --ground).
+const SCENE_TOKENS = {
+  face: ["--text-faint", "#5c6672"],   // the icon face
+  undefFace: ["--panel-3", "#2d343c"], // an undefined op: an empty slot
+  rim: ["--text-dim", "#8a94a0"],      // the shell — the icon's outline
+  ink: ["--text", "#d8dee6"],          // kind marks, sockets
+  faint: ["--text-faint", "#5c6672"],  // an undefined op's outline
+  plate: ["--line", "#333b44"],        // the case window
+  plateRim: ["--text-faint", "#5c6672"],
+  wire: ["--text-dim", "#8a94a0"],
+  ghost: ["--panel-3", "#2d343c"],     // background decks
+  shadow: ["--ground", "#171a1e"],
+  next: ["--f-3d", "#62bd8c"], terminate: ["--danger", "#c15a5a"],
+  fail: ["--f-js", "#ead16c"], finish: ["--f-css", "#56a3d9"],
 };
 
-function opSceneNode(op, i, deckId, prefix, active, editable, push) {
+/** The scene palette: every SCENE_TOKENS role resolved through read(name)
+    (e.g. a getComputedStyle getPropertyValue), else its v1 value. */
+function scenePalette(read) {
+  const pal = {};
+  for (const [role, [name, v1]] of Object.entries(SCENE_TOKENS)) {
+    let v = "";
+    if (typeof read === "function") { try { v = String(read(name) || "").trim(); } catch (e) { v = ""; } }
+    pal[role] = /^#[0-9a-f]{3,8}$/i.test(v) ? v : v1;
+  }
+  return pal;
+}
+
+/** The text an op's icon shows: constants/matchers show their LITERAL
+    (strings quoted, as Prograph does), every other kind its name. */
+function opLabel(op) {
+  const v = op.name == null ? "" : String(op.name);
+  if (op.type === "constant" || op.type === "match") {
+    if (op.ctype === "string" || op.ctype === undefined) return `“${v}”`;
+    return v === "" ? "∅" : v;
+  }
+  if (op.type === "undefined") return v || "?";
+  return v;
+}
+
+function opSceneNode(op, i, deckId, prefix, active, editable, push, pal, plateZ) {
+  pal = pal || scenePalette();
   const id = `${prefix}/op/${i}`;
-  const h = halfH(op.type);
-  const base = {
-    id, parent: deckId,
+  const H = GEO.opH, D = GEO.opD, r = GEO.rim, h = halfH(op.type);
+  const W = opBox(op).x;
+  const fw = W - 2 * r, fh = H - 2 * r;
+  const zf = D / 2 + GEO.inlay / 2;          // face-mounted marks sit ON the face
+  const z0 = (op.pos && op.pos.z) || 0;
+  // the op node is a pure TRANSFORM HOLDER (the deck-node idiom): the icon's
+  // parts, sockets, label, shadow and control tab all parent to it
+  push({ id, parent: deckId, kind: "box",
     pos: { x: op.pos.x, y: op.pos.y, z: op.pos.z },
+    params: { size: { x: 0.001, y: 0.001, z: 0.001 } },
+    material: { color: pal.rim, flat: true },
     affordances: active
       ? (editable ? { tap: true, drag: { plane: "xy", altPlane: "xz" }, hover: true }
                   : { tap: true, hover: true })
       : undefined,
     meta: { role: "op", opIndex: i, opType: op.type, name: op.name,
-      hasLocal: !!op.localdata, ctype: op.ctype, cmd: op.cmd },
+      hasLocal: !!op.localdata, ctype: op.ctype, cmd: op.cmd } });
+  const part = (sfx, kind, pos, params, material, rot) => push({ id: `${id}/${sfx}`, parent: id,
+    kind, pos, ...(rot ? { rot } : {}), params, material, meta: { role: "op-part", opIndex: i, part: sfx } });
+  const lit = (color, extra) => ({ color, flat: true, ...(extra || {}) });
+  const ROUND = { x: Math.PI / 2, y: 0, z: 0 };   // a cylinder turned to face +z: a round end
+  // a w×hh×d slab at `at`: a box, or (oval) a stadium — a box between two
+  // z-facing round caps, the persistent's shape
+  const slab = (sfx, w, hh, d, at, mat, oval) => {
+    if (!oval) { part(sfx, "box", { ...at }, { size: { x: w, y: hh, z: d } }, mat); return; }
+    const cx = (w - hh) / 2;
+    part(sfx, "box", { ...at }, { size: { x: Math.max(0.001, w - hh), y: hh, z: d } }, mat);
+    part(sfx + "l", "cylinder", { x: at.x - cx, y: at.y, z: at.z }, { radius: hh / 2, height: d }, mat, ROUND);
+    part(sfx + "r", "cylinder", { x: at.x + cx, y: at.y, z: at.z }, { radius: hh / 2, height: d }, mat, ROUND);
   };
-  const mat = (c, extra) => ({ color: c, flat: true, ...(extra || {}) });
-  const ghosted = active ? null : { opacity: 0.35 };
-  switch (op.type) {
-    case "constant": case "match":
-      // the op node is a pure TRANSFORM HOLDER (the deck-node idiom): the
-      // capsule body rotates, but sockets/tag/flag parented to the op must
-      // stay axis-aligned — a rotated parent would swing them around z
-      push({ ...base, kind: "box", params: { size: { x: 0.001, y: 0.001, z: 0.001 } },
-        material: mat(SCENE_COLORS.graphite) });
-      push({ id: `${id}/body`, parent: id, kind: "cylinder", rot: { x: 0, y: 0, z: Math.PI / 2 },
-        params: { radius: GEO.capR, height: op.width },
-        material: mat(active ? SCENE_COLORS.paper : SCENE_COLORS.ghost, ghosted),
-        affordances: base.affordances, meta: base.meta });
-      break;
-    case "local":
-      push({ ...base, kind: "box",
-        params: { size: { x: op.width, y: GEO.glassH, z: GEO.glassD } },
-        material: mat(SCENE_COLORS.glassTint, { opacity: active ? 0.28 : 0.15 }) });
-      break;
-    case "persistent":
-      push({ ...base, kind: "cylinder",
-        params: { radius: Math.min(op.width, 0.7) / 2, height: GEO.cylH },
-        material: mat(active ? SCENE_COLORS.paper : SCENE_COLORS.ghost, ghosted) });
-      break;
-    default: // primitive / command / undefined
-      push({ ...base, kind: "box",
-        params: { size: { x: op.width, y: GEO.boxH, z: GEO.boxD } },
-        material: op.type === "undefined"
-          ? mat(SCENE_COLORS.ghost, { opacity: 0.45 })
-          : mat(active ? SCENE_COLORS.paper : SCENE_COLORS.ghost, ghosted) });
-      if (op.type === "command") {
-        push({ id: `${id}/spine`, parent: id, kind: "box",
-          pos: { x: 0, y: GEO.boxH / 2 + 0.02, z: 0 },
-          params: { size: { x: op.width, y: 0.04, z: GEO.boxD } },
-          material: mat(SCENE_COLORS.graphite) });
-      }
+  const O = { x: 0, y: 0, z: 0 };
+  const oval = op.type === "persistent";
+  // background decks: one ghosted silhouette per op, nothing else
+  if (!active) {
+    slab("face", W, H, D, O, lit(pal.ghost, { opacity: 0.35 }), oval);
+    return h;
   }
-  if (active) {
-    push({ id: `${id}/tag`, parent: id, kind: "text",
-      pos: { x: 0, y: h + 0.22, z: 0 },
-      text: { text: `${GLYPH_OF[op.type] || ""} ${op.name}`.trim(), size: 0.85 } });
-    if (op.type === "local" && op.localdata) {
-      const sub = op.localdata, ops = sub.cmds || [];
-      if (ops.length) {
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        for (const o2 of ops) { minX = Math.min(minX, o2.pos.x); maxX = Math.max(maxX, o2.pos.x); minY = Math.min(minY, o2.pos.y); maxY = Math.max(maxY, o2.pos.y); }
-        const w = Math.max(maxX - minX, 0.1), hg = Math.max(maxY - minY, 0.1);
-        const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
-        const scale = Math.min((GEO.glassH * GEO.miniPad) / hg, (GEO.glassH * GEO.miniPad) / w, 0.25);
-        ops.forEach((o2, k) => push({
-          id: `${id}/mini/${k}`, parent: id, kind: "box",
-          pos: { x: (o2.pos.x - cx) * scale, y: (o2.pos.y - cy) * scale, z: 0 },
-          params: { size: { x: Math.max(0.06, o2.width * scale * 0.7), y: 0.06, z: 0.06 } },
-          material: mat(SCENE_COLORS.paper) }));
-      }
+  const undef = op.type === "undefined";
+  slab("ink", W, H, D - 0.04, O, lit(undef ? pal.faint : pal.rim), oval);
+  slab("face", fw, fh, D, O, lit(undef ? pal.undefFace : pal.face), oval);
+  if (typeof plateZ === "number") {
+    // the offset shadow on the case-window plate — a child of the op, so it
+    // rides a drag; the offset grows with the op's standoff from the plate
+    const o = GEO.shadow * Math.max(0, z0 - plateZ);
+    slab("shadow", W, H, 0.004, { x: o, y: -o, z: plateZ - z0 + 0.012 }, lit(pal.shadow, { opacity: 0.75 }), oval);
+  }
+  let labelY = 0;
+  const inlay = (sfx, x, y, sx, sy) => {        // a mark set on the face, front AND back
+    part(sfx, "box", { x, y, z: zf }, { size: { x: sx, y: sy, z: GEO.inlay } }, lit(pal.ink));
+    part(sfx + "_b", "box", { x, y, z: -zf }, { size: { x: sx, y: sy, z: GEO.inlay } }, lit(pal.ink));
+  };
+  switch (op.type) {
+    case "primitive": {            // ‖ name ‖ — a post set in from each end
+      const px = fw / 2 - 0.075;
+      inlay("postl", -px, 0, 0.03, fh);
+      inlay("postr", px, 0, 0.03, fh);
+      break;
+    }
+    case "constant":               // nothing comes in: a solid LID (proud of the shell, no z-fight)
+      part("lid", "box", { x: 0, y: h - 0.052, z: 0 }, { size: { x: W + 0.004, y: 0.116, z: D + 0.004 } }, lit(pal.ink));
+      labelY = -0.04;
+      break;
+    case "match":                  // nothing goes out: a solid SILL
+      part("sill", "box", { x: 0, y: -h + 0.052, z: 0 }, { size: { x: W + 0.004, y: 0.116, z: D + 0.004 } }, lit(pal.ink));
+      labelY = 0.04;
+      break;
+    case "local": {                // a case lives inside: a DOUBLE outline
+      const ix = fw / 2 - 0.05, iy = fh / 2 - 0.05, t = 0.022;
+      inlay("frt", 0, iy, 2 * ix + t, t);
+      inlay("frb", 0, -iy, 2 * ix + t, t);
+      inlay("frl", -ix, 0, t, 2 * iy);
+      inlay("frr", ix, 0, t, 2 * iy);
+      break;
     }
   }
+  // the name INSIDE the icon (Prograph) — centred on the face; the editor's
+  // css styles labels by meta.role/opType/lit
+  push({ id: `${id}/tag`, parent: id, kind: "text",
+    pos: { x: 0, y: labelY, z: D / 2 + 0.02 },
+    text: { text: opLabel(op), size: 0.85 },
+    meta: { role: "label", opIndex: i, opType: op.type, lit: op.type === "constant" || op.type === "match" } });
+  if (op.condition && op.condition.rule) {
+    const s = GEO.ctlS, tx = W / 2 + 0.05 + s / 2;
+    part("ctl", "box", { x: tx, y: 0, z: 0 }, { size: { x: s, y: s, z: D - 0.04 } }, lit(pal.rim));
+    // the tab's face is unlit so the rule colour reads true at any angle
+    part("ctlface", "box", { x: tx, y: 0, z: 0 }, { size: { x: s - 2 * r, y: s - 2 * r, z: D } },
+      { color: pal[op.condition.rule] || pal.terminate, emissive: true });
+    push({ id: `${id}/flag`, parent: id, kind: "text",
+      pos: { x: tx, y: 0, z: D / 2 + 0.02 },
+      text: { text: op.condition.value ? "✓" : "✗", size: 0.85 },
+      meta: { role: "flag", opIndex: i, rule: op.condition.rule, value: op.condition.value } });
+  }
   return h;
+}
+
+/** One socket — Prograph's terminal (top edge) or root (bottom edge): a small
+    bead — plus its multiplex annotation, drawn OUTSIDE the edge: a list
+    terminal's "…" (three dots), a loop terminal's arrowhead. */
+function pushSocket(push, id, parent, pos, node, editable, meta, pal) {
+  pal = pal || scenePalette();
+  push({ id, parent, kind: "sphere", pos, params: { radius: GEO.socketR },
+    material: { color: pal.ink },
+    affordances: editable ? { tap: true, hover: true, drag: { plane: "xy", altPlane: "xy" } }
+                          : { tap: true, hover: true },
+    meta });
+  const mode = node && node.mode;
+  const away = meta.which === "in" ? 1 : -1;    // terminals: above the edge; roots: below
+  if (mode === "list") {
+    for (const k of [-1, 0, 1]) push({ id: `${id}/mux${k + 1}`, parent, kind: "sphere",
+      pos: { x: pos.x + k * 0.05, y: pos.y + away * 0.12, z: pos.z }, params: { radius: 0.018 },
+      material: { color: pal.ink }, meta: { role: "mux", mode } });
+  } else if (mode === "loop") {
+    push({ id: `${id}/mux`, parent, kind: "cone",
+      pos: { x: pos.x + 0.12, y: pos.y, z: pos.z }, rot: { x: 0, y: 0, z: away > 0 ? Math.PI : 0 },
+      params: { radius: 0.04, height: 0.09 },
+      material: { color: pal.ink, flat: true }, meta: { role: "mux", mode } });
+  }
 }
 
 /**
@@ -384,6 +541,7 @@ function opSceneNode(op, i, deckId, prefix, active, editable, push) {
 function toScene(rootCase, opts = {}) {
   const activeDeck = opts.activeDeck ?? 0;
   const editable = opts.editable ?? true;
+  const pal = scenePalette(opts.tokens);
   const specs = [];
   const push = (s) => specs.push(s);
   let bounds = null;
@@ -398,62 +556,74 @@ function toScene(rootCase, opts = {}) {
     const bars = barGeometry(c);
     push({ id: deckId, kind: "box", pos: { x: 0, y: 0, z: deckZ },
       params: { size: { x: 0.001, y: 0.001, z: 0.001 } },
-      material: { color: SCENE_COLORS.graphite },
+      material: { color: pal.plateRim },
       meta: { role: "deck", index: idx } });
 
-    // bars (the signature) — thin boxes; their terminals are deck children
-    const rail = (which, y, len) => push({
-      id: `${prefix}/bar-${which}`, parent: deckId, kind: "box",
-      pos: { x: 0, y, z: 0 },
-      params: { size: { x: Math.max(2, len), y: 0.06, z: 0.2 } },
-      material: { color: SCENE_COLORS.graphite, flat: true, ...(active ? {} : { opacity: 0.35 }) },
-      affordances: active ? { tap: true } : undefined,
-      meta: { role: "bar", which: which === "in" ? "input" : "output" } });
-    rail("in", bars.inY, bars.inLen);
-    rail("out", bars.outY, bars.outLen);
+    // the CASE WINDOW: a plate behind the deck (sized to the bars, which span
+    // every op) that the ops stand off and shadow onto. plateZ is its FRONT
+    // face, deck-local, behind the rearmost op whatever untangle did to z.
+    let backZ = 0;
+    for (const op of c.cmds) backZ = Math.min(backZ, (op.pos && op.pos.z) || 0);
+    const plateZ = backZ - GEO.opD / 2 - GEO.plateGap;
+    const pw = bars.len + 2 * GEO.plateMargin;
+    const ph = bars.inY - bars.outY + GEO.barH + 2 * GEO.plateMargin;
+    const pid = `${prefix}/plate`;
+    push({ id: pid, parent: deckId, kind: "box",
+      pos: { x: bars.x, y: (bars.inY + bars.outY) / 2, z: plateZ - GEO.plateT / 2 },
+      params: { size: { x: pw, y: ph, z: GEO.plateT } },
+      material: { color: pal.plateRim, flat: true, ...(active ? {} : { opacity: 0.3 }) },
+      meta: { role: "plate" } });
+    if (active) push({ id: `${pid}/face`, parent: pid, kind: "box",
+      pos: { x: 0, y: 0, z: 0.004 },
+      params: { size: { x: pw - 0.08, y: ph - 0.08, z: GEO.plateT } },
+      material: { color: pal.plate, flat: true },
+      meta: { role: "plate-face" } });
+
+    // bars (the signature) — Prograph's input/output bars: strips spanning
+    // the case, built like the icons, their sockets on the inner edge
+    const rail = (which, y) => {
+      const bid = `${prefix}/bar-${which}`;
+      push({ id: bid, parent: deckId, kind: "box",
+        pos: { x: bars.x, y, z: 0 },
+        params: { size: { x: bars.len, y: GEO.barH, z: GEO.opD - 0.04 } },
+        material: { color: pal.rim, flat: true, ...(active ? {} : { opacity: 0.35 }) },
+        affordances: active ? { tap: true } : undefined,
+        meta: { role: "bar", which: which === "in" ? "input" : "output" } });
+      if (!active) return;
+      push({ id: `${bid}/face`, parent: bid, kind: "box",
+        pos: { x: 0, y: 0, z: 0 },
+        params: { size: { x: bars.len - 2 * GEO.rim, y: GEO.barH - 2 * GEO.rim, z: GEO.opD } },
+        material: { color: pal.face, flat: true },
+        meta: { role: "bar-face", which: which === "in" ? "input" : "output" } });
+      const o = GEO.shadow * -plateZ;
+      push({ id: `${bid}/shadow`, parent: bid, kind: "box",
+        pos: { x: o, y: -o, z: plateZ + 0.012 },
+        params: { size: { x: bars.len, y: GEO.barH, z: 0.004 } },
+        material: { color: pal.shadow, flat: true, opacity: 0.75 },
+        meta: { role: "shadow" } });
+    };
+    rail("in", bars.inY);
+    rail("out", bars.outY);
 
     c.cmds.forEach((op, i) => {
-      const h = opSceneNode(op, i, deckId, prefix, active, editable, push);
+      const h = opSceneNode(op, i, deckId, prefix, active, editable, push, pal, plateZ);
       if (!active) return;
       const opId = `${prefix}/op/${i}`;
-      for (const [term, n] of Object.entries(op.in)) push({
-        id: `${opId}/in/${term}`, parent: opId, kind: "sphere",
-        pos: { x: n.x || 0, y: h, z: 0 }, params: { radius: GEO.socketR },
-        material: { color: SCENE_COLORS.socket, emissive: true },
-        affordances: editable ? { tap: true, hover: true, drag: { plane: "xy", altPlane: "xy" } }
-                              : { tap: true, hover: true },
-        meta: { role: "terminal", idx: i, which: "in", term } });
-      for (const [term, n] of Object.entries(op.out)) push({
-        id: `${opId}/out/${term}`, parent: opId, kind: "sphere",
-        pos: { x: n.x || 0, y: -h, z: 0 }, params: { radius: GEO.socketR },
-        material: { color: SCENE_COLORS.socket, emissive: true },
-        affordances: editable ? { tap: true, hover: true, drag: { plane: "xy", altPlane: "xy" } }
-                              : { tap: true, hover: true },
-        meta: { role: "terminal", idx: i, which: "out", term } });
-      if (op.condition && op.condition.rule) push({
-        id: `${opId}/flag`, parent: opId, kind: "cone",
-        pos: { x: op.width / 2, y: h + GEO.flagH / 2, z: 0 },
-        params: { radius: 0.08, height: GEO.flagH },
-        material: { color: SCENE_COLORS.flag, emissive: true },
-        affordances: { tap: true, hover: true },
-        meta: { role: "flag", opIndex: i, rule: op.condition.rule, value: op.condition.value } });
+      for (const [term, n] of Object.entries(op.in))
+        pushSocket(push, `${opId}/in/${term}`, opId, { x: n.x || 0, y: h, z: GEO.sockZ }, n, editable,
+          { role: "terminal", idx: i, which: "in", term }, pal);
+      for (const [term, n] of Object.entries(op.out))
+        pushSocket(push, `${opId}/out/${term}`, opId, { x: n.x || 0, y: -h, z: GEO.sockZ }, n, editable,
+          { role: "terminal", idx: i, which: "out", term }, pal);
     });
 
     if (active) {
-      for (const [term, n] of Object.entries(c.input)) push({
-        id: `${prefix}/bt-in/${term}`, parent: deckId, kind: "sphere",
-        pos: { x: n.x || 0, y: bars.inY, z: 0 }, params: { radius: GEO.socketR },
-        material: { color: SCENE_COLORS.socket, emissive: true },
-        affordances: editable ? { tap: true, hover: true, drag: { plane: "xy", altPlane: "xy" } }
-                              : { tap: true, hover: true },
-        meta: { role: "terminal", idx: -1, which: "out", term } });
-      for (const [term, n] of Object.entries(c.output)) push({
-        id: `${prefix}/bt-out/${term}`, parent: deckId, kind: "sphere",
-        pos: { x: n.x || 0, y: bars.outY, z: 0 }, params: { radius: GEO.socketR },
-        material: { color: SCENE_COLORS.socket, emissive: true },
-        affordances: editable ? { tap: true, hover: true, drag: { plane: "xy", altPlane: "xy" } }
-                              : { tap: true, hover: true },
-        meta: { role: "terminal", idx: -2, which: "in", term } });
+      for (const [term, n] of Object.entries(c.input))
+        pushSocket(push, `${prefix}/bt-in/${term}`, deckId, { x: n.x || 0, y: bars.inSockY, z: GEO.sockZ }, n, editable,
+          { role: "terminal", idx: -1, which: "out", term }, pal);
+      for (const [term, n] of Object.entries(c.output))
+        pushSocket(push, `${prefix}/bt-out/${term}`, deckId, { x: n.x || 0, y: bars.outSockY, z: GEO.sockZ }, n, editable,
+          { role: "terminal", idx: -2, which: "in", term }, pal);
 
       // wires: hang links BETWEEN SOCKET NODES — endpoint tracking is the
       // scene stack's own job (loop pairs render as hang links; see notes)
@@ -466,9 +636,29 @@ function toScene(rootCase, opts = {}) {
         const to = socketId(wr.dest[0], "in", wr.dest[1]);
         push({ id: `${prefix}/wire/${wi}`, kind: "link", curve: "hang",
           from, to, r: GEO.wireR,
-          material: { color: SCENE_COLORS.wire, opacity: 0.75 },
+          material: { color: pal.wire },
           affordances: { tap: true, hover: true },
           meta: { role: "wire", index: wi, con: wr } });
+      });
+
+      // a `next` rule's JUMP PIPE (§2.4): it rises out of the op's condition
+      // tab to a bead hung between the decks, then dives into the next case's
+      // input bar. Two hang links, both FROM the bead (a hang link always
+      // leaves its `from` downward and enters its `to` from above — so each
+      // leg hangs from the bead and the pair reads as one arch), in the next
+      // rule's colour. A constant never evaluates its condition: no pipe.
+      const nextC = chain[idx + 1];
+      if (nextC) c.cmds.forEach((op, i) => {
+        if (!op || op.type === "constant" || !op.condition || op.condition.rule !== "next") return;
+        const jp = jumpPoints(c, i, nextC);
+        const oid = `${prefix}/op/${i}`;
+        push({ id: `${oid}/jump`, parent: deckId, kind: "sphere", pos: jp.bead,
+          params: { radius: 0.07 }, material: { color: pal.next, emissive: true },
+          meta: { role: "jump", opIndex: i, part: "bead" } });
+        push({ id: `${oid}/jumpup`, kind: "link", curve: "hang", from: `${oid}/jump`, to: `${oid}/ctl`,
+          r: GEO.wireR * 1.3, material: { color: pal.next }, meta: { role: "jump", opIndex: i, part: "up" } });
+        push({ id: `${oid}/jumpdn`, kind: "link", curve: "hang", from: `${oid}/jump`, to: `d${idx + 1}/bar-in`,
+          r: GEO.wireR * 1.3, material: { color: pal.next }, meta: { role: "jump", opIndex: i, part: "down" } });
       });
 
       let minX = -1.5, maxX = 1.5, minY = bars.outY, maxY = bars.inY;
@@ -482,5 +672,92 @@ function toScene(rootCase, opts = {}) {
   return { specs, bounds, deckCount: chain.length };
 }
 
-    Object.assign(me, { GEO, halfH, project, frontOrtho, terminalWorld, wireCurvePoint, toScene });
+// ── toSceneDoc: flowdoc Case → a scene FACET (P0 of the scene-stack conversion)
+//
+// The DERIVED view (decision 4: the flow body stays authoritative; this facet
+// is regenerated on load, never the source of truth). Pure, like project():
+// a Case in, a scenedoc-compatible scene facet out — no THREE, no DOM. It
+// reuses the SAME geometry constants and terminal math as toScene, so the
+// front-ortho parity (acceptance 2) holds by construction: op bodies at
+// (pos.x, pos.y, pos.z), terminals at (pos.x + node.x, pos.y ± halfH, pos.z),
+// decks receding −Z at GEO.deckPitch.
+//
+// Output shape is a scene facet (app:scenedoc Part II): {env, nodes, state}.
+// Nodes are scenedoc-vocabulary entries — group decks, per-type op bodies
+// (box / rotated-cylinder constant / glass local / cylinder persistent),
+// command spines, text tags, sphere sockets, and hang LINKS between socket
+// ids (the scene stack re-resolves endpoints each frame, so wires follow
+// drags free).
+//
+// IMPLEMENTATION — parity by construction: toSceneDoc DELEGATES to toScene
+// (the R-4 spec path) and converts its flat spec list into scenedoc nodes.
+// toScene's spec shapes are already scenedoc-native (box size.x/y/z, cylinder
+// radius/height, cone radius/height, sphere radius, text text/size, link
+// from/to), so the op bodies, terminals, bars, and wires land at IDENTICAL
+// world positions on both paths — the front-ortho parity check (acceptance 2)
+// compares these two projections and they agree to the last decimal because
+// they ARE the same geometry. ids mirror toScene's (`d0/op/3/in/term`), so
+// behavior code maps a scene node back to (deck, idx, which, term) exactly as
+// the legacy editor does — that mapping IS the P2 gesture bridge.
+//
+// `editable` switches socket/op drag affordances on, `activeDeck` picks the
+// deck that carries bars, terminals, wires, tags, and miniatures (the rest
+// ghost) — the same semantics toScene gives the legacy editor.
+function toSceneDoc(flow, { editable = false, activeDeck = 0, tokens = null } = {}) {
+  const c = flow && flow.root ? flow.root : flow;   // accept a FlowDoc or a Case
+  const { specs, deckCount } = toScene(c, { activeDeck, editable, tokens });
+
+  // scenedoc node ids must satisfy NAME_RE (^[a-z][a-z0-9_]*$) — no slashes.
+  // Slug toScene's hierarchical spec id (`d0/op/3/in/term`) into a flat,
+  // collision-free scenedoc id (`d0_op_3_in_term`), remapping id, parent, and
+  // link from/to through the SAME transform so the graph stays connected. The
+  // original spec id rides along as meta.sid — behavior code maps a scene node
+  // back to (deck, idx, which, term) exactly as the legacy editor does (the
+  // P2 gesture bridge reads meta, and meta.sid is its stable handle).
+  const NAME_RE = /^[a-z][a-z0-9_]*$/;
+  const slug = (sid) => {
+    let s = String(sid).replace(/[^a-zA-Z0-9_]/g, "_").toLowerCase();
+    if (!/^[a-z]/.test(s)) s = "n_" + s;
+    return NAME_RE.test(s) ? s : s.replace(/[^a-z0-9_]/g, "_");
+  };
+
+  // spec → scenedoc node. Verbatim copy of the scenedoc-native fields; the
+  // only structural transform is the deck placeholder, which becomes a
+  // scenedoc GROUP (a pure transform holder — its tiny box gizmo was a
+  // stage-only shim). Ids/parents/endpoints are slugged per above.
+  const nodes = specs.map((s) => {
+    const meta = s.meta ? { ...s.meta, sid: s.id } : { sid: s.id };
+    if (s.meta && s.meta.role === "deck") {
+      return { id: slug(s.id), kind: "group", pos: s.pos, meta };
+    }
+    const n = { id: slug(s.id), kind: s.kind };
+    if (s.parent !== undefined) n.parent = slug(s.parent);
+    if (s.pos) n.pos = s.pos;
+    if (s.rot) n.rot = s.rot;
+    if (s.scale) n.scale = s.scale;
+    if (s.params) n.params = s.params;
+    if (s.text) n.text = s.text;
+    if (s.kind === "link") { n.from = slug(s.from); n.to = slug(s.to);
+      if (s.curve !== undefined) n.curve = s.curve;
+      if (s.r !== undefined) n.r = s.r; }
+    if (s.material) n.material = s.material;
+    if (s.affordances) n.affordances = s.affordances;
+    n.meta = meta;
+    return n;
+  });
+
+  // derived scene facet. state (a scenedoc FIELD ARRAY) carries the chain
+  // geometry a host/camera needs.
+  return {
+    env: { camera: { pos: { x: 0, y: 0, z: 12 }, target: { x: 0, y: 0, z: 0 } },
+      grid: true, lights: "default" },
+    nodes,
+    state: [
+      { name: "deck_count", type: "number", value: deckCount },
+      { name: "active_deck", type: "number", value: activeDeck },
+    ],
+  };
+}
+
+    Object.assign(me, { GEO, halfH, opBox, opLabel, scenePalette, SCENE_TOKENS, project, frontOrtho, terminalWorld, jumpPoints, wireCurvePoint, toScene, toSceneDoc });
   })();

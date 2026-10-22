@@ -1,0 +1,103 @@
+<section class="nb-flowedit3d" tabindex="0">
+  <div class="fe-head">
+    <button class="fe-back" title="Back (Esc)">←</button>
+    <span class="fe-title"></span>
+    <span class="fe-crumbs"></span>
+    <span class="fe-spacer"></span>
+    <span class="fe-status" role="status">booting…</span>
+    <span class="fe-decks" role="tablist" aria-label="case chain"></span>
+    <button class="fe-proj" aria-pressed="false" title="Front-orthographic (2) / perspective (3)">persp</button>
+    <button class="fe-frame" title="Frame the deck (A)">frame</button>
+    <button class="fe-undo" title="Undo (⌘Z)" disabled>undo</button>
+    <button class="fe-redo" title="Redo (⇧⌘Z)">redo</button>
+    <button class="fe-tidy" title="Auto-layout: tidy (longest-path layers)">tidy</button>
+    <button class="fe-untangle" title="Auto-layout: untangle (resolve crossings in z)">untangle</button>
+    <button class="fe-run" title="Run: tokens deliver along the wires in propagation order (R)">run ▸</button>
+    <button class="fe-save" title="Save the flow body (write_flow_body)" disabled>save</button>
+  </div>
+  <div class="fe-conflict" hidden>
+    <span class="fe-conflict-msg">this flow changed on the server since you loaded it</span>
+    <button class="fe-c-theirs">load theirs</button>
+    <button class="fe-c-mine">keep mine</button>
+    <button class="fe-c-cancel">cancel</button>
+  </div>
+
+  <div class="fe-main">
+    <!-- the ONE runtime: an app:scenehost; ops are addControl'd into it and the
+         deck's scene facet (toSceneDoc) rides the stage as the facade. Wiring
+         gestures are flownode behaviors; the flow body stays authoritative. -->
+    <div class="data-control fe-host" data-control="app:scenehost:{}"></div>
+
+    <aside class="fe-rail">
+      <span class="lbl">flow editor</span>
+      <div class="fe-palette">
+        <span class="lbl">node kinds — click to add · with a wire selected, splice</span>
+        <div class="fe-pal-col">
+          <button class="fe-pal-item" data-pi="0" data-kind="primitive" title="pick from the primitive registry"><span class="glyph" aria-hidden="true">⚙</span>primitive</button>
+          <button class="fe-pal-item" data-pi="1" data-kind="command" title="call a command (lib / ctl / cmd)"><span class="glyph" aria-hidden="true">▤</span>command call</button>
+          <button class="fe-pal-item" data-pi="2" data-kind="local" title="a drillable local sub-flow"><span class="glyph" aria-hidden="true">▣</span>local sub-flow</button>
+          <button class="fe-pal-item" data-pi="3" data-kind="constant" title="constant value / matcher"><span class="glyph" aria-hidden="true">◇</span>constant / matcher</button>
+          <button class="fe-pal-item" data-pi="4" data-kind="persistent" title="a persistent slot"><span class="glyph" aria-hidden="true">⛃</span>persistent slot</button>
+          <button class="fe-pal-item" data-pi="5" data-kind="undefined" title="a blank op"><span class="glyph" aria-hidden="true">▢</span>blank (undefined)</button>
+        </div>
+      </div>
+      <ul class="fe-gate">
+        <li class="fe-g-host">host booted — <b>pending</b></li>
+        <li class="fe-g-wiretap">drag wire (either end) — <b>pending</b></li>
+        <li class="fe-g-i1i2">I-1/I-2 refused — <b>pending</b></li>
+        <li class="fe-g-kbd">keyboard wire (W/→/Enter) — <b>pending</b></li>
+        <li class="fe-g-undo">undo restores — <b>pending</b></li>
+        <li class="fe-g-create">palette create — <b>pending</b></li>
+        <li class="fe-g-splice">splice into wire — <b>pending</b></li>
+        <li class="fe-g-delop">delete op — <b>pending</b></li>
+        <li class="fe-g-layout">layout tidy/untangle — <b>pending</b></li>
+        <li class="fe-g-save">save (write_flow_body) — <b>pending</b></li>
+        <li class="fe-g-run">run tokens in propagation order — <b>pending</b></li>
+        <li class="fe-g-diff">changes since save (diffFlow) — <b>pending</b></li>
+        <li class="fe-g-journal">server journal + entry diff — <b>pending</b></li>
+      </ul>
+      <p class="fe-ro">Drag between an input and an output socket — from either
+        end — to wire them (or press <kbd>W</kbd> to wire from the selection). Click a node kind to add it; with
+        a wire selected, the new node is spliced into that wire. <kbd>Del</kbd>
+        removes the selected wire or node; <b>tidy</b>/<b>untangle</b> lay the
+        case out; <b>save</b> writes the flow body (if it changed on the server
+        meanwhile you choose whose version wins). <kbd>⌘Z</kbd>/<kbd>⇧⌘Z</kbd> undo/redo.</p>
+      <p class="fe-keys lbl">keys</p>
+      <ul class="fe-keys-list">
+        <li><kbd>2</kbd> front-ortho · <kbd>3</kbd> perspective · <kbd>A</kbd> frame deck</li>
+        <li><kbd>[</kbd> <kbd>]</kbd> walk case chain · <b>+</b>/<b>×</b> on the case tabs add / delete a case · <kbd>Esc</kbd> back / cancel</li>
+        <li><kbd>Tab</kbd>/<kbd>⇧Tab</kbd> walk ops in firing order · <kbd>F</kbd> frame selection · <kbd>⌘S</kbd> save</li>
+        <li><kbd>W</kbd> wire from selection · <kbd>←</kbd><kbd>→</kbd> choose target · <kbd>Enter</kbd> commit</li>
+        <li><kbd>Del</kbd> unwires a wire / deletes an op · <kbd>⌘Z</kbd>/<kbd>⇧⌘Z</kbd> undo/redo</li>
+        <li><kbd>R</kbd> run — tokens deliver along each wire, round by round</li>
+      </ul>
+    </aside>
+
+    <aside class="fe-inspect">
+      <span class="lbl">inspector</span>
+      <div class="fe-inspect-body">
+        <p class="fe-empty">Select an element. Output sockets start wires.</p>
+      </div>
+      <div class="fe-diag" hidden>
+        <span class="lbl">diagnostics · this case</span>
+        <ul class="fe-diag-list"></ul>
+      </div>
+      <div class="fe-journal">
+        <span class="lbl">mutations · this session</span>
+        <ul class="fe-journal-list"></ul>
+      </div>
+      <div class="fe-changes">
+        <span class="lbl">unsaved changes (vs load/save) · <span class="fe-changes-count">—</span></span>
+        <ul class="fe-changes-list"></ul>
+      </div>
+      <div class="fe-sjournal">
+        <span class="lbl">journal · write_flow_body history <button class="fe-sj-refresh" title="Reload the server journal">↻</button></span>
+        <ul class="fe-sjournal-list"><li class="fe-empty">loading…</li></ul>
+      </div>
+    </aside>
+  </div>
+</section>
+<div class="data-control" data-control="dev:flowdoc" hidden></div>
+<div class="data-control" data-control="dev:flowproject" hidden></div>
+<div class="data-control" data-control="dev:flowprims" hidden></div>
+<div class="data-control" data-control="dev:flowlayout" hidden></div>

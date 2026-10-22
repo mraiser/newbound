@@ -31,6 +31,11 @@
 // api: addControl(lib, ctl, data?, key?) → Promise<instance>,
 //      removeControl(key), children (live array), stage, state/setState,
 //      frameAll(), dispose(), waitReady(cb).
+// hook: state.onSceneTap(specId|null) — set by the host's js to receive taps no
+//      hosted instance claims (its own tappable specs; null = background).
+// hook: state.onSceneDrag(evt) — the same for drags of the host's own
+//      draggable specs (evt = the stage's {type, id, x, y, z, dx, dy, dz,
+//      clientX, clientY, alt}).
 
 var me = this;
 var ME = document.getElementById(me.UUID);
@@ -75,16 +80,27 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     return d2 instanceof Error ? d2 : (d2.list ?? []);
   };
 
-  if (!hasWebGL()) {
-    canvasEl.innerHTML = '<p style="padding:14px" class="sh-cap">no WebGL here — this scene cannot render</p>';
-    return;
-  }
+  // GL-less hosts (CI, the Noobscape test browser) get a headless boot: the
+  // frame loop, instancing, behavior/tap dispatch and links all run — only the
+  // GL stage is swapped for a no-op null-renderer. The P0 verification gate
+  // rides this. Detect via hasWebGL() or force with DATA.headless:true.
+  const headless = (ME.DATA && ME.DATA.headless === true) || !hasWebGL();
   if (ME.DATA.caption) { footEl.hidden = false; capEl.textContent = ME.DATA.caption; }
+  if (headless) { footEl.hidden = false; capEl.textContent = "scenehost · headless (no WebGL) — logic only"; }
 
   me.frameAll = function () { if (me.stage && me.stage.frameAll) me.stage.frameAll(); };
 
   // ── the stage + the frame loop ────────────────────────────────────────────
-  const stage = mountScene(canvasEl, {
+  // null-renderer: the full stage contract as no-ops. Instancing, rigs, links
+  // and behaviors all still run; only rasterization is absent. The surface
+  // mirrors every stage.* call this closure makes (upsert/applyDelta/
+  // removeObject/setScene/requestRender/frameAll/dispose).
+  const nullStage = {
+    headless: true,
+    upsert() {}, applyDelta() {}, removeObject() {}, setScene() {},
+    requestRender() {}, frameAll() {}, dispose() {},
+  };
+  const stage = headless ? nullStage : mountScene(canvasEl, {
     pickMode: "affordant",
     showSlots: false,
     onTap: (id) => handleTap(id),
@@ -92,6 +108,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     onDrag: (evt) => handleDrag(evt),
   });
   me.stage = stage;
+  me.headless = headless;
   const env = ME.DATA.env || {};
   stage.setScene([], {
     lights: env.lights === "none" ? "none" : "default",
@@ -300,15 +317,33 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         api.data = inst.data;          // the addControl seed, as me.data
         if (!api.children) api.children = [];
 
-        // resolve behaviors: me.sceneBehaviors.<impl> OR direct me.animate/render/click
-        const impls = api.sceneBehaviors || {};
-        const impl = impls.default || impls[Object.keys(impls)[0]] || null;
-        inst.animateFn = api.animate || (impl && impl.animate) || null;
-        inst.renderFn = api.render || (impl && impl.render) || null;
-        inst.clickFn = api.click || (impl && impl.click) || null;
-        inst.disposeFn = api.dispose || (impl && impl.dispose) || null;
+        // resolve behaviors: me.sceneBehaviors.<impl> OR direct me.animate/render/click.
+        // Deferred one macrotask: installControl fires this callback BEFORE the
+        // child's own ready() runs (activateControls' setTimeout calls cb first,
+        // then api.ready). A control that assigns me.sceneBehaviors in ready() —
+        // e.g. dev:flownode — is not yet populated at cb time, so binding here
+        // would freeze render/click/etc to null. Deferring past that same-tick
+        // ready() lets every behavior surface. (Not headless-specific: it broke
+        // behavior dispatch on GL hosts too; headless merely exposed it.)
+        setTimeout(() => {
+          const impls = api.sceneBehaviors || {};
+          const impl = impls.default || impls[Object.keys(impls)[0]] || null;
+          inst.animateFn = api.animate || (impl && impl.animate) || null;
+          inst.renderFn = api.render || (impl && impl.render) || null;
+          inst.clickFn = api.click || (impl && impl.click) || null;
+          inst.disposeFn = api.dispose || (impl && impl.dispose) || null;
 
-        resolve(inst);
+          // animate(ctx) once, now that behaviors exist (deferred counterpart
+          // to the post-await block below, which still handles the case where
+          // the child's behaviors were set synchronously before ready).
+          if (inst.animateFn && !inst._animated) {
+            inst._animated = true;
+            try { inst.animateFn.call(inst.me, inst.ctx); }
+            catch (e) { diag(`${key}.animate: ${e && e.message ? e.message : e}`); }
+          }
+
+          resolve(inst);
+        });
       }, data);
       }
     });
@@ -316,8 +351,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     me.children.push(inst);
     byKey.set(key, inst);
 
-    // animate(ctx): once, now that the shape exists and the rig is live
-    if (inst.animateFn) {
+    // animate(ctx) once — only when the child's behaviors were bound
+    // synchronously (set before/at cb). When they arrive via the child's
+    // ready() the deferred setTimeout in inst_boot fires animate instead;
+    // _animated makes the two paths mutually exclusive.
+    if (inst.animateFn && !inst._animated) {
+      inst._animated = true;
       try { inst.animateFn.call(inst.me, inst.ctx); }
       catch (e) { diag(`${key}.animate: ${e && e.message ? e.message : e}`); }
     }
@@ -365,6 +404,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
   me.byId = function (key) { return byKey.get(key) || null; };
 
+  // programmatic tap: run the same dispatch a raycast hit triggers. The GL
+  // stage calls handleTap via its onTap; on the null stage there is no
+  // raycaster, so this is the headless/test surface for tap→behavior dispatch.
+  // specId is "<key>:<nodeId>" (nodeId optional) — the same id the GL stage emits.
+  me.tap = function (specId) { handleTap(specId); };
+
   // ── click dispatch: raycast hit → the instance's click(ctx) ──────────────
   function instForSpec(specId) {
     if (!specId) return null;
@@ -375,7 +420,18 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
   function handleTap(specId) {
     const inst = instForSpec(specId);
-    if (!inst || !inst.clickFn) return;
+    if (!inst) {
+      // a tap NO hosted instance claims — a spec the host's own js put on the
+      // stage with a tap affordance (the flow editor's facade wires), or the
+      // background (null) — goes to the host js's opt-in hook
+      // host.state.onSceneTap(specId|null). Unset ⇒ ignored, as before.
+      const hook = me.state && me.state.onSceneTap;
+      if (typeof hook === "function") {
+        try { hook(specId || null); } catch (e) { diag(`onSceneTap: ${e && e.message ? e.message : e}`); }
+      }
+      return;
+    }
+    if (!inst.clickFn) return;
     const nodeId = specId.indexOf(":") < 0 ? specId : specId.slice(specId.indexOf(":") + 1);
     try { inst.clickFn.call(inst.me, inst.ctx, { node: nodeId, specId, key: inst.key }); }
     catch (e) { diag(`${inst.key}.click: ${e && e.message ? e.message : e}`); }
@@ -383,7 +439,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
   function handleDrag(evt) {
     const inst = instForSpec(evt.id);
-    if (!inst) return;
+    if (!inst) {
+      // a drag NO hosted instance claims — a spec the host's own js put on
+      // the stage with a drag affordance (the flow editor's bar sockets) —
+      // goes to host.state.onSceneDrag(evt), the drag twin of onSceneTap.
+      // Unset ⇒ ignored, as before.
+      const hook = me.state && me.state.onSceneDrag;
+      if (typeof hook === "function") {
+        try { hook(evt); } catch (e) { diag(`onSceneDrag: ${e && e.message ? e.message : e}`); }
+      }
+      return;
+    }
     const fn = inst.me && (inst.me.drag || (inst.me.sceneBehaviors && inst.me.sceneBehaviors.default && inst.me.sceneBehaviors.default.drag));
     if (typeof fn === "function") {
       try { fn.call(inst.me, inst.ctx, evt); } catch (e) { diag(`${inst.key}.drag: ${e && e.message ? e.message : e}`); }

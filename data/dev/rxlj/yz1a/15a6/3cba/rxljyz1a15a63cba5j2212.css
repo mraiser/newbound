@@ -1,0 +1,23 @@
+.nb-flowspike { display: flex; flex-direction: column; height: 100%; min-height: 420px;
+  background: var(--nb-bg, #f6f4ee); color: var(--nb-fg, #2d343c); outline: none;
+  font: 13px/1.5 system-ui, sans-serif; }
+.nb-flowspike .fs-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  border-bottom: 1px solid rgba(0,0,0,.12); }
+.nb-flowspike .fs-title { font-weight: 600; }
+.nb-flowspike .fs-spacer { flex: 1; }
+.nb-flowspike .fs-status { opacity: .7; font-style: italic; }
+.nb-flowspike .fs-frame { padding: 3px 12px; border: 1px solid rgba(0,0,0,.2); border-radius: 4px;
+  background: transparent; cursor: pointer; }
+.nb-flowspike .fs-main { flex: 1; display: flex; min-height: 0; }
+.nb-flowspike .fs-host { flex: 1; min-width: 0; position: relative; }
+.nb-flowspike .fs-host .nb-scenehost { height: 100%; }
+.nb-flowspike .fs-readout { width: 300px; border-left: 1px solid rgba(0,0,0,.12);
+  padding: 12px; overflow: auto; }
+.nb-flowspike .fs-readout .lbl { display: block; font-size: 11px; text-transform: uppercase;
+  letter-spacing: .06em; opacity: .55; margin-bottom: 6px; }
+.nb-flowspike .fs-gate { list-style: none; margin: 0 0 12px; padding: 0; }
+.nb-flowspike .fs-gate li { padding: 4px 0; border-bottom: 1px dotted rgba(0,0,0,.08); }
+.nb-flowspike .fs-last-body { background: rgba(0,0,0,.05); padding: 8px; border-radius: 4px;
+  font: 11px/1.4 ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; }
+.nb-flowspike .fs-note { font-size: 12px; opacity: .75; }
+.nb-flowspike code { background: rgba(0,0,0,.06); padding: 0 3px; border-radius: 3px; }

@@ -1,0 +1,34 @@
+<section class="nb-flowspike" tabindex="0">
+  <div class="fs-head">
+    <span class="fs-title">flowspike · P0 gate</span>
+    <span class="fs-spacer"></span>
+    <span class="fs-status" role="status">booting…</span>
+    <button class="fs-frame" title="Frame the specimen deck">frame</button>
+  </div>
+
+  <div class="fs-main">
+    <!-- the ONE runtime: an app:scenehost, populated by addControl below -->
+    <div class="data-control fs-host" data-control="app:scenehost:{}"></div>
+
+    <aside class="fs-readout">
+      <span class="lbl">P0 gate</span>
+      <ul class="fs-gate">
+        <li class="fs-g-host">host booted — <b>pending</b></li>
+        <li class="fs-g-instances">instances added — <b>pending</b></li>
+        <li class="fs-g-loop">frame loop reaches behaviors — <b>pending</b></li>
+        <li class="fs-g-tap">tap dispatch + node id — <b>pending</b></li>
+      </ul>
+      <div class="fs-last" hidden>
+        <span class="lbl">last click</span>
+        <pre class="fs-last-body"></pre>
+      </div>
+      <p class="fs-note">Each node is a <code>dev:flownode</code> — a control whose
+        scene facet is its shape and whose <code>me.sceneBehaviors</code> carry the
+        (dummy) editing gestures. Click a node: selection emphasis + this readout
+        ride <code>host.state</code>, proving tap→behavior dispatch with the node id.
+        A passing gate is the green light for the floweditor3d port.</p>
+    </aside>
+  </div>
+</section>
+<div class="data-control" data-control="dev:flowdoc" hidden></div>
+<div class="data-control" data-control="dev:flowproject" hidden></div>

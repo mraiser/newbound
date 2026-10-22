@@ -111,10 +111,12 @@ async function init(host) {
     }
 
     if (location.hash.startsWith("#/flow")) {
-      // The 3D editor (floweditor3d) is the flow surface when WebGL is
-      // available; the read-only 2D viewer (floweditor) is the no-WebGL
-      // fallback.
-      const flowControl = hasWebGL() ? "floweditor3d" : "floweditor";
+      // The 3D editor is the flow surface when WebGL is available — since the
+      // P5 cutover that is dev.flowedit3d (the flow as scenehost-hosted
+      // dev:flownode instances; same props contract {title, graph, source,
+      // onBack} as the retired floweditor3d). The read-only 2D viewer
+      // (floweditor) stays the no-WebGL fallback.
+      const flowControl = hasWebGL() ? "flowedit3d" : "floweditor";
       // #/flow/sample — the bundled specimen; #/flow/<lib>/<ctl>/<cmd> when
       // real flow commands exist (none in this store yet).
       shelfApi = null;
@@ -169,7 +171,7 @@ async function init(host) {
           title: { prefix: `${lib} ▸ ${ctlName} ▸`, name: cmdName, suffix: "(flowlang)" },
           graph: typeof raw === "string" ? JSON.parse(raw) : raw,
           // names (not ids) — the flow-body pair resolves ctl/cmd by name,
-          // like the rest of dev.code. floweditor3d enables editing once it
+          // like the rest of dev.code. flowedit3d enables editing once it
           // reads the body back.
           source: { lib, ctl: ctlName, cmd: cmdName },
           onBack: () => { location.hash = `#/bench/${lib}/${ctlIdF}`; },
