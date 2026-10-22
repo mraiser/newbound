@@ -1,10 +1,12 @@
 // flowtoken — ONE flow EXECUTION TOKEN as a scenehost node control (P4 of the
 // floweditor3d → app-scene-stack conversion). The delivery IS the behavior:
 // the editor (dev:flowedit3d run ▸) addControl's one token per wire, seeded
-//   { runId, k, wire, round, from, to, dur, reduced }
+//   { runId, k, wire, round, from, to, dur, reduced, reverse? }
 // and this control's render behavior rides that wire during its propagation
 // round (flowdoc.propagationRounds) and reports through the host's shared
-// state: host.state.onTokenDelivered({ runId, k, round, key }).
+// state: host.state.onTokenDelivered({ runId, k, round, key }). A run that
+// follows a `next` rule also rides the jump pipe's two legs this way (k is
+// then "jump0"/"jump1", the rising leg ridden in reverse).
 //
 // Timing rides ONE shared clock — host.state.run = { id, t0 } (performance.now
 // ms) set by the editor once every token is added — so the per-instance boot
@@ -28,7 +30,10 @@ me.ready = function () {
   };
   const lerp = (a, b, u) => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, z: a.z + (b.z - a.z) * u });
 
+  // seed.reverse rides the link from its `to` end back to its `from` (the
+  // jump pipe's rising leg is a link hung FROM the bead, ridden tab → bead)
   function pointAt(ctx, d, u) {
+    if (d.reverse) u = 1 - u;
     const st = ctx.host && ctx.host.stage;
     if (st && typeof st.linkCurvePoint === "function" && d.wire) {
       try { const p = st.linkCurvePoint(d.wire, u); if (p) return p; } catch (e) { /* fall through */ }
