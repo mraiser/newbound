@@ -251,7 +251,39 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       ? [...stage.objects.values()].filter((o) => o && o.spec && !String(o.spec.id).startsWith("fx_")).map((o) => o.spec)
       : [];
     stage.setScene(specs.concat(ghostSpecs(), hostOwned), { lights: "default", grid: true, camera: null });
+    styleFacadeLabels();
     return sceneDoc;
+  }
+
+  // Prograph look, DOM half: the stage draws text as DOM labels; the facade's
+  // op names, literals and control marks sit INSIDE their icons (centred,
+  // borderless — css fe-opname/fe-ctlmark) and scale with the zoom so a name
+  // keeps to its icon. Classes come from the label's facade meta; the size
+  // rides one css variable (--fe-fs) the camera hook keeps current.
+  function styleFacadeLabels() {
+    if (!stage || !stage.objects) return;          // headless null stage
+    for (const o of stage.objects.values()) {
+      const m = o && o.label && o.spec && o.spec.meta;
+      if (!m) continue;
+      if (m.role === "label") {
+        o.label.classList.add("fe-opname", "fe-k-" + m.opType);
+        if (m.lit) o.label.classList.add("fe-lit");
+      } else if (m.role === "flag") o.label.classList.add("fe-ctlmark");
+    }
+    if (!styleFacadeLabels.hooked && stage.onCameraChange && stage.canvas) {
+      styleFacadeLabels.hooked = true;
+      const box = stage.canvas.parentElement;      // the .sh-canvas the labels live in
+      const fit = () => {
+        const o = stage.orbit; if (!o || !box) return;
+        // px per world unit at the orbit target (persp fov 40 = the ortho match)
+        const u = (stage.canvas.clientHeight || 1) / (2 * Math.max(0.01, o.dist) * Math.tan(20 * Math.PI / 180));
+        const fs = u * 0.2;
+        box.style.setProperty("--fe-fs", Math.min(16, fs).toFixed(1) + "px");
+        box.classList.toggle("fe-far", fs < 6.5);
+      };
+      stage.onCameraChange(fit);
+      fit();
+    }
   }
 
   // ── instances: host each op of the ACTIVE deck as a flownode ─────────────
@@ -293,6 +325,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       const inst = await hostApi.addControl("dev", "flownode", {
         opType: op.type, name: op.name, width: op.width, pos: op.pos, opIndex: i,
         inTerms: Object.keys(op.in || {}), outTerms: Object.keys(op.out || {}), phase: i * 0.7,
+        proxy: true,   // the facade draws the Prograph icon; the instance is its pick surface
       }, key);
       if (disposed) { try { hostApi.removeControl(key); } catch (e) {} return; }
       instances.push(inst);
@@ -1448,6 +1481,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         // (it used to be read as (opIndex, evt), so no drag ever committed);
         // the node live-follows the pointer itself, the move commits on end.
         if (!p || p.which) return;                 // socket drags: not an op move
+        // live-follow: the drawn icon rides the pointer with its pick proxy —
+        // and so do its wires (links re-resolve their socket ends each frame)
+        if (p.phase === "move" && !running) {
+          const c0 = focusedCase(); const op0 = c0 && c0.cmds[p.opIndex]; const e0 = p.evt || {};
+          if (op0 && op0.pos && typeof e0.dx === "number" && stage && stage.applyDelta) {
+            const fid = "fx_" + slug(`d${activeDeck}/op/${p.opIndex}`);
+            stage.applyDelta(fid, "pos.x", op0.pos.x + e0.dx);
+            stage.applyDelta(fid, "pos.y", op0.pos.y + (e0.dy || 0));
+          }
+          return;
+        }
         if (p.phase !== "end" || running) return;
         const c = focusedCase(); const op = c && c.cmds[p.opIndex]; if (!op || !op.pos) return;
         const evt = p.evt || {};

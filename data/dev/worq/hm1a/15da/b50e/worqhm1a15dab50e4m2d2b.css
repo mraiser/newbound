@@ -137,3 +137,18 @@
 .nb-flowedit3d .fe-ed-add input { width:0; }
 .nb-flowedit3d .fe-ed-sentence { font-style:italic; }
 .nb-flowedit3d button.danger { color:#c0392b; border-color:#f0c4c0; }
+/* Prograph look, DOM half: the facade's labels sit INSIDE their icons —
+   centred on the face, borderless ink text, sized by --fe-fs (px per world
+   unit × the icon's text ratio, kept by the camera hook). The stage writes
+   transform/font-size inline, hence !important. */
+.nb-flowedit3d .sh-canvas .ss-label.fe-opname,
+.nb-flowedit3d .sh-canvas .ss-label.fe-ctlmark {
+  transform:translate(-50%,-50%) !important; background:none; border:0; padding:0;
+  font:600 var(--fe-fs, 12px)/1 system-ui, sans-serif !important; letter-spacing:.01em; }
+.nb-flowedit3d .sh-canvas .ss-label.fe-opname { color:#1f252b; }
+.nb-flowedit3d .sh-canvas .ss-label.fe-opname.fe-lit {
+  font-family:ui-monospace, Menlo, Consolas, monospace !important; font-weight:500 !important; }
+.nb-flowedit3d .sh-canvas .ss-label.fe-opname.fe-k-undefined { color:#8a94a0; font-style:italic; }
+.nb-flowedit3d .sh-canvas .ss-label.fe-ctlmark { color:#fff; font-weight:700 !important; }
+.nb-flowedit3d .sh-canvas.fe-far .ss-label.fe-opname,
+.nb-flowedit3d .sh-canvas.fe-far .ss-label.fe-ctlmark { visibility:hidden; }
