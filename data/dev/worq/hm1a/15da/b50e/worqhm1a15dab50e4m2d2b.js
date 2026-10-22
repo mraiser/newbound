@@ -1558,7 +1558,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     segs.forEach((s) => {
       const c = chain[s.deck];
       if (segs.length > 1 || s.end !== "done") {
-        const at = s.stopAt != null ? esc(nameOf(c, s.stopAt)) + (s.inferred ? " (inferred: this case has more than one such rule)" : "") : "?";
+        const sop = s.stopAt != null && c ? c.cmds[s.stopAt] : null;
+        const nm = sop ? (sop.type === "match" || sop.type === "constant" ? `“${nameOf(c, s.stopAt)}”` : nameOf(c, s.stopAt)) : "?";
+        const at = esc(nm) + (s.inferred ? " (inferred: this case has more than one such rule)" : "");
         const how = { done: "done", next: `next at ${at} → case ${s.deck + 2}`, terminate: `terminated at ${at}`, fail: `failed at ${at}`,
           panic: "panicked", "next-missing": `next at ${at}, but there is no next case (I-4)` }[s.end] || esc(s.end);
         h += `<p class="fe-run-case"><b>case ${s.deck + 1}</b> <span class="lbl">${how}</span></p>`;
@@ -1677,7 +1679,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const msg = /^\s*</.test(rawMsg) ? rawMsg.replace(/<title>[\s\S]*?<\/title>/i, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : rawMsg;
     lastResult = { args, ok, result: r, msg, ms, unsaved, source: src, path, untraced,
       tokens: R ? { complete: !!R.complete, inOrder: !!R.inOrder, delivered: R.delivered.length } : null };
-    const via = R && R.segments && R.segments.length ? ` · ${pathText(R.segments)}` : "";
+    const via = untraced ? " · no case path" : (R && R.segments && R.segments.length ? ` · ${pathText(R.segments)}` : "");
     pushJournal(ok ? `ran ${src.cmd}${via} · ${ms}ms` : `run failed: ${msg}`);
     if (ok) status(`ran${via} · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} ${R.delivered.length === 1 ? "delivery" : "deliveries"} in order` : ""), "ok");
     else status(`run failed: ${msg}`, "bad");
