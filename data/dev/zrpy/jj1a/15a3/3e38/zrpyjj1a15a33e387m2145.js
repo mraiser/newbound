@@ -106,7 +106,15 @@ me.ready = function () {
         ctx.host.setState("lastClick", {
           key: ctx.key, node, opType: ctx.me.opType, name: ctx.me.opName, t: Date.now(),
         });
-        // selection emphasis rides the shared state (decision 1)
+        // a BODY tap is op selection. An editor that owns selection (flowedit3d:
+        // op XOR wire, inspector + status follow, Del deletes) takes it through
+        // host.state.onOpSelect — the op twin of onSceneTap's wire pick. A
+        // viewer without the hook gets the plain shared-state emphasis
+        // (decision 1).
+        if (typeof st.onOpSelect === "function") {
+          st.onOpSelect({ key: ctx.key, opIndex: ctx.me.opIndex, node, opType: ctx.me.opType });
+          return;
+        }
         ctx.host.setState("selectedKey", ctx.key);
       },
 
