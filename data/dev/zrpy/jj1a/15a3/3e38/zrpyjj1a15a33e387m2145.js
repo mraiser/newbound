@@ -119,8 +119,9 @@ me.ready = function () {
       },
 
       // drag gestures. The editor owns the interpretation via host.state.onOpDrag
-      // (P2): it sees the start socket (in<N> → begin a wire FROM that input,
-      // committed on release over an output; anything else → begin an op
+      // (P2): it sees the start socket (in<N>/out<N> → begin a wire from that
+      // socket, committed on release over a socket of the other kind;
+      // anything else → begin an op
       // move) and routes move/end accordingly — ghost + I-1/I-2 target
       // preview on socket moves, op-position live update on body moves. The
       // evt carries {phase, id, x, y, z, dx, dy, dz, clientX, clientY, alt};
