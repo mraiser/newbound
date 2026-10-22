@@ -657,9 +657,9 @@ function toScene(rootCase, opts = {}) {
 // `editable` switches socket/op drag affordances on, `activeDeck` picks the
 // deck that carries bars, terminals, wires, tags, and miniatures (the rest
 // ghost) — the same semantics toScene gives the legacy editor.
-function toSceneDoc(flow, { editable = false, activeDeck = 0 } = {}) {
+function toSceneDoc(flow, { editable = false, activeDeck = 0, tokens = null } = {}) {
   const c = flow && flow.root ? flow.root : flow;   // accept a FlowDoc or a Case
-  const { specs, deckCount } = toScene(c, { activeDeck, editable });
+  const { specs, deckCount } = toScene(c, { activeDeck, editable, tokens });
 
   // scenedoc node ids must satisfy NAME_RE (^[a-z][a-z0-9_]*$) — no slashes.
   // Slug toScene's hierarchical spec id (`d0/op/3/in/term`) into a flat,
@@ -713,5 +713,5 @@ function toSceneDoc(flow, { editable = false, activeDeck = 0 } = {}) {
   };
 }
 
-    Object.assign(me, { GEO, halfH, opBox, opLabel, project, frontOrtho, terminalWorld, wireCurvePoint, toScene, toSceneDoc });
+    Object.assign(me, { GEO, halfH, opBox, opLabel, scenePalette, SCENE_TOKENS, project, frontOrtho, terminalWorld, wireCurvePoint, toScene, toSceneDoc });
   })();
