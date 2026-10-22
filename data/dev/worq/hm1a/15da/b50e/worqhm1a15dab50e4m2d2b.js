@@ -8,13 +8,15 @@
 //
 // Gestures ported (design §5.4, pointer AND keyboard):
 //   wire drag  — press a socket, drag to a socket of the OTHER kind, release:
-//                the wire commits. From an INPUT drop on an output (an op's
-//                out socket or a params-bar terminal); from an OUTPUT drop on
-//                an input (an op's in socket or a return-bar terminal). The
+//                the wire commits. Inputs are op in sockets and return-bar
+//                terminals; outputs are op out sockets and params-bar
+//                terminals — any of them can start the drag or end it. The
 //                ghost is a REAL hang link between the grabbed socket and the
 //                pointer; over a legal socket it snaps there and the status
-//                previews the wire (I-1/I-2 via canWire). Socket drags dispatch
-//                flownode.drag → host.state.onOpDrag → onSocketDrag. A plain
+//                previews the wire (I-1/I-2 via canWire). Op socket drags
+//                dispatch flownode.drag → host.state.onOpDrag → onSocketDrag;
+//                bar sockets (facade, no instance) arrive by the scenehost's
+//                host.state.onSceneDrag → onSceneDrag → onSocketDrag. A plain
 //                socket TAP wires nothing (onPortTap just says how).
 //   keyboard   — W arms wiring from the selection; ←→ cycle the legal targets
 //                (reading order, nearest-first); Enter commits; Esc cancels.
@@ -265,6 +267,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       if (n.parent !== undefined) s.parent = "fx_" + n.parent;
       if (n.kind === "link") { s.from = "fx_" + n.from; s.to = "fx_" + n.to; }
       delete s.affordances;                 // facade is scenery; instances are picked —
+      // EXCEPT bar sockets: no instance hosts a bar, so its facade sockets
+      // stay tappable + draggable (the host forwards them to onSceneTap /
+      // onSceneDrag → the wiring engine, the same as an op's sockets)
+      if (barTermOfMeta(n.meta)) s.affordances = { tap: true, hover: true, drag: { plane: "xy" } };
       // EXCEPT wires: a wire is no instance, so its facade link stays tappable
       // (the host forwards the tap to onSceneTap → selectWire), and the
       // selected wire draws in the selection colour, thicker
@@ -418,21 +424,36 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     return evt && typeof evt.clientX === "number" ? clientToWorld(evt) : null;
   }
 
+  // a bar socket of the active deck, from its facade meta (toScene stamps
+  // {role:"terminal", idx:-1|-2, which, term}): the params bar's sockets are
+  // sources (which "out"), the return bar's are sinks (which "in")
+  function barTermOfMeta(m) {
+    return m && m.role === "terminal" && (m.idx === -1 || m.idx === -2) && typeof m.term === "string"
+      ? { idx: m.idx, which: m.which, term: m.term } : null;
+  }
+  function barTermOfSpec(specId) {
+    const o = specId && stage && stage.objects && stage.objects.get ? stage.objects.get(specId) : null;
+    return barTermOfMeta(o && o.spec && o.spec.meta);
+  }
+
   // the `which` ("in"|"out") terminal under the pointer: the socket the stage
-  // picks there (a hosted op on the active deck), else the nearest such
-  // terminal — op sockets plus the matching bar (outputs: the params bar;
-  // inputs: the return bar — bars are facade scenery, never picked) — within
-  // DROP_PX on screen (DROP_WORLD units when headless).
+  // picks there (an op socket on the active deck, or a bar socket), else the
+  // nearest such terminal — op sockets plus the matching bar (outputs: the
+  // params bar; inputs: the return bar) — within DROP_PX on screen
+  // (DROP_WORLD units when headless).
   const DROP_PX = 24, DROP_WORLD = 0.3;
   function terminalAt(c, evt, which) {
     if (!c || !evt) return null;
     const hasClient = typeof evt.clientX === "number" && typeof evt.clientY === "number";
     if (hasClient && stage && stage.pickAt) {
-      const m = /^d(\d+)_op(\d+):(in|out)(\d+)$/.exec(String(stage.pickAt(evt.clientX, evt.clientY) || ""));
+      const id = String(stage.pickAt(evt.clientX, evt.clientY) || "");
+      const m = /^d(\d+)_op(\d+):(in|out)(\d+)$/.exec(id);
       if (m && +m[1] === activeDeck && m[3] === which) {
         const op = c.cmds[+m[2]]; const term = op && Object.keys(op[which] || {})[+m[4]];
         if (term !== undefined) return { idx: +m[2], term };
       }
+      const bt = barTermOfSpec(id);
+      if (bt && bt.which === which) return { idx: bt.idx, term: bt.term };
     }
     const cands = [];
     c.cmds.forEach((op, i) => Object.keys((op && op[which]) || {}).forEach((term) => cands.push({ idx: i, term })));
@@ -453,19 +474,24 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     return bd <= 1 ? best : null;
   }
 
+  // p: {phase, key, opIndex, which, evt} plus ord (an op socket: the socket
+  // ordinal) or term + sock (a bar socket: opIndex -1/-2, sock = its facade
+  // spec id, which the ghost hangs from)
   function onSocketDrag(p) {
     const c = focusedCase(); if (!c || !p) return;
     const evt = p.evt || {};
     if (p.phase === "start") {
       if (running || (p.which !== "in" && p.which !== "out")) return;
-      const op = c.cmds[p.opIndex]; const term = op && Object.keys(op[p.which] || {})[p.ord];
-      if (term === undefined) return;
+      const terms = p.opIndex === -1 ? c.input : p.opIndex === -2 ? c.output
+        : (c.cmds[p.opIndex] && c.cmds[p.opIndex][p.which]);
+      const term = p.term !== undefined ? p.term : Object.keys(terms || {})[p.ord];
+      if (term === undefined || !terms || !(term in terms)) return;
       if (p.which === "in" && c.cons.some((w) => w.dest[0] === p.opIndex && w.dest[1] === term)) {
         status(`✗ ${nameOf(c, p.opIndex)}.${term} is already wired (I-1) — select its wire and Del first`, "bad");
         return;
       }
       if (wireMode) cancelWireGhost();
-      armSrc = { which: p.which, idx: p.opIndex, term, key: p.key }; selWire = null;
+      armSrc = { which: p.which, idx: p.opIndex, term, key: p.key, sock: p.sock || null }; selWire = null;
       hostApi.setState("wireSrc", armSrc);
       showGhost(dragPoint(evt) || terminalWorld(c, p.opIndex, p.which, term));
       status(`wiring ${nameOf(c, p.opIndex)}.${term} — drag to ${p.which === "in" ? "an output" : "an input"} and release (Esc cancels)`, "ok");
@@ -514,7 +540,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       r: GEO.wireR, material: { color: "#62bd8c", dash: true } });
     if (armSrc) {
       const which = armSrc.which || "in";
-      const sockId = `fx_${slug(`d${activeDeck}/op/${armSrc.idx}/${which}/${armSrc.term}`)}`;
+      const sockId = armSrc.sock || `fx_${slug(`d${activeDeck}/op/${armSrc.idx}/${which}/${armSrc.term}`)}`;
       const at = terminalWorld(c, armSrc.idx, which, armSrc.term) || { x: 0, y: 0, z: 0 };
       return which === "in"
         ? [tipSpec(ghostTip || at), linkSpec("fx_ghosttip", sockId)]
@@ -635,9 +661,18 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   function onSceneTap(specId) {
     if (armSrc || wireMode) return;            // mid wiring gesture: not a selection
+    const bt = barTermOfSpec(specId);          // a bar socket: the same hint as an op's
+    if (bt) { onPortTap({ node: bt.which + "0" }); return; }
     const wi = wireIndexOfSpec(specId);
     if (wi != null) { selectWire(wi); return; }
     if (specId == null && selWire != null) selectWire(null);   // background tap drops it
+  }
+  // drags no hosted instance claims (host.state.onSceneDrag): a bar socket's
+  // drag is a wiring gesture — handed to onSocketDrag exactly as flownode
+  // hands it an op socket's (the facade spec id is both key and ghost end)
+  function onSceneDrag(evt) {
+    const bt = evt && barTermOfSpec(evt.id); if (!bt) return;
+    onSocketDrag({ phase: evt.type, key: evt.id, sock: evt.id, opIndex: bt.idx, which: bt.which, term: bt.term, evt });
   }
 
   // ── delete: Del unwires the selected wire (frees its input, I-1) ─────────
@@ -1657,6 +1692,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       hostApi.setState("onPortTap", onPortTap);
       // taps no flownode claims (facade wires; null = background) → wire selection
       hostApi.setState("onSceneTap", onSceneTap);
+      // drags no flownode claims (the bar sockets) → the wiring engine
+      hostApi.setState("onSceneDrag", onSceneDrag);
       // taps on an op BODY (flownode.click) → op selection, the same path as wires
       hostApi.setState("onOpSelect", onOpSelect);
       hostApi.setState("onOpDrag", (p) => {
