@@ -43,7 +43,7 @@
       </div>
       <ul class="fe-gate">
         <li class="fe-g-host">host booted — <b>pending</b></li>
-        <li class="fe-g-wiretap">port-tap wire — <b>pending</b></li>
+        <li class="fe-g-wiretap">drag wire (in → out) — <b>pending</b></li>
         <li class="fe-g-i1i2">I-1/I-2 refused — <b>pending</b></li>
         <li class="fe-g-kbd">keyboard wire (W/→/Enter) — <b>pending</b></li>
         <li class="fe-g-undo">undo restores — <b>pending</b></li>
@@ -56,8 +56,8 @@
         <li class="fe-g-diff">changes since save (diffFlow) — <b>pending</b></li>
         <li class="fe-g-journal">server journal + entry diff — <b>pending</b></li>
       </ul>
-      <p class="fe-ro">Tap an output socket (or press <kbd>W</kbd>) to start a
-        wire, then tap an input to connect it. Click a node kind to add it; with
+      <p class="fe-ro">Drag from an input socket to an output to wire them
+        (or press <kbd>W</kbd> to wire from the selection). Click a node kind to add it; with
         a wire selected, the new node is spliced into that wire. <kbd>Del</kbd>
         removes the selected wire or node; <b>tidy</b>/<b>untangle</b> lay the
         case out; <b>save</b> writes the flow body (if it changed on the server

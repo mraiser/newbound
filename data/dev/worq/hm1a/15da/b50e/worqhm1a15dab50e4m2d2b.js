@@ -489,20 +489,26 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
 
   // ── the wire ghost: facade tip sphere + hang link tracking the pointer ────
+  // pointer drag (armSrc = the dragged INPUT): the tip is the output end, the
+  // link hangs from it into the input. keyboard (wireMode): from the selected
+  // output down to the tip on the candidate input.
   function ghostSpecs() {
     if (!armSrc && !wireMode) return [];
     const c = focusedCase(); if (!c) return [];
-    const src = armSrc || (wireMode && wireMode.src);
+    const tipSpec = (t) => ({ id: "fx_ghosttip", kind: "sphere", pos: { x: t.x, y: t.y, z: t.z },
+      params: { radius: 0.05 }, material: { color: "#62bd8c", emissive: true } });
+    const linkSpec = (from, to) => ({ id: "fx_ghostwire", kind: "link", curve: "hang", from, to,
+      r: GEO.wireR, material: { color: "#62bd8c", dash: true } });
+    if (armSrc) {
+      const inId = `fx_${slug(`d${activeDeck}/op/${armSrc.idx}/in/${armSrc.term}`)}`;
+      const at = terminalWorld(c, armSrc.idx, "in", armSrc.term) || { x: 0, y: 0, z: 0 };
+      return [tipSpec(ghostTip || at), linkSpec("fx_ghosttip", inId)];
+    }
+    const src = wireMode.src;
     if (!src) return [];
     const fromId = `fx_${slug(`d${activeDeck}/op/${src.idx}/out/${src.term}`)}`;
     const from = terminalWorld(c, src.idx, "out", src.term) || { x: 0, y: 0, z: 0 };
-    const tip = ghostTip || from;
-    return [
-      { id: "fx_ghosttip", kind: "sphere", pos: { x: tip.x, y: tip.y, z: tip.z },
-        params: { radius: 0.05 }, material: { color: "#62bd8c", emissive: true } },
-      { id: "fx_ghostwire", kind: "link", curve: "hang", from: fromId, to: "fx_ghosttip",
-        r: GEO.wireR, material: { color: "#62bd8c", dash: true } },
-    ];
+    return [tipSpec(ghostTip || from), linkSpec(fromId, "fx_ghosttip")];
   }
   let ghostTip = null;
   // the ghost touches ONLY its own two specs: upsert while armed, remove when
@@ -519,18 +525,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   function moveGhost(at) { ghostTip = at; if (armSrc || wireMode) syncGhost(); }
   function cancelWireGhost() { armSrc = null; wireMode = null; ghostTip = null; syncGhost(); if (hostApi) hostApi.setState("wireSrc", null); }
 
-  // pointer move on the stage tracks the ghost tip + previews legal targets
-  function onStageMove(ev) {
-    if (!armSrc) return;
-    const c = focusedCase(); if (!c) return;
-    // convert client px → world via the front-ortho plane (z=0) as the editor
-    // does for its wiring ghost; the stage's own raycast is GL-only, so the
-    // headless path uses the same plane math as the front view.
-    const world = clientToWorld(ev);
-    if (world) moveGhost(world);
-  }
-
-  // the front-ortho client→world projection (the wiring ghost's plane)
+  // the front-ortho client→world projection (headless fallback for a drag
+  // point, and an op-drag end that carries no plane delta)
   function clientToWorld(ev) {
     const host = $(".fe-host"); if (!host) return null;
     const r = host.getBoundingClientRect();
@@ -911,7 +907,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const c = focusedCase();
     if (m && c && c.cmds[+m[2]]) renderOpEditor(body, c, +m[2], key);
     else if (c) renderSignatureEditor(body, c);
-    else body.innerHTML = `<p class="fe-empty">Select an element. Output sockets start wires.</p>`;
+    else body.innerHTML = `<p class="fe-empty">Select an element. Drag from an input socket to an output to wire.</p>`;
   }
 
   /** The op popover: literal/slot/name, ctype + matcher toggle, condition,
@@ -965,7 +961,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (op.type === "local") edButton(foot, "drill ▸ into the sub-flow", "fe-ed-drill", () => drillInto(op));
     const wires = doc.wiresTouching(c, oi);
     edButton(foot, `delete op${wires ? ` · removes ${wires} wire${wires > 1 ? "s" : ""}` : ""}`, "fe-del danger", deleteSelectedOp);
-    edNote(body, op.type === "local" ? "dblclick to drill in · Del deletes" : "W wires from its first output · drag body moves · Enter edits · Del deletes");
+    edNote(body, op.type === "local" ? "dblclick to drill in · Del deletes" : "drag an input to an output wires · drag body moves · Enter edits · Del deletes");
   }
 
   /** The terminal popover — op terminals AND bar terminals (the signature). */
@@ -1016,7 +1012,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       outputs, returns its inputs (FlowDoc termMap/sideOf convention). */
   function renderSignatureEditor(body, c) {
     body.replaceChildren();
-    edNote(body, "Select an element. Output sockets start wires.");
+    edNote(body, "Select an element. Drag from an input socket to an output to wire.");
     for (const [idx, label, bar] of [[-1, "params — the signature", "params"], [-2, "return — the signature", "return"]]) {
       const map = (idx === -1 ? c.input : c.output) || {};
       const which = idx === -1 ? "out" : "in";
@@ -1652,7 +1648,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         // flownode hands ONE payload {phase, key, opIndex, evt, which?, ord?}
         // (it used to be read as (opIndex, evt), so no drag ever committed);
         // the node live-follows the pointer itself, the move commits on end.
-        if (!p || p.which) return;                 // socket drags: not an op move
+        if (!p) return;
+        if (p.which) { onSocketDrag(p); return; }   // socket drags WIRE (input → output)
         // live-follow: the drawn icon rides the pointer with its pick proxy —
         // and so do its wires (links re-resolve their socket ends each frame)
         if (p.phase === "move" && !running) {
@@ -1728,8 +1725,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         onSceneTap(null);
       });
 
-      // stage pointer moves track the wire ghost
-      hostEl.addEventListener("pointermove", onStageMove);
+      // (the wire ghost rides the socket DRAG itself — onSocketDrag)
 
       // headless: tap dispatch is programmatic; click a node to select, dblclick drills
       if (scenehost.headless) {
@@ -1839,7 +1835,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         hostedCount: () => (hostApi && hostApi.children ? hostApi.children.length : 0),
         // test/gate surface (headless drives these)
         onPortTap, startKeyboardWiring, moveWireCandidate, commitKeyboardWire,
-        armWire, undo, doc: () => doc, focusedCase, canWire: (s, d2) => doc.canWire(focusedCase(), s, d2),
+        onSocketDrag, undo, doc: () => doc, focusedCase, canWire: (s, d2) => doc.canWire(focusedCase(), s, d2),
         addWire: (s, d2) => { const cmd = doc.addWire(focusedCase(), { src: s, dest: d2 }); if (!cmd.error) commitApplied(cmd); return cmd; },
         removeWire: (i) => { const cmd = doc.removeWire(focusedCase(), i); if (!cmd.error) commitApplied(cmd); return cmd; },
         cons: () => focusedCase().cons.length,
