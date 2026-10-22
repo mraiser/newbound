@@ -46,6 +46,9 @@ me.ready = function () {
         ctx.setRig("halo", "params.size.x", box.x + 0.16);
         ctx.setRig("halo", "params.size.y", box.y + 0.16);
         ctx.setRig("halo", "pos.z", -box.z / 2 + 0.02);
+        // selection = the bench accent (tokens.css: selection/focus/primary)
+        const acc = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+        ctx.setRig("halo", "material", { color: /^#[0-9a-f]{3,8}$/i.test(acc) ? acc : "#f0a63c", emissive: true });
         // STANDALONE (seed proxy:false, or no facade on the stage — the
         // flowspike harness): the instance draws itself, generic geometry
         const st = ctx.host && ctx.host.stage;
