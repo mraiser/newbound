@@ -618,9 +618,19 @@ function wireLabel(c, w) {
     available (the params bar, or a completed op); an op completes when every
     WIRED input has been delivered (ops with none evaluate up front). Wires
     that can never fire (broken flows — I-1/I-2 states) are returned in
-    `unreached` rather than animated; the real interpreter would hang on them. */
-function propagationRounds(c) {
+    `unreached` rather than animated; the real interpreter would hang on them.
+    `order` is the evaluation order: the up-front ops (no wired input) in
+    index order, then each op as its last wired input lands.
+    opts.stopAt (an op index) cuts the schedule where that op evaluates — the
+    op whose condition rule ended the case (a `next` jump, a terminate, a
+    fail): the round it completes in keeps only the wires up to the one that
+    completed it (the interpreter evaluates an op the moment its last input
+    lands, and the rule's exception ends the sweep there), later rounds never
+    run, and the wires cut off come back as `skipped` (stopped: true) rather
+    than `unreached`. */
+function propagationRounds(c, opts = {}) {
   const N = c.cmds.length;
+  const stopAt = typeof opts.stopAt === "number" ? opts.stopAt : null;
   // §1.5 step 3, exactly: a terminal is pre-marked done iff its NAME appears
   // as no connection's dest name — the match is GLOBAL and name-only (the
   // I-1 sharp edge: an unwired input whose name is wired elsewhere waits
@@ -630,9 +640,11 @@ function propagationRounds(c) {
   const need = c.cmds.map((op) => Object.keys(op.in).filter((n) => globalDest.has(n)).length);
   const filled = c.cmds.map(() => new Set());
   const done = c.cmds.map((_, i) => need[i] === 0);
+  const order = done.map((d, i) => (d ? i : -1)).filter((i) => i >= 0);
   const fired = new Set();
   const rounds = [];
-  for (let guard = 0; guard <= c.cons.length + 1; guard++) {
+  let stopped = stopAt !== null && !!done[stopAt];   // an up-front op: nothing fires
+  for (let guard = 0; !stopped && guard <= c.cons.length + 1; guard++) {
     const round = [];
     c.cons.forEach((w, k) => {
       if (fired.has(k)) return;
@@ -640,18 +652,26 @@ function propagationRounds(c) {
       if (s === -1 || (s >= 0 && s < N && done[s])) round.push(k);
     });
     if (!round.length) break;
+    const kept = [];
     for (const k of round) {
       fired.add(k);
+      kept.push(k);
       const d = c.cons[k].dest[0];
       if (d >= 0 && d < N) {
         filled[d].add(c.cons[k].dest[1]);
-        if (filled[d].size >= need[d]) done[d] = true;
+        if (!done[d] && filled[d].size >= need[d]) {
+          done[d] = true;
+          order.push(d);
+          if (d === stopAt) { stopped = true; break; }
+        }
       }
     }
-    rounds.push(round);
+    rounds.push(kept);
   }
-  const unreached = c.cons.map((_, k) => k).filter((k) => !fired.has(k));
-  return { rounds, unreached };
+  const unfired = c.cons.map((_, k) => k).filter((k) => !fired.has(k));
+  return stopped
+    ? { rounds, unreached: [], skipped: unfired, order, stopped: true }
+    : { rounds, unreached: unfired, order };
 }
 
 /** Is `to` (op index) reachable from `from` (op index) along cons edges? */
