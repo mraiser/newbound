@@ -38,7 +38,10 @@ me.ready = function () {
           : (fp && fp.opBox) ? fp.opBox({ type: kind, width: d.width })
           : { x: d.width || 1, y: 0.5, z: 0.26 };
         ctx.setRig("body", "params.size.x", box.x);
-        ctx.setRig("body", "params.size.y", box.y);
+        // the body stops short of the top/bottom edge: the sockets straddle
+        // those edges, and a full-height body (nearer the eye than a socket's
+        // centre) would win the raycast there and swallow the socket tap
+        ctx.setRig("body", "params.size.y", Math.max(0.1, box.y - 0.12));
         ctx.setRig("body", "params.size.z", box.z);
         ctx.setRig("halo", "params.size.x", box.x + 0.16);
         ctx.setRig("halo", "params.size.y", box.y + 0.16);
