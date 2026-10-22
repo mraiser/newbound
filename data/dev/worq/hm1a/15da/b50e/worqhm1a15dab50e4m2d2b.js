@@ -1509,7 +1509,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         to = { x: Math.round(to.x * 2) / 2, y: Math.round(to.y * 2) / 2, z: op.pos.z };
         if (to.x === op.pos.x && to.y === op.pos.y) { renderAll(); return; }   // snapped back: re-seat the node
         const cmd = doc.moveOp(c, p.opIndex, to);
-        if (cmd && !cmd.error) { commitApplied(cmd); status(`moved ${nameOf(c, p.opIndex)} — ⌘Z undoes`, "ok"); }
+        if (cmd && !cmd.error) {
+          // refused (read-only view / mid-run): commitApplied reverted the doc
+          // and set the reason — re-seat the live-followed icon and proxy
+          if (commitApplied(cmd)) status(`moved ${nameOf(c, p.opIndex)} — ⌘Z undoes`, "ok");
+          else renderAll();
+        }
         else { renderAll(); status("move refused" + (cmd && cmd.error ? ": " + cmd.error : ""), "bad"); }
       });
 
