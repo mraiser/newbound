@@ -26,12 +26,42 @@ me.ready = function () {
         ctx.me._phase = phase;
         // front-ortho anchor: the seeded flow position is the rest height
         if (d.pos && typeof d.pos.y === "number") ctx.me.baseY = d.pos.y;
+        if (!ctx.setRig) return;
         // label the body with the op's name (per-node override rides setRig)
-        if (ctx.setRig && ctx.me.opName) ctx.setRig("label", "text", ctx.me.opName);
+        if (ctx.me.opName) ctx.setRig("label", "text", ctx.me.opName);
+        // PICK PROXY (the default): the editor's facade (flowproject.toSceneDoc)
+        // draws the Prograph icon; this instance is the invisible tap/drag
+        // surface sized to that icon's outer box, plus the selection halo.
+        const fpEl = document.querySelector('[data-control="dev:flowproject"]');
+        const fp = fpEl && fpEl.api;
+        const box = (d.body && typeof d.body.x === "number") ? d.body
+          : (fp && fp.opBox) ? fp.opBox({ type: kind, width: d.width })
+          : { x: d.width || 1, y: 0.5, z: 0.26 };
+        ctx.setRig("body", "params.size.x", box.x);
+        ctx.setRig("body", "params.size.y", box.y);
+        ctx.setRig("body", "params.size.z", box.z);
+        ctx.setRig("halo", "params.size.x", box.x + 0.16);
+        ctx.setRig("halo", "params.size.y", box.y + 0.16);
+        ctx.setRig("halo", "pos.z", -box.z / 2 + 0.02);
+        // STANDALONE (seed proxy:false, or no facade on the stage — the
+        // flowspike harness): the instance draws itself, generic geometry
+        const st = ctx.host && ctx.host.stage;
+        const facade = !!(st && st.objects && [...st.objects.keys()].some((k) => String(k).startsWith("fx_")));
+        ctx.me._standalone = d.proxy === false || (d.proxy !== true && !facade);
+        if (ctx.me._standalone) {
+          ctx.setRig("body", "material", { color: "#e8e4dc", flat: true });
+          for (let k = 0; k < 8; k++) {
+            ctx.setRig("in" + k, "material", { color: "#f0a63c", flat: true });
+            ctx.setRig("out" + k, "material", { color: "#62bd8c", flat: true });
+          }
+          ctx.setRig("label", "visible", true);
+        }
       },
 
-      // every frame: a gentle bob — the visible proof that the scenehost frame
-      // loop drives a control-scene behavior. Selected nodes hold still & lift.
+      // every frame: stamp the beat (the proof that the scenehost frame loop
+      // drives a control-scene behavior) and show selection as the halo. A
+      // proxy never leaves its op, so taps keep landing on the drawn sockets;
+      // only a standalone node bobs, and lifts when selected.
       render(ctx, dt) {
         if (!ctx || !ctx.rig) return;
         const t = ctx.t || 0;
@@ -40,9 +70,12 @@ me.ready = function () {
           beats[ctx.key] = t;
         }
         const base = (ctx.me.baseY !== undefined) ? ctx.me.baseY : (ctx.me.baseY = ctx.rig.pos.y);
-        const sel = ctx.host && ctx.host.state && ctx.host.state.selectedKey === ctx.key;
+        const hs = ctx.host && ctx.host.state;
+        const sel = !!(hs && hs.selectedKey === ctx.key);
+        if (sel !== ctx.me._sel && ctx.setRig) { ctx.me._sel = sel; ctx.setRig("halo", "visible", sel); }
+        if (!ctx.me._standalone) { ctx.rig.pos.y = base; return; }
         // a node mid wire-gesture freezes; the rest breathe
-        const wiring = ctx.host && ctx.host.state && ctx.host.state.wireSrc;
+        const wiring = hs && hs.wireSrc;
         ctx.rig.pos.y = sel ? base + 0.15 : (wiring ? base : base + Math.sin(t * 1.4 + ctx.me._phase) * 0.04);
       },
 
