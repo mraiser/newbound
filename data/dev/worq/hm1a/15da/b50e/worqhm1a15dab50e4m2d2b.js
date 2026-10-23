@@ -1627,11 +1627,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   // animate ONE case: its wires round by round (sched is already cut at the
   // rule's op), then the jump legs as two more rounds — on its own clock id.
+  // SYNCHROS (S3): each fired synchro PULSES — one sync-coloured token rides
+  // its straight link in the round its src completes (sched.syncRounds,
+  // parallel to rounds; a round may carry only synchros).
   async function animateSegment(c, sched, jumpOp, dur, reduced) {
     const rid = ++runSeq;
     const { rounds, unreached } = sched;
+    const syncRounds = sched.syncRounds || [];
+    const nRounds = Math.max(rounds.length, syncRounds.length);
     const legs = jumpOp == null ? [] : jumpLegs(c, jumpOp);
-    const expected = rounds.reduce((n, r) => n + r.length, 0) + legs.length;
+    const nSync = syncRounds.reduce((n, r) => n + r.length, 0);
+    const expected = rounds.reduce((n, r) => n + r.length, 0) + nSync + legs.length;
     const started = performance.now();
     const delivered = [], keys = [];
     if (!expected) {                           // nothing travels: let the case be seen
@@ -1646,8 +1652,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       if (delivered.length >= expected) finish(true);
     });
     try {
-      for (let r = 0; r < rounds.length; r++) {
-        for (const k of rounds[r]) {
+      const syncTint = syncColorOf();
+      for (let r = 0; r < nRounds; r++) {
+        for (const k of rounds[r] || []) {
           const w = c.cons[k]; if (!w) continue;
           const key = `run${rid}_w${k}`;
           await hostApi.addControl("dev", "flowtoken", {
@@ -1657,20 +1664,35 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
           }, key);
           keys.push(key);
         }
+        for (const j of syncRounds[r] || []) {
+          const s = (c.syncs || [])[j]; if (!s) continue;
+          const key = `run${rid}_s${j}`;
+          await hostApi.addControl("dev", "flowtoken", {
+            runId: rid, k: "sync" + j, round: r, dur, reduced, straight: true, tint: syncTint,
+            wire: "fx_" + slug(`d${activeDeck}/sync/${j}`),
+            from: syncHandlePos(c, s.src, "out"), to: syncHandlePos(c, s.dest, "in"),
+          }, key);
+          keys.push(key);
+        }
       }
       for (let j = 0; j < legs.length; j++) {
         const key = `run${rid}_j${j}`;
-        await hostApi.addControl("dev", "flowtoken", Object.assign({ runId: rid, k: "jump" + j, round: rounds.length + j, dur, reduced }, legs[j]), key);
+        await hostApi.addControl("dev", "flowtoken", Object.assign({ runId: rid, k: "jump" + j, round: nRounds + j, dur, reduced }, legs[j]), key);
         keys.push(key);
       }
       // every token is booted — start the ONE clock they all ride
       hostApi.setState("run", { id: rid, t0: performance.now() });
-      const budget = ((rounds.length + legs.length) * dur + 3) * 1000;
+      const budget = ((nRounds + legs.length) * dur + 3) * 1000;
       const complete = await Promise.race([allDone, new Promise((res) => setTimeout(() => res(false), budget))]);
       const wires = delivered.filter((d) => typeof d.k === "number");
+      const pulses = delivered.filter((d) => typeof d.k === "string" && d.k.startsWith("sync"));
       const A = auditRun(rid, rounds, unreached, wires, !!complete, Math.round(performance.now() - started));
       A.skipped = sched.skipped || [];
-      A.jumped = legs.length > 0 && delivered.length - wires.length === legs.length;
+      A.jumped = legs.length > 0 && delivered.filter((d) => typeof d.k === "string" && d.k.startsWith("jump")).length === legs.length;
+      A.syncRounds = syncRounds;
+      A.syncsPulsed = pulses.map((d) => +d.k.slice(4));
+      A.syncsInRound = pulses.every((d) => (syncRounds[d.round] || []).includes(+d.k.slice(4)));
+      A.syncsUnreached = sched.syncsUnreached || [];
       A.tokensHosted = keys.length;
       return A;
     } finally {
@@ -1760,10 +1782,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         h += `<p class="fe-run-case"><b>case ${s.deck + 1}</b> <span class="lbl">${how}</span></p>`;
       }
       h += `<ul class="fe-run-list">`;
-      (s.rounds || []).forEach((round, r) => { h += `<li><span class="rd">${r + 1}</span>${round.map((k) => wl(c, k)).join(" · ")}</li>`; });
+      const sr = s.syncRounds || [];
+      const sl = (j) => { const y = c && (c.syncs || [])[j]; return `<span class="fe-run-sync">${esc(y ? `${nameOf(c, y.src)} ⇢ ${nameOf(c, y.dest)}` : `synchro ${j}`)} (synchro)</span>`; };
+      for (let r = 0; r < Math.max((s.rounds || []).length, sr.length); r++) {
+        const parts = ((s.rounds || [])[r] || []).map((k) => wl(c, k)).concat((sr[r] || []).map(sl));
+        h += `<li><span class="rd">${r + 1}</span>${parts.join(" · ")}</li>`;
+      }
       if (s.jumped) h += `<li><span class="rd">↳</span>jump pipe → case ${s.deck + 2}</li>`;
       h += `</ul>`;
       if (s.unreached && s.unreached.length) h += `<p class="fe-empty">never fires (I-1/I-2): ${s.unreached.map((k) => wl(c, k)).join(" · ")}</p>`;
+      if (s.syncsUnreached && s.syncsUnreached.length) h += `<p class="fe-empty">synchro never fires (its src never completes): ${s.syncsUnreached.map(sl).join(" · ")}</p>`;
     });
     if (R.untraced) h += `<p class="fe-empty">no case path (${esc(R.untraced)}): showing case 1's schedule only</p>`;
     for (const note of R.notes || []) h += `<p class="fe-empty">${esc(note)}</p>`;
