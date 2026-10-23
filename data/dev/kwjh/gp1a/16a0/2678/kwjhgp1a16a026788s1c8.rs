@@ -1,12 +1,14 @@
-// Flow step debugger P1 - the core stepper for ONE frame (spec: dev/_ASSETS/docs/flow-language.md 1.5.4).
-// step(state, pick) -> {state', event}: a ready-set scheduler, one event per step, pure over plain ndata
-// state (the graph in state.body is never mutated; the frame is deep-copied per step). Local and command
-// ops are single steps here: their inner flows run to completion inside the eval (the same machine,
-// default picks), so no panic and no hang can escape. The double-wire re-run quirk is NOT reproduced:
-// an op runs once and a second delivery is reported as I-1.
-struct Ctx { steps: i64, budget: i64, depth: i64 }
+// Flow step debugger P2 - the stepper with FRAMES (spec: dev/_ASSETS/docs/flow-language.md 1.5.4).
+// step(state, pick) -> {state', event}: a ready-set scheduler over a FRAME STACK, one event per step.
+// state = {body, args} to start, then the returned {body, frames, seq}; frames[0] is the root and the top
+// frame is the one that steps. The graphs are never mutated; each step copies only the stepper's own
+// bookkeeping (fired/done flags, delivered-input maps, out, cursors, the op in progress) and SHARES value
+// handles, as flowlang does. Local ops with localdata and command ops whose callee is a FLOW (any library;
+// raw args, no auth re-check - the parent call is the gate) open a frame: enter ... leave, then the op's
+// closing eval. List/loop ops run as iterations: iter, then the body (one eval, or enter ... leave + eval).
+// rust/python command ops stay one opaque eval. An op in progress is atomic in its case: its frame then
+// offers only {kind:auto}. No re-run: a second delivery is reported as I-1 instead of re-running the op.
 type Fault = (String, String);
-type Evald = (DataObject, bool, Option<String>, bool, Option<i64>);
 
 fn fault(code: &str, msg: String) -> Fault { (code.to_string(), msg) }
 fn panic_text(p: &Box<dyn std::any::Any + Send>) -> String {
@@ -20,22 +22,35 @@ fn put_copy(o: &mut DataObject, k: &str, d: Data) {
   else { o.set_property(k, d); }
 }
 fn is_obj(o: &DataObject, k: &str) -> bool { o.has(k) && o.get_property(k).is_object() }
-// Copy the stepper's OWN containers (so the prior state is never mutated by a step) but SHARE the value
-// handles inside them: flowlang passes values by handle, and in-place primitives (set, push, push_all,
-// remove) rely on that aliasing - a deep copy per step would break parity for such flows.
+fn is_arr(o: &DataObject, k: &str) -> bool { o.has(k) && o.get_property(k).is_array() }
 fn shallow_obj(o: &DataObject) -> DataObject { let mut n = DataObject::new(); for (k, v) in o.objects() { n.set_property(&k, v); } n }
 fn shallow_arr(a: &DataArray) -> DataArray { let mut n = DataArray::new(); for v in a.objects() { n.push_property(v); } n }
+fn strs(a: &DataArray) -> Vec<String> { a.objects().iter().map(|d| d.string()).collect() }
+fn vec_arr(v: &Vec<String>) -> DataArray { let mut a = DataArray::new(); for s in v { a.push_string(s); } a }
+// the op in progress: in1/in3 and the collected list outputs are the stepper's own containers
+fn copy_inprog(ip: &DataObject) -> DataObject {
+  let mut n = shallow_obj(ip);
+  for k in ["in1", "in3"] { if is_obj(ip, k) { n.put_object(k, shallow_obj(&ip.get_object(k))); } }
+  if is_obj(ip, "out3") {
+    let lo = if is_arr(ip, "list_out") { strs(&ip.get_array("list_out")) } else { Vec::new() };
+    let mut o = shallow_obj(&ip.get_object("out3"));
+    for k in &lo { if is_arr(&o, k) { let a = shallow_arr(&o.get_array(k)); o.put_array(k, a); } }
+    n.put_object("out3", o);
+  }
+  n
+}
 fn copy_frame(f: &DataObject) -> DataObject {
   let mut n = shallow_obj(f);
-  for k in ["wires", "syncs", "done", "prio", "results"] { if f.has(k) && f.get_property(k).is_array() { n.put_array(k, shallow_arr(&f.get_array(k))); } }
+  for k in ["wires", "syncs", "done", "prio", "results"] { if is_arr(f, k) { n.put_array(k, shallow_arr(&f.get_array(k))); } }
   for k in ["cur", "pending", "out"] { if is_obj(f, k) { n.put_object(k, shallow_obj(&f.get_object(k))); } }
   for k in ["inputs", "dlv"] {
-    if f.has(k) && f.get_property(k).is_array() {
+    if is_arr(f, k) {
       let mut na = DataArray::new();
       for v in f.get_array(k).objects() { na.push_object(shallow_obj(&v.object())); }
       n.put_array(k, na);
     }
   }
+  if is_obj(f, "inprog") { n.put_object("inprog", copy_inprog(&f.get_object("inprog"))); }
   n
 }
 fn case_at(body: &DataObject, idx: i64) -> Option<DataObject> {
@@ -94,17 +109,24 @@ fn ready_set(case: &DataObject, f: &DataObject) -> DataArray {
   for i in 0..case.get_array("cmds").len() { if op_ready(case, f, i) { a.push_object(item("op", i)); } }
   a
 }
-fn ready_now(body: &DataObject, f: &DataObject) -> DataArray {
+// the ready set of the TOP frame (only the top frame steps)
+fn ready_now(f: &DataObject) -> DataArray {
   let phase = f.get_string("phase");
   let mut a = DataArray::new();
   if phase == "ended" { return a; }
   if phase != "run" { let mut o = DataObject::new(); o.put_string("kind", "auto"); o.put_string("phase", &phase); a.push_object(o); return a; }
+  if is_obj(f, "inprog") {
+    let ip = f.get_object("inprog");
+    let mut o = DataObject::new(); o.put_string("kind", "auto"); o.put_string("phase", "op");
+    o.put_int("op", ip.get_int("op")); o.put_string("stage", &ip.get_string("stage"));
+    a.push_object(o); return a;
+  }
   if is_obj(f, "pending") {
     let p = f.get_object("pending");
     let mut o = DataObject::new(); o.put_string("kind", "effect"); o.put_string("rule", &p.get_string("rule")); o.put_int("op", p.get_int("op"));
     a.push_object(o); return a;
   }
-  match case_at(body, f.get_int("case")) { Some(c) => ready_set(&c, f), None => a }
+  match case_at(&f.get_object("body"), f.get_int("case")) { Some(c) => ready_set(&c, f), None => a }
 }
 fn prio_front(f: &mut DataObject, i: usize) {
   let old = f.get_array("prio");
@@ -136,7 +158,7 @@ fn diag_case(case: &DataObject) -> DataArray {
 fn ev(kind: &str, f: &DataObject) -> DataObject {
   let mut e = DataObject::new();
   e.put_string("type", kind);
-  e.put_array("frame", DataArray::new());
+  e.put_array("frame", if is_arr(f, "path") { f.get_array("path").deep_copy() } else { DataArray::new() });
   e.put_int("case", f.get_int("case"));
   e
 }
@@ -147,15 +169,18 @@ fn err_ev(f: &mut DataObject, code: &str, msg: String, op: Option<usize>) -> Dat
   f.put_string("phase", "ended");
   e
 }
-fn new_frame(args: DataObject, kind: &str) -> DataObject {
+fn new_frame(args: DataObject, kind: &str, body: DataObject, path: DataArray) -> DataObject {
   let mut f = DataObject::new();
   f.put_string("kind", kind);
+  f.put_object("body", body);
+  f.put_array("path", path);
   f.put_object("args", args);
   f.put_object("out", DataObject::new());
   f.put_int("case", 0);
   f.put_boolean("finish", false);
   f.put_string("phase", "enter");
   f.put_null("pending");
+  f.put_null("inprog");
   f.put_string("outcome", "");
   f
 }
@@ -183,6 +208,7 @@ fn seed_case(case: &DataObject, f: &mut DataObject) -> DataArray {
   }
   f.put_array("results", results); f.put_array("inputs", inputs); f.put_array("dlv", dlv);
   f.put_null("pending");
+  f.put_null("inprog");
   let mut cur = DataObject::new(); cur.put_string("pass", "wire"); cur.put_int("k", 0); f.put_object("cur", cur);
   f.put_array("prio", DataArray::new());
   // case-start rule: no awaited input AND no incoming synchro; flowlang runs these first, in index order
@@ -224,23 +250,36 @@ fn default_pick(case: &DataObject, f: &mut DataObject) -> Option<(String, usize)
   for i in 0..n { if op_ready(case, f, i) { return Some(("op".to_string(), i)); } }
   None
 }
-fn end_of_case(f: &mut DataObject) -> DataObject {
+fn unfired(f: &DataObject) -> (DataArray, DataArray, DataArray) {
   let wires = f.get_array("wires"); let syncs = f.get_array("syncs"); let done = f.get_array("done");
   let mut uw = DataArray::new(); for k in 0..wires.len() { if !wires.get_boolean(k) { uw.push_int(k as i64); } }
   let mut us = DataArray::new(); for k in 0..syncs.len() { if !syncs.get_boolean(k) { us.push_int(k as i64); } }
   let mut nr = DataArray::new(); for i in 0..done.len() { if !done.get_boolean(i) { nr.push_int(i as i64); } }
+  (uw, us, nr)
+}
+fn stall_ev(f: &mut DataObject, uw: DataArray, us: DataArray, nr: DataArray) -> DataObject {
   f.put_string("phase", "ended");
-  if uw.len() == 0 && us.len() == 0 {
-    let mut e = ev("done", f);
-    e.put_string("outcome", "ok"); put_copy(&mut e, "out", f.get_property("out")); e.put_boolean("fail", false);
-    e.put_array("never_ready", nr);
-    f.put_string("outcome", "ok");
-    e
-  } else {
-    let mut e = ev("stall", f);
-    e.put_array("wires", uw); e.put_array("syncs", us); e.put_array("ops", nr);
-    e
-  }
+  let mut e = ev("stall", f);
+  e.put_array("wires", uw); e.put_array("syncs", us); e.put_array("ops", nr);
+  e
+}
+// the root frame's case ran dry: done (everything fired) or stall
+fn end_of_case(f: &mut DataObject) -> DataObject {
+  let (uw, us, nr) = unfired(f);
+  if uw.len() > 0 || us.len() > 0 { return stall_ev(f, uw, us, nr); }
+  f.put_string("phase", "ended");
+  let mut e = ev("done", f);
+  e.put_string("outcome", "ok"); put_copy(&mut e, "out", f.get_property("out")); e.put_boolean("fail", false);
+  e.put_array("never_ready", nr);
+  f.put_string("outcome", "ok");
+  e
+}
+// a nested frame's case ran dry: leave with outcome ok, or stall (which ends the whole run)
+fn end_nested(frames: &mut DataArray) -> DataObject {
+  let mut f = frames.get_object(frames.len() - 1);
+  let (uw, us, nr) = unfired(&f);
+  if uw.len() > 0 || us.len() > 0 { return stall_ev(&mut f, uw, us, nr); }
+  leave(frames, "ok", nr)
 }
 fn deliver(case: &DataObject, f: &mut DataObject, k: usize) -> DataObject {
   let cmds = case.get_array("cmds"); let n = cmds.len();
@@ -307,25 +346,79 @@ fn match_flag(ctype: &str, v: &str, d: Data) -> Result<bool, Fault> {
     _ => false,
   })
 }
-fn run_nested(case0: &DataObject, args: DataObject, ctx: &mut Ctx) -> Result<(String, DataObject, bool), Fault> {
-  if ctx.depth >= 64 { return Err(fault("depth", "frames nested more than 64 deep (recursive flow?)".to_string())); }
-  ctx.depth += 1;
-  let mut f = new_frame(args, "nested");
-  let pick = DataObject::new();
-  let r = loop {
-    ctx.steps += 1;
-    if ctx.steps > ctx.budget { break Err(fault("budget", format!("nested frames exceeded the step budget of {} (an open loop without finish?)", ctx.budget))); }
-    let e = step_frame(case0, &mut f, &pick, ctx);
-    let t = e.get_string("type");
-    if t == "done" { break Ok((e.get_string("outcome"), f.get_object("out"), f.get_boolean("finish"))); }
-    if t == "stall" { break Err(fault("stall", format!("a nested frame stalled: {}", e.to_string()))); }
-    if t == "error" { break Err((e.get_string("code"), format!("in a nested frame: {}", e.get_string("msg")))); }
-  };
-  ctx.depth -= 1;
-  r
+// list inputs, list outputs and loop outputs of an op (flowlang evaluate)
+fn modes(op: &DataObject) -> Result<(Vec<String>, Vec<String>, Vec<(String, String)>), Fault> {
+  let mut list_in: Vec<String> = Vec::new();
+  for (k, d) in op.get_object("in").objects() { if d.is_object() && d.object().has("mode") && d.object().get_string("mode") == "list" { list_in.push(k); } }
+  let mut list_out: Vec<String> = Vec::new();
+  let mut loop_out: Vec<(String, String)> = Vec::new();
+  for (k, d) in op.get_object("out").objects() {
+    if !d.is_object() { continue; }
+    let nd = d.object();
+    let mode = if nd.has("mode") { nd.get_string("mode") } else { "".to_string() };
+    if mode == "list" { list_out.push(k); }
+    else if mode == "loop" {
+      if !(nd.has("loop") && nd.get_property("loop").is_string()) { return Err(fault("panic", format!("loop output '{}' names no input (I-8)", k))); }
+      loop_out.push((k, nd.get_string("loop")));
+    }
+  }
+  Ok((list_in, list_out, loop_out))
 }
-// One evaluation of an op body + its condition (flowlang evaluate_operation).
-fn eval_operation(op: &DataObject, in1: DataObject, ctx: &mut Ctx, ffin: &mut bool, ofin: &mut bool) -> Result<(DataObject, bool, Option<String>), Fault> {
+fn list_count(in1: &DataObject, list_in: &Vec<String>) -> Result<usize, Fault> {
+  let mut count = 0usize;
+  for (j, k) in list_in.iter().enumerate() {
+    let d = if in1.has(k) { in1.get_property(k) } else { Data::DNull };
+    if !d.is_array() { return Err(fault("panic", format!("list input '{}' is not an array", k))); }
+    let l = d.array().len();
+    if j == 0 || l < count { count = l; }
+  }
+  Ok(count)
+}
+fn build_in3(in1: &DataObject, list_in: &Vec<String>, i: usize) -> Result<DataObject, Fault> {
+  let mut in3 = DataObject::new();
+  for (k, d) in in1.objects() {
+    if !list_in.contains(&k) { in3.set_property(&k, d); }
+    else {
+      let a = d.array();
+      if i >= a.len() { return Err(fault("panic", format!("iteration {} indexes past the end of list input '{}' (a loop output with an empty list input panics flowlang)", i, k))); }
+      in3.set_property(&k, a.get_property(i));
+    }
+  }
+  Ok(in3)
+}
+// Does this op open a frame? A local with localdata, or a command whose callee is a FLOW (any library).
+fn frame_spec(op: &DataObject) -> Result<Option<DataObject>, Fault> {
+  let typ = op.get_string("type");
+  if typ == "local" {
+    if !is_obj(op, "localdata") { return Ok(None); }
+    let mut s = DataObject::new(); s.put_string("kind", "local"); s.put_object("body", op.get_object("localdata")); s.put_array("keys", DataArray::new());
+    return Ok(Some(s));
+  }
+  if typ != "command" { return Ok(None); }
+  if !op.has("cmd") { return Err(fault("panic", "command op has no cmd".to_string())); }
+  let cmdstr = op.get_string("cmd");
+  let sa: Vec<String> = cmdstr.split(':').map(|s| s.to_string()).collect();
+  if sa.len() < 3 { return Err(fault("panic", format!("command op cmd '{}' is not lib:ctl:cmd", cmdstr))); }
+  let lib = sa[0].clone(); let id = sa[2].clone();
+  let (l2, i2) = (lib.clone(), id.clone());
+  let sub = match panic::catch_unwind(panic::AssertUnwindSafe(move || Command::new(&l2, &i2))) {
+    Ok(c) => c,
+    Err(p) => return Err(fault("panic", format!("command '{}' could not be loaded: {}", cmdstr, panic_text(&p)))),
+  };
+  if sub.lang != "flow" { return Ok(None); }
+  // the callee's SAVED flow; raw args (no cast_params) and no check_auth - the parent call is the gate
+  let store = DataStore::new();
+  let data = store.get_data(&lib, &id).get_object("data");
+  let codename = data.get_string("flow");
+  let fl = store.get_data(&lib, &codename).get_object("data").get_object("flow");
+  let keys: Vec<String> = fl.get_object("output").keys();
+  let mut s = DataObject::new();
+  s.put_string("kind", "command"); s.put_object("body", fl); s.put_array("keys", vec_arr(&keys));
+  s.put_string("lib", &lib); s.put_string("cmd", &cmdstr);
+  Ok(Some(s))
+}
+// One evaluation of an op body that opens NO frame (flowlang evaluate_operation, minus the condition).
+fn op_body(op: &DataObject, in1: DataObject) -> Result<(DataObject, bool), Fault> {
   let typ = op.get_string("type");
   let v = op.get_string("name");
   let outs: Vec<String> = op.get_object("out").keys();
@@ -338,11 +431,8 @@ fn eval_operation(op: &DataObject, in1: DataObject, ctx: &mut Ctx, ffin: &mut bo
       Err(p) => { return Err(fault("panic", format!("primitive '{}' panicked: {}", v, panic_text(&p)))); }
     }
   } else if typ == "local" {
-    if !is_obj(op, "localdata") { for k in &outs { out.put_null(k); } }
-    else {
-      let (oc, o, fin) = run_nested(&op.get_object("localdata"), in1, ctx)?;
-      if oc == "fail" { b = false; } else { out = o; *ofin = fin; }
-    }
+    // a local with no localdata opens no frame: every output null, b = true
+    for k in &outs { out.put_null(k); }
   } else if typ == "constant" {
     if !op.has("ctype") { return Err(fault("panic", "constant op has no ctype".to_string())); }
     let ctype = op.get_string("ctype");
@@ -359,38 +449,25 @@ fn eval_operation(op: &DataObject, in1: DataObject, ctx: &mut Ctx, ffin: &mut bo
       }
     }
   } else if typ == "command" {
+    // a rust/python callee: one opaque eval, its single key `a` maps onto the op's output
     if !op.has("cmd") { return Err(fault("panic", "command op has no cmd".to_string())); }
     let cmdstr = op.get_string("cmd");
     let sa: Vec<String> = cmdstr.split(':').map(|s| s.to_string()).collect();
     if sa.len() < 3 { return Err(fault("panic", format!("command op cmd '{}' is not lib:ctl:cmd", cmdstr))); }
-    let lib = sa[0].clone(); let id = sa[2].clone();
-    let (l2, i2) = (lib.clone(), id.clone());
+    let (l2, i2) = (sa[0].clone(), sa[2].clone());
     let sub = match panic::catch_unwind(panic::AssertUnwindSafe(move || Command::new(&l2, &i2))) {
       Ok(c) => c,
       Err(p) => return Err(fault("panic", format!("command '{}' could not be loaded: {}", cmdstr, panic_text(&p)))),
     };
     let mut params = DataObject::new();
     for (k, d) in in1.objects() { params.set_property(&k, d); }
-    let mut keys: Vec<String> = Vec::new();
-    let res: Option<DataObject>;
-    if sub.lang == "flow" {
-      // a flow callee runs as a nested frame (raw args: no cast_params, no auth - the parent call is the gate)
-      let store = DataStore::new();
-      let data = store.get_data(&lib, &id).get_object("data");
-      let codename = data.get_string("flow");
-      let fl = store.get_data(&lib, &codename).get_object("data").get_object("flow");
-      keys = fl.get_object("output").keys();
-      let (oc, o, _fin) = run_nested(&fl, params, ctx)?;
-      res = if oc == "fail" { None } else { Some(o) };
-    } else {
-      keys.push("a".to_string());
-      let s2 = &sub; let p2 = params.clone();
-      res = match panic::catch_unwind(panic::AssertUnwindSafe(move || s2.execute(p2))) {
-        Ok(Ok(o)) => Some(o),
-        Ok(Err(_)) => None,
-        Err(p) => return Err(fault("panic", format!("command '{}' panicked: {}", cmdstr, panic_text(&p)))),
-      };
-    }
+    let keys: Vec<String> = vec!["a".to_string()];
+    let s2 = &sub; let p2 = params.clone();
+    let res = match panic::catch_unwind(panic::AssertUnwindSafe(move || s2.execute(p2))) {
+      Ok(Ok(o)) => Some(o),
+      Ok(Err(_)) => None,
+      Err(p) => return Err(fault("panic", format!("command '{}' panicked: {}", cmdstr, panic_text(&p)))),
+    };
     match res {
       None => { b = false; }
       Some(r) => {
@@ -415,174 +492,299 @@ fn eval_operation(op: &DataObject, in1: DataObject, ctx: &mut Ctx, ffin: &mut bo
     b = match_flag(&op.get_string("ctype"), &v, in1.get_property(&ks[0]))?;
   }
   // undefined and unknown types: flowlang prints UNIMPLEMENTED and the op yields {}
-  let mut rule: Option<String> = None;
-  if typ != "constant" && is_obj(op, "condition") {
-    let c = op.get_object("condition");
-    let r = c.get_string("rule");
-    if c.get_boolean("value") == b {
-      if r == "next" || r == "terminate" || r == "fail" { rule = Some(r); }
-      else if r == "finish" { *ffin = true; rule = Some(r); }
-    }
-  }
-  Ok((out, b, rule))
+  Ok((out, b))
 }
-// The whole op (flowlang evaluate): list/loop iterations run inside this one step in P1.
-fn eval_op(op: &DataObject, inputs: &DataObject, ctx: &mut Ctx, ffin: &mut bool) -> Result<Evald, Fault> {
-  let mut in1 = DataObject::new();
-  for (k, d) in inputs.objects() { in1.set_property(&k, d); }
-  let mut list_in: Vec<String> = Vec::new();
-  for (k, d) in op.get_object("in").objects() { if d.is_object() && d.object().has("mode") && d.object().get_string("mode") == "list" { list_in.push(k); } }
-  let mut list_out: Vec<String> = Vec::new();
-  let mut loop_out: Vec<(String, String)> = Vec::new();
-  for (k, d) in op.get_object("out").objects() {
-    if !d.is_object() { continue; }
-    let nd = d.object();
-    let mode = if nd.has("mode") { nd.get_string("mode") } else { "".to_string() };
-    if mode == "list" { list_out.push(k); }
-    else if mode == "loop" {
-      if !(nd.has("loop") && nd.get_property("loop").is_string()) { return Err(fault("panic", format!("loop output '{}' names no input (I-8)", k))); }
-      loop_out.push((k, nd.get_string("loop")));
-    }
-  }
+// A closed frame's result as the op's result: fail = b false + EMPTY result; a command maps by position (I-7).
+fn closing_result(op: &DataObject, ip: &DataObject) -> Result<(DataObject, bool, bool), Fault> {
+  let r = ip.get_object("res");
+  if r.get_string("oc") == "fail" { return Ok((DataObject::new(), false, false)); }
+  let o = r.get_object("out");
+  if op.get_string("type") == "local" { return Ok((o, true, r.get_boolean("fin"))); }
+  let keys = strs(&ip.get_array("keys"));
   let outs: Vec<String> = op.get_object("out").keys();
-  let mut ofin = false;
-  if list_in.is_empty() && loop_out.is_empty() {
-    let (o, b, r) = eval_operation(op, in1, ctx, ffin, &mut ofin)?;
-    let done = !matches!(r.as_deref(), Some("next") | Some("terminate") | Some("fail"));
-    return Ok((o, b, r, done, None));
+  let mut out = DataObject::new();
+  for (i, key1) in outs.iter().enumerate() {
+    if i >= keys.len() { return Err(fault("absent-output", format!("command op output '{}' has no positional counterpart among the callee's {} output(s) (I-7)", key1, keys.len()))); }
+    let key2 = &keys[i];
+    if !o.has(key2) { return Err(fault("absent-output", format!("the callee's result lacks '{}' (flowlang panics in get_property)", key2))); }
+    out.set_property(key1, o.get_property(key2));
   }
+  Ok((out, true, false))
+}
+// The op's condition; a finish rule on it marks the ENCLOSING frame's flag (via ffin and the finish effect).
+fn condition(op: &DataObject, b: bool, ffin: &mut bool) -> Option<String> {
+  if op.get_string("type") == "constant" || !is_obj(op, "condition") { return None; }
+  let c = op.get_object("condition");
+  if c.get_boolean("value") != b { return None; }
+  let r = c.get_string("rule");
+  if r == "next" || r == "terminate" || r == "fail" { return Some(r); }
+  if r == "finish" { *ffin = true; return Some(r); }
+  None
+}
+fn op_ev(f: &DataObject, op: &DataObject, i: usize, in1: &DataObject) -> DataObject {
+  let mut e = ev("eval", f);
+  e.put_int("op", i as i64); e.put_string("optype", &op.get_string("type")); e.put_object("in", in1.deep_copy());
+  e
+}
+// The op's final eval: done unless next/terminate/fail fired; a fired rule's effect is the next step.
+fn finish_op(f: &mut DataObject, mut e: DataObject, i: usize, out: DataObject, b: bool, rule: Option<String>, ffin: bool, iters: Option<i64>) -> DataObject {
+  let done = !matches!(rule.as_deref(), Some("next") | Some("terminate") | Some("fail"));
+  e.put_object("out", out.deep_copy());
+  e.put_boolean("b", b);
+  match &rule { Some(r) => e.put_string("rule", r), None => e.put_null("rule") }
+  e.put_boolean("done", done);
+  match iters { Some(n) => e.put_int("iters", n), None => e.put_null("iters") }
+  if done { f.get_array("done").put_boolean(i, true); f.get_array("results").put_object(i, out); }
+  if let Some(r) = &rule { let mut p = DataObject::new(); p.put_string("rule", r); p.put_int("op", i as i64); f.put_object("pending", p); }
+  if ffin && rule.as_deref() != Some("finish") { f.put_boolean("finish", true); e.put_boolean("finish_set", true); }
+  f.put_null("inprog");
+  e
+}
+fn push_frame(frames: &mut DataArray, spec: &DataObject, args: DataObject, op: usize, iter: Data) -> DataObject {
+  let n = frames.len();
+  let mut parent = frames.get_object(n - 1);
+  if n >= 64 { return err_ev(&mut parent, "depth", "frames nested more than 64 deep (recursive flow?)".to_string(), Some(op)); }
+  let mut path = shallow_arr(&parent.get_array("path"));
+  let mut at = DataArray::new(); at.push_int(op as i64); at.push_property(iter.clone()); path.push_array(at);
+  let kind = spec.get_string("kind");
+  let mut nf = new_frame(args.clone(), &kind, spec.get_object("body"), path);
+  nf.put_string("phase", "seed");
+  let mut e = ev("enter", &nf);
+  e.put_string("kind", &kind); e.put_int("op", op as i64); e.set_property("iter", iter);
+  e.put_object("args", args.deep_copy());
+  if kind == "command" {
+    let (l, c) = (spec.get_string("lib"), spec.get_string("cmd"));
+    nf.put_string("lib", &l); nf.put_string("cmd", &c);
+    e.put_string("lib", &l); e.put_string("cmd", &c);
+  }
+  frames.push_object(nf);
+  e
+}
+// pop the top frame; its outcome and out become the parent's op-in-progress result (stage closing)
+fn leave(frames: &mut DataArray, oc: &str, nr: DataArray) -> DataObject {
+  let n = frames.len();
+  let mut child = frames.get_object(n - 1);
+  child.put_string("phase", "ended"); child.put_string("outcome", oc);
+  let mut e = ev("leave", &child);
+  e.put_string("kind", &child.get_string("kind"));
+  e.put_string("outcome", oc);
+  put_copy(&mut e, "out", child.get_property("out"));
+  e.put_boolean("fail", oc == "fail");
+  e.put_boolean("finish", child.get_boolean("finish"));
+  let path = child.get_array("path");
+  if path.len() > 0 { let at = path.get_array(path.len() - 1); e.put_int("op", at.get_int(0)); e.set_property("iter", at.get_property(1)); }
+  if child.has("lib") { e.put_string("lib", &child.get_string("lib")); e.put_string("cmd", &child.get_string("cmd")); }
+  if oc == "ok" { e.put_array("never_ready", nr); }
+  frames.remove_property(n - 1);
+  let parent = frames.get_object(n - 2);
+  let mut ip = parent.get_object("inprog");
+  let mut r = DataObject::new();
+  r.put_string("oc", oc); r.put_object("out", child.get_object("out")); r.put_boolean("fin", child.get_boolean("finish"));
+  ip.put_object("res", r); ip.put_string("stage", "closing");
+  e
+}
+fn start_op(frames: &mut DataArray, case: &DataObject, i: usize) -> DataObject {
+  let mut f = frames.get_object(frames.len() - 1);
+  prio_remove(&mut f, i);
+  let op = case.get_array("cmds").get_object(i);
+  let in1 = shallow_obj(&f.get_array("inputs").get_object(i));
+  let (list_in, list_out, loop_out) = match modes(&op) { Ok(m) => m, Err((c, m)) => return err_ev(&mut f, &c, format!("op {}: {}", i, m), Some(i)) };
+  if list_in.is_empty() && loop_out.is_empty() {
+    return match frame_spec(&op) {
+      Err((c, m)) => err_ev(&mut f, &c, format!("op {}: {}", i, m), Some(i)),
+      Ok(Some(spec)) => {
+        let mut ip = DataObject::new();
+        ip.put_int("op", i as i64); ip.put_boolean("iterated", false); ip.put_string("stage", "frame");
+        ip.put_boolean("ffin", false); ip.put_array("keys", spec.get_array("keys"));
+        f.put_object("inprog", ip);
+        push_frame(frames, &spec, in1, i, Data::DNull)
+      }
+      Ok(None) => {
+        let e = op_ev(&f, &op, i, &in1);
+        match op_body(&op, in1) {
+          Err((c, m)) => err_ev(&mut f, &c, format!("op {}: {}", i, m), Some(i)),
+          Ok((out, b)) => { let mut ffin = false; let rule = condition(&op, b, &mut ffin); finish_op(&mut f, e, i, out, b, rule, ffin, None) }
+        }
+      }
+    };
+  }
+  let count = match list_count(&in1, &list_in) { Ok(c) => c, Err((c, m)) => return err_ev(&mut f, &c, format!("op {}: {}", i, m), Some(i)) };
+  let outs: Vec<String> = op.get_object("out").keys();
   let mut out3 = DataObject::new();
   for k in &list_out { out3.put_array(k, DataArray::new()); }
-  let n = list_in.len();
-  let mut count = 0usize;
-  for (j, k) in list_in.iter().enumerate() {
-    let d = in1.get_property(k);
-    if !d.is_array() { return Err(fault("panic", format!("list input '{}' is not an array", k))); }
-    let l = d.array().len();
-    if j == 0 || l < count { count = l; }
-  }
   if loop_out.is_empty() && count == 0 {
+    // zero iterations: no body, no condition, list outputs [], the others null
+    let e = op_ev(&f, &op, i, &in1);
     for k in &outs { if !out3.has(k) { out3.put_null(k); } }
-    return Ok((out3, true, None, true, Some(0)));
+    return finish_op(&mut f, e, i, out3, true, None, false, Some(0));
   }
-  let mut i = 0usize;
-  let mut iters = 0i64;
-  let mut last_rule: Option<String> = None;
-  let mut lastb = true;
-  loop {
-    let mut in3 = DataObject::new();
-    for (k, d) in in1.objects() {
-      if !list_in.contains(&k) { in3.set_property(&k, d); }
-      else {
-        let a = d.array();
-        if i >= a.len() { return Err(fault("panic", format!("iteration {} indexes past the end of list input '{}' (a loop output with an empty list input panics flowlang)", i, k))); }
-        in3.set_property(&k, a.get_property(i));
-      }
-    }
-    iters += 1;
-    ctx.steps += 1;
-    if ctx.steps > ctx.budget { return Err(fault("budget", format!("op iterations exceeded the step budget of {} (an open loop without finish?)", ctx.budget))); }
-    let (res, b, r) = eval_operation(op, in3, ctx, ffin, &mut ofin)?;
-    lastb = b;
-    if let Some(rr) = &r {
-      if rr == "next" || rr == "terminate" || rr == "fail" { return Ok((res, b, r, false, Some(iters))); }
-      last_rule = r.clone();
-    }
-    for k in &outs {
-      if !res.has(k) { return Err(fault("absent-output", format!("iteration {} result lacks output '{}' (flowlang panics in get_property)", iters - 1, k))); }
-      let dp = res.get_property(k);
-      if list_out.contains(k) { out3.get_array(k).push_property(dp); }
-      else {
-        out3.set_property(k, dp.clone());
-        if let Some((_, lf)) = loop_out.iter().find(|(a, _)| a == k) { in1.set_property(lf, dp); }
-      }
-    }
-    if ofin { break; }
-    if n > 0 { i += 1; if i == count { break; } }
-  }
-  Ok((out3, lastb, last_rule, true, Some(iters)))
+  let mut lp = DataArray::new();
+  for (a, b) in &loop_out { let mut p = DataArray::new(); p.push_string(a); p.push_string(b); lp.push_array(p); }
+  let mut ip = DataObject::new();
+  ip.put_int("op", i as i64); ip.put_boolean("iterated", true); ip.put_string("stage", "iter");
+  ip.put_int("i", 0); ip.put_int("iters", 0); ip.put_int("nl", list_in.len() as i64); ip.put_int("count", count as i64);
+  ip.put_object("in1", in1); ip.put_object("out3", out3);
+  ip.put_boolean("lastb", true); ip.put_null("last_rule"); ip.put_boolean("ofin", false); ip.put_boolean("ffin", false);
+  ip.put_array("list_in", vec_arr(&list_in)); ip.put_array("list_out", vec_arr(&list_out)); ip.put_array("loop_out", lp);
+  ip.put_array("keys", DataArray::new());
+  f.put_object("inprog", ip);
+  iter_step(&mut f, &op)
 }
-fn eval_step(case: &DataObject, f: &mut DataObject, i: usize, ctx: &mut Ctx) -> DataObject {
-  prio_remove(f, i);
-  let op = case.get_array("cmds").get_object(i);
-  let inputs = f.get_array("inputs").get_object(i);
+// an iteration begins: its inputs (each list input contributes its element)
+fn iter_step(f: &mut DataObject, op: &DataObject) -> DataObject {
+  let mut ip = f.get_object("inprog");
+  let i = ip.get_int("op") as usize;
+  let li = strs(&ip.get_array("list_in"));
+  let in3 = match build_in3(&ip.get_object("in1"), &li, ip.get_int("i") as usize) { Ok(x) => x, Err((c, m)) => return err_ev(f, &c, format!("op {}: {}", i, m), Some(i)) };
+  let mut e = ev("iter", f);
+  e.put_int("op", i as i64); e.put_string("optype", &op.get_string("type"));
+  e.put_int("i", ip.get_int("iters"));
+  if ip.get_int("nl") > 0 { e.put_int("n", ip.get_int("count")); } else { e.put_null("n"); }
+  e.put_object("in", in3.deep_copy());
+  ip.put_object("in3", in3); ip.put_string("stage", "body");
+  e
+}
+// one iteration's result: condition per iteration, collect outputs, loop feedback, last-iteration test
+fn after_iter(f: &mut DataObject, op: &DataObject, i: usize, res: DataObject, b: bool, fin: bool) -> DataObject {
+  let mut ip = f.get_object("inprog");
+  let it = ip.get_int("iters");
+  ip.put_int("iters", it + 1);
+  if fin { ip.put_boolean("ofin", true); }
+  let mut ffin = ip.get_boolean("ffin");
+  let rule = condition(op, b, &mut ffin);
+  ip.put_boolean("ffin", ffin);
+  ip.put_boolean("lastb", b);
   let mut e = ev("eval", f);
-  e.put_int("op", i as i64);
-  e.put_string("optype", &op.get_string("type"));
-  e.put_object("in", inputs.deep_copy());
-  let mut ffin = false;
-  let s0 = ctx.steps;
-  match eval_op(&op, &inputs, ctx, &mut ffin) {
-    Err((code, msg)) => err_ev(f, &code, format!("op {}: {}", i, msg), Some(i)),
-    Ok((out, b, rule, done, iters)) => {
-      e.put_object("out", out.deep_copy());
-      e.put_boolean("b", b);
-      match &rule { Some(r) => e.put_string("rule", r), None => e.put_null("rule") }
-      e.put_boolean("done", done);
-      match iters { Some(n) => e.put_int("iters", n), None => e.put_null("iters") }
-      e.put_int("sub", ctx.steps - s0);
-      if done { f.get_array("done").put_boolean(i, true); f.get_array("results").put_object(i, out); }
-      if let Some(r) = &rule { let mut p = DataObject::new(); p.put_string("rule", r); p.put_int("op", i as i64); f.put_object("pending", p); }
-      if ffin && rule.as_deref() != Some("finish") { f.put_boolean("finish", true); e.put_boolean("finish_set", true); }
-      e
+  e.put_int("op", i as i64); e.put_string("optype", &op.get_string("type")); e.put_int("iter", it);
+  e.put_object("in", ip.get_object("in3").deep_copy());
+  if matches!(rule.as_deref(), Some("next") | Some("terminate") | Some("fail")) { return finish_op(f, e, i, res, b, rule, ffin, Some(it + 1)); }
+  if rule.is_some() { ip.put_string("last_rule", "finish"); e.put_boolean("finish_fired", true); }
+  let lo = strs(&ip.get_array("list_out"));
+  let mut lp: Vec<(String, String)> = Vec::new();
+  for p in ip.get_array("loop_out").objects() { let p = p.array(); lp.push((p.get_string(0), p.get_string(1))); }
+  let mut out3 = ip.get_object("out3");
+  let mut in1 = ip.get_object("in1");
+  for k in op.get_object("out").keys() {
+    if !res.has(&k) { return err_ev(f, "absent-output", format!("op {}: iteration {} result lacks output '{}' (flowlang panics in get_property)", i, it, k), Some(i)); }
+    let dp = res.get_property(&k);
+    if lo.contains(&k) { out3.get_array(&k).push_property(dp); }
+    else {
+      out3.set_property(&k, dp.clone());
+      if let Some((_, lf)) = lp.iter().find(|(a, _)| *a == k) { in1.set_property(lf, dp); }
     }
   }
+  let nl = ip.get_int("nl"); let count = ip.get_int("count");
+  let mut last = ip.get_boolean("ofin");
+  if !last && nl > 0 { let ni = ip.get_int("i") + 1; ip.put_int("i", ni); if ni == count { last = true; } }
+  if last {
+    e.put_object("iter_out", res.deep_copy());
+    let lr = if ip.has("last_rule") && ip.get_property("last_rule").is_string() { Some(ip.get_string("last_rule")) } else { None };
+    let lb = ip.get_boolean("lastb");
+    return finish_op(f, e, i, out3, lb, lr, ffin, Some(it + 1));
+  }
+  e.put_object("out", res.deep_copy()); e.put_boolean("b", b); e.put_null("rule"); e.put_boolean("done", false); e.put_null("iters");
+  ip.put_string("stage", "iter");
+  e
 }
-fn step_frame(body: &DataObject, f: &mut DataObject, pick: &DataObject, ctx: &mut Ctx) -> DataObject {
+// the top frame has an op in progress: its next sub-step
+fn continue_op(frames: &mut DataArray, case: &DataObject) -> DataObject {
+  let mut f = frames.get_object(frames.len() - 1);
+  let mut ip = f.get_object("inprog");
+  let i = ip.get_int("op") as usize;
+  let op = case.get_array("cmds").get_object(i);
+  let stage = ip.get_string("stage");
+  if stage == "iter" { return iter_step(&mut f, &op); }
+  if stage == "body" {
+    let in3 = ip.get_object("in3");
+    return match frame_spec(&op) {
+      Err((c, m)) => err_ev(&mut f, &c, format!("op {}: {}", i, m), Some(i)),
+      Ok(Some(spec)) => {
+        ip.put_array("keys", spec.get_array("keys")); ip.put_string("stage", "frame");
+        let it = ip.get_int("iters");
+        push_frame(frames, &spec, shallow_obj(&in3), i, Data::DInt(it))
+      }
+      Ok(None) => match op_body(&op, shallow_obj(&in3)) {
+        Err((c, m)) => err_ev(&mut f, &c, format!("op {}: {}", i, m), Some(i)),
+        Ok((res, b)) => after_iter(&mut f, &op, i, res, b, false),
+      },
+    };
+  }
+  if stage == "closing" {
+    return match closing_result(&op, &ip) {
+      Err((c, m)) => err_ev(&mut f, &c, format!("op {}: {}", i, m), Some(i)),
+      Ok((res, b, fin)) => {
+        if ip.get_boolean("iterated") { let mut e = after_iter(&mut f, &op, i, res, b, fin); e.put_boolean("from_frame", true); e }
+        else {
+          let in1 = f.get_array("inputs").get_object(i);
+          let mut e = op_ev(&f, &op, i, &in1); e.put_boolean("from_frame", true);
+          let mut ffin = false; let rule = condition(&op, b, &mut ffin);
+          finish_op(&mut f, e, i, res, b, rule, ffin, None)
+        }
+      }
+    };
+  }
+  err_ev(&mut f, "panic", format!("op {} is in progress at stage '{}', which cannot step", i, stage), Some(i))
+}
+fn step_stack(frames: &mut DataArray, pick: &DataObject) -> DataObject {
+  let n = frames.len();
+  let mut f = frames.get_object(n - 1);
+  let body = f.get_object("body");
   let phase = f.get_string("phase");
   if phase == "enter" {
-    let mut e = ev("enter", f);
+    let mut e = ev("enter", &f);
     e.put_string("kind", &f.get_string("kind"));
     put_copy(&mut e, "args", f.get_property("args"));
     f.put_string("phase", "seed");
     return e;
   }
   if phase == "closing" {
-    let mut e = ev("done", f);
     let oc = f.get_string("outcome");
+    if n > 1 { return leave(frames, &oc, DataArray::new()); }
+    let mut e = ev("done", &f);
     e.put_string("outcome", &oc); put_copy(&mut e, "out", f.get_property("out")); e.put_boolean("fail", oc == "fail");
     f.put_string("phase", "ended");
     return e;
   }
-  if phase == "ended" { return err_ev(f, "ended", "the run has already ended".to_string(), None); }
+  if phase == "ended" { return err_ev(&mut f, "ended", "the run has already ended".to_string(), None); }
   let cidx = f.get_int("case");
-  let case = match case_at(body, cidx) { Some(c) => c, None => { return err_ev(f, "panic", format!("case {} is not in the chain", cidx), None); } };
+  let case = match case_at(&body, cidx) { Some(c) => c, None => { return err_ev(&mut f, "panic", format!("case {} is not in the chain", cidx), None); } };
   if phase == "seed" {
-    let mut e = ev("seed", f);
-    let pre = seed_case(&case, f);
+    let mut e = ev("seed", &f);
+    let pre = seed_case(&case, &mut f);
     e.put_array("pre", pre);
-    e.put_array("ready", ready_set(&case, f));
+    e.put_array("ready", ready_set(&case, &f));
     e.put_array("diag", diag_case(&case));
     f.put_string("phase", "run");
     return e;
   }
   // a fired rule's effect is the step after the eval that reports it
-  if is_obj(f, "pending") {
+  if is_obj(&f, "pending") {
     let p = f.get_object("pending");
     let rule = p.get_string("rule"); let op = p.get_int("op");
     f.put_null("pending");
     if rule == "next" {
       if case.has("nextcase") {
-        let mut e = ev("next", f); e.put_int("op", op); e.put_int("from", cidx); e.put_int("to", cidx + 1);
+        let mut e = ev("next", &f); e.put_int("op", op); e.put_int("from", cidx); e.put_int("to", cidx + 1);
         f.put_int("case", cidx + 1); f.put_string("phase", "seed");
         return e;
       }
-      return err_ev(f, "I-4", format!("a next rule fired on op {} in case {} but the chain has no next case (flowlang panics: nextcase.unwrap())", op, cidx), Some(op as usize));
+      return err_ev(&mut f, "I-4", format!("a next rule fired on op {} in case {} but the chain has no next case (flowlang panics: nextcase.unwrap())", op, cidx), Some(op as usize));
     }
     if rule == "terminate" || rule == "fail" {
-      let mut e = ev(&rule, f); e.put_int("op", op);
+      let mut e = ev(&rule, &f); e.put_int("op", op);
       f.put_string("outcome", &rule); f.put_string("phase", "closing");
       return e;
     }
-    let mut e = ev("finish", f); e.put_int("op", op);
+    let mut e = ev("finish", &f); e.put_int("op", op);
     f.put_boolean("finish", true);
     return e;
   }
-  let chosen = if pick.has("kind") { Some((pick.get_string("kind"), pick.get_int("index") as usize)) } else { default_pick(&case, f) };
+  if is_obj(&f, "inprog") { return continue_op(frames, &case); }
+  let chosen = if pick.has("kind") { Some((pick.get_string("kind"), pick.get_int("index") as usize)) } else { default_pick(&case, &mut f) };
   match chosen {
-    None => end_of_case(f),
+    None => { if n == 1 { end_of_case(&mut f) } else { end_nested(frames) } }
     Some((k, i)) => {
-      let mut e = if k == "wire" { deliver(&case, f, i) } else if k == "sync" { fire_sync(&case, f, i) } else { eval_step(&case, f, i, ctx) };
+      let mut e = if k == "wire" { deliver(&case, &mut f, i) } else if k == "sync" { fire_sync(&case, &mut f, i) } else { start_op(frames, &case, i) };
       e.put_string("pick", if pick.has("kind") { "user" } else { "default" });
       e
     }
@@ -597,59 +799,75 @@ if !is_obj(&state, "body") {
   return res;
 }
 let body = state.get_object("body");
-let mut f = if is_obj(&state, "frame") { copy_frame(&state.get_object("frame")) }
-  else { new_frame(if is_obj(&state, "args") { state.get_object("args").deep_copy() } else { DataObject::new() }, "root") };
+let mut frames = DataArray::new();
+if is_arr(&state, "frames") && state.get_array("frames").len() > 0 {
+  for fr in state.get_array("frames").objects() { frames.push_object(copy_frame(&fr.object())); }
+} else if is_obj(&state, "frame") {
+  // a P1-shaped state (one root frame)
+  let mut f0 = copy_frame(&state.get_object("frame"));
+  if !is_obj(&f0, "body") { f0.put_object("body", body.clone()); }
+  if !is_arr(&f0, "path") { f0.put_array("path", DataArray::new()); }
+  frames.push_object(f0);
+} else {
+  let args = if is_obj(&state, "args") { state.get_object("args").deep_copy() } else { DataObject::new() };
+  frames.push_object(new_frame(args, "root", body.clone(), DataArray::new()));
+}
 let seq = if state.has("seq") { state.get_int("seq") } else { 0 };
 let mut ns = DataObject::new();
 ns.put_object("body", body.clone());
-if f.get_string("phase") == "ended" {
-  ns.put_object("frame", f); ns.put_int("seq", seq);
+let mut root = frames.get_object(0);
+if root.get_string("phase") == "ended" {
+  let depth = frames.len() as i64;
+  ns.put_array("frames", frames); ns.put_int("seq", seq);
   res.put_string("status", "ok"); res.put_object("state", ns); res.put_null("event");
-  res.put_boolean("ended", true); res.put_array("ready", DataArray::new());
+  res.put_boolean("ended", true); res.put_array("ready", DataArray::new()); res.put_int("depth", depth);
   return res;
 }
+let top = frames.get_object(frames.len() - 1);
 let mut pk = DataObject::new();
 if pick.has("kind") {
   let kind = pick.get_string("kind");
   if kind == "wire" || kind == "sync" || kind == "op" {
     let idx = if pick.has("index") { pick.get_int("index") } else { -1 };
-    let ready = ready_now(&body, &f);
+    let ready = ready_now(&top);
     let mut ok = false;
     for r in ready.objects() { let r = r.object(); if r.get_string("kind") == kind && r.has("index") && r.get_int("index") == idx { ok = true; } }
     if !ok {
       res.put_string("status", "err");
       res.put_string("msg", &format!("pick {}:{} is not ready", kind, idx));
       res.put_array("ready", ready);
+      res.put_int("depth", frames.len() as i64);
       res.put_object("state", state.clone());
       return res;
     }
     pk.put_string("kind", &kind); pk.put_int("index", idx);
   }
 }
-let mut ctx = Ctx { steps: 0, budget: 100000, depth: 0 };
-let fb = body.clone();
+let fr2 = frames.clone();
 let pk2 = pk.clone();
-let mut f2 = f.clone();
-let r = panic::catch_unwind(panic::AssertUnwindSafe(move || { let mut c = ctx; step_frame(&fb, &mut f2, &pk2, &mut c) }));
+let r = panic::catch_unwind(panic::AssertUnwindSafe(move || { let mut fr = fr2; step_stack(&mut fr, &pk2) }));
 let mut e = match r {
   Ok(e) => e,
-  Err(p) => err_ev(&mut f, "panic", format!("the stepper panicked: {}", panic_text(&p)), None),
+  Err(p) => { let mut t = frames.get_object(frames.len() - 1); err_ev(&mut t, "panic", format!("the stepper panicked: {}", panic_text(&p)), None) }
 };
+let t = e.get_string("type");
+if t == "stall" || t == "error" { root.put_string("phase", "ended"); }
 e.put_int("seq", seq);
-let ready = ready_now(&body, &f);
-let ended = f.get_string("phase") == "ended";
-if !ended {
-  if let Some(c) = case_at(&body, f.get_int("case")) {
-    if f.get_string("phase") == "run" && !is_obj(&f, "pending") {
-      let mut fc = copy_frame(&f);
-      match default_pick(&c, &mut fc) { Some((k, i)) => res.put_object("default", item(&k, i)), None => res.put_null("default") }
-    }
+let top = frames.get_object(frames.len() - 1);
+let ended = root.get_string("phase") == "ended";
+let ready = if ended { DataArray::new() } else { ready_now(&top) };
+if !ended && top.get_string("phase") == "run" && !is_obj(&top, "pending") && !is_obj(&top, "inprog") {
+  if let Some(c) = case_at(&top.get_object("body"), top.get_int("case")) {
+    let mut fc = copy_frame(&top);
+    match default_pick(&c, &mut fc) { Some((k, i)) => res.put_object("default", item(&k, i)), None => res.put_null("default") }
   }
 }
-ns.put_object("frame", f); ns.put_int("seq", seq + 1);
+let depth = frames.len() as i64;
+ns.put_array("frames", frames); ns.put_int("seq", seq + 1);
 res.put_string("status", "ok");
 res.put_object("event", e);
 res.put_array("ready", ready);
 res.put_boolean("ended", ended);
+res.put_int("depth", depth);
 res.put_object("state", ns);
 res

@@ -1,5 +1,5 @@
-// Continue a flow to its end through step(), one event per step. policy picks among the READY items:
-// default (flowlang's sweep order - the same run as Code::execute), first, last, or random:<seed>.
+// Continue a flow to its end through step(), one event per step. policy picks among the READY items of the
+// top frame: default (flowlang's sweep order - the same run as Code::execute), first, last, or random:<seed>.
 // budget bounds the number of steps; running out pauses (not an event).
 fn lcg(s: &mut u64) -> u64 { *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); *s >> 33 }
 let mut res = DataObject::new();
@@ -17,9 +17,10 @@ let mut end = DataObject::new();
 let mut ended = false;
 let mut steps = 0i64;
 let mut user_picks = 0i64;
+let mut max_depth = 1i64;
 while steps < max {
   let mut pick = DataObject::new();
-  if mode != "default" && state.has("frame") {
+  if mode != "default" && state.has("frames") {
     // ask the stepper for the ready set without stepping: a refused pick returns it unchanged
     let mut probe = DataObject::new(); probe.put_string("kind", "op"); probe.put_int("index", -1);
     let pr = super::step::step(state.clone(), probe);
@@ -35,6 +36,7 @@ while steps < max {
   let r = super::step::step(state.clone(), pick);
   if r.get_string("status") != "ok" { res.put_string("status", "err"); res.put_string("msg", &format!("step refused: {}", r.get_string("msg"))); res.put_array("events", events); return res; }
   steps += 1;
+  if r.has("depth") && r.get_int("depth") > max_depth { max_depth = r.get_int("depth"); }
   if r.has("event") && r.get_property("event").is_object() { let e = r.get_object("event"); end = e.clone(); events.push_object(e); }
   state = r.get_object("state");
   if r.get_boolean("ended") { ended = true; break; }
@@ -54,6 +56,7 @@ res.put_object("end", end);
 res.put_boolean("ended", ended);
 res.put_int("steps", steps);
 res.put_int("picks", user_picks);
+res.put_int("max_depth", max_depth);
 res.put_string("policy", &policy);
 res.put_array("events", events);
 res

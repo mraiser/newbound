@@ -147,4 +147,5 @@ res.put_array("violations", v.get_array("violations"));
 res.put_int("steps", r.get_int("steps"));
 res.put_string("policy", &pol);
 if r.has("end") { res.put_object("end", r.get_object("end")); }
+if r.has("max_depth") { res.put_int("max_depth", r.get_int("max_depth")); }
 res
