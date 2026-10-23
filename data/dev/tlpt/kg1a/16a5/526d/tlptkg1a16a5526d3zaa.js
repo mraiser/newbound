@@ -31,6 +31,9 @@
 //                               something on view's picture (D2 tokens)
 //   drillEvents(events, view)   the enter/leave events whose op sits on
 //                               view's picture (D2 drill fly)
+//   rootChain / bpPlace / bpEntry / chainOps   D4 breakpoints: an editor
+//                               breakpoint {kind, ref, root} → its place in
+//                               the doc → a debug_set_breakpoints entry
 //   client                      debug_start/step/state/stop/set_breakpoints
 //                               over invokeCommand (all FLAT replies)
 //
@@ -183,6 +186,60 @@ function drillEvents(events, view) {
     && Array.isArray(ev.frame) && ev.frame.length > 0 && ev.op != null && pathKey(ev.frame.slice(0, -1)) === pk);
 }
 
+// ── D4: breakpoints - the editor's objects → debug_set_breakpoints entries ─
+// The editor keeps a breakpoint as { kind: op|wire|sync, ref, root }: ref =
+// the op / wire / synchro OBJECT it sits on, root = the editor case object
+// whose chain holds it (the doc root, or a local op's localdata). Identity
+// survives edits that renumber, and the breakpoint dies with its object.
+// rootChain(rootCase, target)  the drill path from the doc root to the
+//     picture `target`: [{ case, op }] per local op entered (case = the
+//     parent's case holding it, op = its index there); [] for the root
+//     itself; null when target is unreachable (its local was deleted).
+// bpPlace(rootCase, bp)  { kind, index, case, chain } or null (ref gone)
+// bpEntry(place)  the server entry { kind, index, case, frame, cases }:
+//     frame = [[op, "*"], ...] (ANY iteration of each local on the path),
+//     cases = the case of every frame below the top (frames[i].case), so a
+//     body is told apart per parent case (a frame path names ops only).
+function rootChain(rootCase, target, depth) {
+  if (!rootCase || !target) return null;
+  if (rootCase === target) return [];
+  if ((depth || 0) > 32) return null;
+  const chain = caseChain(rootCase);
+  for (let ci = 0; ci < chain.length; ci++) {
+    const cmds = chain[ci].cmds || [];
+    for (let oi = 0; oi < cmds.length; oi++) {
+      const op = cmds[oi];
+      if (!op || op.type !== "local" || !op.localdata) continue;
+      const sub = rootChain(op.localdata, target, (depth || 0) + 1);
+      if (sub) return [{ case: ci, op: oi }].concat(sub);
+    }
+  }
+  return null;
+}
+const bpList = (c, kind) => !c ? [] : kind === "op" ? (c.cmds || []) : kind === "wire" ? (c.cons || []) : (c.syncs || []);
+function bpPlace(rootCase, bp) {
+  if (!bp || !bp.ref || !bp.root) return null;
+  const chain = rootChain(rootCase, bp.root); if (!chain) return null;
+  const cs = caseChain(bp.root);
+  for (let ci = 0; ci < cs.length; ci++) {
+    const k = bpList(cs[ci], bp.kind).indexOf(bp.ref);
+    if (k >= 0) return { kind: bp.kind, index: k, case: ci, chain };
+  }
+  return null;
+}
+function bpEntry(p) {
+  return { kind: p.kind, index: p.index, case: p.case, frame: p.chain.map((s) => [s.op, "*"]), cases: p.chain.map((s) => s.case) };
+}
+// the local op objects along a chain (names for the breakpoint list)
+function chainOps(rootCase, chain) {
+  const out = []; let r = rootCase;
+  for (const s of chain || []) {
+    const c = r ? caseChain(r)[s.case] : null, op = c ? c.cmds[s.op] : null;
+    out.push(op || null); r = op && op.localdata ? op.localdata : null;
+  }
+  return out;
+}
+
 // ── client: the P3 session API (dev.flowstep, FLAT replies) ──────────────
 const call = (cmd, args) => new Promise((res) => {
   try { invokeCommand("dev", "flowstep", cmd, args, (r) => res(r || { status: "err", msg: "no response" })); }
@@ -196,5 +253,5 @@ const client = {
   setBreakpoints: (session, list) => call("debug_set_breakpoints", { session, list: list || [] }),
 };
 
-Object.assign(me, { caseChain, opState, wireState, syncState, frameViews, deckView, focusChain, eventText, rideEvents, drillEvents, client });
+Object.assign(me, { caseChain, opState, wireState, syncState, frameViews, deckView, focusChain, eventText, rideEvents, drillEvents, rootChain, bpPlace, bpEntry, chainOps, client });
 })();
