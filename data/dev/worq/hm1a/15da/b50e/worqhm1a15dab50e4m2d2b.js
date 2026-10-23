@@ -1831,13 +1831,30 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     return R;
   }
   // ── P5: the run's case path and events come from the stepper ──────────────
-  // The case path is read off the tape: each case-ending event names its op
-  // (a real stepper fact — no ruleOp inference). end ∈ done|next|terminate|
-  // fail|panic|stall|next-missing (pathText's suffix map covers them).
-  function casePathFromState(st) {
-    if (!st || !st.state || !Array.isArray(st.state.frames)) return [];
-    return st.state.frames.filter((f) => f && f.kind === "root")
-      .map((f) => ({ deck: f.case, end: f.phase === "ended" ? (f.outcome || "done") : (f.phase || "done"), stopAt: null, inferred: false }));
+  // The case path is walked off the run's EVENT stream (fin.events): a `next`
+  // event {from, op, to} ends its case and moves on, the final case ends with
+  // the run's done/stall/error. Only the LAST case's root frame is still on
+  // the stack (earlier cases closed and left it), so the frames cannot report
+  // the whole path — the events can. end ∈ done|next|terminate|fail|panic|
+  // stall|next-missing (pathText's suffix map covers them).
+  function casePathFromEvents(events) {
+    const path = [];
+    let cur = -1;
+    for (const ev of events || []) {
+      if (!ev || !ev.type) continue;
+      if (ev.type === "enter" || (ev.type === "seed" && cur < 0)) {
+        if (ev.case != null && ev.case !== cur) { if (cur >= 0) path.push({ deck: cur, end: "next", stopAt: null, inferred: false }); cur = ev.case; }
+      } else if (ev.type === "next" && ev.from != null) {
+        path.push({ deck: ev.from, end: "next", stopAt: ev.op != null ? ev.op : null, inferred: false });
+        cur = ev.to != null ? ev.to : ev.from + 1;
+      } else if (ev.type === "done" || ev.type === "stall" || ev.type === "error") {
+        const c = ev.case != null ? ev.case : Math.max(0, cur);
+        const end = ev.type === "done" ? (ev.fail ? "fail" : (ev.outcome && ev.outcome !== "ok" ? ev.outcome : "done")) : ev.type;
+        path.push({ deck: c, end, stopAt: null, inferred: false });
+        cur = -1;
+      }
+    }
+    return path;
   }
   function runFailureText(ev, lastStop) {
     if (!ev) return `run ended without a done event (${lastStop || "?"})`;
@@ -2066,7 +2083,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       const fin = await FD.client.step(session, "continue", { wait: true });
       tapeEvents = (fin && Array.isArray(fin.events) && !fin.events_truncated) ? fin.events : null;
       const st2 = await FD.client.state(session);
-      path = casePathFromState(st2);
+      path = casePathFromEvents(tapeEvents);
       const ev = (st2 && st2.event) || (fin && fin.event) || null;
       if (st2 && st2.status === "ok" && ev && ev.type === "done" && !ev.fail && ev.outcome === "ok") {
         r = Object.assign({ status: "ok" }, (ev.out && typeof ev.out === "object" && !Array.isArray(ev.out) ? ev.out : {}));
@@ -2081,10 +2098,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const ms = Math.round(performance.now() - started);
     // ride the run's REAL events from the ROOT case's first deck, where the
     // stepper starts (events not on this picture are skipped, never fatal);
-    // untraced: no path — ride the deck-0 schedule
+    // untraced (no session): the dry schedule rides instead (runFlow's own)
     let R = null;
-    if (focusPath.length === 1 && ((tapeEvents && tapeEvents.length) || untraced)) {
-      try { R = await rideRunEvents(tapeEvents || [], path); } catch (e) { R = null; }
+    if (focusPath.length === 1) {
+      try { R = tapeEvents && tapeEvents.length ? await rideRunEvents(tapeEvents, path) : (untraced ? await runFlow() : null); } catch (e) { R = null; }
     }
     liveCall = false;
     if (runBtn) { runBtn.disabled = false; runBtn.classList.remove("running"); runBtn.textContent = "run ▸"; }
