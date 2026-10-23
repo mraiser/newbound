@@ -1,6 +1,9 @@
 // flowdoc.js — the flowlang Case model: pure data. No DOM, no THREE, no
 // network. Parses a Case JSON into a normalized, validated model (the
-// authoritative language description is docs/flow3d-design.md Part I), and
+// authoritative language description is the dev library asset
+// docs/flow-language.md, Part I — it replaces the lost bench-era
+// docs/flow3d-design.md Part I and keeps its numbering, so the §1.x refs
+// below resolve there; the §3–§7 refs are that bench doc's editor design), and
 // produces DIAGNOSTICS (I-1…I-10 + structural), never rejections — the editor
 // must be able to open a broken flow to fix it (design §4.4).
 //
@@ -19,7 +22,8 @@
 // (zero-globals doctrine). Consumers mount it as a hidden data-control
 // child div and read the element's api.
 //
-// SYNCHROS (plan item Synchros S2). A Case may carry `syncs: [{src, dest}]` —
+// SYNCHROS (plan item Synchros S2; the language rules are
+// docs/flow-language.md §1.5.3). A Case may carry `syncs: [{src, dest}]` —
 // a data-less edge between two ops of the SAME case (op indices, src != dest;
 // never the bars) meaning src must finish before dest starts. The owner chose
 // the separate Case key (not a reserved-name con). Absent = [], and emitCase
