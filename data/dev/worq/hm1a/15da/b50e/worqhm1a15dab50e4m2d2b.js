@@ -43,6 +43,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   const { parse: parseFlow, propagationRounds, diffFlow } = document.querySelector('[data-control="dev:flowdoc"]').api;
   const { toSceneDoc, terminalWorld, jumpPoints, GEO, syncHandlePos } = document.querySelector('[data-control="dev:flowproject"]').api;
   const { tidy, untangle } = document.querySelector('[data-control="dev:flowlayout"]').api;
+  // STEP DEBUGGER (P4): debug_state -> editor views + the session client
+  const FD = document.querySelector('[data-control="dev:flowdebug"]').api;
 
   // ── backend plumbing (same ajax idiom as floweditor3d) ────────────────────
   const invokeP = (l2, c2, m2, a2) => new Promise((res2) => invokeCommand(l2, c2, m2, a2, res2));
@@ -262,6 +264,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // a run owns the stage: an edit mid-run would re-project the facade under
     // the tokens — revert it at once (the doc stays exactly as before)
     if (running) { try { cmd.undo(); } catch (e) {} status("running — edit refused until the run delivers", "bad"); return false; }
+    // a debug session's tape describes THIS body: edits wait for stop (⇧F5)
+    if (dbgActive()) { try { cmd.undo(); } catch (e) {} status("debugging — edits are locked; stop the session (⇧F5) to edit", "bad"); renderAll(); return false; }
     // a read-only view (graph without a source command) cannot keep edits
     if (!source) { try { cmd.undo(); } catch (e) {} status("read-only view — no source command to save edits to", "bad"); return false; }
     undoStack.push(cmd);
@@ -274,6 +278,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   function undo() {
     if (running) return;
+    if (dbgActive()) { status("debugging — stop the session (⇧F5) to undo", "bad"); return; }
     const cmd = undoStack.pop(); if (!cmd) return;
     try { cmd.undo(); } catch (e) {}
     redoStack.push(cmd);
@@ -288,6 +293,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   function redo() {
     if (running) return;
+    if (dbgActive()) { status("debugging — stop the session (⇧F5) to redo", "bad"); return; }
     const cmd = redoStack.pop(); if (!cmd) return;
     try { if (cmd.redo) cmd.redo(); } catch (e) {}
     undoStack.push(cmd);
@@ -331,6 +337,20 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // selection = the bench accent, read exactly as flownode's halo reads it
     const selTok = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
     const selColor = /^#[0-9a-f]{3,8}$/i.test(selTok) ? selTok : "#f0a63c";
+    // STEP DEBUGGER (P4): the focused case's frame in the debug session (null
+    // when not debugging or no frame runs this case) tints its wires
+    // (delivered / ready / skipped) and synchros (fired / ready / skipped);
+    // a ready one also thickens - it is pickable (a tap runs it next)
+    const dv = dbgDeckView();
+    const dcol = dv ? dbgColors() : null;
+    const DBG_W = { delivered: "done", fired: "done", ready: "ready", skipped: "skipped" };
+    const tint = (s, n, st) => {
+      const role = DBG_W[st]; if (!role || !dcol) return;
+      s.material = { ...(s.material || n.material || {}), color: dcol[role] };
+      if (st === "ready" && n.kind === "link") s.r = (n.r || 0.035) * 1.6;
+      if (st === "ready" && n.meta && n.meta.part === "mark") s.scale = { x: 1.4, y: 1.4, z: 1.4 };
+      s.meta = { ...(s.meta || n.meta), dbg: st };
+    };
     const specs = sceneDoc.nodes.map((n) => {
       const s = { ...n, id: "fx_" + n.id };
       if (n.parent !== undefined) s.parent = "fx_" + n.parent;
@@ -345,6 +365,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       // selected wire draws in the selection colour, thicker
       if (n.kind === "link" && n.meta && n.meta.role === "wire") {
         s.affordances = { tap: true, hover: true };
+        if (dv) tint(s, n, dv.wires[n.meta.index]);   // only the ACTIVE deck draws wires
         if (selWire != null && n.meta.index === selWire) {
           s.material = { ...(n.material || {}), color: selColor };
           s.r = (n.r || 0.035) * 1.8;
@@ -359,6 +380,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       if (n.meta && n.meta.role === "sync-handle") s.affordances = { tap: true, hover: true, drag: { plane: "xy" } };
       if (n.meta && n.meta.role === "sync") {
         if (n.meta.part === "mark") s.affordances = { tap: true, hover: true };
+        if (dv) tint(s, n, dv.syncs[n.meta.index]);
         if (selSync != null && n.meta.index === selSync) {
           s.material = { ...(n.material || {}), color: selColor };
           if (n.meta.part === "mark") s.scale = { x: 1.6, y: 1.6, z: 1.6 };
@@ -564,7 +586,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const c = focusedCase(); if (!c || !p) return;
     const evt = p.evt || {};
     if (p.phase === "start") {
-      if (running || (p.which !== "in" && p.which !== "out")) return;
+      if (running || dbgActive() || (p.which !== "in" && p.which !== "out")) return;
       const terms = p.opIndex === -1 ? c.input : p.opIndex === -2 ? c.output
         : (c.cmds[p.opIndex] && c.cmds[p.opIndex][p.which]);
       const term = p.term !== undefined ? p.term : Object.keys(terms || {})[p.ord];
@@ -715,7 +737,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const c = focusedCase(); if (!c || !p) return;
     const evt = p.evt || {};
     if (p.phase === "start") {
-      if (running || !c.cmds[p.idx] || (p.which !== "in" && p.which !== "out")) return;
+      if (running || dbgActive() || !c.cmds[p.idx] || (p.which !== "in" && p.which !== "out")) return;
       if (armSrc || wireMode) cancelWireGhost();
       armSync = { idx: p.idx, which: p.which, key: p.key || null };
       if (selWire != null || selSync != null) { selWire = null; selWireRef = null; selSync = null; selSyncRef = null; selSyncCase = null; }
@@ -896,8 +918,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const bt = barTermOfSpec(specId);          // a bar socket: the same hint as an op's
     if (bt) { onPortTap({ node: bt.which + "0" }); return; }
     const wi = wireIndexOfSpec(specId);
+    if (wi != null && debugPickItem("wire", wi)) return;   // STEP DEBUGGER: a ready wire delivers next
     if (wi != null) { selectWire(wi); return; }
     const si = syncIndexOfSpec(specId);
+    if (si != null && debugPickItem("sync", si)) return;   // ...a ready synchro fires next
     if (si != null) { selectSync(si); return; }
     if (syncHandleOfSpec(specId)) { status("drag from a synchro handle (◆) to another op's handle to synchronize them", "ok"); return; }
     if (specId == null && selWire != null) selectWire(null);   // background tap drops it
@@ -938,7 +962,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
 
   // ── render: facade + instances + chrome ───────────────────────────────────
-  function renderAll() { renderFacade(); renderInstances(); renderChrome(); }
+  function renderAll() { syncDebugState(); renderFacade(); renderInstances(); renderChrome(); }
 
   function renderChrome() {
     const chain = caseChain(focusRoot());
@@ -1110,6 +1134,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   function onOpSelect(p) {
     const key = p && p.key; if (!key || !hostApi) return null;
     const m = /^d(\d+)_op(\d+)$/.exec(key);
+    // STEP DEBUGGER: a tap on a READY op of the top frame picks it (it runs next)
+    if (m && +m[1] === activeDeck && debugPickItem("op", +m[2])) return null;
     if (armSrc || wireMode || !m || +m[1] !== activeDeck) { hostApi.setState("selectedKey", key); return null; }
     return selectOp(+m[2]);
   }
@@ -1891,9 +1917,11 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (!params.length) return runLive({});
     return openRunPicker(params);
   }
-  function openRunPicker(params) {
-    const body = $(".fe-inspect-body"); if (!body) return runLive({});
-    body.innerHTML = `<p><b>run</b> <span class="lbl">arguments — the params bar</span></p>`;
+  // goFn/verb: the debugger reuses this form (goFn = debugStart, verb "debug")
+  function openRunPicker(params, goFn, verb) {
+    goFn = goFn || runLive; verb = verb || "run";
+    const body = $(".fe-inspect-body"); if (!body) return goFn({});
+    body.innerHTML = `<p><b>${verb}</b> <span class="lbl">arguments — the params bar</span></p>`;
     const form = document.createElement("form"); form.className = "fe-run-args";
     const inputs = [];
     for (const [name, node] of params) {
@@ -1906,20 +1934,20 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     }
     const foot = document.createElement("div"); foot.className = "fe-run-foot";
     const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "fe-run-cancel"; cancel.textContent = "cancel";
-    const go = document.createElement("button"); go.type = "submit"; go.className = "fe-run-go"; go.textContent = "run ▸";
+    const go = document.createElement("button"); go.type = "submit"; go.className = "fe-run-go"; go.textContent = verb === "run" ? "run ▸" : verb + " ⏯";
     foot.append(cancel, go); form.appendChild(foot);
-    const close = () => { renderInspector(hostApi && hostApi.state ? hostApi.state.selectedKey : null); if (ME.tabIndex >= 0) ME.focus(); status("run cancelled"); };
+    const close = () => { renderInspector(hostApi && hostApi.state ? hostApi.state.selectedKey : null); if (ME.tabIndex >= 0) ME.focus(); status(verb + " cancelled"); };
     cancel.addEventListener("click", close);
     form.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); } });
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       const args = {};
       for (const { name, inp, type } of inputs) args[name] = coerceArg(inp.value, type);
-      runLive(args);
+      goFn(args);
     });
     body.appendChild(form);
     const first = form.querySelector("input"); if (first) first.focus();
-    status("run — fill in the params bar");
+    status(verb + " — fill in the params bar");
     return form;
   }
   async function runLive(args) {
@@ -2147,7 +2175,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         if (p.which) { onSocketDrag(p); return; }   // socket drags WIRE (input → output)
         // live-follow: the drawn icon rides the pointer with its pick proxy —
         // and so do its wires (links re-resolve their socket ends each frame)
-        if (p.phase === "move" && !running) {
+        if (p.phase === "move" && !running && !dbgActive()) {
           const c0 = focusedCase(); const op0 = c0 && c0.cmds[p.opIndex]; const e0 = p.evt || {};
           if (op0 && op0.pos && typeof e0.dx === "number" && stage && stage.applyDelta) {
             const fid = "fx_" + slug(`d${activeDeck}/op/${p.opIndex}`);
@@ -2156,6 +2184,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
           }
           return;
         }
+        if (p.phase === "end" && dbgActive()) { renderAll(); status("debugging — stop the session (⇧F5) to move ops", "bad"); return; }
         if (p.phase !== "end" || running) return;
         const c = focusedCase(); const op = c && c.cmds[p.opIndex]; if (!op || !op.pos) return;
         const evt = p.evt || {};

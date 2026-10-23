@@ -93,6 +93,26 @@
 /* P4 */
 .nb-flowedit3d .fe-run { border-color:var(--f-3d); color:var(--good); }
 .nb-flowedit3d .fe-run.running { background:var(--f-3d); color:var(--ground); }
+/* STEP DEBUGGER (flow step debugger P4) */
+.nb-flowedit3d { --fe-dbg-ready:var(--accent, #f0a63c); --fe-dbg-running:var(--f-css, #56a3d9);
+  --fe-dbg-done:var(--good, #62bd8c); --fe-dbg-skipped:#6b6f78; }
+.nb-flowedit3d .fe-debug { border-color:var(--accent); color:var(--accent); }
+.nb-flowedit3d.fe-debugging .fe-debug { background:var(--accent); color:var(--ground); }
+.nb-flowedit3d .fe-dbg { display:flex; align-items:center; gap:6px; padding:4px 10px; flex-wrap:wrap;
+  background:color-mix(in srgb, var(--accent) 10%, var(--panel)); border-bottom:1px solid var(--accent); font-size:12px; }
+.nb-flowedit3d .fe-dbg[hidden] { display:none; }
+.nb-flowedit3d .fe-dbg-lbl { font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:.06em; font-size:11px; }
+.nb-flowedit3d .fe-dbg button { font-size:12px; padding:2px 8px; }
+.nb-flowedit3d .fe-dbg-pos { font-family:var(--mono, monospace); color:var(--text-dim); min-width:9ch; }
+.nb-flowedit3d .fe-dbg-ev { flex:1; min-width:16ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); }
+.nb-flowedit3d .fe-dbg-ev.ended { color:var(--good); } .nb-flowedit3d .fe-dbg-ev.bad { color:var(--danger); }
+.nb-flowedit3d .fe-dbg-legend { display:flex; gap:8px; font-size:11px; color:var(--text-dim); }
+.nb-flowedit3d .fe-dbg-legend i { font-style:normal; display:inline-flex; align-items:center; gap:3px; }
+.nb-flowedit3d .fe-dbg-legend i::before { content:""; width:9px; height:9px; border-radius:2px; display:inline-block; }
+.nb-flowedit3d .fe-dbg-legend .s-ready::before { background:var(--fe-dbg-ready); }
+.nb-flowedit3d .fe-dbg-legend .s-running::before { background:var(--fe-dbg-running); }
+.nb-flowedit3d .fe-dbg-legend .s-done::before { background:var(--fe-dbg-done); }
+.nb-flowedit3d .fe-dbg-legend .s-skipped::before { background:var(--fe-dbg-skipped); }
 .nb-flowedit3d .fe-changes, .nb-flowedit3d .fe-sjournal { margin-top:8px; }
 .nb-flowedit3d .fe-changes-list, .nb-flowedit3d .fe-sjournal-list, .nb-flowedit3d .fe-run-list,
 .nb-flowedit3d .jl-diff-list { list-style:none; margin:0; padding:0; font-size:11px; }

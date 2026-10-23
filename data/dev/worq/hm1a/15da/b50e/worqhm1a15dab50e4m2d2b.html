@@ -13,7 +13,21 @@
     <button class="fe-tidy" title="Auto-layout: tidy (longest-path layers)">tidy</button>
     <button class="fe-untangle" title="Auto-layout: untangle (resolve crossings in z)">untangle</button>
     <button class="fe-run" title="Run: tokens deliver along the wires in propagation order (R)">run ▸</button>
+    <button class="fe-debug" title="Debug: step through the CURRENT body, unsaved edits included (F11 / F10 start a session)">debug ⏯</button>
     <button class="fe-save" title="Save the flow body (write_flow_body)" disabled>save</button>
+  </div>
+  <div class="fe-dbg" role="toolbar" aria-label="step debugger" hidden>
+    <span class="fe-dbg-lbl">debug</span>
+    <button class="fe-dbg-back" title="Step back - roll the tape back one step (⇧F10)">⟲ back</button>
+    <button class="fe-dbg-over" title="Step over (F10)">over ↷</button>
+    <button class="fe-dbg-into" title="Step into (F11)">into ↓</button>
+    <button class="fe-dbg-out" title="Step out (⇧F11)">out ↑</button>
+    <button class="fe-dbg-cont" title="Continue to a breakpoint or the end (F5)">continue ▸▸</button>
+    <button class="fe-dbg-pause" title="Pause a running continue" disabled>pause ❚❚</button>
+    <button class="fe-dbg-stop" title="Stop debugging (⇧F5) - edits unlock">stop ■</button>
+    <span class="fe-dbg-pos" title="tape cursor / length"></span>
+    <span class="fe-dbg-ev" role="status"></span>
+    <span class="fe-dbg-legend" aria-hidden="true"><i class="s-ready">ready</i><i class="s-running">running</i><i class="s-done">done</i><i class="s-skipped">skipped</i></span>
   </div>
   <div class="fe-conflict" hidden>
     <span class="fe-conflict-msg">this flow changed on the server since you loaded it</span>
@@ -70,6 +84,7 @@
         <li><kbd>W</kbd> wire from selection · <kbd>←</kbd><kbd>→</kbd> choose target · <kbd>Enter</kbd> commit</li>
         <li><kbd>Del</kbd> unwires a wire / deletes an op · <kbd>⌘Z</kbd>/<kbd>⇧⌘Z</kbd> undo/redo</li>
         <li><kbd>R</kbd> run — tokens deliver along each wire, round by round</li>
+        <li><kbd>F11</kbd> into · <kbd>F10</kbd> over · <kbd>⇧F11</kbd> out · <kbd>F5</kbd> continue · <kbd>⇧F10</kbd> back · <kbd>⇧F5</kbd> stop — debug the current body; click a <b>ready</b> op / wire / synchro to run it next</li>
       </ul>
     </aside>
 
@@ -101,3 +116,4 @@
 <div class="data-control" data-control="dev:flowproject" hidden></div>
 <div class="data-control" data-control="dev:flowprims" hidden></div>
 <div class="data-control" data-control="dev:flowlayout" hidden></div>
+<div class="data-control" data-control="dev:flowdebug" hidden></div>
