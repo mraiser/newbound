@@ -391,6 +391,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       return s;
     });
     lastFacadeDbg = specs.filter((s) => s.meta && s.meta.dbg).map((s) => ({ id: s.id, role: s.meta.role, part: s.meta.part, index: s.meta.index, dbg: s.meta.dbg, color: s.material && s.material.color }));
+    // D4: breakpoint dots on the focused case's wires and synchros (ops
+    // carry theirs on the flownode) - see bpDotSpecs
+    for (const s of bpDotSpecs()) specs.push(s);
     // re-attach the ghost specs if a wire is armed (they ride the facade scene).
     // setScene is a WHOLE-scene replace on the real GL stage: it would destroy
     // every spec the scenehost owns (the flownode instances, host links, run
@@ -916,6 +919,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   function onSceneTap(specId) {
     if (armSrc || wireMode || armSync) return;  // mid wiring/synchro gesture: not a selection
+    const bd = bpDotOfSpec(specId);            // D4: a breakpoint dot toggles its breakpoint
+    if (bd) { toggleBreakpoint(bd.kind, bd.index); return; }
     const bt = barTermOfSpec(specId);          // a bar socket: the same hint as an op's
     if (bt) { onPortTap({ node: bt.which + "0" }); return; }
     const wi = wireIndexOfSpec(specId);
@@ -2040,6 +2045,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // unlocks. Without a source the harness's command names the session (the
   // body debugged is still the editor's own).
   let dbg = null;            // { session, src, args, st, views, busy, last, follow, sig }
+  let bps = [];              // D4 breakpoints { kind, ref, root } - the EDITOR's, kept across sessions
+  let lastBpDots = [];       // D4: the facade breakpoint dots the last render drew (checks)
   let dbgPollT = null;
   let lastFacadeDbg = [];    // the facade specs the last render tinted (checks)
   const dbgSrc = () => source || { lib: "scratch", ctl: "skills", cmd: "flowedit3d_body" };
@@ -2058,6 +2065,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (!hostApi) return;
     const dv = dbgDeckView();
     hostApi.setState("dbg", dv ? { deck: activeDeck, ops: dv.ops.slice(), colors: dbgColors(), cursor: dbg.st ? dbg.st.cursor : 0 } : null);
+    syncBpState();
   }
   function startDebug() {
     if (dbgActive()) return null;
@@ -2079,6 +2087,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     dbg = { session: r.session, src, args: args || {}, st: null, views: [], busy: false, last: r, follow: true, sig: "", unsaved: dirty };
     ME.classList.add("fe-debugging");
     pushJournal(`debug session · ${src.cmd}` + (dirty ? " (unsaved body)" : ""));
+    if (bpPlaces().length) await sendBreakpoints();   // D4: the editor's breakpoints ride every session
     await debugRefresh();
     renderInspector(hostApi && hostApi.state ? hostApi.state.selectedKey : null);
     status(`debugging ${src.cmd} — F11 into · F10 over · F5 continue · ⇧F5 stop`, "ok");
@@ -2102,6 +2111,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         if (/session/i.test(msg) && /(no such|no debug session|unknown|not found|gone|missing|reaped)/i.test(msg)) debugEnded("the session is gone (reaped after idling?)");
         return r;
       }
+      // D4: why this move stopped (over/out/run_to: the reply says; a
+      // continue's comes with the poll that sees it end)
+      d.stop = r.running ? null : { stopped: String(r.stopped || ""), hit: r.hit || null, mode };
       // D2: what this move SHOWS — its events (a back(1): the undone one, in
       // reverse); continue/goto/pause/back(n) only redraw
       const back1 = mode === "back" && !!prevEv && !(pick && pick.count > 1);
@@ -2254,7 +2266,11 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       if (!dbgActive() || disposed) return;
       const st = await debugRefresh();
       if (st && st.running) debugPoll();
-      else if (st) status(`debug: stopped${st.last_stop ? " — " + st.last_stop : ""} at step ${st.cursor}`, "ok");
+      else if (st) {
+        if (dbg) { dbg.stop = { stopped: String(st.last_stop || ""), hit: (st.last_run && st.last_run.hit) || null, mode: "continue" }; renderDebugBar(); refreshInspector(); }
+        const bh = dbgStopText();
+        status(bh ? `debug: ${bh} at step ${st.cursor}` : `debug: stopped${st.last_stop ? " — " + st.last_stop : ""} at step ${st.cursor}`, "ok");
+      }
     }, 200);
   }
   async function debugStop() {
@@ -2298,6 +2314,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (ev) {
       const top = dbg.views && dbg.views.length ? dbg.views[dbg.views.length - 1] : null;
       let t = FD.eventText(st.event, dbg.views);
+      { const bh = dbgStopText(); if (bh) t = `● ${bh} · ${t}`; }   // D4
       const rd = (st.ready || []).filter((x) => x && x.kind !== "auto");
       if (ended) t += " · ended";
       else if (rd.length) t += ` · ready: ${rd.map((x) => dbgItemText(top, x)).join(", ")}` + (st.default ? ` · next ${dbgItemText(top, st.default)}` : "");
@@ -2305,7 +2322,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       if (top && top.external) t += ` · in ${top.external.name || "a callee"} (not in this flow)`;
       if (live) t = "running… " + t;
       ev.textContent = t;
-      ev.className = "fe-dbg-ev" + (ended ? " ended" : "") + (st.event && (st.event.type === "error" || st.event.type === "stall") ? " bad" : "");
+      ev.className = "fe-dbg-ev" + (ended ? " ended" : "") + (st.event && (st.event.type === "error" || st.event.type === "stall") ? " bad" : "") + (dbgStopText() ? " bp" : "");
     }
   }
 
@@ -2338,7 +2355,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         outcome: v.outcome, top: v.top, focused: dv === v, showable: v.fi < chainLen, external: !!v.external })),
       ready: (st.ready || []).filter((x) => x && x.kind !== "auto").map((x) => ({ kind: x.kind, index: x.index, text: dbgItemText(top, x),
         isDefault: !!(st.default && st.default.kind === x.kind && st.default.index === x.index) })),
-      sel: null, frame: null };
+      sel: null, frame: null, stop: dbgStopText(),
+      bps: bpListModel().map((x) => ({ kind: x.kind, index: x.index, case: x.case, depth: x.depth, text: x.text, entry: x.entry })) };
     if (!dv) return m;
     const f = dv.frame || {}, c = dv.caseObj;
     m.frame = { fi: dv.fi, case: dv.case, phase: dv.phase, outcome: dv.outcome, args: f.args || {}, out: f.out || {}, inprog: f.inprog || null };
@@ -2365,6 +2383,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         outputs: outTerms.map((t) => ({ term: t, has: dbgOwn(resObj, t), value: dbgOwn(resObj, t) ? resObj[t] : null })),
         results: res == null ? null : res };
     }
+    if (m.sel) m.sel.bp = hasBreakpoint(m.sel.kind, m.sel.index);   // D4
     return m;
   }
   function dbgKv(parent, rows, cls) {
@@ -2389,6 +2408,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     head.innerHTML = `<b>debugger</b> <span class="lbl">step ${m.cursor} / ${m.length}${m.ended ? " · ended" : m.running ? " · running…" : ""}</span>`;
     body.appendChild(head);
     edNote(body, m.event).classList.add("fe-dbgi-ev");
+    if (m.stop) edNote(body, "● " + m.stop).classList.add("fe-dbgi-bphit");   // D4
     // the frame stack, top first
     edLbl(body, "frames · top first — click to focus");
     const ul = document.createElement("ul"); ul.className = "fe-dbgi-frames";
@@ -2412,7 +2432,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         b.dataset.kind = it.kind; b.dataset.index = String(it.index);
       }
     }
-    if (!m.frame) { edNote(body, "no frame runs this case right now — click a frame above, or follow the top frame").classList.add("fe-dbgi-noframe"); return; }
+    if (!m.frame) { edNote(body, "no frame runs this case right now — click a frame above, or follow the top frame").classList.add("fe-dbgi-noframe"); renderBpList(body, m); return; }
     // the selection, in the focused frame
     const s = m.sel;
     const sec = document.createElement("div"); sec.className = "fe-dbgi-sel"; body.appendChild(sec);
@@ -2437,12 +2457,34 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       h.innerHTML = `<b>synchro</b> ${esc(s.text)} <span class="fe-dbgi-st s-${esc(s.state)}">${esc(s.state)}</span>`;
       sec.appendChild(h);
     } else edNote(sec, "click an op or a wire (not a ready one — that runs it) to see its values");
+    // D4: the selection's breakpoint toggle (F9 does the same)
+    if (s) {
+      const b = edButton(edBtns(sec), s.bp ? "● breakpoint — clear (F9)" : "○ set breakpoint (F9)", "fe-dbgi-bp" + (s.bp ? " on" : ""), () => toggleBreakpoint(s.kind, s.index));
+      b.dataset.on = String(!!s.bp);
+    }
     // the focused frame: args in, out so far
     const fr = m.frame;
     edLbl(body, `frame ${fr.fi === 0 ? "root" : "#" + fr.fi} · case ${fr.case + 1} · args`);
     dbgKv(body, dbgObjRows(fr.args), "fe-dbgi-args");
     edLbl(body, "out" + (fr.outcome ? ` · ${fr.outcome}` : "") + (fr.phase ? ` · ${fr.phase}` : ""));
     dbgKv(body, dbgObjRows(fr.out), "fe-dbgi-fout");
+    renderBpList(body, m);
+  }
+  // D4: every breakpoint (click one = clear it), plus clear-all
+  function renderBpList(body, m) {
+    const L = m.bps || [];
+    edLbl(body, `breakpoints · ${L.length}` + (L.length ? " — click one to clear it" : " — ● dots on ops, wires and synchros, or F9 on the selection"));
+    if (!L.length) return;
+    const ul = document.createElement("ul"); ul.className = "fe-dbgi-bps";
+    L.forEach((x, i) => {
+      const li = document.createElement("li"); li.className = "fe-dbgi-bpi";
+      li.dataset.kind = x.kind; li.dataset.index = String(x.index); li.dataset.case = String(x.case); li.dataset.depth = String(x.depth);
+      li.textContent = "● " + x.text; li.title = "clear this breakpoint";
+      li.addEventListener("click", () => removeBreakpointAt(i));
+      ul.appendChild(li);
+    });
+    body.appendChild(ul);
+    edButton(edBtns(body), "clear all breakpoints", "fe-dbgi-bpclear", clearBreakpoints);
   }
   // focus frame fi's case (a click in the stack): the focus stops following
   // the top frame until the next move (or "follow the top frame")
@@ -2466,6 +2508,144 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (debugFollow()) renderAll(); else { syncDebugState(); renderFacade(); }
     refreshInspector();
     return { depth: focusPath.length, deck: activeDeck };
+  }
+
+  // ── D4: breakpoints ──────────────────────────────────────────────────────
+  // A breakpoint is { kind: op|wire|sync, ref, root }: the OBJECT it sits on
+  // and the picture (case-chain root: the doc root or a local's localdata)
+  // holding it — it follows renumbering edits and dies with its object
+  // (FD.bpPlace → null; pruned on read). They belong to the EDITOR, not the
+  // session: set before or during a session, re-sent on every debugStart and
+  // every toggle (dev.flowstep.debug_set_breakpoints; FD.bpEntry: frame
+  // [[op,"*"]…] = any iteration of each local on the way, cases = the parent
+  // cases). The stepper stops BEFORE a breakpointed op / wire / synchro is
+  // picked, on over / out / continue (never on the one a move starts from).
+  // Dots: an op's on its flownode (host.state.bps); a wire's just above its
+  // destination socket (one wire per input, so the spot is the wire's own;
+  // the hang link drops into it from above); a synchro's above its mark.
+  // Solid when set; while a session is open every op / wire / synchro of the
+  // focused case shows a faint ghost dot — a tap toggles. F9 toggles the
+  // selection's; the debug inspector has the toggle and the list.
+  function bpColor() {
+    const v = String(getComputedStyle(ME).getPropertyValue("--fe-dbg-bp") || "").trim();
+    return /^#[0-9a-f]{3,8}$/i.test(v) ? v : "#e5484d";
+  }
+  function bpPlaces() {
+    const out = [];
+    bps = bps.filter((b) => { const p = FD.bpPlace(doc && doc.root, b); if (p) out.push(Object.assign({ bp: b }, p)); return !!p; });
+    return out;
+  }
+  const bpRefOf = (kind, index, c) => !c ? null : kind === "op" ? c.cmds[index] : kind === "wire" ? c.cons[index] : (c.syncs || [])[index];
+  const bpFind = (kind, ref, root) => bps.findIndex((b) => b.kind === kind && b.ref === ref && b.root === root);
+  function hasBreakpoint(kind, index) { const ref = bpRefOf(kind, index, focusedCase()); return !!ref && bpFind(kind, ref, focusRoot()) >= 0; }
+  // the focused case's breakpoints as index lists
+  function bpDeck() {
+    const o = { op: [], wire: [], sync: [] }, c = focusedCase(), root = focusRoot();
+    if (!c) return o;
+    for (const b of bps) {
+      if (b.root !== root || !o[b.kind]) continue;
+      const k = (b.kind === "op" ? c.cmds : b.kind === "wire" ? c.cons : (c.syncs || [])).indexOf(b.ref);
+      if (k >= 0) o[b.kind].push(k);
+    }
+    return o;
+  }
+  function syncBpState() {
+    if (!hostApi || disposed) return;
+    hostApi.setState("bps", { deck: activeDeck, ops: bpDeck().op, ghost: dbgActive(), color: bpColor() });
+  }
+  // the facade dots for wires + synchros (renderFacade appends them)
+  function bpDotSpecs() {
+    lastBpDots = [];
+    const c = focusedCase(); if (!c) return [];
+    const d = bpDeck(), ghost = dbgActive(), col = bpColor(), out = [];
+    const dot = (kind, k, p) => {
+      const on = d[kind].includes(k);
+      if ((!on && !ghost) || !p) return;
+      const id = "fx_" + slug(`d${activeDeck}/bp/${kind}/${k}`);
+      out.push({ id, kind: "sphere", pos: p, params: { radius: on ? 0.07 : 0.055 },
+        material: { color: col, opacity: on ? 1 : 0.3, emissive: on },
+        affordances: { tap: true, hover: true }, meta: { role: "bp", kind, index: k, on } });
+      lastBpDots.push({ id, kind, index: k, on, pos: p });
+    };
+    c.cons.forEach((w, k) => { const e = wireEnd(c, w.dest, "in"); dot("wire", k, e ? { x: e.x, y: e.y + 0.17, z: (e.z || 0) + 0.04 } : null); });
+    (c.syncs || []).forEach((s, j) => {
+      let a = null, b = null;
+      try { a = syncHandlePos(c, s.src, "out"); b = syncHandlePos(c, s.dest, "in"); } catch (e) {}
+      dot("sync", j, a && b ? { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + 0.17, z: ((a.z || 0) + (b.z || 0)) / 2 + 0.04 } : null);
+    });
+    return out;
+  }
+  function bpDotOfSpec(specId) {
+    if (!specId) return null;
+    const o = stage && stage.objects && stage.objects.get ? stage.objects.get(specId) : null;
+    const m = o && o.spec && o.spec.meta;
+    if (m && m.role === "bp" && typeof m.index === "number") return { kind: m.kind, index: m.index };
+    const r = /^fx_d(\d+)_bp_(op|wire|sync)_(\d+)$/.exec(String(specId));
+    return r && +r[1] === activeDeck ? { kind: r[2], index: +r[3] } : null;
+  }
+  function bpRedraw() { syncBpState(); renderFacade(); refreshInspector(); renderDebugBar(); }
+  // toggle (on null) / set (true) / clear (false) kind index of the FOCUSED case
+  function toggleBreakpoint(kind, index, on) {
+    const c = focusedCase(), root = focusRoot();
+    const ref = bpRefOf(kind, index, c);
+    if (!ref) { status(`no ${kind} ${index} in this case`, "bad"); return null; }
+    const k = bpFind(kind, ref, root);
+    const want = on == null ? k < 0 : !!on;
+    if (want && k < 0) bps.push({ kind, ref, root });
+    else if (!want && k >= 0) bps.splice(k, 1);
+    bpRedraw();
+    const sent = sendBreakpoints();
+    status(`breakpoint ${want ? "set" : "cleared"} on ${dbgItemText({ caseObj: c }, { kind, index })}` + (dbgActive() ? "" : " — kept for the next debug session"), "ok");
+    return { on: want, sent };
+  }
+  function toggleSelectedBreakpoint() {
+    if (selWire != null) return toggleBreakpoint("wire", selWire);
+    if (selSync != null) return toggleBreakpoint("sync", selSync);
+    const key = hostApi && hostApi.state ? hostApi.state.selectedKey : null;
+    const mk = key && /^d(\d+)_op(\d+)$/.exec(key);
+    if (mk && +mk[1] === activeDeck) return toggleBreakpoint("op", +mk[2]);
+    status("select an op, a wire or a synchro first — F9 toggles its breakpoint", "bad");
+    return null;
+  }
+  function clearBreakpoints() {
+    bps = [];
+    bpRedraw();
+    const sent = sendBreakpoints();
+    status("breakpoints cleared", "ok");
+    return { sent };
+  }
+  async function sendBreakpoints() {
+    if (!dbgActive()) return null;
+    const d = dbg, list = bpPlaces().map((p) => FD.bpEntry(p));
+    const r = await FD.client.setBreakpoints(d.session, list);
+    if (dbg !== d) return r;
+    d.bpSent = { list, ok: !!(r && r.status === "ok"), echoed: r && Array.isArray(r.breakpoints) ? r.breakpoints : null };
+    if (!r || r.status !== "ok") status("debug: breakpoints refused — " + ((r && r.msg) || "no reply"), "bad");
+    return r;
+  }
+  // the last move's stop on a breakpoint, in words (null: it did not stop on one)
+  function dbgStopText() {
+    if (!dbgActive() || !dbg.stop || dbg.stop.stopped !== "breakpoint") return null;
+    const h = dbg.stop.hit || {}, views = dbg.views || [];
+    const top = views.length ? views[views.length - 1] : null;
+    if (h.kind === "op" || h.kind === "wire" || h.kind === "sync") return `stopped at breakpoint: ${dbgItemText(top, h)}`;
+    return "stopped at breakpoint" + (h.kind ? ` (${h.kind})` : "");
+  }
+  // every breakpoint in words (the inspector's list + checks)
+  function bpListModel() {
+    return bpPlaces().map((p) => {
+      const c = FD.caseChain(p.bp.root)[p.case];
+      const ops = FD.chainOps(doc.root, p.chain);
+      const where = ops.length ? ` · in ${ops.map((o) => (o && (o.name || o.type)) || "local").join(" › ")}` : "";
+      return { kind: p.kind, index: p.index, case: p.case, depth: p.chain.length, entry: FD.bpEntry(p),
+        text: `${dbgItemText({ caseObj: c }, { kind: p.kind, index: p.index })} · case ${p.case + 1}${where}`, bp: p.bp };
+    });
+  }
+  function removeBreakpointAt(i) {
+    const it = bpListModel()[i]; if (!it) return null;
+    const k = bps.indexOf(it.bp); if (k >= 0) bps.splice(k, 1);
+    bpRedraw();
+    return { sent: sendBreakpoints() };
   }
 
   // ── P4: the in-editor journal + diff ─────────────────────────────────────
@@ -2615,6 +2795,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       hostApi.setState("onSceneDrag", onSceneDrag);
       // taps on an op BODY (flownode.click) → op selection, the same path as wires
       hostApi.setState("onOpSelect", onOpSelect);
+      // D4: a tap on an op's breakpoint dot (flownode.click node "bp") toggles it
+      hostApi.setState("onBpTap", (p) => { if (p && typeof p.opIndex === "number" && p.opIndex >= 0) toggleBreakpoint("op", p.opIndex); });
       hostApi.setState("onOpDrag", (p) => {
         // drag an op body to move it (front-ortho plane, z kept). Undoable.
         // flownode hands ONE payload {phase, key, opIndex, evt, which?, ord?}
@@ -2775,6 +2957,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
           else debugStep("continue", { budget: 10000 });
           return;
         }
+        // D4: F9 toggles the selection's breakpoint (session or not)
+        if (e.key === "F9") { e.preventDefault(); toggleSelectedBreakpoint(); return; }
         if (inField) return;
         if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z")) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
         if ((e.metaKey || e.ctrlKey) && (e.key === "y" || e.key === "Y")) { e.preventDefault(); redo(); return; }
@@ -2900,9 +3084,22 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
             sel: sel && sel.dataset.kind ? { kind: sel.dataset.kind, index: +sel.dataset.index, head: (sel.querySelector(".fe-dbgi-selhead") || {}).textContent || "" } : null,
             inputs: rows(".fe-dbgi-in"), outputs: rows(".fe-dbgi-out"), wire: rows(".fe-dbgi-wire"),
             args: rows(".fe-dbgi-args"), out: rows(".fe-dbgi-fout"),
+            bphit: (body.querySelector(".fe-dbgi-bphit") || {}).textContent || null,
+            bpToggle: (() => { const b = body.querySelector(".fe-dbgi-bp"); return b ? { on: b.dataset.on === "true", text: b.textContent } : null; })(),
+            bps: Array.from(body.querySelectorAll(".fe-dbgi-bpi")).map((li) => ({ kind: li.dataset.kind, index: +li.dataset.index, case: +li.dataset.case, depth: +li.dataset.depth, text: li.textContent })),
           };
         },
         dbgVal,
+        // D4 breakpoints surface
+        toggleBreakpoint, toggleSelectedBreakpoint, clearBreakpoints, removeBreakpointAt, sendBreakpoints, hasBreakpoint,
+        breakpoints: () => bpListModel().map((x) => ({ kind: x.kind, index: x.index, case: x.case, depth: x.depth, text: x.text, entry: x.entry })),
+        bpEntries: () => bpPlaces().map((p) => FD.bpEntry(p)),
+        bpHostState: () => (hostApi && hostApi.state ? hostApi.state.bps : null),
+        bpPlates: () => instances.map((inst) => ({ key: inst && inst.key, bp: inst && inst.ctx && inst.ctx.me ? inst.ctx.me._bp : undefined })),
+        bpDots: () => lastBpDots.slice(),
+        bpSent: () => (dbg && dbg.bpSent ? JSON.parse(JSON.stringify(dbg.bpSent)) : null),
+        debugStop: () => (dbg && dbg.stop ? JSON.parse(JSON.stringify(dbg.stop)) : null),
+        debugStopText: dbgStopText,
       };
     }).catch((e) => { status("boot failed: " + (e && e.message ? e.message : e), "bad"); return null; });
   }
