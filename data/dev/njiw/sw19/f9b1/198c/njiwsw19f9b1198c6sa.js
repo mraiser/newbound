@@ -648,13 +648,16 @@ function toScene(rootCase, opts = {}) {
           { role: "terminal", idx: i, which: "out", term }, pal);
       // SYNCHRO handles (S3): a small diamond at each end of the icon in the
       // sync colour — sync-in (left), sync-out (right). Draggable when
-      // editable: a drag from either end authors a synchro (owner's wiring rule)
-      for (const which of ["in", "out"])
+      // editable: a drag from either end authors a synchro (owner's wiring
+      // rule). A read-only view draws only the handles a synchro anchors to.
+      for (const which of ["in", "out"]) {
+        if (!editable && !(c.syncs || []).some((s) => syncDrawable(c, s) && (which === "in" ? s.dest : s.src) === i)) continue;
         push({ id: `${opId}/sync-${which}`, parent: opId, kind: "ico", pos: syncHandleLocal(op, which),
           params: { radius: GEO.syncR, detail: 0 },
           material: { color: pal.sync, flat: true },
           affordances: editable ? { tap: true, hover: true, drag: { plane: "xy" } } : { hover: true },
           meta: { role: "sync-handle", opIndex: i, which } });
+      }
     });
 
     if (active) {
