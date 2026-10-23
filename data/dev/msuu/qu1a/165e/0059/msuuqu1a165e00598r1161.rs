@@ -1,4 +1,4 @@
-// The case path of ONE real run. P5: no sentinel-nextcase — the run is ONE
+// The case path of ONE real run. P5: no sentinel-nextcase - the run is ONE
 // debug session over the stepper (dev.flowstep debug_start + debug_step
 // continue + debug_state + debug_stop), the same interpreter path the
 // editor's run button and the debugger ride. The case path is read off the
