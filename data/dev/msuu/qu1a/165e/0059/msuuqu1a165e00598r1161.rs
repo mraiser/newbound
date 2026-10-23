@@ -23,6 +23,10 @@ out.put_string("status", "ok");
 let mut path = DataArray::new();
 let mut args = args.clone();
 args.put_string("nn_sessionid", &nn_sessionid);
+// Command::execute wraps a FLAT reply as {a: {...}} — unwrap it
+fn unwrap(r: DataObject) -> DataObject {
+    if r.has("a") && r.clone().keys().len() == 1 && r.get_property("a").is_object() { r.get_object("a") } else { r }
+}
 // open a session on the SAVED body (debug_start with an empty body reads it)
 let st = {
     let mut a = DataObject::new();
@@ -31,7 +35,7 @@ let st = {
     a.put_object("args", args.clone());
     let (l, c, m) = (lib.clone(), ctl.clone(), cmd.clone());
     match panic::catch_unwind(panic::AssertUnwindSafe(move || Command::lookup("dev", "flowstep", "debug_start").execute(a))) {
-        Ok(Ok(r)) => r,
+        Ok(Ok(r)) => unwrap(r),
         _ => return err_env(&format!("{}.{}.{}: the stepper refused to open a session", l, c, m)),
     }
 };
@@ -48,7 +52,7 @@ let fin = {
     let mut p = DataObject::new(); p.put_boolean("wait", true);
     a.put_object("pick", p);
     match panic::catch_unwind(panic::AssertUnwindSafe(move || Command::lookup("dev", "flowstep", "debug_step").execute(a))) {
-        Ok(Ok(r)) => r,
+        Ok(Ok(r)) => unwrap(r),
         _ => {
             let mut z = DataObject::new(); z.put_string("session", &session);
             let _ = Command::lookup("dev", "flowstep", "debug_stop").execute(z);
@@ -60,7 +64,7 @@ let st2 = {
     let mut a = DataObject::new();
     a.put_string("session", &session);
     match panic::catch_unwind(panic::AssertUnwindSafe(move || Command::lookup("dev", "flowstep", "debug_state").execute(a))) {
-        Ok(Ok(r)) => r,
+        Ok(Ok(r)) => unwrap(r),
         _ => DataObject::new(),
     }
 };
@@ -136,6 +140,6 @@ let result = match failure {
 };
 DataStore::gc();
 out.put_object("result", result);
-out.put_array("path", path);
 out.put_int("cases", path.len() as i64);
+out.put_array("path", path);
 out
