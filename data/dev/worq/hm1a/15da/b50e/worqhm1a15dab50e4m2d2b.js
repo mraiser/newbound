@@ -2249,6 +2249,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         selectWire, selectedWire: () => selWire, sceneTap: onSceneTap, opSelect: onOpSelect, deleteSelectedWire, deleteSelection,
         // Synchros S3 surface
         selectSync, selectedSync: () => selSync, deleteSelectedSync,
+        syncDrag: onSyncDrag, sceneDrag: onSceneDrag, lastSyncRefusal: () => lastSyncRefusal, syncArmed: () => !!armSync,
         syncs: () => { const c = focusedCase(); return c && Array.isArray(c.syncs) ? c.syncs.map((s) => ({ src: s.src, dest: s.dest })) : []; },
         // P5 step 4 surface (op / terminal / signature editor)
         refreshInspector, inspTerm: () => inspTerm,
