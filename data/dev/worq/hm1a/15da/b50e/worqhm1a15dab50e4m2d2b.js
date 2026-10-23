@@ -1648,14 +1648,14 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // ── init ──────────────────────────────────────────────────────────────────
   // ── P4: run tokens — deliveries ride a flowtoken BEHAVIOR on the host ─────
   // The schedule is local and pure (design §3.5 — the platform returns no
-  // per-wire values): flowdoc.propagationRounds gives each case's firing
-  // order. Which CASES a live run went through is the server's to say
-  // (dev.code.trace_flow); see the case-path section below. One dev:flowtoken
-  // instance per wire is addControl'd into the
-  // scenehost, seeded with its round; ONE shared clock (host.state.run.t0)
-  // starts them together, so the token behaviors deliver round by round and
-  // report via host.state.onTokenDelivered. The editor schedules and audits;
-  // the motion is the behavior's.
+  // per-wire values): flowdoc.propagationRounds gives the DRY harness's firing
+  // order. A LIVE run is the stepper's continue (P5): its real events ride
+  // through rideRunEvents (below runFlow), and which CASES it went through is
+  // the tape's own. One dev:flowtoken instance per leg is addControl'd into
+  // the scenehost, seeded with its round; ONE shared clock starts them
+  // together, so the token behaviors deliver round by round and report via
+  // host.state.onTokenDelivered. The editor schedules and audits; the motion
+  // is the behavior's.
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
   function wireEnd(c, end, which) {
     return terminalWorld(c, end[0], which, end[1]) || terminalWorld(c, end[0], which === "out" ? "in" : "out", end[1]) || null;
@@ -1830,6 +1830,104 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     renderRunInspector(R);
     return R;
   }
+  // ── P5: the run's case path and events come from the stepper ──────────────
+  // The case path is read off the tape: each case-ending event names its op
+  // (a real stepper fact — no ruleOp inference). end ∈ done|next|terminate|
+  // fail|panic|stall|next-missing (pathText's suffix map covers them).
+  function casePathFromState(st) {
+    if (!st || !st.state || !Array.isArray(st.state.frames)) return [];
+    return st.state.frames.filter((f) => f && f.kind === "root")
+      .map((f) => ({ deck: f.case, end: f.phase === "ended" ? (f.outcome || "done") : (f.phase || "done"), stopAt: null, inferred: false }));
+  }
+  function runFailureText(ev, lastStop) {
+    if (!ev) return `run ended without a done event (${lastStop || "?"})`;
+    if (ev.type === "done" && ev.fail) return "the flow failed: a fail rule fired";
+    if (ev.type === "done") return `run ended (${ev.outcome || "?"})`;
+    if (ev.type === "stall" || ev.type === "error") return `${ev.type}: ${ev.msg || ev.reason || "no progress"}`;
+    return `run stopped (${lastStop || ev.type || "?"})`;
+  }
+  // ride the stepper's REAL events on the editor's picture, grouped into
+  // rounds by a shared readySeq — one dev:flowtoken per leg on one clock per
+  // round (the run animation's own machinery). path rides the jump pipe after
+  // a case's events (the tape carries no deliver INTO the next case). Events
+  // not on this picture (a drilled frame's internals, trimmed continues) are
+  // skipped — the ride never blocks or fails the result. Returns lastRun.
+  async function rideRunEvents(events, path) {
+    if (running || !hostApi) return null;
+    if (armSrc || wireMode) cancelWireGhost();
+    running = true;
+    const runBtn = $(".fe-run"); if (runBtn) { runBtn.disabled = true; runBtn.classList.add("running"); runBtn.textContent = "running…"; }
+    const reduced = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const dur = reduced ? 0.34 : 0.42;
+    const started = performance.now();
+    const delivered = [], keys = [], pathSegs = [];
+    let error = null, complete = true, inOrder = true, prevSeq = -1, round = -1, tokens = null, t0 = null;
+    const clock = () => { t0 = performance.now(); hostApi.setState("run", { id: t0, t0 }); };
+    const waitRound = async (ms2) => {
+      if (!keys.length) return;
+      const base = delivered.length, n = keys.length;
+      await Promise.race([
+        (async () => { while (delivered.length < base + n) await sleep(30); })(),
+        sleep(ms2),
+      ]);
+      if (delivered.length < base + n) complete = false;
+      for (const key of keys.splice(0)) { try { hostApi.removeControl(key); } catch (e) {} }
+    };
+    hostApi.setState("onTokenDelivered", (ev) => { if (ev && t0 && ev.runId === t0) delivered.push({ k: ev.k, round: ev.round }); });
+    try {
+      for (const ev of events) {
+        if (!ev) continue;
+        if (ev.type === "enter" && ev.frame && ev.frame.length) break;   // a drilled frame's events are not on this picture
+        if (ev.type === "next" && ev.op != null && ev.from === activeDeck && caseChain(focusRoot())[ev.from + 1]) {
+          await waitRound(6000);
+          const legs = jumpLegs(focusedCase(), ev.op);
+          round += 1;
+          for (let j = 0; j < legs.length; j++) {
+            const key = `run_ev${ev.seq}_${j}`;
+            await hostApi.addControl("dev", "flowtoken", Object.assign({ runId: t0, round, k: "jump" + j, dur, reduced }, legs[j]), key);
+            keys.push(key);
+          }
+          clock();
+          await waitRound(Math.ceil(dur * 1000) + 1500);
+          pathSegs.push({ deck: ev.from, end: "next", stopAt: ev.op, inferred: false });
+          setActiveDeck(ev.to);
+          await frames(2);
+          await sleep(reduced ? 120 : 300);
+          continue;
+        }
+        const legs = dbgLegs(focusedCase(), ev, false);
+        if (!legs.length) continue;
+        const seq = typeof ev.readySeq === "number" ? ev.readySeq : ev.seq;
+        if (seq !== prevSeq) { await waitRound(6000); prevSeq = seq; round += 1; clock(); }
+        for (let j = 0; j < legs.length; j++) {
+          const { seq: _s, ...seed } = legs[j];
+          const key = `run_ev${ev.seq}_${j}`;
+          await hostApi.addControl("dev", "flowtoken", Object.assign({ runId: t0, round, dur, reduced }, seed), key);
+          keys.push(key);
+        }
+      }
+      await waitRound(6000);
+    } catch (e) { error = String(e && e.message ? e.message : e); complete = false; }
+    finally {
+      for (const key of keys) { try { hostApi.removeControl(key); } catch (e) {} }
+      hostApi.setState("run", null);
+      hostApi.setState("onTokenDelivered", null);
+      running = false;
+      if (runBtn) { runBtn.disabled = false; runBtn.classList.remove("running"); runBtn.textContent = "run ▸"; }
+    }
+    for (let i = 1; i < delivered.length; i++) if (delivered[i].round < delivered[i - 1].round) inOrder = false;
+    const segs = (path && path.length ? path : [{ deck: 0, end: "done", stopAt: null, inferred: false }])
+      .map((p) => { const r = pathSegs.find((q) => q.deck === p.deck && q.end === "next"); return r ? Object.assign({}, p, { stopAt: r.stopAt, jumped: true }) : p; });
+    const R = lastRun = {
+      mode: "live", segments: segs, notes: [], untraced: path && path.length ? null : (path ? "no case path" : null), error,
+      path: segs, rounds: [], unreached: [], delivered,
+      complete, inOrder, ms: Math.round(performance.now() - started), tokensHosted: delivered.length,
+    };
+    const n = delivered.length, deliveries = `${n} deliver${n === 1 ? "y" : "ies"}`;
+    pushJournal(`run · ${pathText(segs)} · ${deliveries} (real events)`);
+    gate(".fe-g-run", complete && inOrder, `${deliveries} (real events), ${pathText(segs)}`);
+    return R;
+  }
   // audit: every scheduled wire delivered exactly once, in its own round,
   // rounds non-decreasing in delivery order
   function auditRun(runId, rounds, unreached, delivered, complete, ms) {
@@ -1845,7 +1943,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const wl = (c, k) => { const w = c && c.cons[k]; return esc(w ? `${nameOf(c, w.src[0])}.${w.src[1]} → ${nameOf(c, w.dest[0])}.${w.dest[1]}` : `wire ${k}`); };
     const segs = R.segments && R.segments.length ? R.segments
       : [{ deck: activeDeck, end: "done", stopAt: null, rounds: R.rounds || [], unreached: R.unreached || [] }];
-    const lbl = R.complete && R.inOrder ? (segs.length > 1 || segs[0].end !== "done" ? esc(pathText(segs)) : "delivered in propagation order") : "incomplete";
+    const lbl = R.complete && R.inOrder ? (segs.length > 1 || segs[0].end !== "done" ? esc(pathText(segs)) : (R.mode === "live" ? "delivered in event order" : "delivered in propagation order")) : "incomplete";
     let h = `<p><b>${R.mode === "dry" ? "dry run" : "run"}</b> <span class="lbl">${lbl}${R.ms != null ? ` · ${R.ms}ms` : ""}</span></p>`;
     segs.forEach((s) => {
       const c = chain[s.deck];
@@ -1951,6 +2049,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (savedSyncs || flowSyncCount()) { try { await checkRuntime(); } catch (e) {} }
     status(`running ${src.cmd}…`);
     const started = performance.now();
+    const settle = (p) => p.then((r) => r || { status: "err", msg: "no response" }, (e) => ({ status: "err", msg: String(e && e.message ? e.message : e) }));
     // ONE execution on the stepper: debug_start (body {} = the SAVED body)
     // opens a session and debug_step continue {wait} runs it to the end —
     // the same interpreter path as the debugger. The case path is the tape's
@@ -1969,10 +2068,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       const st2 = await FD.client.state(session);
       path = casePathFromState(st2);
       const ev = (st2 && st2.event) || (fin && fin.event) || null;
-      const outv = ev && ev.out && typeof ev.out === "object" && !Array.isArray(ev.out) ? ev.out : {};
-      const rw = runtimeWarning(savedSyncs);
       if (st2 && st2.status === "ok" && ev && ev.type === "done" && !ev.fail && ev.outcome === "ok") {
-        r = Object.assign({ status: "ok" }, outv);
+        r = Object.assign({ status: "ok" }, (ev.out && typeof ev.out === "object" && !Array.isArray(ev.out) ? ev.out : {}));
       } else if (st2 && st2.status === "ok" && st2.ended) {
         r = { status: "err", msg: runFailureText(ev, st2.last_stop) };
       } else {
@@ -1980,37 +2077,14 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       }
       try { await FD.client.stop(session); } catch (e) {}
       session = null;
-      const ms = Math.round(performance.now() - started);
-      // ride the run's REAL events from the ROOT case's first deck, where the
-      // stepper starts (events not on this picture are skipped, never fatal)
-      let R = null;
-      if (tapeEvents && tapeEvents.length && focusPath.length === 1) {
-        try { R = await rideRunEvents(tapeEvents, path); } catch (e) { R = null; }
-      }
-      liveCall = false;
-      if (runBtn) { runBtn.disabled = false; runBtn.classList.remove("running"); runBtn.textContent = "run ▸"; }
-      const ok = r.status === "ok";
-      const rawMsg = String(r.msg == null ? "" : r.msg);
-      const msg = /^\s*</.test(rawMsg) ? rawMsg.replace(/<title>[\s\S]*?<\/title>/i, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : rawMsg;
-      lastResult = { args, ok, result: r, msg, ms, unsaved, source: src, path, untraced,
-        unsynchronized: rw ? { flowlang: rw.flowlang, min: rw.min, syncs: rw.n, text: rw.text } : null,
-        tokens: R ? { complete: !!R.complete, inOrder: !!R.inOrder, delivered: R.delivered.length } : null };
-      const via = untraced ? " · no case path" : (path && path.length ? ` · ${pathText(path)}` : "");
-      const unsync = rw ? ` · UNSYNCHRONIZED (flowlang ${rw.flowlang} ignores synchros)` : "";
-      pushJournal(ok ? `ran ${src.cmd}${via} · ${ms}ms${unsync}` : `run failed: ${msg}${unsync}`);
-      if (ok && rw) status(`ran UNSYNCHRONIZED — flowlang ${rw.flowlang} ignores synchros · ${ms}ms`, "warn");
-      else if (ok) status(`ran${via} · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} ${R.delivered.length === 1 ? "delivery" : "deliveries"} in order` : ""), "ok");
-      else status(`run failed: ${msg}`, "bad");
-      renderRunResult(lastResult, R);
-      return lastResult;
     }
     const ms = Math.round(performance.now() - started);
-    // replay the run from the ROOT case's first deck, where the server starts
+    // ride the run's REAL events from the ROOT case's first deck, where the
+    // stepper starts (events not on this picture are skipped, never fatal);
+    // untraced: no path — ride the deck-0 schedule
     let R = null;
-    if (focusPath.length === 1 && (path || untraced)) {
-      const plan = path ? livePlan(path)
-        : { mode: "live", segments: [{ deck: 0, end: "done", stopAt: null, inferred: false }], notes: [], untraced };
-      try { R = await runFlow(plan); } catch (e) { R = null; }
+    if (focusPath.length === 1 && ((tapeEvents && tapeEvents.length) || untraced)) {
+      try { R = await rideRunEvents(tapeEvents || [], path); } catch (e) { R = null; }
     }
     liveCall = false;
     if (runBtn) { runBtn.disabled = false; runBtn.classList.remove("running"); runBtn.textContent = "run ▸"; }
@@ -2022,7 +2096,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     lastResult = { args, ok, result: r, msg, ms, unsaved, source: src, path, untraced,
       unsynchronized: rw ? { flowlang: rw.flowlang, min: rw.min, syncs: rw.n, text: rw.text } : null,
       tokens: R ? { complete: !!R.complete, inOrder: !!R.inOrder, delivered: R.delivered.length } : null };
-    const via = untraced ? " · no case path" : (R && R.segments && R.segments.length ? ` · ${pathText(R.segments)}` : "");
+    const via = untraced ? " · no case path" : (path && path.length ? ` · ${pathText(path)}` : "");
     const unsync = rw ? ` · UNSYNCHRONIZED (flowlang ${rw.flowlang} ignores synchros)` : "";
     pushJournal(ok ? `ran ${src.cmd}${via} · ${ms}ms${unsync}` : `run failed: ${msg}${unsync}`);
     if (ok && rw) status(`ran UNSYNCHRONIZED — flowlang ${rw.flowlang} ignores synchros · ${ms}ms`, "warn");
@@ -2041,14 +2115,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     h += `<p class="fe-run-note">args: ${esc(JSON.stringify(L.args))} — the tokens replay the propagation ORDER; per-wire values aren't reported by the platform.</p>`;
     if (L.unsaved) h += `<p class="fe-empty">ran the SAVED body — ${L.unsaved} unsaved change${L.unsaved === 1 ? "" : "s"} not included; save to run them</p>`;
     if (L.unsynchronized) h += `<p class="fe-run-unsync">⚠ ran UNSYNCHRONIZED: flowlang ${esc(L.unsynchronized.flowlang)} predates synchros (need ≥ ${esc(L.unsynchronized.min)}), so the server ignored this flow's ${L.unsynchronized.syncs} synchro${L.unsynchronized.syncs === 1 ? "" : "s"}. The replay below draws the order the synchros ASK for, not the order that ran.</p>`;
-    if (R && R.rounds) h += runRoundsHtml(R);
+    if (R && R.rounds && R.rounds.length) h += runRoundsHtml(R);
     body.innerHTML = h;
   }
 
   // ── STEP DEBUGGER (flow step debugger P4) ────────────────────────────────
   // A debug SESSION (dev.flowstep P3: a recorded tape — step / back / goto /
   // continue / breakpoints) runs the CURRENT body — unsaved edits included
-  // (doc.serialize()) — under the stepper. Every move is one debug_step then
+  // (doc.serialize()) — under the stepper; P5: the run button is the same
+  // session + a continue over the SAVED body, so run and debug share the one
+  // interpreter path. Every move is one debug_step then
   // one debug_state, and the editor only DRAWS that state: dev:flowdebug maps
   // the frames onto the doc's case objects, the focus FOLLOWS the top frame
   // (drill into local frames, the case it runs), flownode plates show each
@@ -3063,7 +3139,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         checkRuntime, runtime: () => runtimeInfo, runtimeWarning, syncCount: flowSyncCount, syncMinFlowlang: SYNC_MIN_FLOWLANG,
         // P5 run parity surface
         startRun, runLive, lastResult: () => lastResult, liveCall: () => liveCall, coerceArg,
-        rounds: () => propagationRounds(focusedCase()), dryPlan, livePlan,
+        rounds: () => propagationRounds(focusedCase()), dryPlan,
         changes: () => renderChanges(), refreshJournal, journalRows: () => journalRows,
         toggleJournalDiff, revertTo: (i) => journalRows[i] ? revertTo(journalRows[i]) : null,
         tokens: () => hostApi.children.filter((ch) => ch.ctl === "flowtoken").length,
