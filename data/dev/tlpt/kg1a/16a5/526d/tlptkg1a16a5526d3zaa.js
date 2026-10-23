@@ -5,7 +5,10 @@
 //
 //   frameViews(rootCase, st)  one view per stepper frame, root first:
 //       { fi, top, kind, path, case, phase, outcome, root, external, caseObj,
-//         opIndex, iter, opName, ops[], wires[], syncs[], frame }
+//         opIndex, iter, opName, ops[], wires[], syncs[], frame, raw }
+//     frame is the stepper frame NORMALIZED by freshFrame (a frame between
+//     cases - phase enter/seed - reads as empty: the stepper still carries
+//     the previous case's arrays there); raw is the stepper's own frame.
 //     root is the EDITOR's case object the frame runs (identity with the
 //     doc tree, so the editor can compare it with its focus): frame 0 runs
 //     rootCase; a LOCAL frame runs its parent case's op.localdata; a COMMAND
@@ -69,6 +72,19 @@ function syncState(f, j, ready) {
 
 function framesOf(st) { return st && st.state && Array.isArray(st.state.frames) ? st.state.frames : []; }
 
+// A frame BETWEEN cases (phase enter / seed - a "next" event moved it to
+// case+1 but seed has not reset the per-case bookkeeping yet) still carries
+// the PREVIOUS case's inputs / dlv / done / results / wires / syncs. Nothing
+// of the case it now names has run, so the view reads those as empty (an
+// array length that disagrees with the case's op count means the same).
+// view.frame is this normalized frame; view.raw is the stepper's own.
+function freshFrame(f, c) {
+  const between = f.phase === "enter" || f.phase === "seed";
+  const stale = between || !!(c && Array.isArray(f.done) && f.done.length !== c.cmds.length);
+  if (!stale) return f;
+  return Object.assign({}, f, { inputs: [], dlv: [], done: [], results: [], wires: [], syncs: [], inprog: between ? null : f.inprog, stale: true });
+}
+
 function frameViews(rootCase, st) {
   const frames = framesOf(st);
   const ready = st && Array.isArray(st.ready) ? st.ready : [];
@@ -88,15 +104,16 @@ function frameViews(rootCase, st) {
       else external = op ? { cmd: op.cmd || "", name: op.name || "", type: op.type || "" } : { inherited: true };
     }
     const c = root ? caseChain(root)[f.case || 0] || null : null;
+    const fv = freshFrame(f, c);
     const rdy = top ? ready : null;
     views.push({
       fi, top, kind: f.kind || "", path: Array.isArray(f.path) ? f.path : [], case: f.case || 0,
       phase: f.phase || "", outcome: f.outcome || "", root, external, caseObj: c,
       opIndex, iter, opName: op ? (op.name || op.type || "op") : (fi === 0 ? "root" : null), op,
-      ops: c ? c.cmds.map((_, i) => opState(f, i, rdy)) : [],
-      wires: c ? c.cons.map((_, k) => wireState(f, k, rdy)) : [],
-      syncs: c ? (c.syncs || []).map((_, j) => syncState(f, j, rdy)) : [],
-      frame: f,
+      ops: c ? c.cmds.map((_, i) => opState(fv, i, rdy)) : [],
+      wires: c ? c.cons.map((_, k) => wireState(fv, k, rdy)) : [],
+      syncs: c ? (c.syncs || []).map((_, j) => syncState(fv, j, rdy)) : [],
+      frame: fv, raw: f,
     });
   }
   return views;
