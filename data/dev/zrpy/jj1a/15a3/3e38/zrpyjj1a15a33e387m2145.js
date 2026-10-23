@@ -46,6 +46,13 @@ me.ready = function () {
         ctx.setRig("halo", "params.size.x", box.x + 0.16);
         ctx.setRig("halo", "params.size.y", box.y + 0.16);
         ctx.setRig("halo", "pos.z", -box.z / 2 + 0.02);
+        // STEP DEBUGGER (P4): the debug-state plate - a wider frame behind the
+        // halo, tinted by the op's state in the editor's debug session
+        // (host.state.dbg; see render). Hidden while waiting / not debugging.
+        ctx.setRig("dbg", "params.size.x", box.x + 0.34);
+        ctx.setRig("dbg", "params.size.y", box.y + 0.34);
+        ctx.setRig("dbg", "pos.z", -box.z / 2 - 0.01);
+        ctx.me._dbg = null;
         // selection = the bench accent (tokens.css: selection/focus/primary)
         const acc = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
         ctx.setRig("halo", "material", { color: /^#[0-9a-f]{3,8}$/i.test(acc) ? acc : "#f0a63c", emissive: true });
@@ -79,6 +86,27 @@ me.ready = function () {
         const hs = ctx.host && ctx.host.state;
         const sel = !!(hs && hs.selectedKey === ctx.key);
         if (sel !== ctx.me._sel && ctx.setRig) { ctx.me._sel = sel; ctx.setRig("halo", "visible", sel); }
+        // STEP DEBUGGER (P4): host.state.dbg = { deck, ops: [state...] } for
+        // the editor's FOCUSED case (null when not debugging / no frame runs
+        // it). States: waiting (hidden) | ready | running | done | skipped.
+        // Colours: the --fe-dbg-<state> tokens when the page defines them.
+        {
+          const dbg = hs && hs.dbg;
+          const km = /^d(\d+)_op(\d+)$/.exec(ctx.key || "");
+          let ds = null;
+          if (dbg && Array.isArray(dbg.ops) && km && +km[1] === dbg.deck) ds = dbg.ops[ctx.me.opIndex] || null;
+          if (ds !== ctx.me._dbg && ctx.setRig) {
+            ctx.me._dbg = ds;
+            const show = !!ds && ds !== "waiting";
+            if (show) {
+              const DEF = { ready: "#f0a63c", running: "#5aa9e6", done: "#62bd8c", skipped: "#6b6f78" };
+              const tok = getComputedStyle(document.documentElement).getPropertyValue("--fe-dbg-" + ds).trim();
+              const color = /^#[0-9a-f]{3,8}$/i.test(tok) ? tok : (DEF[ds] || "#8a8f98");
+              ctx.setRig("dbg", "material", { color, opacity: ds === "skipped" ? 0.35 : ds === "ready" ? 0.9 : 0.7, emissive: ds === "ready" || ds === "running" });
+            }
+            ctx.setRig("dbg", "visible", show);
+          }
+        }
         if (!ctx.me._standalone) { ctx.rig.pos.y = base; return; }
         // a node mid wire-gesture freezes; the rest breathe
         const wiring = hs && hs.wireSrc;
