@@ -89,7 +89,8 @@ me.ready = function () {
         // STEP DEBUGGER (P4): host.state.dbg = { deck, ops: [state...] } for
         // the editor's FOCUSED case (null when not debugging / no frame runs
         // it). States: waiting (hidden) | ready | running | done | skipped.
-        // Colours: the --fe-dbg-<state> tokens when the page defines them.
+        // Colours: dbg.colors (the editor's --fe-dbg-<state> tokens), else a
+        // page-level --fe-dbg-<state>, else the defaults below.
         {
           const dbg = hs && hs.dbg;
           const km = /^d(\d+)_op(\d+)$/.exec(ctx.key || "");
