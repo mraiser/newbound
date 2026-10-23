@@ -82,21 +82,23 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     }, (e) => (runtimeInfo = { unknown: true, msg: String(e && e.message ? e.message : e) }));
     return runtimeP;
   }
-  // synchros in the WHOLE flow: every case of every chain, locals included
-  function flowSyncCount() {
+  // synchros in a WHOLE flow (default: the working doc): every case of every
+  // chain, locals included. A raw body works too (the saved snapshot).
+  function flowSyncCount(root) {
     let n = 0;
     const visit = (c) => {
-      for (; c; c = c.nextcase) {
+      for (; c && typeof c === "object"; c = c.nextcase) {
         n += Array.isArray(c.syncs) ? c.syncs.length : 0;
-        (c.cmds || []).forEach((op) => { if (op && op.localdata) visit(op.localdata); });
+        (Array.isArray(c.cmds) ? c.cmds : []).forEach((op) => { if (op && op.localdata) visit(op.localdata); });
       }
     };
-    if (doc && doc.root) visit(doc.root);
+    visit(root !== undefined ? root : (doc && doc.root));
     return n;
   }
-  // the warning, or null: the flow has synchros AND the runtime predates S1
-  function runtimeWarning() {
-    const n = flowSyncCount();
+  // the warning, or null: the flow has synchros AND the runtime predates S1.
+  // n overrides the count (a live run counts the SAVED body - what it runs).
+  function runtimeWarning(n) {
+    if (typeof n !== "number") n = flowSyncCount();
     if (!n || !runtimeInfo || !runtimeInfo.old) return null;
     return { n, flowlang: runtimeInfo.flowlang, min: SYNC_MIN_FLOWLANG,
       text: `this flow has ${n} synchro${n === 1 ? "" : "s"}, but this instance runs flowlang ${runtimeInfo.flowlang} (synchros need ≥ ${SYNC_MIN_FLOWLANG}, S1): it will run UNSYNCHRONIZED — older interpreters and peers ignore syncs silently` };
@@ -1928,8 +1930,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const runBtn = $(".fe-run");
     const busy = () => { if (runBtn) { runBtn.disabled = true; runBtn.classList.add("running"); runBtn.textContent = "running…"; } };
     busy();
-    // a flow with synchros: know the runtime BEFORE the run reports (cached)
-    if (flowSyncCount()) { try { await checkRuntime(); } catch (e) {} }
+    // a flow with synchros: know the runtime BEFORE the run reports (cached).
+    // The server runs the SAVED body, so ITS synchros are the ones ignored.
+    let savedSyncs; try { savedSyncs = flowSyncCount(JSON.parse(savedBody)); } catch (e) { savedSyncs = flowSyncCount(); }
+    if (savedSyncs || flowSyncCount()) { try { await checkRuntime(); } catch (e) {} }
     status(`running ${src.cmd}…`);
     const started = performance.now();
     const settle = (p) => p.then((r) => r || { status: "err", msg: "no response" }, (e) => ({ status: "err", msg: String(e && e.message ? e.message : e) }));
@@ -1961,7 +1965,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // a server panic arrives as an HTML 500 page in msg; show its words
     const rawMsg = String(r.msg == null ? "" : r.msg);
     const msg = /^\s*</.test(rawMsg) ? rawMsg.replace(/<title>[\s\S]*?<\/title>/i, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : rawMsg;
-    const rw = runtimeWarning();
+    const rw = runtimeWarning(savedSyncs);
     lastResult = { args, ok, result: r, msg, ms, unsaved, source: src, path, untraced,
       unsynchronized: rw ? { flowlang: rw.flowlang, min: rw.min, syncs: rw.n, text: rw.text } : null,
       tokens: R ? { complete: !!R.complete, inOrder: !!R.inOrder, delivered: R.delivered.length } : null };
