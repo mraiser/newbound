@@ -68,39 +68,53 @@ let st2 = {
         _ => DataObject::new(),
     }
 };
-// per-case ms: sum each event's ms over the case it happened on
-let mut case_ms: std::collections::HashMap<i64, i64> = std::collections::HashMap::new();
+// the case path: walked off the run's EVENT stream (the tape's last_run).
+// A `next` event {from, op, to} ends the `from` case and moves on; the final
+// case ends with the run's done/stall/error event. Only the LAST root frame
+// is still on the stack (earlier cases closed and left it), so the frames
+// cannot report the whole path — the events can.
+let mut last_end = "done".to_string();
+let mut events = DataArray::new();
 if st2.has("last_run") && st2.get_property("last_run").is_object() {
     let lr = st2.get_object("last_run");
-    if lr.has("events") && lr.get_property("events").is_array() {
-        for ev in lr.get_array("events").objects() {
-            let ev = ev.object();
-            if ev.has("case") && ev.has("ms") {
-                let k = ev.get_int("case");
-                *case_ms.entry(k).or_insert(0) += ev.get_int("ms");
-            }
-        }
+    if lr.has("events") && lr.get_property("events").is_array() { events = lr.get_array("events"); }
+}
+if events.len() == 0 && fin.has("events") && fin.get_property("events").is_array() { events = fin.get_array("events"); }
+// per-case ms: sum each event's ms over the case it happened on
+let mut case_ms: std::collections::HashMap<i64, i64> = std::collections::HashMap::new();
+for ev in events.objects() {
+    let ev = ev.object();
+    if ev.has("case") && ev.has("ms") {
+        let k = ev.get_int("case");
+        *case_ms.entry(k).or_insert(0) += ev.get_int("ms");
     }
 }
-// the case path: one entry per root frame (a case the run entered)
-let mut last_end = "done".to_string();
-if st2.has("state") && st2.get_property("state").is_object() {
-    let state = st2.get_object("state");
-    if state.has("frames") && state.get_property("frames").is_array() {
-        for f in state.get_array("frames").objects() {
-            let f = f.object();
-            if !(f.has("kind") && f.get_string("kind") == "root") { continue; }
-            let case_i = if f.has("case") { f.get_int("case") } else { 0 };
-            let phase = if f.has("phase") { f.get_string("phase") } else { "done".to_string() };
-            let outcome = if f.has("outcome") { f.get_string("outcome") } else { "done".to_string() };
-            let end = if phase == "ended" { outcome } else { phase };
-            last_end = end.clone();
-            let mut step = DataObject::new();
-            step.put_int("case", case_i);
-            step.put_string("end", &end);
-            step.put_int("ms", *case_ms.get(&case_i).unwrap_or(&0));
-            path.push_object(step);
-        }
+let mut cur: i64 = -1;
+for ev in events.objects() {
+    let ev = ev.object();
+    let t = if ev.has("type") { ev.get_string("type") } else { continue; };
+    if t == "enter" || (t == "seed" && cur < 0) {
+        if ev.has("case") { let c = ev.get_int("case"); if c != cur { if cur >= 0 { let mut s = DataObject::new(); s.put_int("case", cur); s.put_string("end", "next"); s.put_int("ms", *case_ms.get(&cur).unwrap_or(&0)); path.push_object(s); } cur = c; } }
+    } else if t == "next" && ev.has("from") {
+        let from = ev.get_int("from");
+        if cur < 0 { cur = from; }
+        let mut s = DataObject::new();
+        s.put_int("case", from); s.put_string("end", "next"); s.put_int("ms", *case_ms.get(&from).unwrap_or(&0));
+        path.push_object(s);
+        cur = if ev.has("to") { ev.get_int("to") } else { from + 1 };
+        last_end = "next".to_string();
+    } else if t == "done" || t == "stall" || t == "error" {
+        let c = if ev.has("case") { ev.get_int("case") } else { cur.max(0) };
+        let end = if t == "done" {
+            if ev.has("fail") && ev.get_boolean("fail") { "fail".to_string() }
+            else if ev.has("outcome") && ev.get_string("outcome") != "ok" { ev.get_string("outcome") }
+            else { "done".to_string() }
+        } else { t.clone() };
+        last_end = end.clone();
+        let mut s = DataObject::new();
+        s.put_int("case", c); s.put_string("end", &end); s.put_int("ms", *case_ms.get(&c).unwrap_or(&0));
+        path.push_object(s);
+        cur = -1;
     }
 }
 {
