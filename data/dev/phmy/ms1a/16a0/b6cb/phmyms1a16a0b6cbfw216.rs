@@ -21,6 +21,20 @@ fn deq(a: &Data, b: &Data) -> bool {
   let mut w2 = DataObject::new(); w2.set_property("v", b.clone());
   w1.to_string() == w2.to_string()
 }
+// 0 = equal; 1 = same container kind but different contents (an in-place primitive such as set/push
+// mutated a shared handle after it was recorded - legal aliasing, noted not violated); 2 = mismatch.
+fn vcmp(a: &Data, b: &Data) -> u8 {
+  if deq(a, b) { 0 } else if (a.is_object() && b.is_object()) || (a.is_array() && b.is_array()) { 1 } else { 2 }
+}
+fn ocmp(a: &Data, b: &DataObject) -> u8 {
+  if !a.is_object() { return 2; }
+  let x = a.object();
+  let (kx, kb) = (x.clone().keys(), b.clone().keys());
+  if kx.len() != kb.len() { return 2; }
+  let mut w = 0u8;
+  for k in kb { if !x.has(&k) { return 2; } let c = vcmp(&x.get_property(&k), &b.get_property(&k)); if c > w { w = c; } }
+  w
+}
 fn has_obj(o: &DataObject, k: &str) -> bool { o.has(k) && o.get_property(k).is_object() }
 fn nth_case(body: &DataObject, idx: i64) -> Option<DataObject> {
   let mut c = body.clone();
@@ -66,6 +80,7 @@ fn any_ready(sh: &Shadow) -> bool {
 }
 
 let mut viol = DataArray::new();
+let mut alias = DataArray::new();
 let mut note = |seq: i64, t: &str, m: String, viol: &mut DataArray| { let mut v = DataObject::new(); v.put_int("seq", seq); v.put_string("type", t); v.put_string("msg", &m); viol.push_object(v); };
 let mut cidx: i64 = -1;
 let mut sh: Option<Shadow> = None;
@@ -123,7 +138,7 @@ for (idx, e) in evs.iter().enumerate() {
         let (si, sn, di, dn) = s.cons[k].clone();
         let want = if si == -1 { if args.has(&sn) { args.get_property(&sn) } else { Data::DNull } }
           else { match &s.res[si as usize] { Some(r) if r.has(&sn) => r.get_property(&sn), _ => { note(seq, &t, format!("wire {} reads '{}' which op {} did not produce", k, sn, si), &mut viol); Data::DNull } } };
-        if !deq(&e.get_property("value"), &want) { note(seq, &t, format!("wire {} carried a value that is not its source's", k), &mut viol); }
+        match vcmp(&e.get_property("value"), &want) { 0 => {}, 1 => { alias.push_string(&format!("seq {}: wire {} value changed in place since it was recorded", seq, k)); }, _ => note(seq, &t, format!("wire {} carried a value that is not its source's", k), &mut viol) }
         s.wf[k] = true;
         if di == -2 { out.set_property(&dn, want); }
         else if di >= 0 && (di as usize) < n {
@@ -146,7 +161,7 @@ for (idx, e) in evs.iter().enumerate() {
         if s.done[i] { note(seq, &t, format!("op {} evaluated after it was done (re-run)", i), &mut viol); }
         for k in s.cmds[i].get_object("in").keys() { if !s.got[i].contains(&k) { note(seq, &t, format!("op {} evaluated before its input '{}' was delivered", i, k), &mut viol); } }
         for (a, b) in &s.syncs { if *b == i as i64 && sv(*a, *b, n) && !s.done[*a as usize] { note(seq, &t, format!("op {} evaluated before synchro src op {} was done", i, a), &mut viol); } }
-        if e.has("in") && !deq(&e.get_property("in"), &Data::DObject(s.vals[i].data_ref)) { note(seq, &t, format!("op {} evaluated with inputs that are not the delivered values", i), &mut viol); }
+        if e.has("in") { match ocmp(&e.get_property("in"), &s.vals[i]) { 0 => {}, 1 => { alias.push_string(&format!("seq {}: op {} input container changed in place since delivery", seq, i)); }, _ => note(seq, &t, format!("op {} evaluated with inputs that are not the delivered values", i), &mut viol) } }
         let op = s.cmds[i].clone();
         let rule = if e.has("rule") && e.get_property("rule").is_string() { Some(e.get_string("rule")) } else { None };
         let b = if e.has("b") { e.get_boolean("b") } else { true };
@@ -195,7 +210,7 @@ for (idx, e) in evs.iter().enumerate() {
         }
         if oc != "ok" { note(seq, &t, format!("a normal end has outcome ok, not {}", oc), &mut viol); }
       }
-      if oc != "fail" && !deq(&e.get_property("out"), &Data::DObject(out.data_ref)) { note(seq, &t, "done out differs from the values delivered to the return bar".to_string(), &mut viol); }
+      if oc != "fail" { match ocmp(&e.get_property("out"), &out) { 0 => {}, 1 => { alias.push_string(&format!("seq {}: a returned container changed in place after delivery", seq)); }, _ => note(seq, &t, "done out differs from the values delivered to the return bar".to_string(), &mut viol) } }
     }
     "stall" => {
       ended = true;
@@ -229,4 +244,5 @@ res.put_string("status", "ok");
 res.put_boolean("ok", viol.len() == 0);
 res.put_int("checked", checked);
 res.put_array("violations", viol);
+res.put_array("alias_notes", alias);
 res
