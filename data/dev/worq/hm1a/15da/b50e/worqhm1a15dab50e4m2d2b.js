@@ -1661,40 +1661,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     return terminalWorld(c, end[0], which, end[1]) || terminalWorld(c, end[0], which === "out" ? "in" : "out", end[1]) || null;
   }
   // ── the run's CASE PATH (a `next` rule moves the run to the next case) ────
-  // A run is a list of SEGMENTS, one per case it executes, root first:
-  // {deck, end, stopAt, inferred}. end is how that case ended — next (the
-  // jump rides the pipe into the next deck), done, terminate, fail; stopAt is
-  // the op whose rule ended it (its schedule is cut there). A LIVE run's path
-  // is the server's (dev.code.trace_flow runs the real interpreter case by
-  // case); the interpreter does not say WHICH op's rule fired, so it is the
-  // first op carrying that rule in evaluation order — exact when the case has
-  // one such rule, marked `inferred` when it has more. A DRY run (no source)
-  // has no values: it assumes every op succeeds, so a non-match op's rule
-  // fires when its value is true; a match op's rule is unknown (noted, not
-  // taken).
+  // P5: a LIVE run IS the stepper's continue (the run is one debug session),
+  // so the case path is the TAPE's — the stepper's own events name the op
+  // whose next/terminate/fail rule ended each case (no inference, nothing
+  // predicted). A DRY run (the no-source harness) is the only one still
+  // scheduled from propagationRounds' prediction: it assumes every op
+  // succeeds, so a non-match op's rule fires when its value is true and a
+  // match op's rule is unknown (noted, not taken). Segments (root first):
+  // {deck, end, stopAt, inferred} — deck/end as the tape reports them;
+  // stopAt/inferred are the DRY plan's only (a live segment leaves them null).
   const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
   const frames = (n) => new Promise((res) => { const step = () => (n-- <= 0 ? res() : requestAnimationFrame(step)); step(); });
-  function ruleOp(c, rule) {
-    const cands = c.cmds.map((op, i) => (op && op.type !== "constant" && op.condition && op.condition.rule === rule ? i : -1)).filter((i) => i >= 0);
-    if (!cands.length) return null;
-    const order = propagationRounds(c).order || [];
-    const first = order.find((i) => cands.includes(i));
-    return { opIndex: first !== undefined ? first : cands[0], inferred: cands.length > 1 };
-  }
-  function livePlan(path) {
-    const chain = caseChain(focusRoot());
-    const segments = [];
-    for (const step of path || []) {
-      if (!chain[step.case]) break;            // the saved body outran the working one
-      const seg = { deck: step.case, end: step.end, ms: step.ms, stopAt: null, inferred: false };
-      if (step.end === "next" || step.end === "terminate" || step.end === "fail") {
-        const r = ruleOp(chain[step.case], step.end);
-        if (r) { seg.stopAt = r.opIndex; seg.inferred = r.inferred; }
-      }
-      segments.push(seg);
-    }
-    return { mode: "live", segments, notes: [] };
-  }
   function dryPlan() {
     const chain = caseChain(focusRoot());
     const segments = [], notes = [];
@@ -1901,17 +1878,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     body.innerHTML = runRoundsHtml(R);
   }
 
-  // ── P5 run parity: a LIVE editor runs the REAL command ───────────────────
-  // Ported from floweditor3d's openRunPicker/doRun/inspectRunResult. When the
-  // editor has a source (and is not the harness), the run button or R key
-  // opens an args form over the params bar (doc.root.input, coerced by bar
-  // type; no params means run at once). The run is ONE execution of the SAVED
-  // command via dev.code.trace_flow, which also reports the case path; the
-  // flowtoken animation then REPLAYS that path from the root case's first
-  // deck — following each `next` along its jump pipe into the next case —
-  // and never blocks or fails the result. The payload (status/pid stripped)
-  // goes to the inspector with an args sentence. The harness keeps the
-  // token-only (dry) run.
+  // ── P5 run parity: a LIVE editor runs on the stepper ─────────────────────
+  // When the editor has a source (and is not the harness), the run button or
+  // R key opens an args form over the params bar (doc.root.input, coerced by
+  // bar type; no params means run at once). The run is ONE debug session:
+  // debug_start (body {} = the SAVED body) + debug_step continue {wait}, and
+  // its REAL events ride the editor in rounds afterwards — the same
+  // interpreter path as the debugger, with the case path read straight off
+  // the tape (no trace_flow sentinel, no predicted schedule). The payload
+  // (the ended frame's out, or the run's failure) goes to the inspector with
+  // an args sentence. The harness keeps the token-only (dry) run.
   let lastResult = null, liveCall = false;
   function coerceArg(raw, type) {
     const t = (type || "").toLowerCase();
@@ -1975,21 +1951,59 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (savedSyncs || flowSyncCount()) { try { await checkRuntime(); } catch (e) {} }
     status(`running ${src.cmd}…`);
     const started = performance.now();
-    const settle = (p) => p.then((r) => r || { status: "err", msg: "no response" }, (e) => ({ status: "err", msg: String(e && e.message ? e.message : e) }));
-    // ONE execution that also reports the case path: dev.code.trace_flow runs
-    // the saved command through the real interpreter, case by case. Only when
-    // the trace command itself is unavailable (a host that predates it — dev
-    // does not hot-swap — or no access) is the plain run made instead, with no
-    // path; trace_flow's other errors arrive before anything ran or ARE the
-    // run's result, so they are shown as-is — never a second execution.
-    const t = await settle(invokeP("dev", "code", "trace_flow", { lib: src.lib, ctl: src.ctl, cmd: src.cmd, args, nn_sessionid: "" }));
-    let r, path = null, untraced = null;
-    if (t.status === "ok" && t.result) { r = t.result; path = t.path || []; }
-    else if (/no such command|unauthorized|not found/i.test(String(t.msg || ""))) {
-      untraced = String(t.msg || "trace unavailable").slice(0, 120);
+    // ONE execution on the stepper: debug_start (body {} = the SAVED body)
+    // opens a session and debug_step continue {wait} runs it to the end —
+    // the same interpreter path as the debugger. The case path is the tape's
+    // (each case-ending event names its op), and the run's REAL events ride
+    // the editor afterwards. A session the stepper refuses (never started)
+    // falls back to the plain command run with no path; its other failures
+    // ARE the run's result and are shown as-is — never a second execution.
+    const st = await FD.client.start(src, {}, args);
+    let session = st && st.session, r, path = null, untraced = null, tapeEvents = null;
+    if (!session) {
+      untraced = String((st && st.msg) || "no session").slice(0, 120);
       r = await settle(invokeP(src.lib, src.ctl, src.cmd, args));
+    } else {
+      const fin = await FD.client.step(session, "continue", { wait: true });
+      tapeEvents = (fin && Array.isArray(fin.events) && !fin.events_truncated) ? fin.events : null;
+      const st2 = await FD.client.state(session);
+      path = casePathFromState(st2);
+      const ev = (st2 && st2.event) || (fin && fin.event) || null;
+      const outv = ev && ev.out && typeof ev.out === "object" && !Array.isArray(ev.out) ? ev.out : {};
+      const rw = runtimeWarning(savedSyncs);
+      if (st2 && st2.status === "ok" && ev && ev.type === "done" && !ev.fail && ev.outcome === "ok") {
+        r = Object.assign({ status: "ok" }, outv);
+      } else if (st2 && st2.status === "ok" && st2.ended) {
+        r = { status: "err", msg: runFailureText(ev, st2.last_stop) };
+      } else {
+        r = { status: "err", msg: String((fin && fin.msg) || (st2 && st2.msg) || "the run did not end") };
+      }
+      try { await FD.client.stop(session); } catch (e) {}
+      session = null;
+      const ms = Math.round(performance.now() - started);
+      // ride the run's REAL events from the ROOT case's first deck, where the
+      // stepper starts (events not on this picture are skipped, never fatal)
+      let R = null;
+      if (tapeEvents && tapeEvents.length && focusPath.length === 1) {
+        try { R = await rideRunEvents(tapeEvents, path); } catch (e) { R = null; }
+      }
+      liveCall = false;
+      if (runBtn) { runBtn.disabled = false; runBtn.classList.remove("running"); runBtn.textContent = "run ▸"; }
+      const ok = r.status === "ok";
+      const rawMsg = String(r.msg == null ? "" : r.msg);
+      const msg = /^\s*</.test(rawMsg) ? rawMsg.replace(/<title>[\s\S]*?<\/title>/i, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : rawMsg;
+      lastResult = { args, ok, result: r, msg, ms, unsaved, source: src, path, untraced,
+        unsynchronized: rw ? { flowlang: rw.flowlang, min: rw.min, syncs: rw.n, text: rw.text } : null,
+        tokens: R ? { complete: !!R.complete, inOrder: !!R.inOrder, delivered: R.delivered.length } : null };
+      const via = untraced ? " · no case path" : (path && path.length ? ` · ${pathText(path)}` : "");
+      const unsync = rw ? ` · UNSYNCHRONIZED (flowlang ${rw.flowlang} ignores synchros)` : "";
+      pushJournal(ok ? `ran ${src.cmd}${via} · ${ms}ms${unsync}` : `run failed: ${msg}${unsync}`);
+      if (ok && rw) status(`ran UNSYNCHRONIZED — flowlang ${rw.flowlang} ignores synchros · ${ms}ms`, "warn");
+      else if (ok) status(`ran${via} · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} ${R.delivered.length === 1 ? "delivery" : "deliveries"} in order` : ""), "ok");
+      else status(`run failed: ${msg}`, "bad");
+      renderRunResult(lastResult, R);
+      return lastResult;
     }
-    else r = t;
     const ms = Math.round(performance.now() - started);
     // replay the run from the ROOT case's first deck, where the server starts
     let R = null;
