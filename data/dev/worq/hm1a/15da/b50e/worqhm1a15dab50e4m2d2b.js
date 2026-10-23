@@ -265,7 +265,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // the tokens — revert it at once (the doc stays exactly as before)
     if (running) { try { cmd.undo(); } catch (e) {} status("running — edit refused until the run delivers", "bad"); return false; }
     // a debug session's tape describes THIS body: edits wait for stop (⇧F5)
-    if (dbgActive()) { try { cmd.undo(); } catch (e) {} status("debugging — edits are locked; stop the session (⇧F5) to edit", "bad"); renderAll(); return false; }
+    if (dbgActive()) { try { cmd.undo(); } catch (e) {} renderAll(); status("debugging — edits are locked; stop the session (⇧F5) to edit", "bad"); return false; }
     // a read-only view (graph without a source command) cannot keep edits
     if (!source) { try { cmd.undo(); } catch (e) {} status("read-only view — no source command to save edits to", "bad"); return false; }
     undoStack.push(cmd);
@@ -390,6 +390,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       s.params = n.params || (n.text ? n.text : undefined);
       return s;
     });
+    lastFacadeDbg = specs.filter((s) => s.meta && s.meta.dbg).map((s) => ({ id: s.id, role: s.meta.role, part: s.meta.part, index: s.meta.index, dbg: s.meta.dbg, color: s.material && s.material.color }));
     // re-attach the ghost specs if a wire is armed (they ride the facade scene).
     // setScene is a WHOLE-scene replace on the real GL stage: it would destroy
     // every spec the scenehost owns (the flownode instances, host links, run
@@ -1005,7 +1006,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       decks.appendChild(add);
     }
     renderDiagnostics();
-    status(`${deckCount} deck${deckCount === 1 ? "" : "s"} · ${focusedCase() ? focusedCase().cmds.length : 0} ops · ${source ? "editing on" : "read-only (no source command)"}`);
+    status(`${deckCount} deck${deckCount === 1 ? "" : "s"} · ${focusedCase() ? focusedCase().cmds.length : 0} ops · ${source ? (dbgActive() ? "debugging — edits locked" : "editing on") : "read-only (no source command)"}`);
   }
 
   function setActiveDeck(k) { activeDeck = k; cancelWireGhost(); selWire = null; if (hostApi) hostApi.setState("selectedKey", null); renderAll(); }
@@ -2020,6 +2021,192 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     body.innerHTML = h;
   }
 
+  // ── STEP DEBUGGER (flow step debugger P4) ────────────────────────────────
+  // A debug SESSION (dev.flowstep P3: a recorded tape — step / back / goto /
+  // continue / breakpoints) runs the CURRENT body — unsaved edits included
+  // (doc.serialize()) — under the stepper. Every move is one debug_step then
+  // one debug_state, and the editor only DRAWS that state: dev:flowdebug maps
+  // the frames onto the doc's case objects, the focus FOLLOWS the top frame
+  // (drill into local frames, the case it runs), flownode plates show each
+  // op's state via host.state.dbg (waiting / ready / running / done /
+  // skipped), the facade tints wires and synchros, and a tap on a READY op /
+  // wire / synchro picks it (mode into, pick {kind, index}). Edits are locked
+  // while a session is open (its tape describes THIS body); stop (⇧F5)
+  // unlocks. Without a source the harness's command names the session (the
+  // body debugged is still the editor's own).
+  let dbg = null;            // { session, src, args, st, views, busy, last, follow, sig }
+  let dbgPollT = null;
+  let lastFacadeDbg = [];    // the facade specs the last render tinted (checks)
+  const dbgSrc = () => source || { lib: "scratch", ctl: "skills", cmd: "flowedit3d_body" };
+  function dbgActive() { return !!(dbg && dbg.session); }
+  function dbgColors() {
+    const cs = getComputedStyle(ME);
+    const pick = (n, d) => { const v = String(cs.getPropertyValue(n) || "").trim(); return /^#[0-9a-f]{3,8}$/i.test(v) ? v : d; };
+    return { ready: pick("--fe-dbg-ready", "#f0a63c"), running: pick("--fe-dbg-running", "#56a3d9"),
+      done: pick("--fe-dbg-done", "#62bd8c"), skipped: pick("--fe-dbg-skipped", "#6b6f78") };
+  }
+  // the session frame running the FOCUSED case (null: not debugging, or no
+  // frame runs it — e.g. the user walked to another deck)
+  function dbgDeckView() { return dbgActive() && dbg.views ? FD.deckView(dbg.views, focusRoot(), activeDeck) : null; }
+  // the focused case's op states → host.state.dbg (flownode's plate reads it)
+  function syncDebugState() {
+    if (!hostApi) return;
+    const dv = dbgDeckView();
+    hostApi.setState("dbg", dv ? { deck: activeDeck, ops: dv.ops.slice(), colors: dbgColors(), cursor: dbg.st ? dbg.st.cursor : 0 } : null);
+  }
+  function startDebug() {
+    if (dbgActive()) return null;
+    if (running || liveCall) { status("a run is in progress", "bad"); return null; }
+    const params = Object.entries((doc && doc.root && doc.root.input) || {});
+    if (!params.length) return debugStart({});
+    return openRunPicker(params, debugStart, "debug");
+  }
+  async function debugStart(args) {
+    if (running || liveCall || disposed) return null;
+    if (dbgActive()) await debugStop();
+    if (armSrc || wireMode) cancelWireGhost();
+    if (armSync) cancelSyncGesture();
+    let body; try { body = JSON.parse(snap()); } catch (e) { status("debug: body unreadable — " + e.message, "bad"); return null; }
+    const src = dbgSrc();
+    status(`debug: opening a session on ${src.cmd}…`);
+    const r = await FD.client.start(src, body, args || {});
+    if (!r || r.status !== "ok" || !r.session) { status("debug start failed: " + ((r && r.msg) || "no session"), "bad"); return r; }
+    dbg = { session: r.session, src, args: args || {}, st: null, views: [], busy: false, last: r, follow: true, sig: "", unsaved: dirty };
+    ME.classList.add("fe-debugging");
+    pushJournal(`debug session · ${src.cmd}` + (dirty ? " (unsaved body)" : ""));
+    await debugRefresh();
+    renderInspector(hostApi && hostApi.state ? hostApi.state.selectedKey : null);
+    status(`debugging ${src.cmd} — F11 into · F10 over · F5 continue · ⇧F5 stop`, "ok");
+    return r;
+  }
+  // one move: into / over / out / continue / back / goto / pause / run_to …
+  async function debugStep(mode, pick) {
+    if (!dbgActive()) return (mode === "into" || mode === "over" || mode === "continue") ? startDebug() : null;
+    if (dbg.busy) return null;
+    if (dbg.st && dbg.st.running && mode !== "pause") { status("debug: a continue is running — pause first", "bad"); return null; }
+    const d = dbg; d.busy = true;
+    try {
+      const r = await FD.client.step(d.session, mode, pick || {});
+      if (dbg !== d) return r;                 // stopped meanwhile
+      d.last = r;
+      if (!r || r.status !== "ok") {
+        const msg = String((r && r.msg) || "no reply");
+        status(`debug ${mode} refused: ${msg}`, "bad");
+        if (/session/i.test(msg) && /(no such|no debug session|unknown|not found|gone|missing|reaped)/i.test(msg)) debugEnded("the session is gone (reaped after idling?)");
+        return r;
+      }
+      await debugRefresh();
+      if (r.running) debugPoll();
+      return r;
+    } finally { d.busy = false; renderDebugBar(); }
+  }
+  async function debugRefresh() {
+    if (!dbgActive()) return null;
+    const d = dbg;
+    const st = await FD.client.state(d.session);
+    if (dbg !== d) return null;
+    if (!st || st.status !== "ok") {
+      const msg = String((st && st.msg) || "no reply");
+      if (/no debug session|reaped/i.test(msg)) { debugEnded("the session is gone (reaped after idling?)"); return null; }
+      status("debug state failed: " + msg, "bad"); return null;
+    }
+    const sig = `${st.cursor}|${st.length}|${st.running}|${st.hash}`;
+    d.st = st;
+    if (sig === d.sig) { renderDebugBar(); return st; }   // a poll that saw no move
+    d.sig = sig;
+    d.views = FD.frameViews(doc.root, st);
+    const moved = d.follow ? debugFollow() : false;
+    if (moved) renderAll(); else { syncDebugState(); renderFacade(); }
+    renderDebugBar();
+    return st;
+  }
+  // follow the TOP frame: drill to the deepest frame the editor holds (a
+  // command frame's callee is not in this doc — the focus stays on its
+  // caller) and show the case it runs. Returns true when the focus moved.
+  function debugFollow() {
+    const chain = FD.focusChain(dbg.views); if (!chain.length) return false;
+    const deep = chain[chain.length - 1];
+    const same = chain.length === focusPath.length && chain.every((x, k) => focusPath[k].root === x.root) && activeDeck === deep.case;
+    if (same) return false;
+    focusPath = chain.map((x, k) => (k === 0 ? { root: doc.root, title: "case 1" } : { root: x.root, op: x.op, title: x.title }));
+    activeDeck = deep.case;
+    cancelWireGhost();
+    selWire = null; selWireRef = null; selSync = null; selSyncRef = null; selSyncCase = null;
+    if (hostApi) hostApi.setState("selectedKey", null);
+    return true;
+  }
+  // a tap on a READY item of the top frame runs it next; anything else is
+  // not the debugger's (the tap selects, as always)
+  function debugPickItem(kind, index) {
+    if (!dbgActive() || (dbg.st && dbg.st.running)) return false;
+    const dv = dbgDeckView(); if (!dv || !dv.top) return false;
+    const s = kind === "op" ? dv.ops[index] : kind === "wire" ? dv.wires[index] : dv.syncs[index];
+    if (s !== "ready") return false;
+    debugStep("into", { kind, index });
+    return true;
+  }
+  function debugPoll() {
+    if (dbgPollT) clearTimeout(dbgPollT);
+    dbgPollT = setTimeout(async () => {
+      dbgPollT = null;
+      if (!dbgActive() || disposed) return;
+      const st = await debugRefresh();
+      if (st && st.running) debugPoll();
+      else if (st) status(`debug: stopped${st.last_stop ? " — " + st.last_stop : ""} at step ${st.cursor}`, "ok");
+    }, 200);
+  }
+  async function debugStop() {
+    if (!dbg) return null;
+    const d = dbg;
+    debugEnded(null);
+    let r = null;
+    try { r = await FD.client.stop(d.session); } catch (e) {}
+    return r;
+  }
+  function debugEnded(why) {
+    dbg = null;
+    if (dbgPollT) { clearTimeout(dbgPollT); dbgPollT = null; }
+    ME.classList.remove("fe-debugging");
+    renderDebugBar();
+    if (!disposed && hostApi) { syncDebugState(); renderFacade(); }
+    status(why ? "debug: " + why : "debug session stopped — edits unlocked", why ? "bad" : "ok");
+  }
+  // a ready item in words, named in the top frame's case
+  function dbgItemText(v, it) {
+    const c = v && v.caseObj;
+    if (!it || it.kind === "auto") return "auto";
+    if (it.kind === "op") return `op ${c && c.cmds[it.index] ? nameOf(c, it.index) : it.index}`;
+    if (it.kind === "wire") { const w = c && c.cons[it.index]; return w ? `${nameOf(c, w.src[0])}.${w.src[1]}→${nameOf(c, w.dest[0])}.${w.dest[1]}` : `wire ${it.index}`; }
+    if (it.kind === "sync") { const s = c && c.syncs && c.syncs[it.index]; return s ? `${nameOf(c, s.src)}⇢${nameOf(c, s.dest)}` : `synchro ${it.index}`; }
+    return `${it.kind} ${it.index}`;
+  }
+  function renderDebugBar() {
+    const on = dbgActive();
+    const bar = $(".fe-dbg"); if (bar) bar.hidden = !on;
+    const dbtn = $(".fe-debug"); if (dbtn) { dbtn.textContent = on ? "debugging ■" : "debug ⏯"; dbtn.setAttribute("aria-pressed", String(on)); dbtn.title = on ? "Stop debugging (⇧F5)" : "Debug: step through the CURRENT body, unsaved edits included (F11 / F10 start a session)"; }
+    if (!on || !bar) return;
+    const st = dbg.st || {};
+    const live = !!st.running, ended = !!st.ended, busy = !!dbg.busy;
+    const set = (sel, dis) => { const b = $(sel); if (b) b.disabled = !!dis; };
+    set(".fe-dbg-back", busy || live || !((st.cursor || 0) > (st.base || 0)));
+    for (const s of [".fe-dbg-over", ".fe-dbg-into", ".fe-dbg-out", ".fe-dbg-cont"]) set(s, busy || live || ended);
+    set(".fe-dbg-pause", !live);
+    const pos = $(".fe-dbg-pos"); if (pos) pos.textContent = `step ${st.cursor || 0} / ${st.length || 0}`;
+    const ev = $(".fe-dbg-ev");
+    if (ev) {
+      const top = dbg.views && dbg.views.length ? dbg.views[dbg.views.length - 1] : null;
+      let t = FD.eventText(st.event, dbg.views);
+      const rd = (st.ready || []).filter((x) => x && x.kind !== "auto");
+      if (ended) t += " · ended";
+      else if (rd.length) t += ` · ready: ${rd.map((x) => dbgItemText(top, x)).join(", ")}` + (st.default ? ` · next ${dbgItemText(top, st.default)}` : "");
+      else if ((st.ready || []).length) t += " · next: auto";
+      if (top && top.external) t += ` · in ${top.external.name || "a callee"} (not in this flow)`;
+      if (live) t = "running… " + t;
+      ev.textContent = t;
+      ev.className = "fe-dbg-ev" + (ended ? " ended" : "") + (st.event && (st.event.type === "error" || st.event.type === "stall") ? " bad" : "");
+    }
+  }
+
   // ── P4: the in-editor journal + diff ─────────────────────────────────────
   // Two views, both speaking the GRAPH's vocabulary via flowdoc.diffFlow:
   //   unsaved changes — diffFlow(last loaded/saved body, the working body),
@@ -2116,6 +2303,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   // (re)load a body as the authoritative doc — the diff baseline moves with it
   function loadBody(body, hash) {
+    if (dbgActive()) debugStop();     // a new body: the session's tape no longer describes it
     doc = parseFlow(body); baseHash = hash || "";
     focusPath = [{ root: doc.root, title: "case 1" }]; activeDeck = 0;
     undoStack = []; redoStack = []; pendingLabels = []; dirty = false;
@@ -2283,6 +2471,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       });
       refreshSaveUi();
       const runB = $(".fe-run"); if (runB) runB.addEventListener("click", () => { startRun(); });
+      // STEP DEBUGGER toolbar
+      const onClick = (sel, fn) => { const b = $(sel); if (b) b.addEventListener("click", fn); };
+      onClick(".fe-debug", () => { if (dbgActive()) debugStop(); else startDebug(); });
+      onClick(".fe-dbg-back", () => debugStep("back", { count: 1 }));
+      onClick(".fe-dbg-over", () => debugStep("over"));
+      onClick(".fe-dbg-into", () => debugStep("into"));
+      onClick(".fe-dbg-out", () => debugStep("out"));
+      onClick(".fe-dbg-cont", () => debugStep("continue", { budget: 10000 }));
+      onClick(".fe-dbg-pause", () => debugStep("pause"));
+      onClick(".fe-dbg-stop", () => debugStop());
+      renderDebugBar();
       const sjB = $(".fe-sj-refresh"); if (sjB) sjB.addEventListener("click", () => { refreshJournal(); });
       renderChanges();
       refreshJournal();
@@ -2302,6 +2501,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
           if (inField && /^(INPUT|TEXTAREA)$/.test(tg.tagName || "")) tg.dispatchEvent(new Event("change", { bubbles: true }));
           if (inField && tg.isConnected && tg.blur) tg.blur();
           setTimeout(() => { saveFlow(); }, 0);
+          return;
+        }
+        // STEP DEBUGGER keys — F11 into · F10 over · ⇧F11 out · F5 continue ·
+        // ⇧F10 back · ⇧F5 stop. Before the field guard (F-keys type nothing)
+        // and always preventDefault, so F5 never reloads the page mid-session.
+        if (e.key === "F5" || e.key === "F10" || e.key === "F11") {
+          e.preventDefault();
+          if (e.key === "F11") debugStep(e.shiftKey ? "out" : "into");
+          else if (e.key === "F10") { if (e.shiftKey) debugStep("back", { count: 1 }); else debugStep("over"); }
+          else if (e.shiftKey) debugStop();
+          else debugStep("continue", { budget: 10000 });
           return;
         }
         if (inField) return;
@@ -2350,6 +2560,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         dispose() {
           if (disposed) return;
           disposed = true;
+          if (dbg) { const s = dbg.session; dbg = null; if (dbgPollT) { clearTimeout(dbgPollT); dbgPollT = null; } try { FD.client.stop(s); } catch (e) {} }
           cancelWireGhost(); closePicker();
           try { hostApi.setState("onTokenDelivered", null); hostApi.setState("run", null); } catch (e) {}
           for (const ch of (hostApi.children || []).slice()) { try { hostApi.removeControl(ch.key); } catch (e) {} }
@@ -2402,6 +2613,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         focusedPath, diagnostics: () => lastDiags.map((d) => ({ code: d.code, severity: d.severity, opIndex: d.opIndex, message: d.message })),
         walkOps, selectOp, selectedOpIndex, frameSelection, lastFrame: () => lastFrame,
         pose: () => (stage && stage.getPose ? stage.getPose() : null),
+        // STEP DEBUGGER (flow step debugger P4) surface
+        startDebug, debugStart, debugStep, debugStop, debugRefresh, debugPickItem,
+        debugSession: () => (dbg ? dbg.session : null),
+        debugState: () => (dbg ? dbg.st : null),
+        debugView: () => { const dv = dbgDeckView(); return dv ? { fi: dv.fi, top: dv.top, case: dv.case, phase: dv.phase, ops: dv.ops.slice(), wires: dv.wires.slice(), syncs: dv.syncs.slice() } : null; },
+        debugFrames: () => (dbg ? dbg.views.map((v) => ({ fi: v.fi, kind: v.kind, path: v.path, case: v.case, phase: v.phase, opName: v.opName, external: v.external, ops: v.ops.slice(), wires: v.wires.slice(), syncs: v.syncs.slice() })) : []),
+        debugHostState: () => (hostApi && hostApi.state ? hostApi.state.dbg : null),
+        debugPlates: () => instances.map((inst) => ({ key: inst && inst.key, dbg: inst && inst.ctx && inst.ctx.me ? inst.ctx.me._dbg : undefined })),
+        debugFacade: () => lastFacadeDbg.slice(),
+        debugBarText: () => { const b = $(".fe-dbg"); return b && !b.hidden ? { pos: $(".fe-dbg-pos").textContent, ev: $(".fe-dbg-ev").textContent } : null; },
+        focus: () => ({ depth: focusPath.length, deck: activeDeck, titles: focusPath.map((f) => f.title) }),
       };
     }).catch((e) => { status("boot failed: " + (e && e.message ? e.message : e), "bad"); return null; });
   }
