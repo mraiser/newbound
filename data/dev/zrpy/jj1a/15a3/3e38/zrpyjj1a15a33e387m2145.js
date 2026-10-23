@@ -53,6 +53,14 @@ me.ready = function () {
         ctx.setRig("dbg", "params.size.y", box.y + 0.34);
         ctx.setRig("dbg", "pos.z", -box.z / 2 - 0.01);
         ctx.me._dbg = null;
+        // D4: the BREAKPOINT dot - the icon's top-left corner, just outside
+        // it (clear of the sockets on the top edge and the sync-in handle on
+        // the left), in front of the plate; shown by render from
+        // host.state.bps, a tap toggles it (click → host.state.onBpTap)
+        ctx.setRig("bp", "pos.x", -box.x / 2 - 0.1);
+        ctx.setRig("bp", "pos.y", box.y / 2 + 0.1);
+        ctx.setRig("bp", "pos.z", box.z / 2);
+        ctx.me._bp = -1;
         // selection = the bench accent (tokens.css: selection/focus/primary)
         const acc = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
         ctx.setRig("halo", "material", { color: /^#[0-9a-f]{3,8}$/i.test(acc) ? acc : "#f0a63c", emissive: true });
