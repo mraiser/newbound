@@ -24,6 +24,10 @@
 //   focusChain(views)           the drill path to the deepest frame the editor
 //       can show: [{ root, op, title, fi, case }] (frame 0 first)
 //   eventText(ev, views)        one human line for a stepper event
+//   rideEvents(events, view)    the deliver/sync/next events that move
+//                               something on view's picture (D2 tokens)
+//   drillEvents(events, view)   the enter/leave events whose op sits on
+//                               view's picture (D2 drill fly)
 //   client                      debug_start/step/state/stop/set_breakpoints
 //                               over invokeCommand (all FLAT replies)
 //
@@ -139,6 +143,29 @@ function eventText(ev, views) {
   }
 }
 
+// ── D2: what a move SHOWS on one picture ────────────────────────────────
+// rideEvents(events, view): the stepper events that MOVE something on the
+// picture of `view` (a frame view at its case) - deliver (a wire), sync (a
+// synchro pulse), next (the jump pipe out of this case) - in tape order.
+// Events of another frame or another case are not this picture's.
+// drillEvents(events, view): the enter/leave events whose PARENT frame is
+// `view`'s frame - the op the drill goes into / comes out of is on this
+// picture (forward enter / undone leave before the redraw; forward leave /
+// undone enter after it).
+const pathKey = (p) => JSON.stringify(Array.isArray(p) ? p : []);
+function rideEvents(events, view) {
+  if (!view || !Array.isArray(events)) return [];
+  const pk = pathKey(view.path);
+  return events.filter((ev) => ev && (ev.type === "deliver" || ev.type === "sync" || ev.type === "next")
+    && (ev.case || 0) === (view.case || 0) && pathKey(ev.frame) === pk);
+}
+function drillEvents(events, view) {
+  if (!view || !Array.isArray(events)) return [];
+  const pk = pathKey(view.path);
+  return events.filter((ev) => ev && (ev.type === "enter" || ev.type === "leave") && ev.kind !== "root"
+    && Array.isArray(ev.frame) && ev.frame.length > 0 && ev.op != null && pathKey(ev.frame.slice(0, -1)) === pk);
+}
+
 // ── client: the P3 session API (dev.flowstep, FLAT replies) ──────────────
 const call = (cmd, args) => new Promise((res) => {
   try { invokeCommand("dev", "flowstep", cmd, args, (r) => res(r || { status: "err", msg: "no response" })); }
@@ -152,5 +179,5 @@ const client = {
   setBreakpoints: (session, list) => call("debug_set_breakpoints", { session, list: list || [] }),
 };
 
-Object.assign(me, { caseChain, opState, wireState, syncState, frameViews, deckView, focusChain, eventText, client });
+Object.assign(me, { caseChain, opState, wireState, syncState, frameViews, deckView, focusChain, eventText, rideEvents, drillEvents, client });
 })();
