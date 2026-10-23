@@ -6,7 +6,10 @@
 // round (flowdoc.propagationRounds) and reports through the host's shared
 // state: host.state.onTokenDelivered({ runId, k, round, key }). A run that
 // follows a `next` rule also rides the jump pipe's two legs this way (k is
-// then "jump0"/"jump1", the rising leg ridden in reverse).
+// then "jump0"/"jump1", the rising leg ridden in reverse). A SYNCHRO pulse
+// (Synchros S3) is one more token, k "sync<j>", seeded { straight, tint }:
+// it rides the synchro's straight link in the sync colour during the round
+// its src completes (propagationRounds' syncRounds).
 //
 // Timing rides ONE shared clock — host.state.run = { id, t0 } (performance.now
 // ms) set by the editor once every token is added — so the per-instance boot
@@ -31,14 +34,17 @@ me.ready = function () {
   const lerp = (a, b, u) => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, z: a.z + (b.z - a.z) * u });
 
   // seed.reverse rides the link from its `to` end back to its `from` (the
-  // jump pipe's rising leg is a link hung FROM the bead, ridden tab → bead)
+  // jump pipe's rising leg is a link hung FROM the bead, ridden tab → bead).
+  // seed.straight (a SYNCHRO pulse, Synchros S3) rides a straight link: plain
+  // lerp from → to — never linkCurvePoint, which answers the hang spline.
   function pointAt(ctx, d, u) {
     if (d.reverse) u = 1 - u;
+    const from = d.from || { x: 0, y: 0, z: 0 }, to = d.to || from;
+    if (d.straight) return lerp(from, to, u);
     const st = ctx.host && ctx.host.stage;
     if (st && typeof st.linkCurvePoint === "function" && d.wire) {
       try { const p = st.linkCurvePoint(d.wire, u); if (p) return p; } catch (e) { /* fall through */ }
     }
-    const from = d.from || { x: 0, y: 0, z: 0 }, to = d.to || from;
     const wcp = curve();
     return wcp ? wcp(from, to, u) : lerp(from, to, u);
   }
@@ -55,6 +61,8 @@ me.ready = function () {
         const d = ctx.data || {};
         ctx.me._tok = { done: false, shown: null, u: 0,
           delay: (d.round || 0) * (d.dur || 0.42), dur: d.dur || 0.42 };
+        // seed.tint recolours the token (a synchro pulse wears the sync colour)
+        if (typeof d.tint === "string" && /^#[0-9a-f]{3,8}$/i.test(d.tint)) ctx.setRig("tok", "material", { color: d.tint });
         place(ctx, pointAt(ctx, d, d.reduced ? 1 : 0));
         show(ctx, false);
       },

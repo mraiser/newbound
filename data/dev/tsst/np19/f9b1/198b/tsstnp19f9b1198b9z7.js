@@ -1,6 +1,9 @@
 // flowdoc.js — the flowlang Case model: pure data. No DOM, no THREE, no
 // network. Parses a Case JSON into a normalized, validated model (the
-// authoritative language description is docs/flow3d-design.md Part I), and
+// authoritative language description is the dev library asset
+// docs/flow-language.md, Part I — it replaces the lost bench-era
+// docs/flow3d-design.md Part I and keeps its numbering, so the §1.x refs
+// below resolve there; the §3–§7 refs are that bench doc's editor design), and
 // produces DIAGNOSTICS (I-1…I-10 + structural), never rejections — the editor
 // must be able to open a broken flow to fix it (design §4.4).
 //
@@ -18,6 +21,21 @@
 // LIBRARY control — headless: the api rides this control's own element
 // (zero-globals doctrine). Consumers mount it as a hidden data-control
 // child div and read the element's api.
+//
+// SYNCHROS (plan item Synchros S2; the language rules are
+// docs/flow-language.md §1.5.3). A Case may carry `syncs: [{src, dest}]` —
+// a data-less edge between two ops of the SAME case (op indices, src != dest;
+// never the bars) meaning src must finish before dest starts. The owner chose
+// the separate Case key (not a reserved-name con). Absent = [], and emitCase
+// writes the key only when non-empty, so a body without synchros emits
+// exactly as before S2. Everything here honors them: removeOp drops the
+// synchros touching the op and renumbers the rest in the same undoable
+// mutation; canWire/canSync refuse cycles over wires + synchros (I-2: a
+// cycle through a synchro stalls the case); diagnostics flag bad endpoints
+// (S-1) and synchros already implied by a wire path (S-2, info);
+// propagationRounds makes an op wait for the src of every incoming synchro
+// (case-start rule: up front only when no awaited input AND no incoming
+// synchro); diffFlow pairs synchros through the stable op pairing.
 
 var me = this;
 var ME = document.getElementById(me.UUID);
@@ -27,13 +45,15 @@ var ME = document.getElementById(me.UUID);
 const DIAG = {
   STRUCT: "struct",       // a from_data-required field was absent
   I1_UNWIRED: "I-1",      // input terminal without exactly one incoming wire
-  I2_CYCLE: "I-2",        // a wire cycle (the propagation loop would hang)
+  I2_CYCLE: "I-2",        // a wire (or wire + synchro) cycle — hang / stall
   I4_NEXT: "I-4",         // `next` rule with no nextcase in the chain
   I5_MATCH: "I-5",        // match op: !=1 input, or an object/array ctype
   I6_PERSIST: "I-6",      // persistent op: more than one input
   I7_MULTIOUT: "I-7",     // command call with >1 output (positional-map fragile)
   I8_LOOP: "I-8",         // loop output's `loop` names no input on the same op
   I10_COND: "I-10",       // a condition on a constant (dead data)
+  S1_SYNC: "S-1",         // synchro endpoint not an op of this case, or src == dest
+  S2_IMPLIED: "S-2",      // synchro already implied by a wire path (or a duplicate)
 };
 
 const OP_TYPES = new Set([
@@ -43,6 +63,8 @@ const MATCH_CTYPES = new Set(["int", "decimal", "boolean", "string", "null"]);
 
 const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
 const num = (v, d = 0) => (typeof v === "number" && isFinite(v) ? v : d);
+/** Is v an op index of a case with N ops? (Synchro endpoints: never a bar.) */
+const isOpIdx = (v, N) => Number.isInteger(v) && v >= 0 && v < N;
 
 /** Normalize one Node, recording a struct diagnostic per missing required
     field. Returns { node, missing:[...] }. */
@@ -107,8 +129,28 @@ function normCase(raw, diags, path) {
   c.output = normNodeMap(src.output, diags, `${path}.output`);
   c.cmds = Array.isArray(src.cmds) ? src.cmds.map((op, i) => normOp(op, diags, `${path}.cmds[${i}]`)) : [];
   c.cons = Array.isArray(src.cons) ? src.cons.map((con) => normCon(con)) : [];
+  // synchros: optional, absent = []. Endpoint validity is a DIAGNOSTIC (S-1),
+  // never a rejection — the values are kept verbatim so a broken body
+  // round-trips and stays fixable.
+  if ("syncs" in src && !Array.isArray(src.syncs) && src.syncs !== null && src.syncs !== undefined) {
+    diags.push({ code: DIAG.STRUCT, severity: "warn", path, message: "Case.syncs is not an array — ignored (absent = no synchros)" });
+  }
+  c.syncs = Array.isArray(src.syncs) ? src.syncs.map((s, k) => normSync(s, diags, `${path}.syncs[${k}]`, path)) : [];
   if (isObj(src.nextcase)) c.nextcase = normCase(src.nextcase, diags, `${path}.next`);
   return c;
+}
+
+/** Normalize one synchro {src, dest}: endpoints kept verbatim (validated by
+    validateCase as S-1); any other fields preserved for byte-stable
+    round-trips. */
+function normSync(raw, diags, path, casePath) {
+  if (!isObj(raw)) {
+    diags.push({ code: DIAG.STRUCT, severity: "warn", path: casePath, message: `${path} is not a {src, dest} object` });
+    return { src: undefined, dest: undefined };
+  }
+  const s = { src: raw.src, dest: raw.dest };
+  for (const [k, v] of Object.entries(raw)) if (!(k in s)) s[k] = v;
+  return s;
 }
 
 function normCon(raw) {
@@ -135,20 +177,45 @@ function validateCase(c, path, hasNextInChain, diags) {
   });
 
   // I-2: no wire cycle among op indices (bars -1/-2 are not nodes).
-  const adj = new Map();
-  for (const w of c.cons) {
-    const s = w.src[0], d = w.dest[0];
-    if (s >= 0 && d >= 0) { if (!adj.has(s)) adj.set(s, []); adj.get(s).push(d); }
-  }
+  const wireAdj = opGraph(c, { syncs: false });
   const color = new Array(N).fill(0); // 0 white 1 grey 2 black
-  let cyc = false;
-  const dfs = (u) => {
-    color[u] = 1;
-    for (const v of adj.get(u) || []) { if (color[v] === 1) { cyc = true; } else if (color[v] === 0) dfs(v); }
-    color[u] = 2;
+  const hasCycle = (adj) => {
+    color.fill(0);
+    let cyc = false;
+    const dfs = (u) => {
+      color[u] = 1;
+      for (const v of adj.get(u) || []) { if (color[v] === 1) { cyc = true; } else if (color[v] === 0) dfs(v); }
+      color[u] = 2;
+    };
+    for (let i = 0; i < N; i++) if (color[i] === 0) dfs(i);
+    return cyc;
   };
-  for (let i = 0; i < N; i++) if (color[i] === 0) dfs(i);
-  if (cyc) diags.push({ code: DIAG.I2_CYCLE, severity: "error", path, message: "wire cycle — the propagation loop would hang" });
+  const syncs = c.syncs || [];
+  if (hasCycle(wireAdj)) diags.push({ code: DIAG.I2_CYCLE, severity: "error", path, message: "wire cycle — the propagation loop would hang" });
+  else if (syncs.length && hasCycle(opGraph(c))) diags.push({ code: DIAG.I2_CYCLE, severity: "error", path, message: "cycle through a synchro — the ops on it never become ready (the case stalls)" });
+
+  // S-1: a synchro joins two DIFFERENT ops of THIS case (never a bar).
+  // S-2 (info): a synchro already implied by a wire path, or a duplicate.
+  const fmt = (v) => (v === undefined ? "absent" : JSON.stringify(v));
+  const seen = new Map();
+  syncs.forEach((s, k) => {
+    const bad = [];
+    if (!isOpIdx(s.src, N)) bad.push(`src ${fmt(s.src)} is not an op of this case`);
+    if (!isOpIdx(s.dest, N)) bad.push(`dest ${fmt(s.dest)} is not an op of this case`);
+    if (!bad.length && s.src === s.dest) bad.push(`src == dest (op ${s.src} would wait for itself)`);
+    if (bad.length) {
+      diags.push({ code: DIAG.S1_SYNC, severity: "error", path, syncIndex: k, message: `synchro ${k}: ${bad.join("; ")}` });
+      return;
+    }
+    const key = `${s.src}>${s.dest}`;
+    const what = `synchro ${k} (${opName(c, s.src)} → ${opName(c, s.dest)})`;
+    if (seen.has(key)) {
+      diags.push({ code: DIAG.S2_IMPLIED, severity: "info", path, syncIndex: k, message: `${what} duplicates synchro ${seen.get(key)}` });
+      return;
+    }
+    seen.set(key, k);
+    if (reachIn(wireAdj, s.src, s.dest)) diags.push({ code: DIAG.S2_IMPLIED, severity: "info", path, syncIndex: k, message: `${what} is already implied by a wire path — redundant` });
+  });
 
   // per-op semantic checks
   c.cmds.forEach((op, i) => {
@@ -284,15 +351,57 @@ class FlowDoc {
     return c.cons.filter((w) => w.src[0] === i || w.dest[0] === i).length;
   }
 
-  /** Remove op i: drops its wires and REWRITES cons indices > i in the same
-      mutation (§6.3 — indices are semantic addresses). Undo re-inserts the
-      SAME wire objects and un-shifts indices in place, so composed undos
-      (which find wires by identity) stay sound. */
+  /** Synchros touching op i (for the delete preview). */
+  syncsTouching(c, i) {
+    return (c.syncs || []).filter((s) => s.src === i || s.dest === i).length;
+  }
+
+  /** Add a synchro src → dest (op indices): src must finish before dest
+      starts. Enforces S-1 (two different ops of this case) and I-2 (no
+      cycle over wires + synchros) via canSync. */
+  addSync(c, src, dest) {
+    const chk = this.canSync(c, src, dest);
+    if (!chk.ok) return { error: chk.reason };
+    if (!Array.isArray(c.syncs)) c.syncs = [];
+    const sync = { src, dest };
+    c.syncs.push(sync);
+    return { label: `synchro ${opName(c, src)} → ${opName(c, dest)}`,
+      undo: () => { const k = c.syncs.indexOf(sync); if (k >= 0) c.syncs.splice(k, 1); },
+      redo: () => { if (c.syncs.indexOf(sync) < 0) c.syncs.push(sync); } };
+  }
+
+  /** Remove the synchro at index idx. */
+  removeSync(c, idx) {
+    const sync = (c.syncs || [])[idx]; if (!sync) return { error: "no such synchro" };
+    c.syncs.splice(idx, 1);
+    return { label: `unsync ${opName(c, sync.src)} → ${opName(c, sync.dest)}`,
+      undo: () => { c.syncs.splice(idx, 0, sync); },
+      redo: () => { const k = c.syncs.indexOf(sync); if (k >= 0) c.syncs.splice(k, 1); } };
+  }
+
+  /** Would the synchro src → dest be legal? {ok} or {ok:false, reason}. */
+  canSync(c, src, dest) {
+    const N = c.cmds.length;
+    if (!isOpIdx(src, N) || !isOpIdx(dest, N)) return { ok: false, reason: "a synchro joins two ops of this case (S-1)" };
+    if (src === dest) return { ok: false, reason: "can’t synchronize an op with itself (S-1)" };
+    if ((c.syncs || []).some((s) => s.src === src && s.dest === dest)) return { ok: false, reason: "already synchronized" };
+    if (reaches(c, dest, src)) return { ok: false, reason: "would create a cycle — the case would stall (I-2)" };
+    return { ok: true };
+  }
+
+  /** Remove op i: drops its wires AND its synchros, and REWRITES cons and
+      syncs indices > i in the same mutation (§6.3 — indices are semantic
+      addresses). Undo re-inserts the SAME wire/synchro objects and un-shifts
+      indices in place, so composed undos (which find them by identity) stay
+      sound. */
   removeOp(c, i) {
     const op = c.cmds[i]; if (!op) return { error: "no such op" };
+    if (!Array.isArray(c.syncs)) c.syncs = [];
     const removed = []; // [position, wire], ascending
+    const removedSyncs = []; // [position, synchro], ascending
     const apply = () => {
       removed.length = 0;
+      removedSyncs.length = 0;
       c.cmds.splice(i, 1);
       for (let k = c.cons.length - 1; k >= 0; k--) {
         const w = c.cons[k];
@@ -302,15 +411,28 @@ class FlowDoc {
         if (w.src[0] > i) w.src[0]--;
         if (w.dest[0] > i) w.dest[0]--;
       }
+      for (let k = c.syncs.length - 1; k >= 0; k--) {
+        const s = c.syncs[k];
+        if (s.src === i || s.dest === i) { removedSyncs.unshift([k, s]); c.syncs.splice(k, 1); }
+      }
+      for (const s of c.syncs) {
+        if (Number.isInteger(s.src) && s.src > i) s.src--;
+        if (Number.isInteger(s.dest) && s.dest > i) s.dest--;
+      }
     };
     apply();
-    return { label: `delete ${op.name || op.type}`,
+    return { label: `delete ${op.name || op.type}`, wires: removed.length, syncs: removedSyncs.length,
       undo: () => {
         for (const w of c.cons) {
           if (w.src[0] >= i) w.src[0]++;
           if (w.dest[0] >= i) w.dest[0]++;
         }
         for (const [k, w] of removed) c.cons.splice(k, 0, w);
+        for (const s of c.syncs) {
+          if (Number.isInteger(s.src) && s.src >= i) s.src++;
+          if (Number.isInteger(s.dest) && s.dest >= i) s.dest++;
+        }
+        for (const [k, s] of removedSyncs) c.syncs.splice(k, 0, s);
         c.cmds.splice(i, 0, op);
       },
       redo: apply };
@@ -495,15 +617,15 @@ class FlowDoc {
   addCase(root) {
     let last = root; while (last.nextcase) last = last.nextcase;
     const copyBars = (m) => Object.fromEntries(Object.entries(m).map(([k, n]) => [k, { mode: n.mode, type: n.type, x: n.x }]));
-    const fresh = { input: copyBars(root.input), output: copyBars(root.output), cmds: [], cons: [] };
+    const fresh = { input: copyBars(root.input), output: copyBars(root.output), cmds: [], cons: [], syncs: [] };
     last.nextcase = fresh;
     return { label: "add case", undo: () => { delete last.nextcase; }, redo: () => { last.nextcase = fresh; } };
   }
 
   /** Remove deck k from the chain, splicing it out. Refused when the case
       that would become last still contains a `next` rule (I-4 — nothing left
-      to jump to). k=0 shifts the next case's fields into the root object so
-      external references to the root stay valid. */
+      to jump to). k=0 shifts the next case's fields (synchros included) into
+      the root object so external references to the root stay valid. */
   removeCase(root, k) {
     const chain = []; let c = root; while (c) { chain.push(c); c = c.nextcase; }
     if (chain.length < 2) return { error: "a flow needs at least one case" };
@@ -518,7 +640,7 @@ class FlowDoc {
       if (k === 0) {
         const next = root.nextcase;
         root.input = next.input; root.output = next.output;
-        root.cmds = next.cmds; root.cons = next.cons;
+        root.cmds = next.cmds; root.cons = next.cons; root.syncs = next.syncs || [];
         if (next.nextcase) root.nextcase = next.nextcase; else delete root.nextcase;
       } else {
         const parent = chain[k - 1];
@@ -530,7 +652,7 @@ class FlowDoc {
       undo: () => {
         if (k === 0) {
           root.input = snapshot.input; root.output = snapshot.output;
-          root.cmds = snapshot.cmds; root.cons = snapshot.cons;
+          root.cmds = snapshot.cmds; root.cons = snapshot.cons; root.syncs = snapshot.syncs || [];
           if (snapshot.nextcase) root.nextcase = snapshot.nextcase; else delete root.nextcase;
         } else {
           chain[k - 1].nextcase = removed;
@@ -565,7 +687,8 @@ class FlowDoc {
     if (si >= 0 && si === di) return { ok: false, reason: "can’t wire an op to itself" };
     // I-1: the dest slot must be unwired (fan-in is 1)
     if (c.cons.some((w) => w.dest[0] === di && w.dest[1] === dt)) return { ok: false, reason: "input already wired" };
-    // I-2: adding si→di must not close a cycle
+    // I-2: adding si→di must not close a cycle (over wires AND synchros — a
+    // cycle through a synchro stalls the case just as a wire cycle hangs it)
     if (si >= 0 && di >= 0 && reaches(c, di, si)) return { ok: false, reason: "would create a cycle" };
     return { ok: true };
   }
@@ -627,7 +750,15 @@ function wireLabel(c, w) {
     completed it (the interpreter evaluates an op the moment its last input
     lands, and the rule's exception ends the sweep there), later rounds never
     run, and the wires cut off come back as `skipped` (stopped: true) rather
-    than `unreached`. */
+    than `unreached`.
+    SYNCHROS: an op is ready only when every awaited input has landed AND the
+    src of every incoming (well-formed) synchro has completed; so the case-
+    start rule is "no awaited input AND no incoming synchro". A synchro fires
+    in the round its src is first done (after that round's wires). When the
+    case has synchros the result also carries `syncRounds` (synchro indices
+    fired per round, parallel to `rounds` — a round may then hold no wires,
+    only synchros) and `syncsUnreached` / `syncsSkipped`. A case without
+    synchros returns exactly the pre-synchro shape. */
 function propagationRounds(c, opts = {}) {
   const N = c.cmds.length;
   const stopAt = typeof opts.stopAt === "number" ? opts.stopAt : null;
@@ -638,49 +769,93 @@ function propagationRounds(c, opts = {}) {
   // name anywhere in the case.
   const globalDest = new Set(c.cons.map((w) => w.dest[1]));
   const need = c.cmds.map((op) => Object.keys(op.in).filter((n) => globalDest.has(n)).length);
+  // synchros: S-1-broken ones are diagnosed, never scheduled
+  const syncs = c.syncs || [];
+  const live = syncs.map((s) => isOpIdx(s.src, N) && isOpIdx(s.dest, N) && s.src !== s.dest);
+  const needSync = c.cmds.map(() => 0);
+  syncs.forEach((s, k) => { if (live[k]) needSync[s.dest]++; });
+  const synced = c.cmds.map(() => 0);
   const filled = c.cmds.map(() => new Set());
-  const done = c.cmds.map((_, i) => need[i] === 0);
+  const done = c.cmds.map((_, i) => need[i] === 0 && needSync[i] === 0);
   const order = done.map((d, i) => (d ? i : -1)).filter((i) => i >= 0);
-  const fired = new Set();
-  const rounds = [];
+  const fired = new Set(), syncFired = new Set();
+  const rounds = [], syncRounds = [];
   let stopped = stopAt !== null && !!done[stopAt];   // an up-front op: nothing fires
-  for (let guard = 0; !stopped && guard <= c.cons.length + 1; guard++) {
+  const land = (d) => {
+    if (!done[d] && filled[d].size >= need[d] && synced[d] >= needSync[d]) {
+      done[d] = true;
+      order.push(d);
+      if (d === stopAt) stopped = true;
+    }
+  };
+  for (let guard = 0; !stopped && guard <= c.cons.length + syncs.length + 1; guard++) {
     const round = [];
     c.cons.forEach((w, k) => {
       if (fired.has(k)) return;
       const s = w.src[0];
       if (s === -1 || (s >= 0 && s < N && done[s])) round.push(k);
     });
-    if (!round.length) break;
-    const kept = [];
+    const sround = [];
+    syncs.forEach((s, k) => { if (live[k] && !syncFired.has(k) && done[s.src]) sround.push(k); });
+    if (!round.length && !sround.length) break;
+    const kept = [], skept = [];
     for (const k of round) {
       fired.add(k);
       kept.push(k);
       const d = c.cons[k].dest[0];
       if (d >= 0 && d < N) {
         filled[d].add(c.cons[k].dest[1]);
-        if (!done[d] && filled[d].size >= need[d]) {
-          done[d] = true;
-          order.push(d);
-          if (d === stopAt) { stopped = true; break; }
-        }
+        land(d);
+        if (stopped) break;
       }
     }
+    if (!stopped) for (const k of sround) {
+      syncFired.add(k);
+      skept.push(k);
+      synced[syncs[k].dest]++;
+      land(syncs[k].dest);
+      if (stopped) break;
+    }
     rounds.push(kept);
+    syncRounds.push(skept);
   }
   const unfired = c.cons.map((_, k) => k).filter((k) => !fired.has(k));
-  return stopped
+  const res = stopped
     ? { rounds, unreached: [], skipped: unfired, order, stopped: true }
     : { rounds, unreached: unfired, order };
+  if (syncs.length) {
+    const sunfired = syncs.map((_, k) => k).filter((k) => !syncFired.has(k));
+    res.syncRounds = syncRounds;
+    if (stopped) { res.syncsUnreached = []; res.syncsSkipped = sunfired; }
+    else res.syncsUnreached = sunfired;
+  }
+  return res;
 }
 
-/** Is `to` (op index) reachable from `from` (op index) along cons edges? */
-function reaches(c, from, to) {
+/** The op-ordering graph of a case: op index → [op index], from wires (op to
+    op; the bars are not nodes) and — unless opts.syncs === false — from the
+    case's well-formed synchros (S-1-broken ones are diagnosed, not edges). */
+function opGraph(c, opts = {}) {
   const adj = new Map();
-  for (const w of c.cons) if (w.src[0] >= 0 && w.dest[0] >= 0) (adj.get(w.src[0]) || adj.set(w.src[0], []).get(w.src[0])).push(w.dest[0]);
+  const edge = (s, d) => (adj.get(s) || adj.set(s, []).get(s)).push(d);
+  for (const w of c.cons) if (w.src[0] >= 0 && w.dest[0] >= 0) edge(w.src[0], w.dest[0]);
+  if (opts.syncs !== false) {
+    const N = c.cmds.length;
+    for (const s of c.syncs || []) if (isOpIdx(s.src, N) && isOpIdx(s.dest, N) && s.src !== s.dest) edge(s.src, s.dest);
+  }
+  return adj;
+}
+
+function reachIn(adj, from, to) {
   const seen = new Set(), stack = [from];
   while (stack.length) { const u = stack.pop(); if (u === to) return true; if (seen.has(u)) continue; seen.add(u); for (const v of adj.get(u) || []) stack.push(v); }
   return false;
+}
+
+/** Is `to` (op index) reachable from `from` (op index) along cons AND
+    synchro edges? (A cycle through a synchro stalls the case — I-2.) */
+function reaches(c, from, to) {
+  return reachIn(opGraph(c), from, to);
 }
 
 function emitNode(n) {
@@ -710,6 +885,8 @@ function emitCase(c) {
     cmds: (c.cmds || []).map(emitOp),
     cons: (c.cons || []).map((w) => ({ src: [w.src[0], w.src[1]], dest: [w.dest[0], w.dest[1]] })),
   };
+  // synchros only when present — a body without them emits exactly as before
+  if (c.syncs && c.syncs.length) o.syncs = c.syncs.map((s) => ({ ...s, src: s.src, dest: s.dest }));
   if (c.nextcase) o.nextcase = emitCase(c.nextcase);
   return o;
 }
@@ -820,11 +997,29 @@ function diffCase(A, B, deck, out) {
   B.cons.forEach((w) => kb.set(wkey(w, slotB, "b"), w));
   for (const [k, w] of kb) if (!ka.has(k)) out.push({ deck, kind: "wire+", text: `wired ${label(B, w)}` });
   for (const [k, w] of ka) if (!kb.has(k)) out.push({ deck, kind: "wire-", text: `unwired ${label(A, w)}` });
+
+  // synchros by the same STABLE pairing (a multiset — a duplicate synchro
+  // added or removed is reported once per copy)
+  const sA = A.syncs || [], sB = B.syncs || [];
+  if (!sA.length && !sB.length) return;
+  const skey = (s, slots, side) => {
+    const end = (idx) => (slots.has(idx) ? `#${slots.get(idx)}` : `${side}${JSON.stringify(idx)}`);
+    return `${end(s.src)} ${end(s.dest)}`;
+  };
+  const slabel = (c, s) => `${Number.isInteger(s.src) ? terminalName(c, s.src) : `?${s.src}`} before ${Number.isInteger(s.dest) ? terminalName(c, s.dest) : `?${s.dest}`}`;
+  const tally = (L, slots, side) => {
+    const m = new Map();
+    L.forEach((s) => { const k = skey(s, slots, side); if (!m.has(k)) m.set(k, []); m.get(k).push(s); });
+    return m;
+  };
+  const ta = tally(sA, slotA, "a"), tb = tally(sB, slotB, "b");
+  for (const [k, L] of tb) for (const s of L.slice((ta.get(k) || []).length)) out.push({ deck, kind: "sync+", text: `synchro added: ${slabel(B, s)}` });
+  for (const [k, L] of ta) for (const s of L.slice((tb.get(k) || []).length)) out.push({ deck, kind: "sync-", text: `synchro removed: ${slabel(A, s)}` });
 }
 
 /** Diff two flow bodies (objects or JSON strings) into a flat change list.
     Returns {changes:[{deck, kind, text}], counts:{added, removed, changed}}.
-    `kind` is one of op+/op-/op~/wire+/wire-/sig/deck+/deck-. */
+    `kind` is one of op+/op-/op~/wire+/wire-/sync+/sync-/sig/deck+/deck-. */
 function diffFlow(oldBody, newBody) {
   const A = parse(oldBody).root, B = parse(newBody).root;
   const chain = (c) => { const out = []; while (c) { out.push(c); c = c.nextcase; } return out; };

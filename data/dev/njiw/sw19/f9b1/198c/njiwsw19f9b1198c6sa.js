@@ -45,6 +45,10 @@ const GEO = {
   cylH: 0.5,
   flagH: 0.35,
   wireR: 0.035,
+  // SYNCHROS (S3): op-to-op handles at the icon's ends (sync-in left,
+  // sync-out right of any control tab), and the arrowhead mark that rides a
+  // synchro's midpoint — its pick surface (a straight link is not pickable)
+  syncR: 0.055, syncGap: 0.08, syncMarkR: 0.07, syncMarkH: 0.18,
   miniPad: 0.86,         // miniature fills this fraction of the glass box
 };
 
@@ -96,6 +100,32 @@ function terminalPos(c, idx, which, term, bars, deckZ) {
   if (!node) return null;
   const h = halfH(op.type);
   return { x: op.pos.x + (node.x || 0), y: op.pos.y + (which === "in" ? h : -h), z: op.pos.z + deckZ + GEO.sockZ };
+}
+
+/** Where an op's SYNCHRO handle sits, op-local (S3). A synchro joins two
+    OPS, never terminals: sync-in at the icon's left end, sync-out at its
+    right end (past a condition's control tab), both at mid-height on the
+    front edge — off the terminal/root rows, so the two link families never
+    share an anchor. */
+function syncHandleLocal(op, which) {
+  const W = opBox(op).x;
+  if (which === "in") return { x: -W / 2 - GEO.syncGap, y: 0, z: GEO.sockZ };
+  const tab = op && op.condition && op.condition.rule ? GEO.ctlS + 0.05 : 0;
+  return { x: W / 2 + tab + GEO.syncGap, y: 0, z: GEO.sockZ };
+}
+/** An op's sync handle in deck space (+ deckZ): which "in" | "out". */
+function syncHandlePos(c, idx, which, deckZ = 0) {
+  const op = c && c.cmds ? c.cmds[idx] : null;
+  if (!op || !op.pos) return null;
+  const l = syncHandleLocal(op, which);
+  return { x: op.pos.x + l.x, y: op.pos.y + l.y, z: (op.pos.z || 0) + deckZ + l.z };
+}
+/** Is synchro s drawable in case c (two different in-range ops)? Invalid
+    endpoints are diagnostic S-1 (flowdoc) — the view draws nothing. */
+function syncDrawable(c, s) {
+  const N = (c && c.cmds) ? c.cmds.length : 0;
+  return !!s && Number.isInteger(s.src) && Number.isInteger(s.dest) && s.src !== s.dest
+    && s.src >= 0 && s.dest >= 0 && s.src < N && s.dest < N;
 }
 
 function barGeometry(c) {
@@ -385,6 +415,7 @@ const SCENE_TOKENS = {
   shadow: ["--ground", "#171a1e"],
   next: ["--f-3d", "#62bd8c"], terminate: ["--danger", "#c15a5a"],
   fail: ["--f-js", "#ead16c"], finish: ["--f-css", "#56a3d9"],
+  sync: ["--f-data", "#a78bda"],       // synchros: op-to-op, data-less (S3)
 };
 
 /** The scene palette: every SCENE_TOKENS role resolved through read(name)
@@ -615,6 +646,18 @@ function toScene(rootCase, opts = {}) {
       for (const [term, n] of Object.entries(op.out))
         pushSocket(push, `${opId}/out/${term}`, opId, { x: n.x || 0, y: -h, z: GEO.sockZ }, n, editable,
           { role: "terminal", idx: i, which: "out", term }, pal);
+      // SYNCHRO handles (S3): a small diamond at each end of the icon in the
+      // sync colour — sync-in (left), sync-out (right). Draggable when
+      // editable: a drag from either end authors a synchro (owner's wiring
+      // rule). A read-only view draws only the handles a synchro anchors to.
+      for (const which of ["in", "out"]) {
+        if (!editable && !(c.syncs || []).some((s) => syncDrawable(c, s) && (which === "in" ? s.dest : s.src) === i)) continue;
+        push({ id: `${opId}/sync-${which}`, parent: opId, kind: "ico", pos: syncHandleLocal(op, which),
+          params: { radius: GEO.syncR, detail: 0 },
+          material: { color: pal.sync, flat: true },
+          affordances: editable ? { tap: true, hover: true, drag: { plane: "xy" } } : { hover: true },
+          meta: { role: "sync-handle", opIndex: i, which } });
+      }
     });
 
     if (active) {
@@ -639,6 +682,31 @@ function toScene(rootCase, opts = {}) {
           material: { color: pal.wire },
           affordances: { tap: true, hover: true },
           meta: { role: "wire", index: wi, con: wr } });
+      });
+
+      // SYNCHROS (S3): op-to-op and data-less, so never a hanging tube — a
+      // thin STRAIGHT link in the sync colour from the src's sync-out handle
+      // to the dest's sync-in handle (endpoints track, like every link),
+      // plus an arrowhead MARK at its midpoint pointing src → dest. The mark
+      // is the synchro's pick surface (straight links take no ray) and the
+      // body a run pulses. Invalid endpoints (flowdoc S-1) draw nothing.
+      (c.syncs || []).forEach((sy, k) => {
+        if (!syncDrawable(c, sy)) return;
+        const sid = `${prefix}/sync/${k}`;
+        const ends = { src: sy.src, dest: sy.dest };
+        push({ id: sid, kind: "link",
+          from: `${prefix}/op/${sy.src}/sync-out`, to: `${prefix}/op/${sy.dest}/sync-in`,
+          material: { color: pal.sync },
+          meta: { role: "sync", part: "line", index: k, sync: ends } });
+        const a = syncHandlePos(c, sy.src, "out"), b = syncHandlePos(c, sy.dest, "in");
+        const ang = Math.atan2(b.y - a.y, b.x - a.x);
+        push({ id: `${sid}/mark`, parent: deckId, kind: "cone",
+          pos: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 },
+          rot: { x: 0, y: 0, z: ang - Math.PI / 2 },   // the cone's apex (+y) → dest
+          params: { radius: GEO.syncMarkR, height: GEO.syncMarkH },
+          material: { color: pal.sync, emissive: true },
+          affordances: { tap: true, hover: true },
+          meta: { role: "sync", part: "mark", index: k, sync: ends } });
       });
 
       // a `next` rule's JUMP PIPE (§2.4): it rises out of the op's condition
@@ -759,5 +827,5 @@ function toSceneDoc(flow, { editable = false, activeDeck = 0, tokens = null } = 
   };
 }
 
-    Object.assign(me, { GEO, halfH, opBox, opLabel, scenePalette, SCENE_TOKENS, project, frontOrtho, terminalWorld, jumpPoints, wireCurvePoint, toScene, toSceneDoc });
+    Object.assign(me, { GEO, halfH, opBox, opLabel, scenePalette, SCENE_TOKENS, project, frontOrtho, terminalWorld, jumpPoints, wireCurvePoint, toScene, toSceneDoc, syncHandleLocal, syncHandlePos, syncDrawable });
   })();

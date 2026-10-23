@@ -216,16 +216,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fd1289c04a9ea8cb22300a459a72a385d7c73d3259e2ed7dcb2af674838cfa9"
 
 [[package]]
-name = "cmd"
-version = "0.1.0"
-dependencies = [
- "flowlang",
- "ndata",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "cocoa"
 version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -584,9 +574,9 @@ dependencies = [
 
 [[package]]
 name = "flowlang"
-version = "0.3.36"
+version = "0.3.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c698629d803fec3c68ec5cc30fc50dc37c81f4fa2d459ea0688d6f0761a8928"
+checksum = "2e6587d368f18e4716a6fae1fff6e97be6704aea7afd493418b292886e413e06"
 dependencies = [
  "deno_core",
  "jni 0.21.1",
@@ -1507,7 +1497,6 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 name = "newbound"
 version = "0.1.0"
 dependencies = [
- "cmd",
  "flowlang",
  "ndata",
  "newbound_core",

@@ -41,12 +41,68 @@ var ME = document.getElementById(me.UUID);
 
 var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   const { parse: parseFlow, propagationRounds, diffFlow } = document.querySelector('[data-control="dev:flowdoc"]').api;
-  const { toSceneDoc, terminalWorld, jumpPoints, GEO } = document.querySelector('[data-control="dev:flowproject"]').api;
+  const { toSceneDoc, terminalWorld, jumpPoints, GEO, syncHandlePos } = document.querySelector('[data-control="dev:flowproject"]').api;
   const { tidy, untangle } = document.querySelector('[data-control="dev:flowlayout"]').api;
 
   // ── backend plumbing (same ajax idiom as floweditor3d) ────────────────────
   const invokeP = (l2, c2, m2, a2) => new Promise((res2) => invokeCommand(l2, c2, m2, a2, res2));
   const codeCmd = (m2, a2) => invokeP("dev", "code", m2, a2);
+
+  // ── OLD RUNTIMES (synchros S3) ────────────────────────────────────────────
+  // A synchro is honored only by a flowlang that implements S1 (Case.syncs in
+  // Code::execute). Older interpreters — this instance's build, or any peer's —
+  // ignore the key SILENTLY and run the flow unsynchronized. S1 is unreleased
+  // as of this writing; 0.3.38 is verified synchro-less, so the first release
+  // that can carry it is 0.3.39. Set SYNC_MIN_FLOWLANG to the actual S1
+  // release when it ships.
+  const SYNC_MIN_FLOWLANG = "0.3.39";
+  const verParts = (v) => String(v || "").replace(/^[^0-9]*/, "").split(/[.+-]/).slice(0, 3).map((x) => parseInt(x, 10) || 0);
+  const verLess = (a, b) => { const A = verParts(a), B = verParts(b); for (let i = 0; i < 3; i++) if (A[i] !== B[i]) return A[i] < B[i]; return false; };
+  // dev.dev.crate_versions ONCE per mount (it reads every manifest), and only
+  // when the flow has synchros. The OLDEST flowlang pin across the manifests
+  // wins: a skewed build (mismatch) still links the older interpreter somewhere.
+  // Unreadable (non-admin, older host) = unknown = no warning.
+  let runtimeInfo = null;         // {flowlang, min, old, mismatch} | {unknown:true, msg}
+  let runtimeP = null;
+  function checkRuntime() {
+    if (!runtimeP) runtimeP = invokeP("dev", "dev", "crate_versions", {}).then((r) => {
+      const d = r && r.data && typeof r.data === "object" && "flowlang" in r.data ? r.data : r;
+      if (!d || d.status === "err" || typeof d.flowlang !== "string") {
+        runtimeInfo = { unknown: true, msg: String((d && d.msg) || "crate_versions unavailable") };
+        return runtimeInfo;
+      }
+      let fl = d.flowlang;
+      for (const m of Array.isArray(d.manifests) ? d.manifests : []) {
+        if (m && m.flowlang && (!fl || verLess(m.flowlang, fl))) fl = m.flowlang;
+      }
+      runtimeInfo = fl
+        ? { flowlang: fl, min: SYNC_MIN_FLOWLANG, old: verLess(fl, SYNC_MIN_FLOWLANG), mismatch: !!d.mismatch }
+        : { unknown: true, msg: "no flowlang pin found" };
+      return runtimeInfo;
+    }, (e) => (runtimeInfo = { unknown: true, msg: String(e && e.message ? e.message : e) }));
+    return runtimeP;
+  }
+  // synchros in a WHOLE flow (default: the working doc): every case of every
+  // chain, locals included. A raw body works too (the saved snapshot).
+  function flowSyncCount(root) {
+    let n = 0;
+    const visit = (c) => {
+      for (; c && typeof c === "object"; c = c.nextcase) {
+        n += Array.isArray(c.syncs) ? c.syncs.length : 0;
+        (Array.isArray(c.cmds) ? c.cmds : []).forEach((op) => { if (op && op.localdata) visit(op.localdata); });
+      }
+    };
+    visit(root !== undefined ? root : (doc && doc.root));
+    return n;
+  }
+  // the warning, or null: the flow has synchros AND the runtime predates S1.
+  // n overrides the count (a live run counts the SAVED body - what it runs).
+  function runtimeWarning(n) {
+    if (typeof n !== "number") n = flowSyncCount();
+    if (!n || !runtimeInfo || !runtimeInfo.old) return null;
+    return { n, flowlang: runtimeInfo.flowlang, min: SYNC_MIN_FLOWLANG,
+      text: `this flow has ${n} synchro${n === 1 ? "" : "s"}, but this instance runs flowlang ${runtimeInfo.flowlang} (synchros need ≥ ${SYNC_MIN_FLOWLANG}, S1): it will run UNSYNCHRONIZED — older interpreters and peers ignore syncs silently` };
+  }
   const writeFlowBody = (l2, c2, m2, b2, { base = "", label = "" } = {}) =>
     codeCmd("write_flow_body", { lib: l2, ctl: c2, cmd: m2, body: b2, base, label, author: "", nn_sessionid: "" });
   const readFlowBody = (l2, c2, m2) => codeCmd("read_flow_body", { lib: l2, ctl: c2, cmd: m2 });
@@ -136,6 +192,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   let ghostIds = [];              // facade ghost specs (tip + hang link)
   let selWire = null;             // a selected wire's cons index (for Del)
   let selWireRef = null;          // ...and the cons OBJECT, so the selection survives re-indexing
+  // a selected SYNCHRO (S3): its syncs index, the sync OBJECT (survives
+  // re-indexing, like selWireRef) and the case it belongs to (a deck switch
+  // or drill drops it). One selection at a time: op XOR wire XOR synchro.
+  let selSync = null, selSyncRef = null, selSyncCase = null;
 
   // ── P3: authoring + save state ────────────────────────────────────────────
   let dirty = false, saving = false, baseHash = "", pendingLabels = [];
@@ -237,7 +297,15 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     pushJournal("redo " + (cmd.label || ""));
     afterMutation();
   }
-  function afterMutation() { reconcileFocus(); reconcileSelWire(); cancelWireGhost(); renderAll(); refreshSaveUi(); renderChanges(); refreshInspector(); }
+  function afterMutation() { reconcileFocus(); reconcileSelWire(); reconcileSelSync(); cancelWireGhost(); renderAll(); refreshSaveUi(); renderChanges(); refreshInspector(); }
+  // the synchro twin: follow the selected sync OBJECT to its new index in
+  // the SAME case, else drop it (deleted, undone, or another deck in focus)
+  function reconcileSelSync() {
+    if (selSync == null) return;
+    const c = focusedCase();
+    const i = c && c === selSyncCase && selSyncRef && Array.isArray(c.syncs) ? c.syncs.indexOf(selSyncRef) : -1;
+    if (i >= 0) selSync = i; else { selSync = null; selSyncRef = null; selSyncCase = null; }
+  }
   // a mutation can re-index cons (removeWire/removeOp/undo): follow the
   // selected wire OBJECT to its new index, or drop the selection if it is gone
   function reconcileSelWire() {
@@ -256,6 +324,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
   // ── facade: project the derived scene facet onto the stage ────────────────
   function renderFacade() {
+    reconcileSelSync();                       // a deck switch / drill drops it
     // colours follow the live bench tokens (app:tokens) — the dev app's theme
     const tokens = (n) => getComputedStyle(ME).getPropertyValue(n);
     const sceneDoc = toSceneDoc(focusRoot(), { editable: true, activeDeck, tokens });
@@ -282,6 +351,20 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
           s.meta = { ...n.meta, selected: true };
         }
       }
+      // SYNCHROS (S3): no instance hosts a synchro either — its midpoint
+      // MARK stays tappable (onSceneTap → selectSync) and its op-end HANDLES
+      // stay tappable + draggable (onSceneDrag → onSyncDrag, from either
+      // end). The selected synchro draws its line + mark in the selection
+      // colour, the mark enlarged.
+      if (n.meta && n.meta.role === "sync-handle") s.affordances = { tap: true, hover: true, drag: { plane: "xy" } };
+      if (n.meta && n.meta.role === "sync") {
+        if (n.meta.part === "mark") s.affordances = { tap: true, hover: true };
+        if (selSync != null && n.meta.index === selSync) {
+          s.material = { ...(n.material || {}), color: selColor };
+          if (n.meta.part === "mark") s.scale = { x: 1.6, y: 1.6, z: 1.6 };
+          s.meta = { ...n.meta, selected: true };
+        }
+      }
       s.params = n.params || (n.text ? n.text : undefined);
       return s;
     });
@@ -295,7 +378,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const hostOwned = stage.objects
       ? [...stage.objects.values()].filter((o) => o && o.spec && !String(o.spec.id).startsWith("fx_")).map((o) => o.spec)
       : [];
-    stage.setScene(specs.concat(ghostSpecs(), hostOwned), { lights: "default", grid: false, camera: null });
+    stage.setScene(specs.concat(ghostSpecs(), syncGhostSpecs(), hostOwned), { lights: "default", grid: false, camera: null });
     styleFacadeLabels();
     return sceneDoc;
   }
@@ -565,7 +648,110 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   function showGhost(at) { ghostTip = at; syncGhost(); }
   function moveGhost(at) { ghostTip = at; if (armSrc || wireMode) syncGhost(); }
-  function cancelWireGhost() { armSrc = null; wireMode = null; ghostTip = null; syncGhost(); if (hostApi) hostApi.setState("wireSrc", null); }
+  function cancelWireGhost() { armSrc = null; wireMode = null; ghostTip = null; syncGhost(); cancelSyncGesture(); if (hostApi) hostApi.setState("wireSrc", null); }
+
+  // ── synchro authoring (S3): drag between sync handles, from EITHER end ──
+  // The handles are facade nodes (no instance hosts them), so their drags
+  // arrive via host.state.onSceneDrag → onSceneDrag → onSyncDrag, exactly as
+  // a bar socket's do. Grab a sync-out (◆ right end) and drop on another
+  // op's sync-in (◆ left end) — or the reverse; dropping on the other op's
+  // BODY also counts. FlowDoc.canSync refuses self, duplicates and any
+  // synchro that would close a cycle over wires + synchros (I-2: the case
+  // would stall); FlowDoc.addSync is the ONE undoable mutation, journaled by
+  // commitApplied and written by the normal save. The ghost is a straight
+  // sync-coloured link from the grabbed handle to the pointer.
+  let armSync = null;             // {idx, which, key} while a synchro drag is live
+  let syncTip = null;
+  function syncColorOf() { const v = getComputedStyle(ME).getPropertyValue("--f-data").trim(); return /^#[0-9a-f]{3,8}$/i.test(v) ? v : "#a78bda"; }
+  function syncGhostSpecs() {
+    if (!armSync) return [];
+    const c = focusedCase(); if (!c) return [];
+    const col = syncColorOf();
+    const at = syncTip || syncHandlePos(c, armSync.idx, armSync.which) || { x: 0, y: 0, z: 0 };
+    const hid = armSync.key || `fx_${slug(`d${activeDeck}/op/${armSync.idx}/sync-${armSync.which}`)}`;
+    const tip = { id: "fx_ghostsynctip", kind: "ico", pos: { x: at.x, y: at.y, z: at.z },
+      params: { radius: GEO.syncR || 0.055, detail: 0 }, material: { color: col, emissive: true } };
+    const link = armSync.which === "out"
+      ? { id: "fx_ghostsync", kind: "link", from: hid, to: "fx_ghostsynctip", material: { color: col } }
+      : { id: "fx_ghostsync", kind: "link", from: "fx_ghostsynctip", to: hid, material: { color: col } };
+    return [tip, link];
+  }
+  function drawSyncGhost() {
+    if (!stage) return;
+    const g = syncGhostSpecs();
+    if (g.length) { for (const s of g) stage.upsert(s); }
+    else { stage.removeObject("fx_ghostsync"); stage.removeObject("fx_ghostsynctip"); }
+  }
+  function cancelSyncGesture() { if (!armSync && !syncTip) return; armSync = null; syncTip = null; drawSyncGhost(); }
+  // the op whose `which` sync handle (or body) is under the pointer: a picked
+  // handle / op body first, else the nearest such handle within DROP_PX on
+  // screen (DROP_WORLD headless)
+  function syncHandleAt(c, evt, which) {
+    if (!c || !evt) return null;
+    const hasClient = typeof evt.clientX === "number" && typeof evt.clientY === "number";
+    if (hasClient && stage && stage.pickAt) {
+      const id = String(stage.pickAt(evt.clientX, evt.clientY) || "");
+      const sh = syncHandleOfSpec(id);
+      if (sh && sh.which === which) return sh.idx;
+      const m = /^d(\d+)_op(\d+)(?::body)?$/.exec(id);
+      if (m && +m[1] === activeDeck && c.cmds[+m[2]]) return +m[2];
+    }
+    const screen = hasClient && stage && stage.anchor && stage.canvas;
+    const r = screen ? stage.canvas.getBoundingClientRect() : null;
+    const pt = screen ? null : dragPoint(evt);
+    let best = null, bd = Infinity;
+    c.cmds.forEach((op, i) => {
+      const w = syncHandlePos(c, i, which); if (!w) return;
+      let d;
+      if (screen) { const a = stage.anchor(w); if (!a.visible) return; d = Math.hypot(a.x - (evt.clientX - r.left), a.y - (evt.clientY - r.top)) / DROP_PX; }
+      else if (pt) d = Math.hypot(w.x - pt.x, w.y - pt.y) / DROP_WORLD;
+      else return;
+      if (d < bd) { bd = d; best = i; }
+    });
+    return bd <= 1 ? best : null;
+  }
+  // p: {phase, key (the grabbed handle's facade spec id), idx, which, evt}
+  function onSyncDrag(p) {
+    const c = focusedCase(); if (!c || !p) return;
+    const evt = p.evt || {};
+    if (p.phase === "start") {
+      if (running || !c.cmds[p.idx] || (p.which !== "in" && p.which !== "out")) return;
+      if (armSrc || wireMode) cancelWireGhost();
+      armSync = { idx: p.idx, which: p.which, key: p.key || null };
+      if (selWire != null || selSync != null) { selWire = null; selWireRef = null; selSync = null; selSyncRef = null; selSyncCase = null; }
+      syncTip = dragPoint(evt) || syncHandlePos(c, p.idx, p.which);
+      drawSyncGhost();
+      status(`synchronizing ${nameOf(c, p.idx)} — drag to another op's ${p.which === "out" ? "sync-in (left ◆)" : "sync-out (right ◆)"} and release (Esc cancels)`, "ok");
+      return;
+    }
+    if (!armSync || (p.key && armSync.key && p.key !== armSync.key)) return;
+    const fromOut = armSync.which === "out";
+    const want = fromOut ? "in" : "out";
+    const there = syncHandleAt(c, evt, want);
+    const tgt = there === armSync.idx ? null : there;   // its own op: no target (not a refusal)
+    const src = tgt == null ? null : (fromOut ? armSync.idx : tgt);
+    const dest = tgt == null ? null : (fromOut ? tgt : armSync.idx);
+    const chk = tgt == null ? null : doc.canSync(c, src, dest);
+    const sl = tgt == null ? "" : `${nameOf(c, src)} → ${nameOf(c, dest)}`;
+    if (p.phase === "move") {
+      syncTip = (chk && chk.ok && syncHandlePos(c, tgt, want)) || dragPoint(evt) || syncTip;
+      drawSyncGhost();
+      if (tgt == null) status(`synchronizing ${nameOf(c, armSync.idx)} — drag to another op's sync handle and release (Esc cancels)`, "ok");
+      else if (chk.ok) status(`release to synchronize ${sl}`, "ok");
+      else status("✗ " + chk.reason, "bad");
+      return;
+    }
+    if (p.phase !== "end") return;
+    cancelSyncGesture();
+    if (tgt == null) return status("synchro cancelled — release over another op's sync handle to synchronize");
+    if (!chk.ok) { status("✗ synchro refused: " + chk.reason, "bad"); lastSyncRefusal = chk.reason; return; }
+    const cmd = doc.addSync(c, src, dest);
+    if (!cmd || cmd.error) { lastSyncRefusal = (cmd && cmd.error) || "refused"; return status("synchro refused: " + lastSyncRefusal, "bad"); }
+    if (!commitApplied(cmd)) return;
+    lastSyncRefusal = null;
+    status(`synchronized ${sl} — ${nameOf(c, src)} finishes before ${nameOf(c, dest)} starts · ⌘Z undoes`, "ok");
+  }
+  let lastSyncRefusal = null;
 
   // the front-ortho client→world projection (headless fallback for a drag
   // point, and an op-drag end that carries no plane delta)
@@ -653,24 +839,76 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       return null;
     }
     selWire = i; selWireRef = c.cons[i];
+    selSync = null; selSyncRef = null; selSyncCase = null;
     if (hostApi && hostApi.state && hostApi.state.selectedKey) hostApi.setState("selectedKey", null);
     renderFacade(); renderInspector(null);
     const w = c.cons[i];
     status(`wire ${nameOf(c, w.src[0])}.${w.src[1]} → ${nameOf(c, w.dest[0])}.${w.dest[1]} selected — Del unwires`, "ok");
     return i;
   }
+  // ── synchros (S3): select by the midpoint mark, Del removes ─────────────
+  // The mark's facade spec carries meta {role:"sync", part:"mark", index};
+  // the id fallback is the slug fx_d<deck>_sync_<k>_mark (headless stage).
+  function syncIndexOfSpec(specId) {
+    if (!specId) return null;
+    const o = stage && stage.objects && stage.objects.get ? stage.objects.get(specId) : null;
+    const m = o && o.spec && o.spec.meta;
+    if (m && m.role === "sync" && typeof m.index === "number") return m.index;
+    const r = /^fx_d(\d+)_sync_(\d+)(?:_mark)?$/.exec(String(specId));
+    return r && +r[1] === activeDeck ? +r[2] : null;
+  }
+  function syncHandleOfSpec(specId) {
+    const o = specId && stage && stage.objects && stage.objects.get ? stage.objects.get(specId) : null;
+    const m = o && o.spec && o.spec.meta;
+    if (m && m.role === "sync-handle" && typeof m.opIndex === "number") return { idx: m.opIndex, which: m.which };
+    const r = /^fx_d(\d+)_op_(\d+)_sync_(in|out)$/.exec(String(specId || ""));
+    return r && +r[1] === activeDeck ? { idx: +r[2], which: r[3] } : null;
+  }
+  function syncText(c, s) { return `${nameOf(c, s.src)} → ${nameOf(c, s.dest)}`; }
+  // select synchro k of the focused case (null/absent clears). ONE selection.
+  function selectSync(k) {
+    const c = focusedCase();
+    if (k == null || !c || !Array.isArray(c.syncs) || !c.syncs[k]) {
+      const had = selSync != null;
+      selSync = null; selSyncRef = null; selSyncCase = null;
+      if (had) renderFacade();
+      refreshInspector();
+      return null;
+    }
+    selSync = k; selSyncRef = c.syncs[k]; selSyncCase = c;
+    selWire = null; selWireRef = null;
+    if (hostApi && hostApi.state && hostApi.state.selectedKey) hostApi.setState("selectedKey", null);
+    renderFacade(); renderInspector(null);
+    status(`synchro ${syncText(c, c.syncs[k])} selected — Del removes it`, "ok");
+    return k;
+  }
+  function deleteSelectedSync() {
+    const c = focusedCase(); if (!c) return;
+    if (selSync == null) return status("select a synchro first (click its arrow)", "bad");
+    const cmd = doc.removeSync(c, selSync);
+    if (!cmd || cmd.error) return status((cmd && cmd.error) || "unsync refused", "bad");
+    if (!commitApplied(cmd)) return;
+    selSync = null; selSyncRef = null; selSyncCase = null;
+    status("synchro removed — ⌘Z undoes", "ok");
+  }
   function onSceneTap(specId) {
-    if (armSrc || wireMode) return;            // mid wiring gesture: not a selection
+    if (armSrc || wireMode || armSync) return;  // mid wiring/synchro gesture: not a selection
     const bt = barTermOfSpec(specId);          // a bar socket: the same hint as an op's
     if (bt) { onPortTap({ node: bt.which + "0" }); return; }
     const wi = wireIndexOfSpec(specId);
     if (wi != null) { selectWire(wi); return; }
+    const si = syncIndexOfSpec(specId);
+    if (si != null) { selectSync(si); return; }
+    if (syncHandleOfSpec(specId)) { status("drag from a synchro handle (◆) to another op's handle to synchronize them", "ok"); return; }
     if (specId == null && selWire != null) selectWire(null);   // background tap drops it
+    if (specId == null && selSync != null) selectSync(null);
   }
   // drags no hosted instance claims (host.state.onSceneDrag): a bar socket's
   // drag is a wiring gesture — handed to onSocketDrag exactly as flownode
   // hands it an op socket's (the facade spec id is both key and ghost end)
   function onSceneDrag(evt) {
+    const sh = evt && syncHandleOfSpec(evt.id);
+    if (sh) { onSyncDrag({ phase: evt.type || evt.phase, key: evt.id, idx: sh.idx, which: sh.which, evt }); return; }
     const bt = evt && barTermOfSpec(evt.id); if (!bt) return;
     onSocketDrag({ phase: evt.type, key: evt.id, sock: evt.id, opIndex: bt.idx, which: bt.which, term: bt.term, evt });
   }
@@ -694,8 +932,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   function deleteSelection() {
     if (armSrc || wireMode) return status("finish or Esc the wiring first", "bad");
     if (selWire != null) return deleteSelectedWire();
+    if (selSync != null) return deleteSelectedSync();
     if (selectedOpIndex() != null) return deleteSelectedOp();
-    status("select an op or a wire first (click it)", "bad");
+    status("select an op, a wire or a synchro first (click it)", "bad");
   }
 
   // ── render: facade + instances + chrome ───────────────────────────────────
@@ -769,7 +1008,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   function drillTo(k) { focusPath = focusPath.slice(0, k + 1); activeDeck = 0; cancelWireGhost(); renderAll(); }
   function drillBack() { if (focusPath.length > 1) { focusPath.pop(); activeDeck = 0; cancelWireGhost(); renderAll(); } }
-  function clearSelection() { if (hostApi) hostApi.setState("selectedKey", null); const had = selWire != null; selWire = null; selWireRef = null; if (had) renderFacade(); renderInspector(null); }
+  function clearSelection() { if (hostApi) hostApi.setState("selectedKey", null); const had = selWire != null || selSync != null; selWire = null; selWireRef = null; selSync = null; selSyncRef = null; selSyncCase = null; if (had) renderFacade(); renderInspector(null); }
 
   function setProj(mode) {
     projMode = mode;
@@ -803,6 +1042,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const box = $(".fe-diag"), list = $(".fe-diag-list"); if (!box || !list || !doc) return;
     const path = focusedPath();
     lastDiags = path ? doc.diagnosticsFor(path) : [];
+    // OLD RUNTIMES: a flow-wide warn row while the flow has synchros and the
+    // instance's flowlang predates S1. The first render with synchros asks
+    // crate_versions (once) and re-renders when it answers.
+    const rw = runtimeWarning();
+    if (rw) lastDiags = lastDiags.concat([{ code: "RT", severity: "warn", message: rw.text, runtime: true }]);
+    else if (!runtimeP && flowSyncCount()) checkRuntime().then(() => { if (runtimeWarning()) renderDiagnostics(); });
     list.replaceChildren();
     box.hidden = !lastDiags.length;
     for (const d of lastDiags) {
@@ -952,6 +1197,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         `<p class="fe-empty"><kbd>Del</kbd> unwires · click a palette op to <b>splice</b> it into this wire</p>`;
       const btns = edBtns(body);
       edButton(btns, "unwire", "fe-del fe-unwire danger", deleteSelectedWire);
+      return;
+    }
+    // a synchro (S3): same one-selection rule — an op key alongside wins
+    if (selSync != null && key) { selSync = null; selSyncRef = null; selSyncCase = null; renderFacade(); }
+    if (selSync != null) {
+      const c = focusedCase(); const s = c && Array.isArray(c.syncs) && c.syncs[selSync];
+      if (!s) { selSync = null; selSyncRef = null; selSyncCase = null; body.innerHTML = ""; return; }
+      body.innerHTML = `<p class="fe-ed-head"><b>synchro</b> ${esc(syncText(c, s))}</p>` +
+        `<p class="fe-empty">${esc(nameOf(c, s.src))} must finish before ${esc(nameOf(c, s.dest))} starts — no data flows. <kbd>Del</kbd> removes it</p>`;
+      const btns = edBtns(body);
+      edButton(btns, "unsync", "fe-del fe-unsync danger", deleteSelectedSync);
       return;
     }
     const m = key && /^d(\d+)_op(\d+)$/.exec(key);
@@ -1433,11 +1689,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   // animate ONE case: its wires round by round (sched is already cut at the
   // rule's op), then the jump legs as two more rounds — on its own clock id.
+  // SYNCHROS (S3): each fired synchro PULSES — one sync-coloured token rides
+  // its straight link in the round its src completes (sched.syncRounds,
+  // parallel to rounds; a round may carry only synchros).
   async function animateSegment(c, sched, jumpOp, dur, reduced) {
     const rid = ++runSeq;
     const { rounds, unreached } = sched;
+    const syncRounds = sched.syncRounds || [];
+    const nRounds = Math.max(rounds.length, syncRounds.length);
     const legs = jumpOp == null ? [] : jumpLegs(c, jumpOp);
-    const expected = rounds.reduce((n, r) => n + r.length, 0) + legs.length;
+    const nSync = syncRounds.reduce((n, r) => n + r.length, 0);
+    const expected = rounds.reduce((n, r) => n + r.length, 0) + nSync + legs.length;
     const started = performance.now();
     const delivered = [], keys = [];
     if (!expected) {                           // nothing travels: let the case be seen
@@ -1452,8 +1714,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       if (delivered.length >= expected) finish(true);
     });
     try {
-      for (let r = 0; r < rounds.length; r++) {
-        for (const k of rounds[r]) {
+      const syncTint = syncColorOf();
+      for (let r = 0; r < nRounds; r++) {
+        for (const k of rounds[r] || []) {
           const w = c.cons[k]; if (!w) continue;
           const key = `run${rid}_w${k}`;
           await hostApi.addControl("dev", "flowtoken", {
@@ -1463,20 +1726,35 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
           }, key);
           keys.push(key);
         }
+        for (const j of syncRounds[r] || []) {
+          const s = (c.syncs || [])[j]; if (!s) continue;
+          const key = `run${rid}_s${j}`;
+          await hostApi.addControl("dev", "flowtoken", {
+            runId: rid, k: "sync" + j, round: r, dur, reduced, straight: true, tint: syncTint,
+            wire: "fx_" + slug(`d${activeDeck}/sync/${j}`),
+            from: syncHandlePos(c, s.src, "out"), to: syncHandlePos(c, s.dest, "in"),
+          }, key);
+          keys.push(key);
+        }
       }
       for (let j = 0; j < legs.length; j++) {
         const key = `run${rid}_j${j}`;
-        await hostApi.addControl("dev", "flowtoken", Object.assign({ runId: rid, k: "jump" + j, round: rounds.length + j, dur, reduced }, legs[j]), key);
+        await hostApi.addControl("dev", "flowtoken", Object.assign({ runId: rid, k: "jump" + j, round: nRounds + j, dur, reduced }, legs[j]), key);
         keys.push(key);
       }
       // every token is booted — start the ONE clock they all ride
       hostApi.setState("run", { id: rid, t0: performance.now() });
-      const budget = ((rounds.length + legs.length) * dur + 3) * 1000;
+      const budget = ((nRounds + legs.length) * dur + 3) * 1000;
       const complete = await Promise.race([allDone, new Promise((res) => setTimeout(() => res(false), budget))]);
       const wires = delivered.filter((d) => typeof d.k === "number");
+      const pulses = delivered.filter((d) => typeof d.k === "string" && d.k.startsWith("sync"));
       const A = auditRun(rid, rounds, unreached, wires, !!complete, Math.round(performance.now() - started));
       A.skipped = sched.skipped || [];
-      A.jumped = legs.length > 0 && delivered.length - wires.length === legs.length;
+      A.jumped = legs.length > 0 && delivered.filter((d) => typeof d.k === "string" && d.k.startsWith("jump")).length === legs.length;
+      A.syncRounds = syncRounds;
+      A.syncsPulsed = pulses.map((d) => +d.k.slice(4));
+      A.syncsInRound = pulses.every((d) => (syncRounds[d.round] || []).includes(+d.k.slice(4)));
+      A.syncsUnreached = sched.syncsUnreached || [];
       A.tokensHosted = keys.length;
       return A;
     } finally {
@@ -1566,10 +1844,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         h += `<p class="fe-run-case"><b>case ${s.deck + 1}</b> <span class="lbl">${how}</span></p>`;
       }
       h += `<ul class="fe-run-list">`;
-      (s.rounds || []).forEach((round, r) => { h += `<li><span class="rd">${r + 1}</span>${round.map((k) => wl(c, k)).join(" · ")}</li>`; });
+      const sr = s.syncRounds || [];
+      const sl = (j) => { const y = c && (c.syncs || [])[j]; return `<span class="fe-run-sync">${esc(y ? `${nameOf(c, y.src)} ⇢ ${nameOf(c, y.dest)}` : `synchro ${j}`)} (synchro)</span>`; };
+      for (let r = 0; r < Math.max((s.rounds || []).length, sr.length); r++) {
+        const parts = ((s.rounds || [])[r] || []).map((k) => wl(c, k)).concat((sr[r] || []).map(sl));
+        h += `<li><span class="rd">${r + 1}</span>${parts.join(" · ")}</li>`;
+      }
       if (s.jumped) h += `<li><span class="rd">↳</span>jump pipe → case ${s.deck + 2}</li>`;
       h += `</ul>`;
       if (s.unreached && s.unreached.length) h += `<p class="fe-empty">never fires (I-1/I-2): ${s.unreached.map((k) => wl(c, k)).join(" · ")}</p>`;
+      if (s.syncsUnreached && s.syncsUnreached.length) h += `<p class="fe-empty">synchro never fires (its src never completes): ${s.syncsUnreached.map(sl).join(" · ")}</p>`;
     });
     if (R.untraced) h += `<p class="fe-empty">no case path (${esc(R.untraced)}): showing case 1's schedule only</p>`;
     for (const note of R.notes || []) h += `<p class="fe-empty">${esc(note)}</p>`;
@@ -1646,6 +1930,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const runBtn = $(".fe-run");
     const busy = () => { if (runBtn) { runBtn.disabled = true; runBtn.classList.add("running"); runBtn.textContent = "running…"; } };
     busy();
+    // a flow with synchros: know the runtime BEFORE the run reports (cached).
+    // The server runs the SAVED body, so ITS synchros are the ones ignored.
+    let savedSyncs; try { savedSyncs = flowSyncCount(JSON.parse(savedBody)); } catch (e) { savedSyncs = flowSyncCount(); }
+    if (savedSyncs || flowSyncCount()) { try { await checkRuntime(); } catch (e) {} }
     status(`running ${src.cmd}…`);
     const started = performance.now();
     const settle = (p) => p.then((r) => r || { status: "err", msg: "no response" }, (e) => ({ status: "err", msg: String(e && e.message ? e.message : e) }));
@@ -1677,11 +1965,15 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // a server panic arrives as an HTML 500 page in msg; show its words
     const rawMsg = String(r.msg == null ? "" : r.msg);
     const msg = /^\s*</.test(rawMsg) ? rawMsg.replace(/<title>[\s\S]*?<\/title>/i, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : rawMsg;
+    const rw = runtimeWarning(savedSyncs);
     lastResult = { args, ok, result: r, msg, ms, unsaved, source: src, path, untraced,
+      unsynchronized: rw ? { flowlang: rw.flowlang, min: rw.min, syncs: rw.n, text: rw.text } : null,
       tokens: R ? { complete: !!R.complete, inOrder: !!R.inOrder, delivered: R.delivered.length } : null };
     const via = untraced ? " · no case path" : (R && R.segments && R.segments.length ? ` · ${pathText(R.segments)}` : "");
-    pushJournal(ok ? `ran ${src.cmd}${via} · ${ms}ms` : `run failed: ${msg}`);
-    if (ok) status(`ran${via} · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} ${R.delivered.length === 1 ? "delivery" : "deliveries"} in order` : ""), "ok");
+    const unsync = rw ? ` · UNSYNCHRONIZED (flowlang ${rw.flowlang} ignores synchros)` : "";
+    pushJournal(ok ? `ran ${src.cmd}${via} · ${ms}ms${unsync}` : `run failed: ${msg}${unsync}`);
+    if (ok && rw) status(`ran UNSYNCHRONIZED — flowlang ${rw.flowlang} ignores synchros · ${ms}ms`, "warn");
+    else if (ok) status(`ran${via} · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} ${R.delivered.length === 1 ? "delivery" : "deliveries"} in order` : ""), "ok");
     else status(`run failed: ${msg}`, "bad");
     renderRunResult(lastResult, R);
     return lastResult;
@@ -1695,6 +1987,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     h += `<pre class="fe-run-pre${L.ok ? "" : " bad"}">${esc(typeof shown === "string" ? shown : JSON.stringify(shown, null, 1))}</pre>`;
     h += `<p class="fe-run-note">args: ${esc(JSON.stringify(L.args))} — the tokens replay the propagation ORDER; per-wire values aren't reported by the platform.</p>`;
     if (L.unsaved) h += `<p class="fe-empty">ran the SAVED body — ${L.unsaved} unsaved change${L.unsaved === 1 ? "" : "s"} not included; save to run them</p>`;
+    if (L.unsynchronized) h += `<p class="fe-run-unsync">⚠ ran UNSYNCHRONIZED: flowlang ${esc(L.unsynchronized.flowlang)} predates synchros (need ≥ ${esc(L.unsynchronized.min)}), so the server ignored this flow's ${L.unsynchronized.syncs} synchro${L.unsynchronized.syncs === 1 ? "" : "s"}. The replay below draws the order the synchros ASK for, not the order that ran.</p>`;
     if (R && R.rounds) h += runRoundsHtml(R);
     body.innerHTML = h;
   }
@@ -1922,7 +2215,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       });
       hostEl.addEventListener("click", (e) => {
         const d = bgDown; bgDown = null;
-        if (!d || selWire == null) return;
+        if (!d || (selWire == null && selSync == null)) return;
         if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) return;
         onSceneTap(null);
       });
@@ -2009,8 +2302,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         else if (e.key === "w" || e.key === "W") { e.preventDefault(); startKeyboardWiring(); }
         else if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSelection(); }
         else if (e.key === "Escape") {
-          const hasSel = (hostApi && hostApi.state && hostApi.state.selectedKey) || selWire != null;
+          const hasSel = (hostApi && hostApi.state && hostApi.state.selectedKey) || selWire != null || selSync != null;
           if (armSrc) { cancelWireGhost(); status("wiring cancelled"); }
+          else if (armSync) { cancelSyncGesture(); status("synchro cancelled"); }
           else if (focusPath.length > 1) drillBack();
           else if (hasSel || harness || typeof PROPS.onBack !== "function") clearSelection();
           else PROPS.onBack();
@@ -2052,6 +2346,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         opAt: (i) => { const c = focusedCase(); return c && c.cmds[i] ? JSON.parse(JSON.stringify(c.cmds[i])) : null; },
         opCount: () => { const c = focusedCase(); return c ? c.cmds.length : 0; },
         selectWire, selectedWire: () => selWire, sceneTap: onSceneTap, opSelect: onOpSelect, deleteSelectedWire, deleteSelection,
+        // Synchros S3 surface
+        selectSync, selectedSync: () => selSync, deleteSelectedSync,
+        syncDrag: onSyncDrag, sceneDrag: onSceneDrag, lastSyncRefusal: () => lastSyncRefusal, syncArmed: () => !!armSync,
+        syncs: () => { const c = focusedCase(); return c && Array.isArray(c.syncs) ? c.syncs.map((s) => ({ src: s.src, dest: s.dest })) : []; },
         // P5 step 4 surface (op / terminal / signature editor)
         refreshInspector, inspTerm: () => inspTerm,
         editTerm: (key, idx, which, term) => { inspTerm = { key, idx, which, term }; refreshInspector(); },
@@ -2062,6 +2360,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         source: () => source, baseHash: () => baseHash, harness: () => harness, titleText: () => $(".fe-title").textContent,
         // P4 surface
         runFlow, lastRun: () => lastRun, running: () => running,
+        // S3 old-runtimes surface
+        checkRuntime, runtime: () => runtimeInfo, runtimeWarning, syncCount: flowSyncCount, syncMinFlowlang: SYNC_MIN_FLOWLANG,
         // P5 run parity surface
         startRun, runLive, lastResult: () => lastResult, liveCall: () => liveCall, coerceArg,
         rounds: () => propagationRounds(focusedCase()), dryPlan, livePlan,
