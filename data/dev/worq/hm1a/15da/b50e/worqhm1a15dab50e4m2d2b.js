@@ -2090,6 +2090,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (dbg.busy) return null;
     if (dbg.st && dbg.st.running && mode !== "pause") { status("debug: a continue is running — pause first", "bad"); return null; }
     const d = dbg; d.busy = true;
+    if (mode !== "pause") d.follow = true;     // D3: a frame focused in the stack holds only until the next move
     const prevEv = d.st ? d.st.event : null;   // the event a back(1) undoes
     try {
       const r = await FD.client.step(d.session, mode, pick || {});
@@ -2135,6 +2136,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const moved = d.follow ? debugFollow() : false;
     if (moved) renderAll(); else { syncDebugState(); renderFacade(); }
     renderDebugBar();
+    refreshInspector();
     return st;
   }
   // follow the TOP frame: drill to the deepest frame the editor holds (a
@@ -2268,7 +2270,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (dbgPollT) { clearTimeout(dbgPollT); dbgPollT = null; }
     ME.classList.remove("fe-debugging");
     renderDebugBar();
-    if (!disposed && hostApi) { syncDebugState(); renderFacade(); }
+    if (!disposed && hostApi) { syncDebugState(); renderFacade(); refreshInspector(); }
     status(why ? "debug: " + why : "debug session stopped — edits unlocked", why ? "bad" : "ok");
   }
   // a ready item in words, named in the top frame's case
@@ -2884,6 +2886,23 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         debugFacade: () => lastFacadeDbg.slice(),
         debugBarText: () => { const b = $(".fe-dbg"); return b && !b.hidden ? { pos: $(".fe-dbg-pos").textContent, ev: $(".fe-dbg-ev").textContent } : null; },
         focus: () => ({ depth: focusPath.length, deck: activeDeck, titles: focusPath.map((f) => f.title) }),
+        // D3 inspector surface
+        debugFocusFrame, debugFollowNow,
+        debugInspector: () => (dbgInsp ? JSON.parse(JSON.stringify(dbgInsp)) : null),
+        debugInspectorDom: () => {
+          const body = $(".fe-inspect-body"); if (!body || !dbgActive()) return null;
+          const rows = (sel) => { const t = body.querySelector(sel); return t ? Array.from(t.querySelectorAll("tr")).map((tr) => { const td = tr.querySelectorAll("td"); return { term: tr.dataset.term, v: td[1] ? td[1].textContent : "", mark: td[2] ? td[2].textContent : null }; }) : null; };
+          const sel = body.querySelector(".fe-dbgi-sel");
+          return {
+            head: (body.querySelector(".fe-dbgi-head") || {}).textContent || "",
+            frames: Array.from(body.querySelectorAll(".fe-dbgi-frame")).map((li) => ({ fi: +li.dataset.fi, text: li.textContent, focused: li.classList.contains("focused"), top: li.classList.contains("top") })),
+            ready: Array.from(body.querySelectorAll(".fe-dbgi-pick")).map((b) => ({ kind: b.dataset.kind, index: +b.dataset.index, text: b.textContent })),
+            sel: sel && sel.dataset.kind ? { kind: sel.dataset.kind, index: +sel.dataset.index, head: (sel.querySelector(".fe-dbgi-selhead") || {}).textContent || "" } : null,
+            inputs: rows(".fe-dbgi-in"), outputs: rows(".fe-dbgi-out"), wire: rows(".fe-dbgi-wire"),
+            args: rows(".fe-dbgi-args"), out: rows(".fe-dbgi-fout"),
+          };
+        },
+        dbgVal,
       };
     }).catch((e) => { status("boot failed: " + (e && e.message ? e.message : e), "bad"); return null; });
   }
