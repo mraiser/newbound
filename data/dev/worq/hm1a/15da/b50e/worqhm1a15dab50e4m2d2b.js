@@ -2085,6 +2085,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (dbg.busy) return null;
     if (dbg.st && dbg.st.running && mode !== "pause") { status("debug: a continue is running — pause first", "bad"); return null; }
     const d = dbg; d.busy = true;
+    const prevEv = d.st ? d.st.event : null;   // the event a back(1) undoes
     try {
       const r = await FD.client.step(d.session, mode, pick || {});
       if (dbg !== d) return r;                 // stopped meanwhile
@@ -2095,7 +2096,18 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         if (/session/i.test(msg) && /(no such|no debug session|unknown|not found|gone|missing|reaped)/i.test(msg)) debugEnded("the session is gone (reaped after idling?)");
         return r;
       }
+      // D2: what this move SHOWS — its events (a back(1): the undone one, in
+      // reverse); continue/goto/pause/back(n) only redraw
+      const back1 = mode === "back" && !!prevEv && !(pick && pick.count > 1);
+      const evs = back1 ? [prevEv] : (!r.running && Array.isArray(r.events) && !r.events_truncated ? r.events : []);
+      const ride = { mode, reverse: back1, events: evs.map((e) => e.seq), a: null, b: null };
+      if (evs.length) ride.a = await dbgShow(evs, back1, null);   // on the picture as it stands
+      if (dbg !== d) return r;
       await debugRefresh();
+      // flew to the op going IN: the drilled deck is framed whole once drawn
+      if (ride.a && ride.a.fly && dbg === d && focusPath.length > ride.a.depth) frameDeck();
+      if (evs.length && dbg === d) ride.b = await dbgShow(evs, back1, ride.a);   // where the focus went
+      d.lastRide = ride;
       if (r.running) debugPoll();
       return r;
     } finally { d.busy = false; renderDebugBar(); }
@@ -2144,6 +2156,89 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (s !== "ready") return false;
     debugStep("into", { kind, index });
     return true;
+  }
+  // ── D2: every move SHOWS what it moved ────────────────────────────────────
+  // A step's events ride the picture: each deliver rides its wire, each fired
+  // synchro pulses down its straight link, a next rule rides the jump pipe
+  // out of the case — one dev:flowtoken per leg on ONE shared clock (the run
+  // animation's machinery: host.state.run + onTokenDelivered), legs in tape
+  // order. Events on the picture AS IT STANDS ride first, then the state
+  // redraws (the wire turns delivered, the focus follows); events on the
+  // picture the focus moved to ride after the redraw. A drill (enter/leave of
+  // a local op) flies the orbit to the op on its parent's picture — before
+  // the redraw going in, after it coming out. back(1) shows the undone event
+  // in REVERSE: the token rides dest → src, the jump pipe is climbed back,
+  // the drill flies the other way. continue/goto/pause/back(n) only redraw
+  // (their replies carry no events). FD.rideEvents/drillEvents decide which
+  // events belong to a picture; the geometry is the run animation's own.
+  const DBG_RIDE_MAX = 16;
+  function dbgLegs(c, ev, reverse) {
+    const id = (sfx) => "fx_" + slug(`d${activeDeck}/${sfx}`);
+    if (ev.type === "deliver") {
+      const w = c.cons[ev.wire]; if (!w) return [];
+      return [{ k: "w" + ev.wire, seq: ev.seq, wire: id(`wire/${ev.wire}`), from: wireEnd(c, w.src, "out"), to: wireEnd(c, w.dest, "in"), reverse: !!reverse }];
+    }
+    if (ev.type === "sync") {
+      const s = (c.syncs || [])[ev.sync]; if (!s) return [];
+      return [{ k: "s" + ev.sync, seq: ev.seq, straight: true, tint: syncColorOf(), wire: id(`sync/${ev.sync}`),
+        from: syncHandlePos(c, s.src, "out"), to: syncHandlePos(c, s.dest, "in"), reverse: !!reverse }];
+    }
+    if (ev.type === "next" && ev.op != null && c.cmds[ev.op] && caseChain(focusRoot())[activeDeck + 1]) {
+      const legs = jumpLegs(c, ev.op).map((l, j) => Object.assign({ k: "j" + j, seq: ev.seq }, l));
+      return reverse ? legs.reverse().map((l) => Object.assign({}, l, { reverse: !l.reverse })) : legs;
+    }
+    return [];
+  }
+  // ride the legs one after another (leg j in round j) and wait for them all
+  async function dbgRide(legs) {
+    if (!legs.length || !hostApi || disposed) return null;
+    const reduced = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const dur = Math.max(0.12, Math.min(reduced ? 0.2 : 0.32, 2.4 / legs.length));
+    const rid = ++runSeq, keys = [], got = [];
+    const started = performance.now();
+    let finish; const allDone = new Promise((res) => { finish = res; });
+    hostApi.setState("run", { id: rid, t0: null });
+    hostApi.setState("onTokenDelivered", (e) => { if (!e || e.runId !== rid) return; got.push(e.k); if (got.length >= legs.length) finish(true); });
+    try {
+      for (let j = 0; j < legs.length; j++) {
+        const { seq, ...seed } = legs[j];
+        const key = `dbg${rid}_${j}`;
+        await hostApi.addControl("dev", "flowtoken", Object.assign({ runId: rid, round: j, dur, reduced }, seed), key);
+        keys.push(key);
+      }
+      hostApi.setState("run", { id: rid, t0: performance.now() });
+      const complete = await Promise.race([allDone, sleep((legs.length * dur + 2) * 1000).then(() => false)]);
+      return { rid, hosted: keys.length, delivered: got.slice(), complete: !!complete,
+        inOrder: got.length === legs.length && got.every((k, j) => k === legs[j].k),
+        reverse: legs.map((l) => !!l.reverse), dur, ms: Math.round(performance.now() - started) };
+    } finally {
+      for (const key of keys) { try { hostApi.removeControl(key); } catch (e) {} }
+      hostApi.setState("run", null);
+      hostApi.setState("onTokenDelivered", null);
+    }
+  }
+  // show `evs` on the focused picture; `prior` = what the first pass showed
+  async function dbgShow(evs, reverse, prior) {
+    const dv = dbgDeckView(), c = focusedCase();
+    if (!dv || !c || !hostApi || disposed) return null;
+    const seen = prior ? prior.seqs : [];
+    let on = FD.rideEvents(evs, dv).filter((ev) => !seen.includes(ev.seq));
+    if (reverse) on = on.slice().reverse();
+    if (on.length > DBG_RIDE_MAX) on = on.slice(0, DBG_RIDE_MAX);
+    const legs = [];
+    for (const ev of on) for (const L of dbgLegs(c, ev, reverse)) legs.push(L);
+    const drill = prior && prior.fly ? [] : FD.drillEvents(evs, dv).filter((ev) => !seen.includes(ev.seq));
+    if (!legs.length && !drill.length) return null;
+    const out = { deck: activeDeck, depth: focusPath.length, path: dv.path, seqs: on.map((ev) => ev.seq).concat(drill.map((ev) => ev.seq)),
+      legs: legs.map((l) => l.k), ride: null, fly: null };
+    if (legs.length) out.ride = await dbgRide(legs);
+    const ev = drill[0], op = ev ? c.cmds[ev.op] : null;
+    if (op && op.pos && dbgActive()) {
+      const target = { x: op.pos.x, y: op.pos.y, z: op.pos.z || 0 };
+      out.fly = { op: ev.op, type: ev.type, target, flew: !!(stage && stage.flyTo) };
+      if (stage && stage.flyTo) { stage.flyTo({ target }, 240); await sleep(260); }
+    }
+    return out;
   }
   function debugPoll() {
     if (dbgPollT) clearTimeout(dbgPollT);
@@ -2617,6 +2712,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         startDebug, debugStart, debugStep, debugStop, debugRefresh, debugPickItem,
         debugSession: () => (dbg ? dbg.session : null),
         debugState: () => (dbg ? dbg.st : null),
+        debugLastRide: () => (dbg && dbg.lastRide ? JSON.parse(JSON.stringify(dbg.lastRide)) : null),
         debugView: () => { const dv = dbgDeckView(); return dv ? { fi: dv.fi, top: dv.top, case: dv.case, phase: dv.phase, ops: dv.ops.slice(), wires: dv.wires.slice(), syncs: dv.syncs.slice() } : null; },
         debugFrames: () => (dbg ? dbg.views.map((v) => ({ fi: v.fi, kind: v.kind, path: v.path, case: v.case, phase: v.phase, opName: v.opName, external: v.external, ops: v.ops.slice(), wires: v.wires.slice(), syncs: v.syncs.slice() })) : []),
         debugHostState: () => (hostApi && hostApi.state ? hostApi.state.dbg : null),
