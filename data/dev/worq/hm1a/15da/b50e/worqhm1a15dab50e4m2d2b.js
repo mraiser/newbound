@@ -1897,14 +1897,14 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         if (ev.type === "enter" && ev.frame && ev.frame.length) break;   // a drilled frame's events are not on this picture
         if (ev.type === "next" && ev.op != null && ev.from === activeDeck && caseChain(focusRoot())[ev.from + 1]) {
           await waitRound(6000);
-          const legs = jumpLegs(focusedCase(), ev.op);
+          const legs = jumpLegs(focusedCase(), ev.op).filter((l) => l && l.from && l.to);
           round += 1;
+          clock();
           for (let j = 0; j < legs.length; j++) {
             const key = `run_ev${ev.seq}_${j}`;
             await hostApi.addControl("dev", "flowtoken", Object.assign({ runId: t0, round, k: "jump" + j, dur, reduced }, legs[j]), key);
             keys.push(key);
           }
-          clock();
           await waitRound(Math.ceil(dur * 1000) + 1500);
           pathSegs.push({ deck: ev.from, end: "next", stopAt: ev.op, inferred: false });
           setActiveDeck(ev.to);
@@ -1912,7 +1912,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
           await sleep(reduced ? 120 : 300);
           continue;
         }
-        const legs = dbgLegs(focusedCase(), ev, false);
+        const legs = dbgLegs(focusedCase(), ev, false).filter((l) => l && l.from && l.to);
         if (!legs.length) continue;
         const seq = typeof ev.readySeq === "number" ? ev.readySeq : ev.seq;
         if (seq !== prevSeq) { await waitRound(6000); prevSeq = seq; round += 1; clock(); }
