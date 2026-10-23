@@ -100,7 +100,7 @@ me.ready = function () {
             const show = !!ds && ds !== "waiting";
             if (show) {
               const DEF = { ready: "#f0a63c", running: "#5aa9e6", done: "#62bd8c", skipped: "#6b6f78" };
-              const tok = getComputedStyle(document.documentElement).getPropertyValue("--fe-dbg-" + ds).trim();
+              const tok = String((dbg.colors && dbg.colors[ds]) || getComputedStyle(document.documentElement).getPropertyValue("--fe-dbg-" + ds)).trim();
               const color = /^#[0-9a-f]{3,8}$/i.test(tok) ? tok : (DEF[ds] || "#8a8f98");
               ctx.setRig("dbg", "material", { color, opacity: ds === "skipped" ? 0.35 : ds === "ready" ? 0.9 : 0.7, emissive: ds === "ready" || ds === "running" });
             }
