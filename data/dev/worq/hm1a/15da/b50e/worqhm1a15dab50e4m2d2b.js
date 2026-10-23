@@ -47,6 +47,60 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // ── backend plumbing (same ajax idiom as floweditor3d) ────────────────────
   const invokeP = (l2, c2, m2, a2) => new Promise((res2) => invokeCommand(l2, c2, m2, a2, res2));
   const codeCmd = (m2, a2) => invokeP("dev", "code", m2, a2);
+
+  // ── OLD RUNTIMES (synchros S3) ────────────────────────────────────────────
+  // A synchro is honored only by a flowlang that implements S1 (Case.syncs in
+  // Code::execute). Older interpreters — this instance's build, or any peer's —
+  // ignore the key SILENTLY and run the flow unsynchronized. S1 is unreleased
+  // as of this writing; 0.3.38 is verified synchro-less, so the first release
+  // that can carry it is 0.3.39. Set SYNC_MIN_FLOWLANG to the actual S1
+  // release when it ships.
+  const SYNC_MIN_FLOWLANG = "0.3.39";
+  const verParts = (v) => String(v || "").replace(/^[^0-9]*/, "").split(/[.+-]/).slice(0, 3).map((x) => parseInt(x, 10) || 0);
+  const verLess = (a, b) => { const A = verParts(a), B = verParts(b); for (let i = 0; i < 3; i++) if (A[i] !== B[i]) return A[i] < B[i]; return false; };
+  // dev.dev.crate_versions ONCE per mount (it reads every manifest), and only
+  // when the flow has synchros. The OLDEST flowlang pin across the manifests
+  // wins: a skewed build (mismatch) still links the older interpreter somewhere.
+  // Unreadable (non-admin, older host) = unknown = no warning.
+  let runtimeInfo = null;         // {flowlang, min, old, mismatch} | {unknown:true, msg}
+  let runtimeP = null;
+  function checkRuntime() {
+    if (!runtimeP) runtimeP = invokeP("dev", "dev", "crate_versions", {}).then((r) => {
+      const d = r && r.data && typeof r.data === "object" && "flowlang" in r.data ? r.data : r;
+      if (!d || d.status === "err" || typeof d.flowlang !== "string") {
+        runtimeInfo = { unknown: true, msg: String((d && d.msg) || "crate_versions unavailable") };
+        return runtimeInfo;
+      }
+      let fl = d.flowlang;
+      for (const m of Array.isArray(d.manifests) ? d.manifests : []) {
+        if (m && m.flowlang && (!fl || verLess(m.flowlang, fl))) fl = m.flowlang;
+      }
+      runtimeInfo = fl
+        ? { flowlang: fl, min: SYNC_MIN_FLOWLANG, old: verLess(fl, SYNC_MIN_FLOWLANG), mismatch: !!d.mismatch }
+        : { unknown: true, msg: "no flowlang pin found" };
+      return runtimeInfo;
+    }, (e) => (runtimeInfo = { unknown: true, msg: String(e && e.message ? e.message : e) }));
+    return runtimeP;
+  }
+  // synchros in the WHOLE flow: every case of every chain, locals included
+  function flowSyncCount() {
+    let n = 0;
+    const visit = (c) => {
+      for (; c; c = c.nextcase) {
+        n += Array.isArray(c.syncs) ? c.syncs.length : 0;
+        (c.cmds || []).forEach((op) => { if (op && op.localdata) visit(op.localdata); });
+      }
+    };
+    if (doc && doc.root) visit(doc.root);
+    return n;
+  }
+  // the warning, or null: the flow has synchros AND the runtime predates S1
+  function runtimeWarning() {
+    const n = flowSyncCount();
+    if (!n || !runtimeInfo || !runtimeInfo.old) return null;
+    return { n, flowlang: runtimeInfo.flowlang, min: SYNC_MIN_FLOWLANG,
+      text: `this flow has ${n} synchro${n === 1 ? "" : "s"}, but this instance runs flowlang ${runtimeInfo.flowlang} (synchros need ≥ ${SYNC_MIN_FLOWLANG}, S1): it will run UNSYNCHRONIZED — older interpreters and peers ignore syncs silently` };
+  }
   const writeFlowBody = (l2, c2, m2, b2, { base = "", label = "" } = {}) =>
     codeCmd("write_flow_body", { lib: l2, ctl: c2, cmd: m2, body: b2, base, label, author: "", nn_sessionid: "" });
   const readFlowBody = (l2, c2, m2) => codeCmd("read_flow_body", { lib: l2, ctl: c2, cmd: m2 });
@@ -986,6 +1040,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const box = $(".fe-diag"), list = $(".fe-diag-list"); if (!box || !list || !doc) return;
     const path = focusedPath();
     lastDiags = path ? doc.diagnosticsFor(path) : [];
+    // OLD RUNTIMES: a flow-wide warn row while the flow has synchros and the
+    // instance's flowlang predates S1. The first render with synchros asks
+    // crate_versions (once) and re-renders when it answers.
+    const rw = runtimeWarning();
+    if (rw) lastDiags = lastDiags.concat([{ code: "RT", severity: "warn", message: rw.text, runtime: true }]);
+    else if (!runtimeP && flowSyncCount()) checkRuntime().then(() => { if (runtimeWarning()) renderDiagnostics(); });
     list.replaceChildren();
     box.hidden = !lastDiags.length;
     for (const d of lastDiags) {
@@ -1868,6 +1928,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const runBtn = $(".fe-run");
     const busy = () => { if (runBtn) { runBtn.disabled = true; runBtn.classList.add("running"); runBtn.textContent = "running…"; } };
     busy();
+    // a flow with synchros: know the runtime BEFORE the run reports (cached)
+    if (flowSyncCount()) { try { await checkRuntime(); } catch (e) {} }
     status(`running ${src.cmd}…`);
     const started = performance.now();
     const settle = (p) => p.then((r) => r || { status: "err", msg: "no response" }, (e) => ({ status: "err", msg: String(e && e.message ? e.message : e) }));
@@ -1899,11 +1961,15 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // a server panic arrives as an HTML 500 page in msg; show its words
     const rawMsg = String(r.msg == null ? "" : r.msg);
     const msg = /^\s*</.test(rawMsg) ? rawMsg.replace(/<title>[\s\S]*?<\/title>/i, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : rawMsg;
+    const rw = runtimeWarning();
     lastResult = { args, ok, result: r, msg, ms, unsaved, source: src, path, untraced,
+      unsynchronized: rw ? { flowlang: rw.flowlang, min: rw.min, syncs: rw.n, text: rw.text } : null,
       tokens: R ? { complete: !!R.complete, inOrder: !!R.inOrder, delivered: R.delivered.length } : null };
     const via = untraced ? " · no case path" : (R && R.segments && R.segments.length ? ` · ${pathText(R.segments)}` : "");
-    pushJournal(ok ? `ran ${src.cmd}${via} · ${ms}ms` : `run failed: ${msg}`);
-    if (ok) status(`ran${via} · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} ${R.delivered.length === 1 ? "delivery" : "deliveries"} in order` : ""), "ok");
+    const unsync = rw ? ` · UNSYNCHRONIZED (flowlang ${rw.flowlang} ignores synchros)` : "";
+    pushJournal(ok ? `ran ${src.cmd}${via} · ${ms}ms${unsync}` : `run failed: ${msg}${unsync}`);
+    if (ok && rw) status(`ran UNSYNCHRONIZED — flowlang ${rw.flowlang} ignores synchros · ${ms}ms`, "warn");
+    else if (ok) status(`ran${via} · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} ${R.delivered.length === 1 ? "delivery" : "deliveries"} in order` : ""), "ok");
     else status(`run failed: ${msg}`, "bad");
     renderRunResult(lastResult, R);
     return lastResult;
@@ -1917,6 +1983,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     h += `<pre class="fe-run-pre${L.ok ? "" : " bad"}">${esc(typeof shown === "string" ? shown : JSON.stringify(shown, null, 1))}</pre>`;
     h += `<p class="fe-run-note">args: ${esc(JSON.stringify(L.args))} — the tokens replay the propagation ORDER; per-wire values aren't reported by the platform.</p>`;
     if (L.unsaved) h += `<p class="fe-empty">ran the SAVED body — ${L.unsaved} unsaved change${L.unsaved === 1 ? "" : "s"} not included; save to run them</p>`;
+    if (L.unsynchronized) h += `<p class="fe-run-unsync">⚠ ran UNSYNCHRONIZED: flowlang ${esc(L.unsynchronized.flowlang)} predates synchros (need ≥ ${esc(L.unsynchronized.min)}), so the server ignored this flow's ${L.unsynchronized.syncs} synchro${L.unsynchronized.syncs === 1 ? "" : "s"}. The replay below draws the order the synchros ASK for, not the order that ran.</p>`;
     if (R && R.rounds) h += runRoundsHtml(R);
     body.innerHTML = h;
   }
@@ -2289,6 +2356,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         source: () => source, baseHash: () => baseHash, harness: () => harness, titleText: () => $(".fe-title").textContent,
         // P4 surface
         runFlow, lastRun: () => lastRun, running: () => running,
+        // S3 old-runtimes surface
+        checkRuntime, runtime: () => runtimeInfo, runtimeWarning, syncCount: flowSyncCount, syncMinFlowlang: SYNC_MIN_FLOWLANG,
         // P5 run parity surface
         startRun, runLive, lastResult: () => lastResult, liveCall: () => liveCall, coerceArg,
         rounds: () => propagationRounds(focusedCase()), dryPlan, livePlan,

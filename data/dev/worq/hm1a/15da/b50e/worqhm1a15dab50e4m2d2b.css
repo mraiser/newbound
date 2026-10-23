@@ -10,6 +10,9 @@
 .nb-flowedit3d .fe-status { font-size:12px; color:var(--text-dim); max-width:34ch;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .nb-flowedit3d .fe-status.ok { color:var(--good); } .nb-flowedit3d .fe-status.bad { color:var(--danger); }
+.nb-flowedit3d .fe-status.warn { color:var(--accent-dim); }
+.nb-flowedit3d .fe-run-unsync { margin:6px 0; padding:4px 6px; border-left:2px solid var(--accent-dim);
+  font-size:11px; color:var(--text); background:var(--panel-2); }
 .nb-flowedit3d .fe-decks { display:flex; gap:2px; }
 .nb-flowedit3d .fe-decks button { border:1px solid var(--line); background:var(--panel-2); border-radius:6px;
   padding:2px 8px; cursor:pointer; font-size:12px; }
