@@ -1,10 +1,9 @@
-// The case path of ONE real run. P5: this no longer uses the sentinel-nextcase
-// trick — the run is ONE debug session over the stepper (dev.flowstep
-// debug_start + debug_step continue + debug_state + debug_stop), the same
-// interpreter path the editor's run button and the debugger ride. The case
-// path is read off the session's root frames (one per case it entered, with
-// its outcome), and each case's per-case ms is the sum of its stepper events'
-// ms on that case (the tape's per-step events carry ms).
+// The case path of ONE real run. P5: no sentinel-nextcase — the run is ONE
+// debug session over the stepper (dev.flowstep debug_start + debug_step
+// continue + debug_state + debug_stop), the same interpreter path the
+// editor's run button and the debugger ride. The case path is read off the
+// session's root frames (one per case it entered, with its outcome); each
+// case's ms is the sum of its stepper events' ms on that case.
 fn err_env(msg: &str) -> DataObject {
     let mut o = DataObject::new();
     o.put_string("status", "err");
@@ -19,14 +18,11 @@ let command = Command::new(&lib, &id);
 if command.lang != "flow" {
     return err_env(&format!("'{}' is not a flow command (type is '{}')", cmd, command.lang));
 }
-
 let mut out = DataObject::new();
 out.put_string("status", "ok");
 let mut path = DataArray::new();
-
 let mut args = args.clone();
 args.put_string("nn_sessionid", &nn_sessionid);
-
 // open a session on the SAVED body (debug_start with an empty body reads it)
 let st = {
     let mut a = DataObject::new();
@@ -48,19 +44,21 @@ let session = st.get_string("session");
 let fin = {
     let mut a = DataObject::new();
     a.put_string("session", &session);
-    a.put_string("mode", "continue".to_string());
+    a.put_string("mode", "continue");
     let mut p = DataObject::new(); p.put_boolean("wait", true);
     a.put_object("pick", p);
-    let s = session.clone();
     match panic::catch_unwind(panic::AssertUnwindSafe(move || Command::lookup("dev", "flowstep", "debug_step").execute(a))) {
         Ok(Ok(r)) => r,
-        _ => { let _ = Command::lookup("dev", "flowstep", "debug_stop"); return err_env("debug_step continue panicked"); }
+        _ => {
+            let mut z = DataObject::new(); z.put_string("session", &session);
+            let _ = Command::lookup("dev", "flowstep", "debug_stop").execute(z);
+            return err_env("debug_step continue panicked");
+        }
     }
 };
 let st2 = {
     let mut a = DataObject::new();
     a.put_string("session", &session);
-    let s = session.clone();
     match panic::catch_unwind(panic::AssertUnwindSafe(move || Command::lookup("dev", "flowstep", "debug_state").execute(a))) {
         Ok(Ok(r)) => r,
         _ => DataObject::new(),
@@ -101,12 +99,11 @@ if st2.has("state") && st2.get_property("state").is_object() {
         }
     }
 }
-let _ = {
+{
     let mut a = DataObject::new();
     a.put_string("session", &session);
-    panic::catch_unwind(panic::AssertUnwindSafe(move || { let _ = Command::lookup("dev", "flowstep", "debug_stop").execute(a); }))
-};
-
+    let _ = panic::catch_unwind(panic::AssertUnwindSafe(move || { let _ = Command::lookup("dev", "flowstep", "debug_stop").execute(a); }));
+}
 // the result envelope: the run's own output, formatted as app.app.exec would
 let failure = if st2.has("ended") && st2.get_property("ended").is_boolean() && st2.get_boolean("ended") {
     let ev = if st2.has("event") && st2.get_property("event").is_object() { st2.get_object("event") } else { DataObject::new() };
