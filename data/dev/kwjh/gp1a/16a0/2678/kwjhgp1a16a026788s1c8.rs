@@ -19,6 +19,7 @@ fn put_copy(o: &mut DataObject, k: &str, d: Data) {
   else if d.is_array() { o.put_array(k, d.array().deep_copy()); }
   else { o.set_property(k, d); }
 }
+fn is_obj(o: &DataObject, k: &str) -> bool { o.has(k) && o.get_property(k).is_object() }
 fn case_at(body: &DataObject, idx: i64) -> Option<DataObject> {
   let mut c = body.clone();
   let mut i = 0;
@@ -80,7 +81,7 @@ fn ready_now(body: &DataObject, f: &DataObject) -> DataArray {
   let mut a = DataArray::new();
   if phase == "ended" { return a; }
   if phase != "run" { let mut o = DataObject::new(); o.put_string("kind", "auto"); o.put_string("phase", &phase); a.push_object(o); return a; }
-  if f.get_property("pending").is_object() {
+  if is_obj(f, "pending") {
     let p = f.get_object("pending");
     let mut o = DataObject::new(); o.put_string("kind", "effect"); o.put_string("rule", &p.get_string("rule")); o.put_int("op", p.get_int("op"));
     a.push_object(o); return a;
@@ -319,7 +320,7 @@ fn eval_operation(op: &DataObject, in1: DataObject, ctx: &mut Ctx, ffin: &mut bo
       Err(p) => { return Err(fault("panic", format!("primitive '{}' panicked: {}", v, panic_text(&p)))); }
     }
   } else if typ == "local" {
-    if !op.get_property("localdata").is_object() { for k in &outs { out.put_null(k); } }
+    if !is_obj(op, "localdata") { for k in &outs { out.put_null(k); } }
     else {
       let (oc, o, fin) = run_nested(&op.get_object("localdata"), in1, ctx)?;
       if oc == "fail" { b = false; } else { out = o; *ofin = fin; }
@@ -397,7 +398,7 @@ fn eval_operation(op: &DataObject, in1: DataObject, ctx: &mut Ctx, ffin: &mut bo
   }
   // undefined and unknown types: flowlang prints UNIMPLEMENTED and the op yields {}
   let mut rule: Option<String> = None;
-  if typ != "constant" && op.get_property("condition").is_object() {
+  if typ != "constant" && is_obj(op, "condition") {
     let c = op.get_object("condition");
     let r = c.get_string("rule");
     if c.get_boolean("value") == b {
@@ -421,7 +422,7 @@ fn eval_op(op: &DataObject, inputs: &DataObject, ctx: &mut Ctx, ffin: &mut bool)
     let mode = if nd.has("mode") { nd.get_string("mode") } else { "".to_string() };
     if mode == "list" { list_out.push(k); }
     else if mode == "loop" {
-      if !nd.get_property("loop").is_string() { return Err(fault("panic", format!("loop output '{}' names no input (I-8)", k))); }
+      if !(nd.has("loop") && nd.get_property("loop").is_string()) { return Err(fault("panic", format!("loop output '{}' names no input (I-8)", k))); }
       loop_out.push((k, nd.get_string("loop")));
     }
   }
@@ -538,7 +539,7 @@ fn step_frame(body: &DataObject, f: &mut DataObject, pick: &DataObject, ctx: &mu
     return e;
   }
   // a fired rule's effect is the step after the eval that reports it
-  if f.get_property("pending").is_object() {
+  if is_obj(f, "pending") {
     let p = f.get_object("pending");
     let rule = p.get_string("rule"); let op = p.get_int("op");
     f.put_null("pending");
@@ -572,14 +573,14 @@ fn step_frame(body: &DataObject, f: &mut DataObject, pick: &DataObject, ctx: &mu
 
 // ---- the command ----
 let mut res = DataObject::new();
-if !state.get_property("body").is_object() {
+if !is_obj(&state, "body") {
   res.put_string("status", "err");
   res.put_string("msg", "state needs body (the flow's root Case JSON) and args; pass {body, args} to start a run");
   return res;
 }
 let body = state.get_object("body");
-let mut f = if state.get_property("frame").is_object() { state.get_object("frame").deep_copy() }
-  else { new_frame(if state.get_property("args").is_object() { state.get_object("args").deep_copy() } else { DataObject::new() }, "root") };
+let mut f = if is_obj(&state, "frame") { state.get_object("frame").deep_copy() }
+  else { new_frame(if is_obj(&state, "args") { state.get_object("args").deep_copy() } else { DataObject::new() }, "root") };
 let seq = if state.has("seq") { state.get_int("seq") } else { 0 };
 let mut ns = DataObject::new();
 ns.put_object("body", body.clone());
@@ -621,7 +622,7 @@ let ready = ready_now(&body, &f);
 let ended = f.get_string("phase") == "ended";
 if !ended {
   if let Some(c) = case_at(&body, f.get_int("case")) {
-    if f.get_string("phase") == "run" && !f.get_property("pending").is_object() {
+    if f.get_string("phase") == "run" && !is_obj(&f, "pending") {
       let mut fc = f.deep_copy();
       match default_pick(&c, &mut fc) { Some((k, i)) => res.put_object("default", item(&k, i)), None => res.put_null("default") }
     }
