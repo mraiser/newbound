@@ -1,28 +1,16 @@
-// The case path of ONE real run. flowlang's Code::execute walks the nextcase
-// chain internally and reports only the final output, so this runs the chain
-// ONE CASE AT A TIME through that same interpreter: each case executes with a
-// tiny SENTINEL as its nextcase (a constant writing a marker key), so a `next`
-// rule firing lands in the sentinel and returns with the marker instead of
-// running case k+1 — then case k+1 runs on its own. Every op still executes
-// exactly once, with the same args, in the interpreter's own order; outputs
-// accumulate across cases exactly as Code::execute's shared `out` does. Auth,
-// cast_params and format_result mirror app.app.exec, so `result` is the
-// envelope a plain run of the command returns.
-const MARK: &str = "__nb_trace_next__";
-const SENTINEL: &str = r#"{"input":{},"output":{"__nb_trace_next__":{"mode":"out","type":"Boolean","x":0}},"cmds":[{"name":"true","type":"constant","ctype":"boolean","width":1,"pos":{"x":0,"y":0,"z":0},"in":{},"out":{"v":{"mode":"out","type":"Boolean","x":0}}}],"cons":[{"src":[0,"v"],"dest":[-2,"__nb_trace_next__"]}]}"#;
-
+// The case path of ONE real run. P5: this no longer uses the sentinel-nextcase
+// trick — the run is ONE debug session over the stepper (dev.flowstep
+// debug_start + debug_step continue + debug_state + debug_stop), the same
+// interpreter path the editor's run button and the debugger ride. The case
+// path is read off the session's root frames (one per case it entered, with
+// its outcome), and each case's per-case ms is the sum of its stepper events'
+// ms on that case (the tape's per-step events carry ms).
 fn err_env(msg: &str) -> DataObject {
     let mut o = DataObject::new();
     o.put_string("status", "err");
     o.put_string("msg", msg);
     o
 }
-fn panic_text(p: &Box<dyn std::any::Any + Send>) -> String {
-    if let Some(s) = p.downcast_ref::<&str>() { s.to_string() }
-    else if let Some(s) = p.downcast_ref::<String>() { s.clone() }
-    else { "unknown panic".to_string() }
-}
-
 let store = DataStore::new();
 let id = store.lookup_cmd_id(&lib, &ctl, &cmd);
 if id.is_empty() { return err_env(&format!("Command {}:{}:{} not found", lib, ctl, cmd)); }
@@ -38,88 +26,119 @@ let mut path = DataArray::new();
 
 let mut args = args.clone();
 args.put_string("nn_sessionid", &nn_sessionid);
-let cast = { let c2 = &command; let a2 = args.clone(); panic::catch_unwind(panic::AssertUnwindSafe(move || c2.cast_params(a2))) };
-if let Err(p) = cast {
-    out.put_object("result", err_env(&format!("bad arguments: {}", panic_text(&p))));
-    out.put_array("path", path);
-    out.put_int("cases", 0);
-    return out;
-}
 
-// the chain, root first
-let mut chain: Vec<Case> = Vec::new();
-let mut cur = Some(command.src());
-while let Some(c) = cur {
-    let next = c.nextcase.as_ref().map(|b| b.duplicate());
-    chain.push(c);
-    cur = next;
+// open a session on the SAVED body (debug_start with an empty body reads it)
+let st = {
+    let mut a = DataObject::new();
+    a.put_string("lib", &lib); a.put_string("ctl", &ctl); a.put_string("cmd", &cmd);
+    a.put_object("body", DataObject::new());
+    a.put_object("args", args.clone());
+    let (l, c, m) = (lib.clone(), ctl.clone(), cmd.clone());
+    match panic::catch_unwind(panic::AssertUnwindSafe(move || Command::lookup("dev", "flowstep", "debug_start").execute(a))) {
+        Ok(Ok(r)) => r,
+        _ => return err_env(&format!("{}.{}.{}: the stepper refused to open a session", l, c, m)),
+    }
+};
+if !st.has("session") || !st.get_property("session").is_string() {
+    let msg = if st.has("msg") { st.get_string("msg") } else { "no session".to_string() };
+    return err_env(&format!("debug_start failed: {}", msg));
 }
-let n = chain.len();
-
-let mut acc = DataObject::new();
-let mut failure: Option<DataObject> = None;
-let mut k = 0usize;
-while k < n {
-    let mut ck = chain[k].duplicate();
-    ck.nextcase = Some(Box::new(Case::from_data(DataObject::from_string(SENTINEL))));
-    // natural completion delivers EVERY wired return terminal (the case loop
-    // ends only when all cons are done); a missing one means a terminate rule
-    let wired_ret: Vec<String> = ck.cons.iter().filter(|w| w.dest.index == -2).map(|w| w.dest.name.clone()).collect();
-    let a = args.clone();
-    let t0 = Instant::now();
-    let r = panic::catch_unwind(panic::AssertUnwindSafe(move || { let mut code = Code::new(ck); code.execute(a) }));
-    let mut step = DataObject::new();
-    step.put_int("case", k as i64);
-    step.put_int("ms", t0.elapsed().as_millis() as i64);
-    match r {
-        Ok(Ok(o)) => {
-            let jumped = o.has(MARK);
-            for (key, v) in o.objects() { if key != MARK { acc.set_property(&key, v); } }
-            if jumped {
-                step.put_string("end", "next");
-                path.push_object(step);
-                if k + 1 >= n {
-                    failure = Some(err_env(&format!("a next rule fired in case {} but the chain has no next case (I-4)", k + 1)));
-                    break;
-                }
-                k += 1;
-                continue;
+let session = st.get_string("session");
+// run to the end
+let fin = {
+    let mut a = DataObject::new();
+    a.put_string("session", &session);
+    a.put_string("mode", "continue".to_string());
+    let mut p = DataObject::new(); p.put_boolean("wait", true);
+    a.put_object("pick", p);
+    let s = session.clone();
+    match panic::catch_unwind(panic::AssertUnwindSafe(move || Command::lookup("dev", "flowstep", "debug_step").execute(a))) {
+        Ok(Ok(r)) => r,
+        _ => { let _ = Command::lookup("dev", "flowstep", "debug_stop"); return err_env("debug_step continue panicked"); }
+    }
+};
+let st2 = {
+    let mut a = DataObject::new();
+    a.put_string("session", &session);
+    let s = session.clone();
+    match panic::catch_unwind(panic::AssertUnwindSafe(move || Command::lookup("dev", "flowstep", "debug_state").execute(a))) {
+        Ok(Ok(r)) => r,
+        _ => DataObject::new(),
+    }
+};
+// per-case ms: sum each event's ms over the case it happened on
+let mut case_ms: std::collections::HashMap<i64, i64> = std::collections::HashMap::new();
+if st2.has("last_run") && st2.get_property("last_run").is_object() {
+    let lr = st2.get_object("last_run");
+    if lr.has("events") && lr.get_property("events").is_array() {
+        for ev in lr.get_array("events").objects() {
+            let ev = ev.object();
+            if ev.has("case") && ev.has("ms") {
+                let k = ev.get_int("case");
+                *case_ms.entry(k).or_insert(0) += ev.get_int("ms");
             }
-            let early = wired_ret.iter().any(|name| !o.has(name));
-            step.put_string("end", if early { "terminate" } else { "done" });
-            path.push_object(step);
-            break;
-        }
-        Ok(Err(e)) => {
-            step.put_string("end", "fail");
-            path.push_object(step);
-            failure = Some(err_env(&format!("the flow failed in case {} ({:?}: a fail rule fired)", k + 1, e)));
-            break;
-        }
-        Err(p) => {
-            let msg = panic_text(&p);
-            step.put_string("end", "panic");
-            step.put_string("msg", &msg);
-            path.push_object(step);
-            failure = Some(err_env(&format!("the flow panicked in case {}: {}", k + 1, msg)));
-            break;
         }
     }
 }
+// the case path: one entry per root frame (a case the run entered)
+let mut last_end = "done".to_string();
+if st2.has("state") && st2.get_property("state").is_object() {
+    let state = st2.get_object("state");
+    if state.has("frames") && state.get_property("frames").is_array() {
+        for f in state.get_array("frames").objects() {
+            let f = f.object();
+            if !(f.has("kind") && f.get_string("kind") == "root") { continue; }
+            let case_i = if f.has("case") { f.get_int("case") } else { 0 };
+            let phase = if f.has("phase") { f.get_string("phase") } else { "done".to_string() };
+            let outcome = if f.has("outcome") { f.get_string("outcome") } else { "done".to_string() };
+            let end = if phase == "ended" { outcome } else { phase };
+            last_end = end.clone();
+            let mut step = DataObject::new();
+            step.put_int("case", case_i);
+            step.put_string("end", &end);
+            step.put_int("ms", *case_ms.get(&case_i).unwrap_or(&0));
+            path.push_object(step);
+        }
+    }
+}
+let _ = {
+    let mut a = DataObject::new();
+    a.put_string("session", &session);
+    panic::catch_unwind(panic::AssertUnwindSafe(move || { let _ = Command::lookup("dev", "flowstep", "debug_stop").execute(a); }))
+};
 
+// the result envelope: the run's own output, formatted as app.app.exec would
+let failure = if st2.has("ended") && st2.get_property("ended").is_boolean() && st2.get_boolean("ended") {
+    let ev = if st2.has("event") && st2.get_property("event").is_object() { st2.get_object("event") } else { DataObject::new() };
+    if ev.has("type") && ev.get_string("type") == "done" && (!ev.has("fail") || !ev.get_boolean("fail")) && ev.has("outcome") && ev.get_string("outcome") == "ok" {
+        None
+    } else if ev.has("type") && (ev.get_string("type") == "stall" || ev.get_string("type") == "error") {
+        Some(err_env(&format!("the flow {}: {}", ev.get_string("type"), if ev.has("msg") { ev.get_string("msg") } else { "no progress".to_string() })))
+    } else if last_end == "panic" {
+        Some(err_env("the flow panicked"))
+    } else if last_end == "fail" || (ev.has("fail") && ev.get_boolean("fail")) {
+        Some(err_env("the flow failed: a fail rule fired"))
+    } else if last_end != "done" && last_end != "ok" {
+        Some(err_env(&format!("the run ended ({})", last_end)))
+    } else { None }
+} else {
+    Some(err_env(&format!("the run did not end ({})", if fin.has("msg") { fin.get_string("msg") } else { "no done".to_string() })))
+};
 let result = match failure {
     Some(e) => e,
     None => {
+        let ev = st2.get_object("event");
+        let mut acc = DataObject::new();
+        if ev.has("out") && ev.get_property("out").is_object() { acc = ev.get_object("out"); }
         let cmd2 = Command::new(&lib, &id);
-        let acc2 = acc.clone();
-        match panic::catch_unwind(panic::AssertUnwindSafe(move || format_result(cmd2, acc2))) {
+        match panic::catch_unwind(panic::AssertUnwindSafe(move || format_result(cmd2, acc))) {
             Ok(x) => x,
-            Err(p) => err_env(&format!("Server Error: {}", panic_text(&p))),
+            Err(_) => err_env("Server Error: format_result panicked"),
         }
     }
 };
 DataStore::gc();
 out.put_object("result", result);
 out.put_array("path", path);
-out.put_int("cases", n as i64);
+out.put_int("cases", path.len() as i64);
 out
