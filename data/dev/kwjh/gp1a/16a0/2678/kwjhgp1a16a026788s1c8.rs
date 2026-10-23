@@ -20,6 +20,24 @@ fn put_copy(o: &mut DataObject, k: &str, d: Data) {
   else { o.set_property(k, d); }
 }
 fn is_obj(o: &DataObject, k: &str) -> bool { o.has(k) && o.get_property(k).is_object() }
+// Copy the stepper's OWN containers (so the prior state is never mutated by a step) but SHARE the value
+// handles inside them: flowlang passes values by handle, and in-place primitives (set, push, push_all,
+// remove) rely on that aliasing - a deep copy per step would break parity for such flows.
+fn shallow_obj(o: &DataObject) -> DataObject { let mut n = DataObject::new(); for (k, v) in o.objects() { n.set_property(&k, v); } n }
+fn shallow_arr(a: &DataArray) -> DataArray { let mut n = DataArray::new(); for v in a.objects() { n.push_property(v); } n }
+fn copy_frame(f: &DataObject) -> DataObject {
+  let mut n = shallow_obj(f);
+  for k in ["wires", "syncs", "done", "prio", "results"] { if f.has(k) && f.get_property(k).is_array() { n.put_array(k, shallow_arr(&f.get_array(k))); } }
+  for k in ["cur", "pending", "out"] { if is_obj(f, k) { n.put_object(k, shallow_obj(&f.get_object(k))); } }
+  for k in ["inputs", "dlv"] {
+    if f.has(k) && f.get_property(k).is_array() {
+      let mut na = DataArray::new();
+      for v in f.get_array(k).objects() { na.push_object(shallow_obj(&v.object())); }
+      n.put_array(k, na);
+    }
+  }
+  n
+}
 fn case_at(body: &DataObject, idx: i64) -> Option<DataObject> {
   let mut c = body.clone();
   let mut i = 0;
@@ -579,7 +597,7 @@ if !is_obj(&state, "body") {
   return res;
 }
 let body = state.get_object("body");
-let mut f = if is_obj(&state, "frame") { state.get_object("frame").deep_copy() }
+let mut f = if is_obj(&state, "frame") { copy_frame(&state.get_object("frame")) }
   else { new_frame(if is_obj(&state, "args") { state.get_object("args").deep_copy() } else { DataObject::new() }, "root") };
 let seq = if state.has("seq") { state.get_int("seq") } else { 0 };
 let mut ns = DataObject::new();
@@ -623,7 +641,7 @@ let ended = f.get_string("phase") == "ended";
 if !ended {
   if let Some(c) = case_at(&body, f.get_int("case")) {
     if f.get_string("phase") == "run" && !is_obj(&f, "pending") {
-      let mut fc = f.deep_copy();
+      let mut fc = copy_frame(&f);
       match default_pick(&c, &mut fc) { Some((k, i)) => res.put_object("default", item(&k, i)), None => res.put_null("default") }
     }
   }
