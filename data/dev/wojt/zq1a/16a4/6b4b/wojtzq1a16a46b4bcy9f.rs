@@ -443,19 +443,47 @@ fn advance(s: &mut DataObject, core: &Command, pick: &DataObject, force: bool, o
   if r.is_ok() { out.put_int("executed", gi(out, "executed") + 1); }
   r
 }
-fn frame_ok(b: &DataObject, path: &str) -> bool { !is_a(b, "frame") || b.get_array("frame").to_string() == path }
+// a breakpoint's place: frame = the exact path [[op, iter], ...], where an element [op, "*"] matches ANY
+// iteration of that op (an editor breakpoint lives in a local's BODY, not in one iteration of it); cases =
+// the frames' current cases from the root down (cases[i] must equal frames[i].case), which tells a local's
+// body apart per parent case (a path names ops only). Absent = any.
+fn frame_ok(b: &DataObject, at: &(DataArray, DataObject)) -> bool {
+  let (path, cur) = (&at.0, &at.1);
+  if is_a(b, "frame") {
+    let f = b.get_array("frame");
+    if f.len() != path.len() { return false; }
+    for i in 0..f.len() {
+      let (x, y) = (f.get_property(i), path.get_property(i));
+      if !x.is_array() || !y.is_array() { return false; }
+      let (x, y) = (x.array(), y.array());
+      let op = |a: &DataArray| if a.len() > 0 && a.get_property(0).is_int() { Some(a.get_int(0)) } else { None };
+      let it = |a: &DataArray| if a.len() > 1 && a.get_property(1).is_int() { Some(a.get_int(1)) } else { None };
+      if op(&x).is_none() || op(&x) != op(&y) { return false; }
+      let wild = x.len() > 1 && x.get_property(1).is_string() && x.get_string(1) == "*";
+      if !wild && it(&x) != it(&y) { return false; }
+    }
+  }
+  if is_a(b, "cases") {
+    let (cs, fr) = (b.get_array("cases"), ga(cur, "frames"));
+    for i in 0..cs.len() {
+      if i >= fr.len() || !cs.get_property(i).is_int() || !fr.get_property(i).is_object() || gi(&fr.get_object(i), "case") != cs.get_int(i) { return false; }
+    }
+  }
+  true
+}
 fn bp_before(s: &DataObject, v: &DataObject) -> Option<DataObject> {
   if !is_o(v, "default") { return None; }
   let d = v.get_object("default"); let cur = s.get_object("cur");
+  let at = (match top_of(&cur) { Some(t) => ga(&t, "path"), None => DataArray::new() }, cur.clone());
   for b in ga(s, "bps").objects() {
     if !b.is_object() { continue; }
     let b = b.object(); let k = gs(&b, "kind");
-    if (k == "op" || k == "wire" || k == "sync") && k == gs(&d, "kind") && gi(&b, "index") == gi(&d, "index") && frame_ok(&b, &top_path(&cur)) && (!b.has("case") || gi(&b, "case") == top_case(&cur)) { return Some(b); }
+    if (k == "op" || k == "wire" || k == "sync") && k == gs(&d, "kind") && gi(&b, "index") == gi(&d, "index") && frame_ok(&b, &at) && (!b.has("case") || gi(&b, "case") == top_case(&cur)) { return Some(b); }
   }
   None
 }
 fn bp_after(s: &DataObject, ev: &DataObject) -> Option<DataObject> {
-  let t = gs(ev, "type"); let fp = ga(ev, "frame").to_string();
+  let t = gs(ev, "type"); let fp = (ga(ev, "frame"), s.get_object("cur"));
   for b in ga(s, "bps").objects() {
     if !b.is_object() { continue; }
     let b = b.object(); let k = gs(&b, "kind");

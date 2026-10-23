@@ -25,6 +25,7 @@ for (i, b) in list.objects().iter().enumerate() {
   };
   if !ok { return err(&format!("breakpoint {} is not one of {{kind: op|wire|sync, index}}, {{kind: case, case}}, {{kind: rule, rule?}}: {}", i, b.to_string())); }
   if b.has("frame") && !b.get_property("frame").is_array() { return err(&format!("breakpoint {}: frame must be a path array [[op, iter], ...]", i)); }
+  if b.has("cases") && !b.get_property("cases").is_array() { return err(&format!("breakpoint {}: cases must be an array of the frames' cases from the root down", i)); }
   bps.push_object(b.deep_copy());
 }
 s.put_array("bps", bps.clone());
