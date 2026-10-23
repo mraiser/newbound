@@ -1217,6 +1217,11 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // ONE selection: selecting a wire clears selectedKey, so a key alongside
     // a wire means an op was selected AFTER it — the op wins
     if (selWire != null && key) { selWire = null; selWireRef = null; renderFacade(); }
+    // STEP DEBUGGER (D3): a session owns the inspector (edits are locked)
+    if (dbgActive()) {
+      if (selSync != null && key) { selSync = null; selSyncRef = null; selSyncCase = null; renderFacade(); }
+      renderDebugInspector(body, key); return;
+    }
     if (selWire != null) {
       const c = focusedCase(); const w = c && c.cons[selWire];
       if (!w) { selWire = null; selWireRef = null; body.innerHTML = ""; return; }
@@ -2300,6 +2305,165 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       ev.textContent = t;
       ev.className = "fe-dbg-ev" + (ended ? " ended" : "") + (st.event && (st.event.type === "error" || st.event.type === "stall") ? " bad" : "");
     }
+  }
+
+  // ── D3: the debug inspector ──────────────────────────────────────────────
+  // While a session is open the inspector shows the SESSION, not the editor's
+  // popovers (edits are locked anyway): the frame stack (top first; a click
+  // focuses that frame's case and the focus stops following until the next
+  // move), the ready set (click = run it next), the selection in the focused
+  // frame (an op's inputs with delivery marks + its results; a wire's source
+  // and delivered value; a synchro's state) and the frame's args / out /
+  // outcome. dbgInspModel is the same picture as data, read straight from
+  // the frame debug_state returned (checks compare the DOM rows with it).
+  let dbgInsp = null;          // the last rendered model
+  const dbgVal = (v) => { let s; try { s = JSON.stringify(v); } catch (e) { s = String(v); } if (s === undefined) s = "null"; return s.length > 160 ? s.slice(0, 159) + "…" : s; };
+  const dbgOwn = (o, k) => !!o && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k);
+  function dbgFrameTitle(v) {
+    if (v.fi === 0) return "root";
+    const nm = v.opName || (v.external && (v.external.name || v.external.cmd)) || "frame";
+    return `${v.kind || "frame"} ${nm}` + (v.iter != null ? ` [${v.iter}]` : "");
+  }
+  function dbgInspModel(key) {
+    if (!dbgActive()) return null;
+    const st = dbg.st || {}, views = dbg.views || [];
+    const dv = dbgDeckView();
+    const chainLen = FD.focusChain(views).length;
+    const top = views.length ? views[views.length - 1] : null;
+    const m = { cursor: st.cursor || 0, length: st.length || 0, ended: !!st.ended, running: !!st.running,
+      event: FD.eventText(st.event, views), focusFi: dv ? dv.fi : null, follow: !!dbg.follow,
+      frames: views.slice().reverse().map((v) => ({ fi: v.fi, title: dbgFrameTitle(v), kind: v.kind, case: v.case, phase: v.phase,
+        outcome: v.outcome, top: v.top, focused: dv === v, showable: v.fi < chainLen, external: !!v.external })),
+      ready: (st.ready || []).filter((x) => x && x.kind !== "auto").map((x) => ({ kind: x.kind, index: x.index, text: dbgItemText(top, x),
+        isDefault: !!(st.default && st.default.kind === x.kind && st.default.index === x.index) })),
+      sel: null, frame: null };
+    if (!dv) return m;
+    const f = dv.frame || {}, c = dv.caseObj;
+    m.frame = { fi: dv.fi, case: dv.case, phase: dv.phase, outcome: dv.outcome, args: f.args || {}, out: f.out || {}, inprog: f.inprog || null };
+    const mk = key && /^d(\d+)_op(\d+)$/.exec(key);
+    if (selWire != null && c && c.cons[selWire]) {
+      const k = selWire, w = c.cons[k];
+      const srcObj = w.src[0] === -1 ? f.args : (Array.isArray(f.results) ? f.results[w.src[0]] : null);
+      const dstObj = w.dest[0] === -2 ? f.out : (Array.isArray(f.inputs) ? f.inputs[w.dest[0]] : null);
+      m.sel = { kind: "wire", index: k, text: `${nameOf(c, w.src[0])}.${w.src[1]} → ${nameOf(c, w.dest[0])}.${w.dest[1]}`, state: dv.wires[k],
+        src: dbgOwn(srcObj, w.src[1]) ? { has: true, value: srcObj[w.src[1]] } : { has: false, value: null },
+        dest: dbgOwn(dstObj, w.dest[1]) ? { has: true, value: dstObj[w.dest[1]] } : { has: false, value: null } };
+    } else if (selSync != null && c && Array.isArray(c.syncs) && c.syncs[selSync]) {
+      m.sel = { kind: "sync", index: selSync, text: syncText(c, c.syncs[selSync]), state: dv.syncs[selSync] };
+    } else if (mk && +mk[1] === activeDeck && c && c.cmds[+mk[2]]) {
+      const i = +mk[2], op = c.cmds[i];
+      const inp = (Array.isArray(f.inputs) && f.inputs[i]) || {}, dl = (Array.isArray(f.dlv) && f.dlv[i]) || {};
+      const res = Array.isArray(f.results) ? f.results[i] : null;
+      const resObj = res && typeof res === "object" ? res : {};
+      const inTerms = Array.from(new Set([...Object.keys(op.in || {}), ...Object.keys(inp)]));
+      const outTerms = Array.from(new Set([...Object.keys(op.out || {}), ...Object.keys(resObj)]));
+      m.sel = { kind: "op", index: i, name: nameOf(c, i), type: op.type, state: dv.ops[i], done: !!(Array.isArray(f.done) && f.done[i]),
+        running: f.inprog && f.inprog.op === i ? (f.inprog.stage || "running") : null,
+        inputs: inTerms.map((t) => ({ term: t, has: dbgOwn(inp, t), value: dbgOwn(inp, t) ? inp[t] : null, delivered: !!dl[t] })),
+        outputs: outTerms.map((t) => ({ term: t, has: dbgOwn(resObj, t), value: dbgOwn(resObj, t) ? resObj[t] : null })),
+        results: res == null ? null : res };
+    }
+    return m;
+  }
+  function dbgKv(parent, rows, cls) {
+    if (!rows.length) { const p = edNote(parent, "—"); p.classList.add("fe-dbgi-none"); return null; }
+    const t = document.createElement("table"); t.className = "fe-dbgi-kv" + (cls ? " " + cls : "");
+    for (const r of rows) {
+      const tr = document.createElement("tr"); tr.dataset.term = r.k; if (r.cls) tr.className = r.cls;
+      const a = document.createElement("td"); a.className = "k"; a.textContent = r.k;
+      const b = document.createElement("td"); b.className = "v"; b.textContent = r.v;
+      tr.append(a, b);
+      if (r.mark != null) { const mk = document.createElement("td"); mk.className = "m"; mk.textContent = r.mark; mk.title = r.markTitle || ""; tr.appendChild(mk); }
+      t.appendChild(tr);
+    }
+    parent.appendChild(t); return t;
+  }
+  const dbgObjRows = (o) => Object.keys(o && typeof o === "object" ? o : {}).map((k) => ({ k, v: dbgVal(o[k]) }));
+  function renderDebugInspector(body, key) {
+    const m = dbgInspModel(key); dbgInsp = m;
+    body.replaceChildren();
+    if (!m) return;
+    const head = document.createElement("p"); head.className = "fe-ed-head fe-dbgi-head";
+    head.innerHTML = `<b>debugger</b> <span class="lbl">step ${m.cursor} / ${m.length}${m.ended ? " · ended" : m.running ? " · running…" : ""}</span>`;
+    body.appendChild(head);
+    edNote(body, m.event).classList.add("fe-dbgi-ev");
+    // the frame stack, top first
+    edLbl(body, "frames · top first — click to focus");
+    const ul = document.createElement("ul"); ul.className = "fe-dbgi-frames";
+    for (const fr of m.frames) {
+      const li = document.createElement("li");
+      li.className = "fe-dbgi-frame" + (fr.focused ? " focused" : "") + (fr.top ? " top" : "") + (fr.showable ? "" : " external");
+      li.dataset.fi = String(fr.fi);
+      li.textContent = `${fr.title} · case ${fr.case + 1} · ${fr.phase || "—"}${fr.outcome ? " · " + fr.outcome : ""}`;
+      li.title = fr.showable ? "focus this frame's case" : "a callee this editor does not hold";
+      if (fr.showable) li.addEventListener("click", () => debugFocusFrame(fr.fi));
+      ul.appendChild(li);
+    }
+    body.appendChild(ul);
+    if (!m.follow) edButton(edBtns(body), "follow the top frame", "fe-dbgi-follow", debugFollowNow);
+    // the ready set: click = run it next
+    if (m.ready.length && !m.ended && !m.running) {
+      edLbl(body, "ready — click to run it next");
+      const rb = edBtns(body); rb.classList.add("fe-dbgi-ready");
+      for (const it of m.ready) {
+        const b = edButton(rb, it.text + (it.isDefault ? " ·default" : ""), "fe-dbgi-pick" + (it.isDefault ? " default" : ""), () => debugStep("into", { kind: it.kind, index: it.index }));
+        b.dataset.kind = it.kind; b.dataset.index = String(it.index);
+      }
+    }
+    if (!m.frame) { edNote(body, "no frame runs this case right now — click a frame above, or follow the top frame").classList.add("fe-dbgi-noframe"); return; }
+    // the selection, in the focused frame
+    const s = m.sel;
+    const sec = document.createElement("div"); sec.className = "fe-dbgi-sel"; body.appendChild(sec);
+    if (s && s.kind === "op") {
+      sec.dataset.kind = "op"; sec.dataset.index = String(s.index);
+      const h = document.createElement("p"); h.className = "fe-dbgi-selhead";
+      h.innerHTML = `<b>${esc(s.name)}</b> <span class="lbl">${esc(s.type)}</span> <span class="fe-dbgi-st s-${esc(s.state)}">${esc(s.state)}${s.running ? " · " + esc(s.running) : ""}</span>`;
+      sec.appendChild(h);
+      edLbl(sec, "inputs");
+      dbgKv(sec, s.inputs.map((x) => ({ k: x.term, v: x.has ? dbgVal(x.value) : "—", mark: x.delivered ? "✓" : "·", markTitle: x.delivered ? "delivered" : "not delivered yet", cls: x.delivered ? "dlv" : "pend" })), "fe-dbgi-in");
+      edLbl(sec, s.results == null ? "outputs · not evaluated" : "outputs");
+      dbgKv(sec, s.outputs.map((x) => ({ k: x.term, v: x.has ? dbgVal(x.value) : "—", cls: x.has ? "has" : "pend" })), "fe-dbgi-out");
+    } else if (s && s.kind === "wire") {
+      sec.dataset.kind = "wire"; sec.dataset.index = String(s.index);
+      const h = document.createElement("p"); h.className = "fe-dbgi-selhead";
+      h.innerHTML = `<b>wire</b> ${esc(s.text)} <span class="fe-dbgi-st s-${esc(s.state)}">${esc(s.state)}</span>`;
+      sec.appendChild(h);
+      dbgKv(sec, [{ k: "source", v: s.src.has ? dbgVal(s.src.value) : "—" }, { k: "delivered", v: s.dest.has ? dbgVal(s.dest.value) : "—" }], "fe-dbgi-wire");
+    } else if (s && s.kind === "sync") {
+      sec.dataset.kind = "sync"; sec.dataset.index = String(s.index);
+      const h = document.createElement("p"); h.className = "fe-dbgi-selhead";
+      h.innerHTML = `<b>synchro</b> ${esc(s.text)} <span class="fe-dbgi-st s-${esc(s.state)}">${esc(s.state)}</span>`;
+      sec.appendChild(h);
+    } else edNote(sec, "click an op or a wire (not a ready one — that runs it) to see its values");
+    // the focused frame: args in, out so far
+    const fr = m.frame;
+    edLbl(body, `frame ${fr.fi === 0 ? "root" : "#" + fr.fi} · case ${fr.case + 1} · args`);
+    dbgKv(body, dbgObjRows(fr.args), "fe-dbgi-args");
+    edLbl(body, "out" + (fr.outcome ? ` · ${fr.outcome}` : "") + (fr.phase ? ` · ${fr.phase}` : ""));
+    dbgKv(body, dbgObjRows(fr.out), "fe-dbgi-fout");
+  }
+  // focus frame fi's case (a click in the stack): the focus stops following
+  // the top frame until the next move (or "follow the top frame")
+  function debugFocusFrame(fi) {
+    if (!dbgActive()) return null;
+    const chain = FD.focusChain(dbg.views);
+    if (!(fi >= 0 && fi < chain.length)) { status("that frame runs a callee this editor doesn't hold", "bad"); return null; }
+    dbg.follow = fi === dbg.views.length - 1;
+    focusPath = chain.slice(0, fi + 1).map((x, k) => (k === 0 ? { root: doc.root, title: "case 1" } : { root: x.root, op: x.op, title: x.title }));
+    activeDeck = chain[fi].case;
+    cancelWireGhost();
+    selWire = null; selWireRef = null; selSync = null; selSyncRef = null; selSyncCase = null;
+    if (hostApi) hostApi.setState("selectedKey", null);
+    renderAll(); refreshInspector();
+    status(`debug: showing frame ${fi === 0 ? "root" : dbgFrameTitle(dbg.views[fi])} · case ${activeDeck + 1}` + (dbg.follow ? "" : " — the next move follows the top frame again"), "ok");
+    return { fi, depth: focusPath.length, deck: activeDeck, follow: dbg.follow };
+  }
+  function debugFollowNow() {
+    if (!dbgActive()) return null;
+    dbg.follow = true;
+    if (debugFollow()) renderAll(); else { syncDebugState(); renderFacade(); }
+    refreshInspector();
+    return { depth: focusPath.length, deck: activeDeck };
   }
 
   // ── P4: the in-editor journal + diff ─────────────────────────────────────
