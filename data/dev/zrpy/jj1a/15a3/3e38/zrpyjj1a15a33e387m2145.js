@@ -116,6 +116,25 @@ me.ready = function () {
             ctx.setRig("dbg", "visible", show);
           }
         }
+        // D4 BREAKPOINT dot: host.state.bps = { deck, ops: [opIndex...],
+        // ghost, color } for the editor's focused case. Set = a solid dot;
+        // while a debug session is open (ghost) every op shows a faint one,
+        // so a tap can set it. ctx.me._bp mirrors 0 hidden / 1 ghost / 2 set.
+        {
+          const bp = hs && hs.bps;
+          const km = /^d(\d+)_op(\d+)$/.exec(ctx.key || "");
+          let bs = 0;
+          if (bp && km && +km[1] === bp.deck) bs = (Array.isArray(bp.ops) && bp.ops.includes(ctx.me.opIndex)) ? 2 : (bp.ghost ? 1 : 0);
+          if (bs !== ctx.me._bp && ctx.setRig) {
+            ctx.me._bp = bs;
+            if (bs) {
+              const tok = String((bp && bp.color) || getComputedStyle(document.documentElement).getPropertyValue("--fe-dbg-bp")).trim();
+              const color = /^#[0-9a-f]{3,8}$/i.test(tok) ? tok : "#e5484d";
+              ctx.setRig("bp", "material", { color, opacity: bs === 2 ? 1 : 0.3, emissive: bs === 2 });
+            }
+            ctx.setRig("bp", "visible", bs > 0);
+          }
+        }
         if (!ctx.me._standalone) { ctx.rig.pos.y = base; return; }
         // a node mid wire-gesture freezes; the rest breathe
         const wiring = hs && hs.wireSrc;
@@ -132,6 +151,8 @@ me.ready = function () {
         if (!ctx.host) return;
         const node = hit && hit.node;
         const st = ctx.host.state || (ctx.host.state = {});
+        // D4: the breakpoint dot toggles the op's breakpoint (the editor owns it)
+        if (node === "bp") { if (typeof st.onBpTap === "function") st.onBpTap({ key: ctx.key, opIndex: ctx.me.opIndex }); return; }
         if (node && /^(in|out)\d+$/.test(node)) {
           // which = "in"|"out", socket ordinal = the trailing number
           const which = node.slice(0, 2) === "in" ? "in" : "out";
