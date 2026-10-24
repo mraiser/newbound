@@ -1,18 +1,34 @@
 // Flow step debugger core - P6: DELEGATES to the flowlang crate's stepper (flowlang::stepper),
-// the single source of truth for flow execution. The stepper used to be a copy here (P2); now
-// Code::execute is a continue-to-end over the same crate stepper, so the debugger and the runtime
-// share one execution semantics (spec: dev/_ASSETS/docs/flow-language.md 1.5.4). This command keeps
-// only the debug-session wrapper: the state bootstrap, the pick validation (a not-ready pick is
-// refused with the state unchanged), the seq bookkeeping, and the {state, event, ready, default,
-// ended, depth} envelope. The step itself is flowlang::stepper::step_stack over the crate's frame
-// shape (flowlang::stepper::new_frame / copy_frame), so a saved debug state is interchangeable with
-// a runtime frame stack.
+// the single source of truth for flow execution. Code::execute is a continue-to-end over the same
+// crate stepper, so the debugger and the runtime share one execution semantics (spec:
+// dev/_ASSETS/docs/flow-language.md 1.5.4). This command keeps only the debug-session wrapper:
+// the state bootstrap, the pick validation (a not-ready pick is refused with the state unchanged),
+// the seq bookkeeping, and the {state, event, ready, default, ended, depth} envelope. The step
+// itself is flowlang::stepper::step_stack over the crate's frame shape (new_frame / copy_frame),
+// so a saved debug state is interchangeable with a runtime frame stack.
+//
+// R2 repair (against flowlang 0.3.41):
+//  - step_stack returns the EVENT object directly (not an {event,...} wrapper) - the old adapter
+//    read out.get_object("event") and died on the first real step ("Key 'event' not found").
+//  - a frame's `case` is an INTEGER index - the old pick validation read top.get_object("case")
+//    (a panic); the current case comes from st::case_at(body, case_index).
+//  - ready_set indices ARE graph indices, so an explicit pick validates by graph identity
+//    ({kind, index} membership in the post-step top-frame ready set), never by an ordinal within
+//    the ready subset of that kind; the same number is forwarded to step_stack unchanged.
+//  - the envelope's post-step ready/default come from st::ready_now / st::default_pick with the
+//    session's own semantics; `ended` is the root phase.
 use flowlang::stepper as st;
 
 fn panic_text(p: &Box<dyn std::any::Any + Send>) -> String {
   if let Some(s) = p.downcast_ref::<&str>() { s.to_string() }
   else if let Some(s) = p.downcast_ref::<String>() { s.clone() }
   else { "unknown panic".to_string() }
+}
+fn end_state(frames: &DataArray) -> DataObject {
+  let mut d = DataObject::new();
+  d.put_boolean("ended", frames.get_object(0).get_string("phase") == "ended");
+  d.put_int("depth", frames.len() as i64);
+  d
 }
 
 let mut res = DataObject::new();
@@ -40,28 +56,35 @@ let mut ns = DataObject::new();
 ns.put_object("body", body.clone());
 let root = frames.get_object(0);
 if root.get_string("phase") == "ended" {
-  let depth = frames.len() as i64;
-  ns.put_array("frames", frames); ns.put_int("seq", seq);
+  ns.put_array("frames", frames.clone()); ns.put_int("seq", seq);
   res.put_string("status", "ok"); res.put_object("state", ns); res.put_null("event");
-  res.put_boolean("ended", true); res.put_array("ready", DataArray::new()); res.put_int("depth", depth);
+  res.put_boolean("ended", true); res.put_array("ready", DataArray::new());
+  res.put_null("default"); res.put_int("depth", frames.len() as i64);
   return res;
 }
-let top = frames.get_object(frames.len() - 1);
+// Validate an explicit pick against the CURRENT top frame by graph identity before stepping, so a
+// bad pick leaves the state untouched. kind/index are required ints/strings; anything not in the
+// current ready set is refused with status err (never a panic, never a forced execution).
 let mut pk = DataObject::new();
 if pick.has("kind") {
   let kind = pick.get_string("kind");
-  let ready = st::ready_set(&top.get_object("case"), &top);
-  let idx = if pick.has("index") { pick.get_int("index") } else { -1 };
+  if !(kind == "wire" || kind == "sync" || kind == "op") || !pick.has("index") || !pick.get_property("index").is_int() {
+    res.put_string("status", "err");
+    res.put_string("msg", "pick needs kind wire|sync|op and an integer index");
+    res.put_object("state", state.clone());
+    return res;
+  }
+  let idx = pick.get_int("index");
+  let top = frames.get_object(frames.len() - 1);
+  let cur = st::ready_now(&top);
   let mut found = false;
-  let mut k = 0;
-  for r in ready.objects() {
+  for r in cur.objects() {
     let r = r.object();
-    if r.get_string("kind") == kind && k == idx { found = true; break; }
-    if r.get_string("kind") == kind { k += 1; }
+    if r.has("kind") && r.get_string("kind") == kind && r.has("index") && r.get_property("index").is_int() && r.get_int("index") == idx { found = true; break; }
   }
   if !found {
     res.put_string("status", "err");
-    res.put_string("msg", "pick is not READY in the top frame; state unchanged");
+    res.put_string("msg", &format!("pick {} {} is not READY in the top frame; state unchanged", kind, idx));
     res.put_object("state", state.clone());
     return res;
   }
@@ -69,8 +92,8 @@ if pick.has("kind") {
   pk.put_int("index", idx);
 }
 let stepped = panic::catch_unwind(panic::AssertUnwindSafe(|| st::step_stack(&mut frames, &pk)));
-let out = match stepped {
-  Ok(o) => o,
+let event = match stepped {
+  Ok(e) => e,
   Err(e) => {
     res.put_string("status", "err");
     res.put_string("msg", &format!("step panic: {}", panic_text(&e)));
@@ -78,13 +101,26 @@ let out = match stepped {
     return res;
   }
 };
+// Post-step view: ready/default from the NEW top frame with the session's semantics, ended from
+// the root phase, depth = frames. default_pick mutates only the cursor of a throwaway copy.
+let top = frames.get_object(frames.len() - 1);
+let ready = st::ready_now(&top);
+let mut peek = st::copy_frame(&top);
+let dflt: Option<DataObject> = match st::case_at(&top.get_object("body"), top.get_int("case")) {
+  Some(c) => match st::default_pick(&c, &mut peek) {
+    Some((k, i)) => { let mut o = DataObject::new(); o.put_string("kind", &k); o.put_int("index", i as i64); Some(o) }
+    None => None,
+  },
+  None => None,
+};
+let es = end_state(&frames);
 ns.put_array("frames", frames);
 ns.put_int("seq", seq + 1);
 res.put_string("status", "ok");
 res.put_object("state", ns);
-res.put_object("event", out.get_object("event"));
-res.put_array("ready", out.get_array("ready"));
-res.put_object("default", out.get_object("default"));
-res.put_boolean("ended", out.get_boolean("ended"));
-res.put_int("depth", out.get_int("depth"));
+res.put_object("event", event);
+res.put_array("ready", ready);
+match dflt { Some(d) => res.put_object("default", d), None => res.put_null("default") };
+res.put_boolean("ended", es.get_boolean("ended"));
+res.put_int("depth", es.get_int("depth"));
 res
