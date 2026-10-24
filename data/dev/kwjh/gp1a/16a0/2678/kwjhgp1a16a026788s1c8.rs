@@ -76,6 +76,12 @@ if pick.has("kind") {
   }
   let idx = pick.get_int("index");
   let top = frames.get_object(frames.len() - 1);
+  if top.get_string("phase") != "run" {
+    res.put_string("status", "err");
+    res.put_string("msg", "no ready pick is available before the top frame is running (mid enter/seed); take the default step");
+    res.put_object("state", state.clone());
+    return res;
+  }
   let cur = st::ready_now(&top);
   let mut found = false;
   for r in cur.objects() {
@@ -102,17 +108,22 @@ let event = match stepped {
   }
 };
 // Post-step view: ready/default from the NEW top frame with the session's semantics, ended from
-// the root phase, depth = frames. default_pick mutates only the cursor of a throwaway copy.
+// the root phase, depth = frames. default_pick mutates only the cursor of a throwaway copy. A top
+// frame not yet in `run` (mid enter/seed) carries no ready arrays - report an empty ready and a
+// null default rather than dereference state seed has not built yet.
 let top = frames.get_object(frames.len() - 1);
-let ready = st::ready_now(&top);
-let mut peek = st::copy_frame(&top);
-let dflt: Option<DataObject> = match st::case_at(&top.get_object("body"), top.get_int("case")) {
-  Some(c) => match st::default_pick(&c, &mut peek) {
-    Some((k, i)) => { let mut o = DataObject::new(); o.put_string("kind", &k); o.put_int("index", i as i64); Some(o) }
+let running = top.get_string("phase") == "run";
+let ready = if running { st::ready_now(&top) } else { DataArray::new() };
+let dflt: Option<DataObject> = if running {
+  let mut peek = st::copy_frame(&top);
+  match st::case_at(&top.get_object("body"), top.get_int("case")) {
+    Some(c) => match st::default_pick(&c, &mut peek) {
+      Some((k, i)) => { let mut o = DataObject::new(); o.put_string("kind", &k); o.put_int("index", i as i64); Some(o) }
+      None => None,
+    },
     None => None,
-  },
-  None => None,
-};
+  }
+} else { None };
 let es = end_state(&frames);
 ns.put_array("frames", frames);
 ns.put_int("seq", seq + 1);
