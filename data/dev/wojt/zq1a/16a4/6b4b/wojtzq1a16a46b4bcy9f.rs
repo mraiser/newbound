@@ -222,22 +222,26 @@ fn alias_walk(d: &Data, path: &mut Vec<P>, seen: &mut HashMap<usize, DataArray>,
   else { for (i, v) in d.array().objects().iter().enumerate() { path.push(P::I(i)); alias_walk(v, path, seen, groups); path.pop(); } }
 }
 fn aliases(st: &DataObject) -> DataArray {
-  let mut seen = HashMap::new(); let mut groups = DataArray::new(); let mut path = Vec::new();
-  alias_walk(&Data::DObject(st.data_ref), &mut path, &mut seen, &mut groups);
-  // Only duplicates have two or more paths. `seen` entries include single paths used for cycle guards.
-  // Key by the WHOLE first path, not its first component: nearly every frame alias starts
-  // with "frames", and merging those unrelated groups also breaks the group-length accounting.
-  let mut counts: HashMap<String, usize> = HashMap::new();
-  for g in groups.objects() { let a = g.array(); if a.len() > 0 { *counts.entry(canon_str(&Data::DArray(a.data_ref))).or_insert(0) += 1; } }
-  let mut out = DataArray::new(); let mut i = 0;
-  while i < groups.len() {
-    let first = groups.get_array(i); let key = canon_str(&Data::DArray(first.data_ref)); let n = *counts.get(&key).unwrap_or(&0);
-    if n > 0 {
-      let mut paths = DataArray::new();
-      for j in 0..=n { paths.push_property(groups.get_property(i + j)); }
-      out.push_array(paths);
+  let mut seen = HashMap::new(); let mut pairs = DataArray::new(); let mut path = Vec::new();
+  alias_walk(&Data::DObject(st.data_ref), &mut path, &mut seen, &mut pairs);
+  // A repeated reference contributes its original path once, then each later path.
+  // Join pairs by the complete original path; never index across unrelated groups.
+  let mut out = DataArray::new(); let mut used: HashMap<String, bool> = HashMap::new();
+  let mut i = 0;
+  while i < pairs.len() {
+    let first = pairs.get_array(i); let key = canon_str(&Data::DArray(first.data_ref));
+    if !used.contains_key(&key) {
+      used.insert(key.clone(), true);
+      let mut paths = DataArray::new(); paths.push_array(first.clone());
+      let mut j = i + 1;
+      while j + 1 < pairs.len() {
+        let candidate = pairs.get_array(j);
+        if canon_str(&Data::DArray(candidate.data_ref)) == key { paths.push_array(pairs.get_array(j + 1)); j += 2; }
+        else { j += 1; }
+      }
+      if paths.len() > 1 { out.push_array(paths); }
     }
-    i += n + 1;
+    i += 2;
   }
   out
 }
