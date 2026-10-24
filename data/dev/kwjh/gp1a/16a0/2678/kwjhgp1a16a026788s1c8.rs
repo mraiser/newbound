@@ -30,6 +30,26 @@ fn end_state(frames: &DataArray) -> DataObject {
   d.put_int("depth", frames.len() as i64);
   d
 }
+// Readiness is a VIEW, never extra execution state. Both successful steps and refused picks report
+// the current top frame's real ready set and default; default_pick touches only a throwaway frame copy.
+fn ready_view(top: &DataObject) -> (DataArray, Option<DataObject>) {
+  if top.get_string("phase") != "run" { return (DataArray::new(), None); }
+  let ready = st::ready_now(top);
+  let dflt = match st::case_at(&top.get_object("body"), top.get_int("case")) {
+    Some(c) => {
+      let mut peek = st::copy_frame(top);
+      st::default_pick(&c, &mut peek).map(|(k, i)| {
+        let mut o = DataObject::new(); o.put_string("kind", &k); o.put_int("index", i as i64); o
+      })
+    },
+    None => None,
+  };
+  (ready, dflt)
+}
+fn put_ready_view(res: &mut DataObject, ready: DataArray, dflt: Option<DataObject>) {
+  res.put_array("ready", ready);
+  match dflt { Some(d) => res.put_object("default", d), None => res.put_null("default") };
+}
 
 let mut res = DataObject::new();
 if !st::is_obj(&state, "body") {
@@ -67,11 +87,21 @@ if root.get_string("phase") == "ended" {
 // current ready set is refused with status err (never a panic, never a forced execution).
 let mut pk = DataObject::new();
 if pick.has("kind") {
+  if !pick.get_property("kind").is_string() || !pick.has("index") || !pick.get_property("index").is_int() {
+    res.put_string("status", "err");
+    res.put_string("msg", "pick needs kind wire|sync|op and an integer index");
+    res.put_object("state", state.clone());
+    let (ready, dflt) = ready_view(&frames.get_object(frames.len() - 1));
+    put_ready_view(&mut res, ready, dflt);
+    return res;
+  }
   let kind = pick.get_string("kind");
   if !(kind == "wire" || kind == "sync" || kind == "op") || !pick.has("index") || !pick.get_property("index").is_int() {
     res.put_string("status", "err");
     res.put_string("msg", "pick needs kind wire|sync|op and an integer index");
     res.put_object("state", state.clone());
+    let (ready, dflt) = ready_view(&frames.get_object(frames.len() - 1));
+    put_ready_view(&mut res, ready, dflt);
     return res;
   }
   let idx = pick.get_int("index");
@@ -80,6 +110,8 @@ if pick.has("kind") {
     res.put_string("status", "err");
     res.put_string("msg", "no ready pick is available before the top frame is running (mid enter/seed); take the default step");
     res.put_object("state", state.clone());
+    let (ready, dflt) = ready_view(&top);
+    put_ready_view(&mut res, ready, dflt);
     return res;
   }
   let cur = st::ready_now(&top);
@@ -92,6 +124,8 @@ if pick.has("kind") {
     res.put_string("status", "err");
     res.put_string("msg", &format!("pick {} {} is not READY in the top frame; state unchanged", kind, idx));
     res.put_object("state", state.clone());
+    let (ready, dflt) = ready_view(&top);
+    put_ready_view(&mut res, ready, dflt);
     return res;
   }
   pk.put_string("kind", &kind);
@@ -112,26 +146,14 @@ let event = match stepped {
 // frame not yet in `run` (mid enter/seed) carries no ready arrays - report an empty ready and a
 // null default rather than dereference state seed has not built yet.
 let top = frames.get_object(frames.len() - 1);
-let running = top.get_string("phase") == "run";
-let ready = if running { st::ready_now(&top) } else { DataArray::new() };
-let dflt: Option<DataObject> = if running {
-  let mut peek = st::copy_frame(&top);
-  match st::case_at(&top.get_object("body"), top.get_int("case")) {
-    Some(c) => match st::default_pick(&c, &mut peek) {
-      Some((k, i)) => { let mut o = DataObject::new(); o.put_string("kind", &k); o.put_int("index", i as i64); Some(o) }
-      None => None,
-    },
-    None => None,
-  }
-} else { None };
+let (ready, dflt) = ready_view(&top);
 let es = end_state(&frames);
 ns.put_array("frames", frames);
 ns.put_int("seq", seq + 1);
 res.put_string("status", "ok");
 res.put_object("state", ns);
 res.put_object("event", event);
-res.put_array("ready", ready);
-match dflt { Some(d) => res.put_object("default", d), None => res.put_null("default") };
+put_ready_view(&mut res, ready, dflt);
 res.put_boolean("ended", es.get_boolean("ended"));
 res.put_int("depth", es.get_int("depth"));
 res
