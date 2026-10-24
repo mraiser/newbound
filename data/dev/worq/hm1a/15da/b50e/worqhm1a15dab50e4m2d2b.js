@@ -2192,6 +2192,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const r = await FD.client.start(src, body, args || {});
     if (!r || r.status !== "ok" || !r.session) { status("debug start failed: " + ((r && r.msg) || "no session"), "bad"); return r; }
     dbg = { session: r.session, src, args: args || {}, st: null, views: [], busy: false, last: r, follow: true, sig: "", unsaved: dirty };
+    dbgTape = []; dbgTapeCursor = -1;                    // D5: a fresh tape
     ME.classList.add("fe-debugging");
     pushJournal(`debug session · ${src.cmd}` + (dirty ? " (unsaved body)" : ""));
     if (bpPlaces().length) await sendBreakpoints();   // D4: the editor's breakpoints ride every session
@@ -2225,6 +2226,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       // reverse); continue/goto/pause/back(n) only redraw
       const back1 = mode === "back" && !!prevEv && !(pick && pick.count > 1);
       const evs = back1 ? [prevEv] : (!r.running && Array.isArray(r.events) && !r.events_truncated ? r.events : []);
+      // D5: the timeline's tape: every reply's event span (a move's own events,
+      // or continue/back(n)/goto's span) records its steps' events
+      if (!r.running && Array.isArray(r.events) && !r.events_truncated) dbgRecordEvents(r.events, r.cursor);
       const ride = { mode, reverse: back1, events: evs.map((e) => e.seq), a: null, b: null };
       if (evs.length) ride.a = await dbgShow(evs, back1, null);   // on the picture as it stands
       if (dbg !== d) return r;
@@ -2546,6 +2550,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   function renderDebugBar() {
     const on = dbgActive();
     const bar = $(".fe-dbg"); if (bar) bar.hidden = !on;
+    renderTimeline();
     const dbtn = $(".fe-debug"); if (dbtn) { dbtn.textContent = on ? "debugging ■" : "debug ⏯"; dbtn.setAttribute("aria-pressed", String(on)); dbtn.title = on ? "Stop debugging (⇧F5)" : "Debug: step through the CURRENT body, unsaved edits included (F11 / F10 start a session)"; }
     if (!on || !bar) return;
     const st = dbg.st || {};
@@ -2655,6 +2660,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     body.appendChild(head);
     edNote(body, m.event).classList.add("fe-dbgi-ev");
     if (m.stop) edNote(body, "● " + m.stop).classList.add("fe-dbgi-bphit");   // D4
+    renderTimelineInspector(body, m);   // D5: the tape + branches
     // the frame stack, top first
     edLbl(body, "frames · top first — click to focus");
     const ul = document.createElement("ul"); ul.className = "fe-dbgi-frames";
@@ -3170,6 +3176,30 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       onClick(".fe-dbg-cont", () => debugStep("continue", { budget: 10000 }));
       onClick(".fe-dbg-pause", () => debugStep("pause"));
       onClick(".fe-dbg-stop", () => debugStop());
+      // D5: scrub the tape on the top strip (click / drag / ←→; double-click steps)
+      {
+        const tr = $(".fe-dbg-tl-track");
+        if (tr) {
+          const go = (e) => { if (dbgActive() && !(dbg.st && dbg.st.running)) debugStep("goto", { seq: tlSeqAt(tr, e.clientX) }); };
+          tr.addEventListener("pointerdown", (e) => { if (!dbgActive() || (dbg.st && dbg.st.running)) return; e.preventDefault(); tlDrag = true; try { tr.setPointerCapture(e.pointerId); } catch (e2) {} go(e); });
+          tr.addEventListener("pointermove", (e) => { if (tlDrag) go(e); });
+          tr.addEventListener("pointerup", () => { tlDrag = null; });
+          tr.addEventListener("pointercancel", () => { tlDrag = null; });
+          tr.addEventListener("dblclick", (e) => {
+            if (!dbgActive() || (dbg.st && dbg.st.running)) return;
+            const seq = tlSeqAt(tr, e.clientX);
+            const cur = (dbg.st && typeof dbg.st.cursor === "number") ? dbg.st.cursor : 0;
+            if (seq === cur + 1) debugStep("into");
+            else if (seq !== cur) debugStep("goto", { seq });
+          });
+          tr.addEventListener("keydown", (e) => {
+            if (!dbgActive()) return;
+            const cur = (dbg.st && typeof dbg.st.cursor === "number") ? dbg.st.cursor : 0;
+            if (e.key === "ArrowLeft") { e.preventDefault(); debugStep("goto", { seq: cur - 1 }); }
+            else if (e.key === "ArrowRight") { e.preventDefault(); debugStep("goto", { seq: cur + 1 }); }
+          });
+        }
+      }
       renderDebugBar();
       const sjB = $(".fe-sj-refresh"); if (sjB) sjB.addEventListener("click", () => { refreshJournal(); });
       renderChanges();
@@ -3333,6 +3363,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
             bphit: (body.querySelector(".fe-dbgi-bphit") || {}).textContent || null,
             bpToggle: (() => { const b = body.querySelector(".fe-dbgi-bp"); return b ? { on: b.dataset.on === "true", text: b.textContent } : null; })(),
             bps: Array.from(body.querySelectorAll(".fe-dbgi-bpi")).map((li) => ({ kind: li.dataset.kind, index: +li.dataset.index, case: +li.dataset.case, depth: +li.dataset.depth, text: li.textContent })),
+            branchSwaps: Array.from(body.querySelectorAll(".fe-dbgi-bswap")).map((b) => b.textContent),
+            tlNote: (body.querySelector(".fe-dbgi-tl-track") ? "shown" : null),
           };
         },
         dbgVal,
@@ -3346,6 +3378,20 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         bpSent: () => (dbg && dbg.bpSent ? JSON.parse(JSON.stringify(dbg.bpSent)) : null),
         debugStop: () => (dbg && dbg.stop ? JSON.parse(JSON.stringify(dbg.stop)) : null),
         debugStopText: dbgStopText,
+        // D5 timeline surface
+        debugBranch, debugTimeline: () => {
+          const strip = $(".fe-dbg-timeline");
+          const tickEls = Array.from(document.querySelectorAll(".fe-dbg-tl-tick"));
+          const cur = document.querySelector(".fe-dbg-tl-cursor");
+          return {
+            shown: !!(strip && !strip.hidden),
+            pos: ($(".fe-dbg-tl-pos") || {}).textContent || "",
+            ticks: tickEls.map((t) => ({ seq: +t.dataset.seq, type: (t.className.match(/t-([a-z]+)/) || [])[1] || "", left: t.style.left, title: t.title })),
+            branches: Array.from(document.querySelectorAll(".fe-dbg-tl-branch")).map((b) => ({ left: b.style.left, width: b.style.width, title: b.title })),
+            cursor: cur ? { left: cur.style.left } : null,
+            tape: dbgTape.filter((x) => x).map((x) => ({ seq: x.seq, type: x.type, user: !!x.user })),
+          };
+        },
       };
     }).catch((e) => { status("boot failed: " + (e && e.message ? e.message : e), "bad"); return null; });
   }
