@@ -262,10 +262,27 @@ fn link_aliases(root: &DataObject, groups: &DataArray) {
     }
   }
 }
-fn restore_aliases(s: &mut DataObject) {
+fn cursor_aliases(s: &DataObject) -> DataArray {
   let (c, base) = (gi(s, "cursor"), gi(s, "base"));
-  let a = if c == base { ga(&go(&s.get_object("snaps"), &base.to_string()), "a") } else { ga(&s.get_array("tape").get_object((c - 1 - base) as usize), "a") };
+  if c == base { ga(&go(&s.get_object("snaps"), &base.to_string()), "a") } else { ga(&s.get_array("tape").get_object((c - 1 - base) as usize), "a") }
+}
+fn restore_aliases(s: &mut DataObject) {
+  let a = cursor_aliases(s);
   if a.len() > 0 { unshare(s); let cur = s.get_object("cur"); link_aliases(&cur, &a); }
+}
+fn path_prefix(p: &DataArray, prefix: &DataArray) -> bool {
+  if prefix.len() > p.len() { return false; }
+  for i in 0..prefix.len() { if !same_scalar(&p.get_property(i), &prefix.get_property(i)) { return false; } }
+  true
+}
+fn aliases_after_edit(before: &DataArray, edited: &DataArray) -> DataArray {
+  let mut out = DataArray::new();
+  for g in before.objects() {
+    let paths = g.array(); let mut keep = DataArray::new();
+    for p in paths.objects() { if !path_prefix(&p.array(), edited) { keep.push_property(p); } }
+    if keep.len() > 1 { out.push_array(keep); }
+  }
+  out
 }
 // ---- persistent globals ----
 fn scan(body: &DataObject, names: &mut DataArray) {
@@ -288,39 +305,41 @@ fn scan(body: &DataObject, names: &mut DataArray) {
   }
 }
 fn capture(names: &DataArray) -> DataObject {
-  let g = DataStore::globals();
-  let mut o = DataObject::new();
-  for i in 0..names.len() {
-    let k = names.get_string(i);
-    if g.has(&k) { o.put_object(&k, copy_val(&g.get_property(&k))); } else { o.put_object(&k, DataObject::new()); }
-  }
-  o
+  // ONE memo for the whole named global set: aliases within AND BETWEEN persistent keys survive.
+  // Missing keys stay missing; an explicitly present null is a real value.
+  let g = DataStore::globals(); let mut named = DataObject::new();
+  for i in 0..names.len() { let k = names.get_string(i); if g.has(&k) { named.set_property(&k, g.get_property(&k)); } }
+  copy_obj(&named)
 }
-fn gdiff(pre: &DataObject) -> DataArray {
-  let g = DataStore::globals();
-  let mut out = DataArray::new();
-  for (k, w) in pre.objects() {
-    let w = w.object();
-    let had = w.has("v"); let has = g.has(&k);
-    let changed = if had && has { canon_str(&w.get_property("v")) != canon_str(&g.get_property(&k)) } else { had != has };
+fn gdiff(pre: &DataObject, names: &DataArray) -> DataObject {
+  let post = capture(names); let mut out = DataArray::new();
+  for (k, _) in pre.objects() {
+    let had = true; let has = post.has(&k);
+    let changed = if has { canon_str(&pre.get_property(&k)) != canon_str(&post.get_property(&k)) } else { true };
     if !changed { continue; }
     let mut c = DataObject::new(); c.put_string("k", &k);
-    if had { c.set_property("o", w.get_property("v")); }
-    if has { let h = copy_val(&g.get_property(&k)); c.set_property("n", h.get_property("v")); }
+    if had { c.set_property("o", pre.get_property(&k)); }
+    if has { c.set_property("n", post.get_property(&k)); }
     out.push_object(c);
   }
-  out
+  for (k, _) in post.objects() {
+    if pre.has(&k) { continue; }
+    let mut c = DataObject::new(); c.put_string("k", &k); c.set_property("n", post.get_property(&k)); out.push_object(c);
+  }
+  let mut r = DataObject::new(); r.put_array("changes", out);
+  r.put_array("before_aliases", aliases(pre)); r.put_array("after_aliases", aliases(&post));
+  r
 }
 fn apply_g(e: &DataObject, fwd: bool) {
-  let gl = ga(e, "g");
-  let n = gl.len();
-  let mut g = DataStore::globals();
+  let gl = ga(e, "g"); let n = gl.len(); let mut g = DataStore::globals();
+  // Copy every changed value through one memo, then restore topology to unchanged named keys too.
+  let mut memo = Memo { o: HashMap::new(), a: HashMap::new() };
   for j in 0..n {
-    let c = gl.get_object(if fwd { j } else { n - 1 - j });
-    let k = gs(&c, "k");
-    let key = if fwd { "n" } else { "o" };
-    if c.has(key) { let h = copy_val(&c.get_property(key)); g.set_property(&k, h.get_property("v")); } else if g.has(&k) { g.remove_property(&k); }
+    let c = gl.get_object(if fwd { j } else { n - 1 - j }); let k = gs(&c, "k"); let key = if fwd { "n" } else { "o" };
+    if c.has(key) { let v = cp(&c.get_property(key), &mut memo); g.set_property(&k, v); } else if g.has(&k) { g.remove_property(&k); }
   }
+  let topology = ga(e, if fwd { "gafter" } else { "gbefore" });
+  link_aliases(&g, &topology);
 }
 // ---- views and frame helpers (on the plain copy) ----
 fn item(kind: &str, i: i64) -> DataObject { let mut o = DataObject::new(); o.put_string("kind", kind); o.put_int("index", i); o }
@@ -382,6 +401,7 @@ fn goto(s: &mut DataObject, k: i64) -> DataArray {
   } else if k < c { for q in (k..c).rev() { apply_entry(s, &tape.get_object((q - base) as usize), false); } }
   else { for q in c..k { apply_entry(s, &tape.get_object((q - base) as usize), true); } }
   s.put_int("cursor", k); s.put_boolean("live_ok", false);
+  restore_aliases(s);
   fx
 }
 fn replay_fwd(s: &mut DataObject) {
@@ -390,6 +410,7 @@ fn replay_fwd(s: &mut DataObject) {
   apply_g(&e, true);
   apply_entry(s, &e, true);
   s.put_int("cursor", c + 1); s.put_boolean("live_ok", false);
+  restore_aliases(s);
 }
 // the tape from c on becomes a branch record; returns its id
 fn fork(s: &mut DataObject, c: i64) -> i64 {
@@ -454,14 +475,15 @@ fn exec(s: &mut DataObject, core: &Command, pick: &DataObject, took: Option<Data
   let ev = go(&r, "event");
   let et = gs(&ev, "type");
   if et == "enter" { if let Some(t) = top_of(&ns) { if is_o(&t, "body") { scan(&t.get_object("body"), &mut pn); } } }
-  let g = gdiff(&pre);
+  let grecord = gdiff(&pre, &pn);
+  let g = ga(&grecord, "changes");
   let mut bodies = s.get_array("bodies"); let mut keys = s.get_array("bodykeys");
   let nc = snap(&ns, &mut bodies, &mut keys);
   let alias = aliases(&ns);
   let cur = s.get_object("cur");
   let mut ch = DataArray::new(); let mut size = 0i64; let mut path: Vec<P> = Vec::new();
   diff(&Data::DObject(cur.data_ref), &Data::DObject(nc.data_ref), &mut path, &mut ch, &mut size);
-  for c in g.objects() { size += nodes(&c); }
+  size += nodes(&Data::DObject(grecord.data_ref));
   let h = hash_obj(&nc);
   let view = mkview(&r);
   let seq = gi(s, "cursor");
@@ -472,6 +494,7 @@ fn exec(s: &mut DataObject, core: &Command, pick: &DataObject, took: Option<Data
   match &took { Some(t) => e.put_object("took", t.clone()), None => e.put_null("took") }
   e.put_boolean("user", pick.has("kind"));
   e.put_array("c", ch); e.put_array("g", g.clone());
+  e.put_array("gbefore", ga(&grecord, "before_aliases")); e.put_array("gafter", ga(&grecord, "after_aliases"));
   size += alias_size(&alias); e.put_array("a", alias);
   e.put_object("v", view.clone()); e.put_string("h", &h);
   e.put_boolean("fx", et == "eval" && gs(&ev, "optype") == "command" && !gb(&ev, "from_frame"));
@@ -676,8 +699,9 @@ if mode == "init" {
   let c = snap(&st, &mut bodies, &mut keys);
   let mut pn = DataArray::new(); scan(&body, &mut pn);
   let h = hash_obj(&c);
+  let alias = aliases(&st);
   let mut v0 = DataObject::new(); v0.put_null("event"); v0.put_array("ready", DataArray::new()); v0.put_null("default"); v0.put_boolean("ended", false); v0.put_int("depth", 0);
-  let mut sn = DataObject::new(); sn.put_object("s", c.clone()); sn.put_object("v", v0); sn.put_string("h", &h);
+  let mut sn = DataObject::new(); sn.put_object("s", c.clone()); sn.put_object("v", v0); sn.put_string("h", &h); sn.put_array("a", alias);
   let mut snaps = DataObject::new(); snaps.put_object("0", sn);
   s.put_array("bodies", bodies); s.put_array("bodykeys", keys);
   s.put_object("cur", c); s.put_boolean("shared", true);
@@ -725,7 +749,9 @@ match mode.as_str() {
     let v = cur_view(&s);
     if gb(&v, "ended") { return err("the run has ended - go back first"); }
     if c < n { let id = fork(&mut s, c); out.put_boolean("forked", true); out.put_int("branch", id); }
+    restore_aliases(&mut s);
     unshare(&mut s);
+    let old_aliases = cursor_aliases(&s);
     let cur = s.get_object("cur");
     // resolve the old value (the container must exist)
     let mut d = Data::DObject(cur.data_ref);
@@ -741,17 +767,22 @@ match mode.as_str() {
     if let Some(o) = old { let h = copy_val(&o); ch.set_property("o", h.get_property("v")); }
     let hv = copy_val(&pick.get_property("value")); ch.set_property("n", hv.get_property("v"));
     apply(&cur, &ch, true);
+    // An edit replaces one path: other aliases of the old value stay linked, but the edited path
+    // deliberately detaches (the normal assignment semantics of the editor's value edit).
+    let next_aliases = aliases_after_edit(&old_aliases, &p);
+    let cur = s.get_object("cur");
+    link_aliases(&cur, &next_aliases);
     let mut cl = DataArray::new(); cl.push_object(ch);
-    let mut ev = DataObject::new(); ev.put_string("type", "edit"); ev.put_array("path", p.clone()); let hv2 = copy_val(&pick.get_property("value")); ev.set_property("value", hv2.get_property("v"));
+    let mut ev = DataObject::new(); ev.put_string("type", "edit"); ev.put_int("seq", c); ev.put_array("path", p.clone()); let hv2 = copy_val(&pick.get_property("value")); ev.set_property("value", hv2.get_property("v"));
     let mut view = copy_obj(&v); view.put_object("event", ev);
     let h = hash_obj(&cur);
     let mut e = DataObject::new();
     e.put_int("seq", c); e.put_object("took", item("edit", 0)); e.put_boolean("user", true);
-    e.put_array("c", cl); e.put_array("g", DataArray::new()); e.put_object("v", view.clone()); e.put_string("h", &h);
-    e.put_boolean("fx", false); e.put_boolean("persist", false); e.put_int("size", 4);
+    e.put_array("c", cl); e.put_array("g", DataArray::new()); e.put_array("a", next_aliases.clone()); e.put_object("v", view.clone()); e.put_string("h", &h);
+    e.put_boolean("fx", false); e.put_boolean("persist", false); e.put_int("size", 4 + alias_size(&next_aliases));
     s.get_array("tape").push_object(e);
     s.put_int("cursor", c + 1); s.put_boolean("live_ok", false);
-    if (c + 1) % SNAP_EVERY == 0 { let mut sn = DataObject::new(); sn.put_object("s", copy_obj(&cur)); sn.put_object("v", view); sn.put_string("h", &h); s.get_object("snaps").put_object(&(c + 1).to_string(), sn); }
+    if (c + 1) % SNAP_EVERY == 0 { let mut sn = DataObject::new(); sn.put_object("s", copy_obj(&cur)); sn.put_object("v", view); sn.put_string("h", &h); sn.put_array("a", next_aliases); s.get_object("snaps").put_object(&(c + 1).to_string(), sn); }
     out.put_string("status", "ok"); out.put_string("mode", "edit");
   }
   "branch" => {
