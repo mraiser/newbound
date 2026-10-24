@@ -2401,10 +2401,14 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (!track) return [];
     track.replaceChildren();
     const base = st.base || 0, len = st.length || 0, cur = st.cursor || 0;
-    const span = Math.max(1, len - base);
+    // position against the deepest the tape has EVER been here: a fork's new
+    // tail is shorter than the branch it replaced, and the branch band sits
+    // past the (new) end — st.length alone would push it off the strip
+    let far = len;
+    for (const b of (st.branch_list || [])) { if (typeof b.at === "number" && typeof b.steps === "number") far = Math.max(far, b.at + b.steps); }
+    const span = Math.max(1, far - base);
     const placed = [];
-    if (len > 0) {
-      for (let s = base; s < len; s++) {
+    for (let s = base; s < len; s++) {
       const ev = dbgTape[s];
       if (!ev) continue;                                     // a step we never saw (skipped ticks)
       const el = document.createElement("div");
@@ -2414,17 +2418,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       el.title = tlTickTitle(ev, s);
       track.appendChild(el);
       placed.push({ seq: s, type: ev.type });
-      }
-      // the forked-off branches shade their fork point
-      for (const b of (st.branch_list || [])) {
-        if (typeof b.at !== "number" || b.at < base || b.at >= len) continue;
-        const el = document.createElement("div");
-        el.className = "fe-dbg-tl-branch";
-        el.style.left = (((b.at - base) / span) * 100) + "%";
-        el.style.width = Math.max(1.2, ((Math.min(len, b.at + (b.steps || 0)) - b.at) / span) * 100) + "%";
-        el.title = `branch ${b.id}: forked at step ${b.at} · ${b.steps} steps`;
-        track.appendChild(el);
-      }
+    }
+    // the forked-off branches shade their fork point
+    for (const b of (st.branch_list || [])) {
+      if (typeof b.at !== "number" || b.at < base) continue;
+      const el = document.createElement("div");
+      el.className = "fe-dbg-tl-branch";
+      el.style.left = (((b.at - base) / span) * 100) + "%";
+      el.style.width = Math.max(1.2, (Math.max(1, Math.min(b.steps || 1, far - b.at)) / span) * 100) + "%";
+      el.title = `branch ${b.id}: forked at step ${b.at} · ${b.steps} steps`;
+      track.appendChild(el);
     }
     const cur2 = document.createElement("div");
     cur2.className = "fe-dbg-tl-cursor";
@@ -3379,7 +3382,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         bpPlates: () => instances.map((inst) => ({ key: inst && inst.key, bp: inst && inst.ctx && inst.ctx.me ? inst.ctx.me._bp : undefined })),
         bpDots: () => lastBpDots.slice(),
         bpSent: () => (dbg && dbg.bpSent ? JSON.parse(JSON.stringify(dbg.bpSent)) : null),
-        debugStop: () => (dbg && dbg.stop ? JSON.parse(JSON.stringify(dbg.stop)) : null),
+        debugStopInfo: () => (dbg && dbg.stop ? JSON.parse(JSON.stringify(dbg.stop)) : null),
         debugStopText: dbgStopText,
         // D5 timeline surface
         debugBranch, debugTimeline: () => {
