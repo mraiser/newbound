@@ -225,12 +225,18 @@ fn aliases(st: &DataObject) -> DataArray {
   let mut seen = HashMap::new(); let mut groups = DataArray::new(); let mut path = Vec::new();
   alias_walk(&Data::DObject(st.data_ref), &mut path, &mut seen, &mut groups);
   // Only duplicates have two or more paths. `seen` entries include single paths used for cycle guards.
+  // Key by the WHOLE first path, not its first component: nearly every frame alias starts
+  // with "frames", and merging those unrelated groups also breaks the group-length accounting.
   let mut counts: HashMap<String, usize> = HashMap::new();
-  for g in groups.objects() { let a = g.array(); if a.len() > 0 { *counts.entry(canon_str(&a.get_property(0))).or_insert(0) += 1; } }
+  for g in groups.objects() { let a = g.array(); if a.len() > 0 { *counts.entry(canon_str(&Data::DArray(a.data_ref))).or_insert(0) += 1; } }
   let mut out = DataArray::new(); let mut i = 0;
   while i < groups.len() {
-    let first = groups.get_array(i); let key = canon_str(&first.get_property(0)); let n = *counts.get(&key).unwrap_or(&0);
-    if n > 0 { for j in 0..=n { out.push_property(groups.get_property(i + j)); } }
+    let first = groups.get_array(i); let key = canon_str(&Data::DArray(first.data_ref)); let n = *counts.get(&key).unwrap_or(&0);
+    if n > 0 {
+      let mut paths = DataArray::new();
+      for j in 0..=n { paths.push_property(groups.get_property(i + j)); }
+      out.push_array(paths);
+    }
     i += n + 1;
   }
   out
