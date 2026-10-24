@@ -35,6 +35,15 @@
 // The facade (toSceneDoc) is the rendered picture; the instances are the pick
 // surface. The wire ghost lives on the facade as tip+hang-link specs moved via
 // flowproject.terminalWorld — the SAME geometry the wires render with.
+//
+// STEP DEBUGGER (P4): toolbar + keys (F10 over · F11 into · ⇧F11 out · F5
+// continue · ⇧F10 back · ⇧F5 stop · F9 breakpoint), deliveries ride
+// dev:flowtoken (reverse on ⇧F10), op state on flownode's dbg plate, the ready
+// set click-to-pick, drill in/out with the frame stack, the debug inspector
+// (frames, selection values, args/out, breakpoints) and the D5 TIMELINE: a
+// scrub strip over the session's tape (one tick per step, the cursor, branch
+// bands at the forks) — click/drag = goto, double-click = step; the inspector
+// carries the same strip plus the branch swap buttons.
 
 var me = this;
 var ME = document.getElementById(me.UUID);
