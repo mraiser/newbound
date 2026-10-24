@@ -50,53 +50,41 @@ let top = frames.get_object(frames.len() - 1);
 let mut pk = DataObject::new();
 if pick.has("kind") {
   let kind = pick.get_string("kind");
-  if kind == "wire" || kind == "sync" || kind == "op" {
-    let idx = if pick.has("index") { pick.get_int("index") } else { -1 };
-    let ready = st::ready_now(&top);
-    let mut ok = false;
-    for r in ready.objects() { let r = r.object(); if r.get_string("kind") == kind && r.has("index") && r.get_int("index") == idx { ok = true; } }
-    if !ok {
-      res.put_string("status", "err");
-      res.put_string("msg", &format!("pick {}:{} is not ready", kind, idx));
-      res.put_array("ready", ready);
-      res.put_int("depth", frames.len() as i64);
-      res.put_object("state", state.clone());
-      return res;
-    }
-    pk.put_string("kind", &kind); pk.put_int("index", idx);
+  let ready = st::ready_set(&top.get_object("case"), &top);
+  let idx = if pick.has("index") { pick.get_int("index") } else { -1 };
+  let mut found = false;
+  let mut k = 0;
+  for r in ready.objects() {
+    let r = r.object();
+    if r.get_string("kind") == kind && k == idx { found = true; break; }
+    if r.get_string("kind") == kind { k += 1; }
   }
+  if !found {
+    res.put_string("status", "err");
+    res.put_string("msg", "pick is not READY in the top frame; state unchanged");
+    res.put_object("state", state.clone());
+    return res;
+  }
+  pk.put_string("kind", &kind);
+  pk.put_int("index", idx);
 }
-let fr2 = frames.clone();
-let pk2 = pk.clone();
-let r = panic::catch_unwind(panic::AssertUnwindSafe(move || { let mut fr = fr2; st::step_stack(&mut fr, &pk2) }));
-let mut e = match r {
-  Ok(e) => e,
-  Err(p) => {
-    let mut t = frames.get_object(frames.len() - 1);
-    t.put_string("phase", "ended");
-    let mut e = st::ev("error", &t);
-    e.put_string("code", "panic"); e.put_string("msg", &format!("the stepper panicked: {}", panic_text(&p)));
-    e
+let stepped = panic::catch_unwind(panic::AssertUnwindSafe(|| st::step_stack(&mut frames, &pk)));
+let out = match stepped {
+  Ok(o) => o,
+  Err(e) => {
+    res.put_string("status", "err");
+    res.put_string("msg", &format!("step panic: {}", panic_text(&e)));
+    res.put_object("state", state.clone());
+    return res;
   }
 };
-let t = e.get_string("type");
-if t == "stall" || t == "error" { root.put_string("phase", "ended"); }
-e.put_int("seq", seq);
-let top = frames.get_object(frames.len() - 1);
-let ended = root.get_string("phase") == "ended";
-let ready = if ended { DataArray::new() } else { st::ready_now(&top) };
-if !ended && top.get_string("phase") == "run" && !st::is_obj(&top, "pending") && !st::is_obj(&top, "inprog") {
-  if let Some(c) = st::case_at(&top.get_object("body"), top.get_int("case")) {
-    let mut fc = st::copy_frame(&top);
-    match st::default_pick(&c, &mut fc) { Some((k, i)) => res.put_object("default", st::item(&k, i)), None => res.put_null("default") }
-  }
-}
-let depth = frames.len() as i64;
-ns.put_array("frames", frames); ns.put_int("seq", seq + 1);
+ns.put_array("frames", frames);
+ns.put_int("seq", seq + 1);
 res.put_string("status", "ok");
-res.put_object("event", e);
-res.put_array("ready", ready);
-res.put_boolean("ended", ended);
-res.put_int("depth", depth);
 res.put_object("state", ns);
+res.put_object("event", out.get_object("event"));
+res.put_array("ready", out.get_array("ready"));
+res.put_object("default", out.get_object("default"));
+res.put_boolean("ended", out.get_boolean("ended"));
+res.put_int("depth", out.get_int("depth"));
 res
