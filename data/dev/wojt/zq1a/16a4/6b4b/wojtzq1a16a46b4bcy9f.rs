@@ -199,6 +199,74 @@ fn apply(root: &DataObject, ch: &DataObject, fwd: bool) {
     match &holder { Some(h) => { o.set_property(&k, h.get_property("v")); }, None => { if o.has(&k) { o.remove_property(&k); } } }
   }
 }
+// ---- alias topology (R3) ----
+// cp/diff preserve identity WITHIN one copy but apply necessarily copies each changed path separately.
+// Record every reachable alias group from the LIVE interpreter graph and re-link those paths at the
+// cursor. Graph bodies are immutable graph references, not values, and never participate in diff.
+// The map is tape data (with real size accounting), not an assertion based on the canonical hash.
+fn ref_at(d: &Data) -> usize { if d.is_object() { d.object().data_ref } else { d.array().data_ref } }
+fn alias_walk(d: &Data, path: &mut Vec<P>, seen: &mut HashMap<usize, DataArray>, groups: &mut DataArray) {
+  if !(d.is_object() || d.is_array()) { return; }
+  let id = ref_at(d);
+  if seen.contains_key(&id) {
+    if seen.get(&id).unwrap().len() > 0 { groups.push_array(seen.get(&id).unwrap().clone()); }
+    let mut p = DataArray::new();
+    for e in path.iter() { match e { P::K(s) => p.push_string(s), P::I(i) => p.push_int(*i as i64) } }
+    groups.push_array(p);
+    return;
+  }
+  let mut p = DataArray::new();
+  for e in path.iter() { match e { P::K(s) => p.push_string(s), P::I(i) => p.push_int(*i as i64) } }
+  seen.insert(id, p);
+  if d.is_object() { for (k, v) in d.object().objects() { if k == "body" { continue; } path.push(P::K(k)); alias_walk(&v, path, seen, groups); path.pop(); } }
+  else { for (i, v) in d.array().objects().iter().enumerate() { path.push(P::I(i)); alias_walk(v, path, seen, groups); path.pop(); } }
+}
+fn aliases(st: &DataObject) -> DataArray {
+  let mut seen = HashMap::new(); let mut groups = DataArray::new(); let mut path = Vec::new();
+  alias_walk(&Data::DObject(st.data_ref), &mut path, &mut seen, &mut groups);
+  // Only duplicates have two or more paths. `seen` entries include single paths used for cycle guards.
+  let mut counts: HashMap<String, usize> = HashMap::new();
+  for g in groups.objects() { let a = g.array(); if a.len() > 0 { *counts.entry(canon_str(&a.get_property(0))).or_insert(0) += 1; } }
+  let mut out = DataArray::new(); let mut i = 0;
+  while i < groups.len() {
+    let first = groups.get_array(i); let key = canon_str(&first.get_property(0)); let n = *counts.get(&key).unwrap_or(&0);
+    if n > 0 { for j in 0..=n { out.push_property(groups.get_property(i + j)); } }
+    i += n + 1;
+  }
+  out
+}
+fn alias_size(a: &DataArray) -> i64 { let mut n = 0; for p in a.objects() { n += 1 + p.array().len() as i64; } n }
+fn link_aliases(root: &DataObject, groups: &DataArray) {
+  let mut i = 0;
+  while i < groups.len() {
+    let paths = groups.get_array(i); i += 1;
+    if paths.len() < 2 { continue; }
+    let mut shared: Option<Data> = None;
+    for p in paths.objects() {
+      let pa = p.array(); let mut cur = Data::DObject(root.data_ref); let mut ok = pa.len() > 0;
+      for j in 0..pa.len() {
+        let e = pa.get_property(j);
+        if e.is_int() { if cur.is_array() && (e.int() as usize) < cur.array().len() { cur = cur.array().get_property(e.int() as usize); } else { ok = false; break; } }
+        else if cur.is_object() && cur.object().has(&e.string()) { cur = cur.object().get_property(&e.string()); } else { ok = false; break; }
+      }
+      if !ok { break; }
+      if let Some(v) = &shared {
+        if ref_at(&cur) == ref_at(v) { continue; }
+        let parent = pa.get_property(pa.len() - 1);
+        // Re-resolve the parent (cur is the child). Paths never address the root itself.
+        let mut par = Data::DObject(root.data_ref);
+        for j in 0..pa.len() - 1 { let e = pa.get_property(j); par = if e.is_int() { par.array().get_property(e.int() as usize) } else { par.object().get_property(&e.string()) }; }
+        if parent.is_int() { par.array().set_property(parent.int() as usize, v.clone()); }
+        else { par.object().set_property(&parent.string(), v.clone()); }
+      } else { shared = Some(cur); }
+    }
+  }
+}
+fn restore_aliases(s: &mut DataObject) {
+  let (c, base) = (gi(s, "cursor"), gi(s, "base"));
+  let a = if c == base { ga(&go(&s.get_object("snaps"), &base.to_string()), "a") } else { ga(&s.get_array("tape").get_object((c - 1 - base) as usize), "a") };
+  if a.len() > 0 { unshare(s); let cur = s.get_object("cur"); link_aliases(&cur, &a); }
+}
 // ---- persistent globals ----
 fn scan(body: &DataObject, names: &mut DataArray) {
   let mut c = Some(body.clone());
@@ -389,6 +457,7 @@ fn exec(s: &mut DataObject, core: &Command, pick: &DataObject, took: Option<Data
   let g = gdiff(&pre);
   let mut bodies = s.get_array("bodies"); let mut keys = s.get_array("bodykeys");
   let nc = snap(&ns, &mut bodies, &mut keys);
+  let alias = aliases(&ns);
   let cur = s.get_object("cur");
   let mut ch = DataArray::new(); let mut size = 0i64; let mut path: Vec<P> = Vec::new();
   diff(&Data::DObject(cur.data_ref), &Data::DObject(nc.data_ref), &mut path, &mut ch, &mut size);
@@ -396,11 +465,14 @@ fn exec(s: &mut DataObject, core: &Command, pick: &DataObject, took: Option<Data
   let h = hash_obj(&nc);
   let view = mkview(&r);
   let seq = gi(s, "cursor");
+  // Events acquire their session tape ordinal here, at the session boundary (R3), not in the UI.
+  if is_o(&view, "event") { view.get_object("event").put_int("seq", seq); }
   let mut e = DataObject::new();
   e.put_int("seq", seq);
   match &took { Some(t) => e.put_object("took", t.clone()), None => e.put_null("took") }
   e.put_boolean("user", pick.has("kind"));
   e.put_array("c", ch); e.put_array("g", g.clone());
+  size += alias_size(&alias); e.put_array("a", alias);
   e.put_object("v", view.clone()); e.put_string("h", &h);
   e.put_boolean("fx", et == "eval" && gs(&ev, "optype") == "command" && !gb(&ev, "from_frame"));
   e.put_boolean("persist", g.len() > 0);
@@ -411,7 +483,7 @@ fn exec(s: &mut DataObject, core: &Command, pick: &DataObject, took: Option<Data
   s.put_object("cur", nc.clone()); s.put_boolean("shared", true);
   s.put_object("live", ns); s.put_boolean("live_ok", true);
   if (seq + 1) % SNAP_EVERY == 0 {
-    let mut sn = DataObject::new(); sn.put_object("s", nc); sn.put_object("v", view.clone()); sn.put_string("h", &h);
+    let mut sn = DataObject::new(); sn.put_object("s", nc); sn.put_object("v", view.clone()); sn.put_string("h", &h); sn.put_array("a", ga(&s.get_array("tape").get_object(s.get_array("tape").len() - 1), "a"));
     s.get_object("snaps").put_object(&(seq + 1).to_string(), sn);
   }
   trim(s);

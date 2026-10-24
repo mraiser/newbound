@@ -68,7 +68,9 @@ if st::is_arr(&state, "frames") && state.get_array("frames").len() > 0 {
   if !st::is_arr(&f0, "path") { f0.put_array("path", DataArray::new()); }
   frames.push_object(f0);
 } else {
-  let args = if st::is_obj(&state, "args") { state.get_object("args").deep_copy() } else { DataObject::new() };
+  // Values enter by handle, exactly as in Code::execute. A plain deep_copy here splits mutual aliases
+    // between parameters before the first step (R3), changing every later in-place mutation.
+    let args = if st::is_obj(&state, "args") { state.get_object("args") } else { DataObject::new() };
   frames.push_object(st::new_frame(args, "root", body.clone(), DataArray::new()));
 }
 let seq = if state.has("seq") { state.get_int("seq") } else { 0 };
