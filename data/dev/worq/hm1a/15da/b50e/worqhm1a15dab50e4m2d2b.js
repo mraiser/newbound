@@ -2401,10 +2401,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (!track) return [];
     track.replaceChildren();
     const base = st.base || 0, len = st.length || 0, cur = st.cursor || 0;
-    if (!(len > 0)) return [];
     const span = Math.max(1, len - base);
     const placed = [];
-    for (let s = base; s < len; s++) {
+    if (len > 0) {
+      for (let s = base; s < len; s++) {
       const ev = dbgTape[s];
       if (!ev) continue;                                     // a step we never saw (skipped ticks)
       const el = document.createElement("div");
@@ -2414,16 +2414,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       el.title = tlTickTitle(ev, s);
       track.appendChild(el);
       placed.push({ seq: s, type: ev.type });
-    }
-    // the forked-off branches shade their fork point
-    for (const b of (st.branch_list || [])) {
-      if (typeof b.at !== "number" || b.at < base || b.at >= len) continue;
-      const el = document.createElement("div");
-      el.className = "fe-dbg-tl-branch";
-      el.style.left = (((b.at - base) / span) * 100) + "%";
-      el.style.width = Math.max(1.2, ((Math.min(len, b.at + (b.steps || 0)) - b.at) / span) * 100) + "%";
-      el.title = `branch ${b.id}: forked at step ${b.at} · ${b.steps} steps`;
-      track.appendChild(el);
+      }
+      // the forked-off branches shade their fork point
+      for (const b of (st.branch_list || [])) {
+        if (typeof b.at !== "number" || b.at < base || b.at >= len) continue;
+        const el = document.createElement("div");
+        el.className = "fe-dbg-tl-branch";
+        el.style.left = (((b.at - base) / span) * 100) + "%";
+        el.style.width = Math.max(1.2, ((Math.min(len, b.at + (b.steps || 0)) - b.at) / span) * 100) + "%";
+        el.title = `branch ${b.id}: forked at step ${b.at} · ${b.steps} steps`;
+        track.appendChild(el);
+      }
     }
     const cur2 = document.createElement("div");
     cur2.className = "fe-dbg-tl-cursor";
@@ -2516,6 +2517,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       const st = await debugRefresh();
       if (st && st.running) debugPoll();
       else if (st) {
+        // D5: a continue's ticks ride its last_run's event span
+        if (st.last_run && Array.isArray(st.last_run.events) && !st.last_run.events_truncated) dbgRecordEvents(st.last_run.events, st.cursor);
         if (dbg) { dbg.stop = { stopped: String(st.last_stop || ""), hit: (st.last_run && st.last_run.hit) || null, mode: "continue" }; renderDebugBar(); refreshInspector(); }
         const bh = dbgStopText();
         status(bh ? `debug: ${bh} at step ${st.cursor}` : `debug: stopped${st.last_stop ? " — " + st.last_stop : ""} at step ${st.cursor}`, "ok");
