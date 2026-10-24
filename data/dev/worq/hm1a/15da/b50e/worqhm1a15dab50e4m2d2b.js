@@ -2366,6 +2366,144 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     }
     return out;
   }
+  // ── D5: the timeline scrubber ────────────────────────────────────────────
+  // The session's TAPE as a strip: one tick per step (its event type), the
+  // cursor at the tape position, the forked-off branches shaded at their fork
+  // points. Click / drag / ←→ on the strip = goto that step (no execution:
+  // goto replays or rolls back; it never runs code). Double-click = step to it
+  // (into, one step). The same strip renders in the inspector, plus the branch
+  // records (click = swap a branch back in at its fork point — the current tail
+  // is kept as a branch). Ticks come from the steps' OWN views (each reply's
+  // .event), recorded on dbgTape; continue/back(n)/goto record the reply's
+  // event span.
+  let dbgTape = [];              // step seq → its event ({} = not seen)
+  let dbgTapeCursor = -1;        // the largest seq this session has reached
+  let lastTlTicks = [];          // the ticks the last draw placed (checks)
+  let tlDrag = null;             // a drag in progress on the top strip
+  function dbgRecordEvents(evs, upto) {
+    if (!Array.isArray(evs)) return;
+    for (const e of evs) {
+      if (!e || typeof e.seq !== "number") continue;
+      dbgTape[e.seq] = { type: e.type || "?", seq: e.seq, user: e.pick === "user" };
+      if (e.seq > dbgTapeCursor) dbgTapeCursor = e.seq;
+    }
+    if (typeof upto === "number" && upto > dbgTapeCursor) dbgTapeCursor = upto;
+  }
+  function tlTickTitle(ev, seq) {
+    if (!ev) return `step ${seq}`;
+    return `#${seq} ${ev.type}` + (ev.user ? " · your pick" : "");
+  }
+  function tlDrawInto(track, st) {
+    if (!track) return [];
+    track.replaceChildren();
+    const base = st.base || 0, len = st.length || 0, cur = st.cursor || 0;
+    if (!(len > 0)) return [];
+    const span = Math.max(1, len - base);
+    const placed = [];
+    for (let s = base; s < len; s++) {
+      const ev = dbgTape[s];
+      if (!ev) continue;                                     // a step we never saw (skipped ticks)
+      const el = document.createElement("div");
+      el.className = "fe-dbg-tl-tick t-" + String(ev.type).replace(/[^a-z]/g, "");
+      el.dataset.seq = String(s);
+      el.style.left = (((s - base) / span) * 100) + "%";
+      el.title = tlTickTitle(ev, s);
+      track.appendChild(el);
+      placed.push({ seq: s, type: ev.type });
+    }
+    // the forked-off branches shade their fork point
+    for (const b of (st.branch_list || [])) {
+      if (typeof b.at !== "number" || b.at < base || b.at >= len) continue;
+      const el = document.createElement("div");
+      el.className = "fe-dbg-tl-branch";
+      el.style.left = (((b.at - base) / span) * 100) + "%";
+      el.style.width = Math.max(1.2, ((Math.min(len, b.at + (b.steps || 0)) - b.at) / span) * 100) + "%";
+      el.title = `branch ${b.id}: forked at step ${b.at} · ${b.steps} steps`;
+      track.appendChild(el);
+    }
+    const cur2 = document.createElement("div");
+    cur2.className = "fe-dbg-tl-cursor";
+    cur2.style.left = (Math.max(0, Math.min(span, cur - base)) / span * 100) + "%";
+    track.appendChild(cur2);
+    return placed;
+  }
+  function tlSeqAt(track, clientX) {
+    const st = dbg && dbg.st ? dbg.st : {};
+    const base = st.base || 0, len = st.length || 0;
+    const r = track.getBoundingClientRect();
+    const frac = Math.max(0, Math.min(1, (clientX - r.left) / Math.max(1, r.width)));
+    return Math.max(base, Math.min(Math.max(base, len - 1), Math.round(base + frac * Math.max(0, len - 1 - base))));
+  }
+  function renderTimeline() {
+    const on = dbgActive();
+    const strip = $(".fe-dbg-timeline");
+    if (strip) strip.hidden = !on;
+    if (!on) { lastTlTicks = []; return; }
+    const st = dbg.st || {};
+    lastTlTicks = tlDrawInto($(".fe-dbg-tl-track"), st);
+    const pos = $(".fe-dbg-tl-pos");
+    if (pos) pos.textContent = `${st.cursor || 0} / ${st.length || 0}` + ((st.branches || 0) ? ` · ${st.branches} branch${st.branches === 1 ? "" : "es"}` : "");
+  }
+  async function debugBranch(id) {
+    const st = dbg && dbg.st ? dbg.st : {};
+    const bl = (st.branch_list || []).find((b) => b.id === id);
+    if (bl && typeof bl.at === "number" && (st.cursor || 0) !== bl.at) {
+      const g = await debugStep("goto", { seq: bl.at });
+      if (!g || g.status !== "ok") return g;
+    }
+    return debugStep("branch", { id });
+  }
+  // the inspector's own strip + the branch records
+  function renderTimelineInspector(body, m) {
+    edLbl(body, `timeline · ${m.length} step${m.length === 1 ? "" : "s"} on the tape` + (m.branches ? ` · ${m.branches} branch${m.branches === 1 ? "" : "es"}` : ""));
+    const track = document.createElement("div");
+    track.className = "fe-dbgi-tl-track";
+    track.title = "click = go to that step · double-click = step to it";
+    body.appendChild(track);
+    // place the ticks on the inspector strip (same data, own geometry)
+    const base = 0, len = m.length || 0, span = Math.max(1, len);
+    for (let s = 0; s < len; s++) {
+      const ev = dbgTape[s]; if (!ev) continue;
+      const el = document.createElement("div");
+      el.className = "fe-dbgi-tl-tick t-" + String(ev.type).replace(/[^a-z]/g, "");
+      el.style.left = ((s / span) * 100) + "%";
+      el.title = tlTickTitle(ev, s);
+      track.appendChild(el);
+    }
+    const cur = document.createElement("div");
+    cur.className = "fe-dbgi-tl-cursor";
+    cur.style.left = (Math.max(0, Math.min(span, m.cursor)) / span * 100) + "%";
+    track.appendChild(cur);
+    track.addEventListener("click", (e) => {
+      if (!dbgActive() || (dbg.st && dbg.st.running)) return;
+      const r = track.getBoundingClientRect();
+      const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / Math.max(1, r.width)));
+      const seq = Math.max(0, Math.min(Math.max(0, len - 1), Math.round(frac * Math.max(0, len - 1))));
+      debugStep("goto", { seq });
+    });
+    track.addEventListener("dblclick", (e) => {
+      if (!dbgActive() || (dbg.st && dbg.st.running)) return;
+      const r = track.getBoundingClientRect();
+      const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / Math.max(1, r.width)));
+      const seq = Math.max(0, Math.min(Math.max(0, len - 1), Math.round(frac * Math.max(0, len - 1))));
+      const cur2 = (dbg.st && typeof dbg.st.cursor === "number") ? dbg.st.cursor : 0;
+      if (seq === cur2 + 1) debugStep("into");
+      else if (seq !== cur2) debugStep("goto", { seq });
+    });
+    // the branches (a fork kept the tail it replaced)
+    const bl = m.branchList || [];
+    if (bl.length) {
+      edLbl(body, `branches · ${bl.length} — swap one back in (your current tail is kept)`);
+      for (const b of bl) {
+        const box = document.createElement("div"); box.className = "fe-dbgi-branch";
+        const p = document.createElement("p"); p.className = "fe-dbgi-brnote";
+        p.textContent = `#${b.id} · forked at step ${b.at} · ${b.steps} steps · took ${b.took ? (b.took.kind + " " + b.took.index) : "—"} · ends ${b.end || "?"}`;
+        box.appendChild(p);
+        edButton(edBtns(box), `swap branch ${b.id} in`, "fe-dbgi-bswap", () => debugBranch(b.id));
+        body.appendChild(box);
+      }
+    }
+  }
   function debugPoll() {
     if (dbgPollT) clearTimeout(dbgPollT);
     dbgPollT = setTimeout(async () => {
@@ -2457,6 +2595,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const chainLen = FD.focusChain(views).length;
     const top = views.length ? views[views.length - 1] : null;
     const m = { cursor: st.cursor || 0, length: st.length || 0, ended: !!st.ended, running: !!st.running,
+      base: st.base || 0, branches: st.branches || 0, branchList: st.branch_list || [],
       event: FD.eventText(st.event, views), focusFi: dv ? dv.fi : null, follow: !!dbg.follow,
       frames: views.slice().reverse().map((v) => ({ fi: v.fi, title: dbgFrameTitle(v), kind: v.kind, case: v.case, phase: v.phase,
         outcome: v.outcome, top: v.top, focused: dv === v, showable: v.fi < chainLen, external: !!v.external })),

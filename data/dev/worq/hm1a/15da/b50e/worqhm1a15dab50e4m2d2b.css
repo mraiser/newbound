@@ -201,3 +201,34 @@
 .nb-flowedit3d .sh-canvas .ss-label.fe-ctlmark { color:var(--ground); font-weight:700 !important; }
 .nb-flowedit3d .sh-canvas.fe-far .ss-label.fe-opname,
 .nb-flowedit3d .sh-canvas.fe-far .ss-label.fe-ctlmark { visibility:hidden; }
+
+/* D5: the tape timeline scrubber */
+.nb-flowedit3d .fe-dbg-timeline { display:flex; align-items:center; gap:8px; padding:5px 10px 6px;
+  background:color-mix(in srgb, var(--accent) 7%, var(--panel)); border-bottom:1px solid var(--line); }
+.nb-flowedit3d .fe-dbg-timeline[hidden] { display:none; }
+.nb-flowedit3d .fe-dbg-tl-lbl { font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:.06em; font-size:10px; }
+.nb-flowedit3d .fe-dbg-tl-track { flex:1; position:relative; height:22px; min-width:120px; cursor:pointer;
+  background:var(--panel-2); border:1px solid var(--line); border-radius:5px; overflow:hidden; }
+.nb-flowedit3d .fe-dbg-tl-track:focus { outline:1px solid var(--accent); outline-offset:-1px; }
+.nb-flowedit3d .fe-dbg-tl-tick { position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; }
+.nb-flowedit3d .fe-dbg-tl-tick.t-enter { background:var(--fe-dbg-running, #56a3d9); }
+.nb-flowedit3d .fe-dbg-tl-tick.t-seed { background:var(--text-faint, #888); }
+.nb-flowedit3d .fe-dbg-tl-tick.t-deliver { background:var(--fe-dbg-ready, #f0a63c); }
+.nb-flowedit3d .fe-dbg-tl-tick.t-eval { background:var(--fe-dbg-done, #62bd8c); }
+.nb-flowedit3d .fe-dbg-tl-tick.t-sync { background:#b06ee0; }
+.nb-flowedit3d .fe-dbg-tl-tick.t-next, .nb-flowedit3d .fe-dbg-tl-tick.t-leave { background:#8a6ee0; }
+.nb-flowedit3d .fe-dbg-tl-tick.t-done, .nb-flowedit3d .fe-dbg-tl-tick.t-error, .nb-flowedit3d .fe-dbg-tl-tick.t-stall {
+  background:var(--danger, #d95f56); width:3px; margin-left:-1.5px; }
+.nb-flowedit3d .fe-dbg-tl-tick.t-done { background:var(--fe-dbg-done, #62bd8c); }
+.nb-flowedit3d .fe-dbg-tl-cursor { position:absolute; top:-1px; bottom:-1px; width:3px; margin-left:-1.5px;
+  background:var(--accent); box-shadow:0 0 5px var(--accent); pointer-events:none; }
+.nb-flowedit3d .fe-dbg-tl-branch { position:absolute; bottom:0; height:4px; background:color-mix(in srgb, #b06ee0 70%, transparent); }
+.nb-flowedit3d .fe-dbg-tl-pos { font-family:var(--mono, monospace); color:var(--text-dim); min-width:9ch; font-size:11.5px; }
+.nb-flowedit3d .fe-dbgi-tl-track { position:relative; height:20px; cursor:pointer; margin:2px 0 4px;
+  background:var(--panel-2); border:1px solid var(--line); border-radius:5px; overflow:hidden; }
+.nb-flowedit3d .fe-dbgi-tl-tick { position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; }
+.nb-flowedit3d .fe-dbgi-tl-cursor { position:absolute; top:-1px; bottom:-1px; width:3px; margin-left:-1.5px;
+  background:var(--accent); box-shadow:0 0 5px var(--accent); pointer-events:none; }
+.nb-flowedit3d .fe-dbgi-tl-note { font-size:11px; color:var(--text-dim); }
+.nb-flowedit3d .fe-dbgi-branch { border:1px solid var(--line); border-radius:4px; padding:4px 6px; margin:4px 0; }
+.nb-flowedit3d .fe-dbgi-branch .fe-ed-btns { margin:2px 0 0; }
