@@ -936,6 +936,8 @@ if mode == "init" {
   body = DataObject::new(); let _ = body;
   let mut all2 = all.clone(); all2.put_object(&id, s.clone());
   let mut o = DataObject::new(); o.put_string("status", "ok"); o.put_string("mode", "init");
+  // R3: the session boundary, stated where the session is born (not isolation - see debug_start's desc)
+  o.put_string("boundary", "persistent globals are NOT isolated: the session reads and writes the real process globals (the same handles an ordinary run uses); back/goto/replay overwrite them with the tape's values, and a concurrent ordinary run or another session writing the same persistent key is neither detected nor undone - debug persistent flows where nothing else writes those keys. rust/python command ops are opaque: their effects outside the interpreter are flagged (side_effects, crossed_side_effects) but never undone.");
   return respond(&s, o, false);
 }
 if !is_o(&all, &session) { return err(&format!("no debug session '{}' (stopped or reaped?)", session)); }
