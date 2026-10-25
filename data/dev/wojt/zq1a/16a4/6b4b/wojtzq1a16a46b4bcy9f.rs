@@ -436,6 +436,14 @@ fn cursor_aliases(s: &DataObject) -> DataArray {
   let (c, base) = (gi(s, "cursor"), gi(s, "base"));
   if c == base { ga(&go(&s.get_object("snaps"), &base.to_string()), "a") } else { ga(&s.get_array("tape").get_object((c - 1 - base) as usize), "a") }
 }
+// interpreter<->persistent-global alias groups AT THE CURSOR (paths rooted at s / g). Tape entries carry them as
+// xafter and every snapshot as x, so an execution at the base (after a cap trim, or a fork there) and after an
+// edit step relinks exactly like one further along the tape (R3). None = a legacy record without either.
+fn cursor_x(s: &DataObject) -> Option<DataArray> {
+  let (c, base) = (gi(s, "cursor"), gi(s, "base"));
+  let (holder, k) = if c == base { (go(&s.get_object("snaps"), &base.to_string()), "x") } else { (s.get_array("tape").get_object((c - 1 - base) as usize), "xafter") };
+  if is_a(&holder, k) { Some(holder.get_array(k)) } else { None }
+}
 fn restore_aliases(s: &mut DataObject) -> Result<(), String> {
   let a = cursor_aliases(s);
   if a.len() > 0 { unshare(s); let cur = s.get_object("cur"); link_aliases(&cur, &a)?; }
@@ -672,11 +680,7 @@ fn exec(s: &mut DataObject, core: &Command, pick: &DataObject, took: Option<Data
     // Replaying applies persistent values but does not execute the graph. Before a REAL next
     // execution, restore interpreter-to-global aliases from the tape at THIS cursor; otherwise
     // a fork mutates detached copies while JSON/hash comparisons still look correct.
-    let c = gi(s, "cursor"); let base = gi(s, "base"); let groups = if c == base {
-      cross_aliases(&s.get_object("cur"), &s.get_array("pnames"))
-    } else {
-      ga(&s.get_array("tape").get_object((c - 1 - base) as usize), "xafter")
-    };
+    let groups = match cursor_x(s) { Some(x) => x, None => cross_aliases(&s.get_object("cur"), &s.get_array("pnames")) };
     s.put_array("xcur", groups);
     if let Err(m) = relink_live(s, &live) { return Err(format!("could not restore the interpreter/global aliases before executing: {}", m)); }
     s.put_object("live", live); s.put_boolean("live_ok", true);
@@ -724,7 +728,7 @@ fn exec(s: &mut DataObject, core: &Command, pick: &DataObject, took: Option<Data
   s.put_object("cur", nc.clone()); s.put_boolean("shared", true);
   s.put_object("live", ns); s.put_boolean("live_ok", true);
   if (seq + 1) % SNAP_EVERY == 0 {
-    let mut sn = DataObject::new(); sn.put_object("s", nc); sn.put_object("v", view.clone()); sn.put_string("h", &h); sn.put_array("a", ga(&s.get_array("tape").get_object(s.get_array("tape").len() - 1), "a"));
+    let mut sn = DataObject::new(); sn.put_object("s", nc); sn.put_object("v", view.clone()); sn.put_string("h", &h); sn.put_array("a", ga(&s.get_array("tape").get_object(s.get_array("tape").len() - 1), "a")); sn.put_array("x", ga(&grecord, "xafter"));
     s.get_object("snaps").put_object(&(seq + 1).to_string(), sn);
   }
   trim(s);
@@ -919,7 +923,7 @@ if mode == "init" {
   let h = hash_obj(&c);
   let alias = aliases(&st);
   let mut v0 = DataObject::new(); v0.put_null("event"); v0.put_array("ready", DataArray::new()); v0.put_null("default"); v0.put_boolean("ended", false); v0.put_int("depth", 0);
-  let mut sn = DataObject::new(); sn.put_object("s", c.clone()); sn.put_object("v", v0); sn.put_string("h", &h); sn.put_array("a", alias);
+  let mut sn = DataObject::new(); sn.put_object("s", c.clone()); sn.put_object("v", v0); sn.put_string("h", &h); sn.put_array("a", alias); sn.put_array("x", cross_aliases(&st, &pn));
   let mut snaps = DataObject::new(); snaps.put_object("0", sn);
   s.put_array("bodies", bodies); s.put_array("bodykeys", keys);
   s.put_object("cur", c); s.put_boolean("shared", true);
@@ -992,6 +996,8 @@ match mode.as_str() {
     // An edit replaces one path: other aliases of the old value stay linked, but the edited path
     // deliberately detaches (the normal assignment semantics of the editor's value edit).
     let next_aliases = aliases_after_edit(&old_aliases, &p);
+    // the interpreter<->global groups minus the edited path (the cursor has not moved yet)
+    let next_x = { let mut sp = DataArray::new(); sp.push_string("s"); for x in p.objects() { sp.push_property(x); } aliases_after_edit(&cursor_x(&s).unwrap_or(DataArray::new()), &sp) };
     let cur = s.get_object("cur");
     if let Err(m) = link_aliases(&cur, &next_aliases) { put_back(&mut s, &old_cur, old_shared); return err(&format!("edit refused{}: {}", forked, m)); }
     let mut cl = DataArray::new(); cl.push_object(ch);
@@ -1000,11 +1006,11 @@ match mode.as_str() {
     let h = hash_obj(&cur);
     let mut e = DataObject::new();
     e.put_int("seq", c); e.put_object("took", item("edit", 0)); e.put_boolean("user", true);
-    e.put_array("c", cl); e.put_array("g", DataArray::new()); e.put_array("a", next_aliases.clone()); e.put_object("v", view.clone()); e.put_string("h", &h);
+    e.put_array("c", cl); e.put_array("g", DataArray::new()); e.put_array("a", next_aliases.clone()); e.put_array("xafter", next_x.clone()); e.put_object("v", view.clone()); e.put_string("h", &h);
     e.put_boolean("fx", false); e.put_boolean("persist", false); e.put_int("size", 4 + alias_size(&next_aliases));
     s.get_array("tape").push_object(e);
     s.put_int("cursor", c + 1); s.put_boolean("live_ok", false);
-    if (c + 1) % SNAP_EVERY == 0 { let mut sn = DataObject::new(); sn.put_object("s", copy_obj(&cur)); sn.put_object("v", view); sn.put_string("h", &h); sn.put_array("a", next_aliases); s.get_object("snaps").put_object(&(c + 1).to_string(), sn); }
+    if (c + 1) % SNAP_EVERY == 0 { let mut sn = DataObject::new(); sn.put_object("s", copy_obj(&cur)); sn.put_object("v", view); sn.put_string("h", &h); sn.put_array("a", next_aliases); sn.put_array("x", next_x); s.get_object("snaps").put_object(&(c + 1).to_string(), sn); }
     out.put_string("status", "ok"); out.put_string("mode", "edit");
   }
   "branch" => {
