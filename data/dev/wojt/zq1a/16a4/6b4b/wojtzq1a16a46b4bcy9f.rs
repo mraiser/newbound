@@ -510,6 +510,30 @@ fn gdiff(pre: &DataObject, names: &DataArray, state: &DataObject) -> DataObject 
   r.put_array("xafter", cross_aliases(state, names));
   r
 }
+// A copy with every DAG share removed: each occurrence of a shared container becomes its own copy (R3 D1).
+// A container met again on its own path (a cycle) re-uses the copy being built for it, and past MAX_DEPTH the
+// rest is a plain alias-keeping copy, so the walk never recurses unboundedly. Parked in a holder {v}.
+fn detached_v(v: &V, on: &mut Vec<((bool, usize), V)>, depth: usize) -> V {
+  let id = match vid(v) { Some(id) => id, None => return v.clone() };
+  for (k, c) in on.iter() { if *k == id { return c.clone(); } }
+  if depth >= MAX_DEPTH { let h = copy_val(&data_of(v)); return val(&h.get_property("v")); }
+  match v {
+    V::O(o) => {
+      let n = DataObject::new(); on.push((id, V::O(n.clone())));
+      let mut w = n.clone();
+      for (k, c) in obj_kids(o) { let d = detached_v(&c, on, depth + 1); put_v(&mut w, &k, &d); }
+      on.pop(); V::O(n)
+    }
+    V::A(a) => {
+      let n = DataArray::new(); on.push((id, V::A(n.clone())));
+      let mut w = n.clone();
+      for c in arr_kids(a) { match detached_v(&c, on, depth + 1) { V::O(x) => w.push_object(x), V::A(x) => w.push_array(x), V::S(d) => w.push_property(d) } }
+      on.pop(); V::A(n)
+    }
+    V::S(_) => v.clone(),
+  }
+}
+fn detached_val(d: &Data) -> DataObject { let v = detached_v(&val(d), &mut Vec::new(), 0); let mut w = DataObject::new(); put_v(&mut w, "v", &v); w }
 fn apply_g(e: &DataObject, fwd: bool) -> Result<(), String> {
   let gl = ga(e, "g"); let n = gl.len(); let mut g = DataStore::globals();
   // Copy every changed value through one memo, then restore topology to unchanged named keys too.
@@ -519,6 +543,19 @@ fn apply_g(e: &DataObject, fwd: bool) -> Result<(), String> {
     if c.has(key) { let v = cp(&c.get_property(key), &mut memo); g.set_property(&k, v); } else if g.has(&k) { g.remove_property(&k); }
   }
   let topology = ga(e, if fwd { "gafter" } else { "gbefore" });
+  // R3 D1: a step can JOIN or SPLIT persistent keys without changing any value - gdiff then records no change,
+  // and linking never unlinks, so moving back over a join (or forward over a split) left the keys ONE object and
+  // a later in-place write leaked from one key into the other (scratch.skills.flowstep_r3_pjoin_check). When the
+  // recorded topology differs across the step, every key named in either topology gets a copy with no sharing
+  // at all and the target groups are linked: the keys' topology is then exactly the recorded one.
+  let (tb, ta) = (ga(e, "gbefore"), ga(e, "gafter"));
+  if canon_a(&tb) != canon_a(&ta) {
+    let mut keys: Vec<String> = Vec::new();
+    for t in [&tb, &ta] { for grp in t.objects() { if !grp.is_array() { continue; } for p in grp.array().objects() {
+      if !p.is_array() { continue; } let pa = p.array();
+      if pa.len() > 0 && pa.get_property(0).is_string() { let k = pa.get_string(0); if !keys.contains(&k) { keys.push(k); } } } } }
+    for k in keys.iter() { if g.has(k) { let d = g.get_property(k); if d.is_object() || d.is_array() { let h = detached_val(&d); g.set_property(k, h.get_property("v")); } } }
+  }
   link_aliases(&g, &topology).map_err(|m| format!("persistent globals: {}", m))
 }
 // ---- views and frame helpers (on the plain copy) ----
