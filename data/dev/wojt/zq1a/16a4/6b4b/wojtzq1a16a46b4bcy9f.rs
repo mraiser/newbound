@@ -514,7 +514,19 @@ fn core_cmd() -> Result<Command, String> {
 }
 // execute one step from the cursor (which is the tape end) and record it
 fn exec(s: &mut DataObject, core: &Command, pick: &DataObject, took: Option<DataObject>) -> Result<DataObject, String> {
-  if !gb(s, "live_ok") { let live = unsnap(&s.get_object("cur"), &s.get_array("bodies")); s.put_object("live", live); s.put_boolean("live_ok", true); }
+  if !gb(s, "live_ok") {
+    let live = unsnap(&s.get_object("cur"), &s.get_array("bodies"));
+    // Replaying applies persistent values but does not execute the graph. Before a REAL next
+    // execution, restore interpreter-to-global aliases from the tape at THIS cursor; otherwise
+    // a fork mutates detached copies while JSON/hash comparisons still look correct.
+    let c = gi(s, "cursor"); let base = gi(s, "base"); let groups = if c == base {
+      cross_aliases(&s.get_object("cur"), &s.get_array("pnames"))
+    } else {
+      ga(&s.get_array("tape").get_object((c - 1 - base) as usize), "xafter")
+    };
+    s.put_array("xcur", groups); relink_live(s, &live);
+    s.put_object("live", live); s.put_boolean("live_ok", true);
+  }
   let mut pn = s.get_array("pnames");
   let pre = capture(&pn);
   let mut pk = DataObject::new();
@@ -526,7 +538,7 @@ fn exec(s: &mut DataObject, core: &Command, pick: &DataObject, took: Option<Data
   let ev = go(&r, "event");
   let et = gs(&ev, "type");
   if et == "enter" { if let Some(t) = top_of(&ns) { if is_o(&t, "body") { scan(&t.get_object("body"), &mut pn); } } }
-  let grecord = gdiff(&pre, &pn);
+  let grecord = gdiff(&pre, &pn, &ns);
   let g = ga(&grecord, "changes");
   let mut bodies = s.get_array("bodies"); let mut keys = s.get_array("bodykeys");
   let nc = snap(&ns, &mut bodies, &mut keys);
@@ -546,6 +558,7 @@ fn exec(s: &mut DataObject, core: &Command, pick: &DataObject, took: Option<Data
   e.put_boolean("user", pick.has("kind"));
   e.put_array("c", ch); e.put_array("g", g.clone());
   e.put_array("gbefore", ga(&grecord, "before_aliases")); e.put_array("gafter", ga(&grecord, "after_aliases"));
+  e.put_array("xafter", ga(&grecord, "xafter"));
   size += alias_size(&alias); e.put_array("a", alias);
   e.put_object("v", view.clone()); e.put_string("h", &h);
   e.put_boolean("fx", et == "eval" && gs(&ev, "optype") == "command" && !gb(&ev, "from_frame"));
