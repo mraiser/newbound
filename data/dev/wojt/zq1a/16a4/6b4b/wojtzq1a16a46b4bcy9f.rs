@@ -58,10 +58,51 @@ fn cp(d: &Data, m: &mut Memo) -> Data {
 fn copy_obj(o: &DataObject) -> DataObject { let mut m = Memo { o: HashMap::new(), a: HashMap::new() }; let d = cp(&Data::DObject(o.data_ref), &mut m); d.object() }
 // a copied value parked in a holder object {v} so its handle stays alive until it is inserted somewhere
 fn copy_val(d: &Data) -> DataObject { let mut m = Memo { o: HashMap::new(), a: HashMap::new() }; let mut w = DataObject::new(); let c = cp(d, &mut m); w.set_property("v", c); w }
-fn nodes(d: &Data) -> i64 {
-  if d.is_object() { let mut n = 1; for (_, v) in d.object().objects() { n += nodes(&v); } n }
-  else if d.is_array() { let mut n = 1; for v in d.array().objects() { n += nodes(&v); } n }
-  else { 1 }
+// ---- cycle-safe walks ----
+// The 2026-10-25 SIGSEGVs were unbounded recursion (canon/nodes/diff) over cyclic or very deep state. Every
+// recursive walk below holds real handles (V: a DataObject/DataArray handle or a scalar, never a bare data_ref
+// carried across calls), keeps the containers on the CURRENT path in a set and stops at MAX_DEPTH. A container
+// met again on its own path is a cycle: canon emits a fixed back-reference marker, nodes counts it once, diff
+// stops there. Shared (acyclic) subtrees are still walked in full, so an acyclic state hashes and sizes exactly
+// as before. reaches, parent_at, apply and link_aliases do not recurse at all.
+const MAX_DEPTH: usize = 256;
+type OnPath = std::collections::HashSet<(bool, usize)>;
+#[derive(Clone)]
+enum V { O(DataObject), A(DataArray), S(Data) }
+fn val(d: &Data) -> V { if d.is_object() { V::O(d.object()) } else if d.is_array() { V::A(d.array()) } else { V::S(d.clone()) } }
+fn vid(v: &V) -> Option<(bool, usize)> { match v { V::O(o) => Some((true, o.data_ref)), V::A(a) => Some((false, a.data_ref)), V::S(_) => None } }
+// a Data naming a HELD handle - only for an immediate set_property/copy_val while v is alive
+fn data_of(v: &V) -> Data { match v { V::O(o) => Data::DObject(o.data_ref), V::A(a) => Data::DArray(a.data_ref), V::S(d) => d.clone() } }
+fn put_v(o: &mut DataObject, k: &str, v: &V) { match v { V::O(x) => o.put_object(k, x.clone()), V::A(x) => o.put_array(k, x.clone()), V::S(d) => o.set_property(k, d.clone()) } }
+fn obj_kids(o: &DataObject) -> Vec<(String, V)> { o.objects().into_iter().map(|(k, d)| (k, val(&d))).collect() }
+fn arr_kids(a: &DataArray) -> Vec<V> { a.objects().iter().map(|d| val(d)).collect() }
+fn nodes_v(v: &V, on: &mut OnPath, depth: usize) -> i64 {
+  let id = match vid(v) { Some(id) => id, None => return 1 };
+  if depth >= MAX_DEPTH || !on.insert(id) { return 1; }
+  let mut n = 1;
+  match v {
+    V::O(o) => { for (_, c) in obj_kids(o) { n += nodes_v(&c, on, depth + 1); } }
+    V::A(a) => { for c in arr_kids(a) { n += nodes_v(&c, on, depth + 1); } }
+    V::S(_) => {}
+  }
+  on.remove(&id);
+  n
+}
+fn nodes_o(o: &DataObject) -> i64 { nodes_v(&V::O(o.clone()), &mut OnPath::new(), 0) }
+// does any path from `from` reach the container `target`? (iterative with a seen set - no recursion)
+fn reaches(from: &V, target: (bool, usize)) -> bool {
+  let mut seen = OnPath::new(); let mut stack: Vec<V> = vec![from.clone()];
+  while let Some(v) = stack.pop() {
+    let id = match vid(&v) { Some(id) => id, None => continue };
+    if id == target { return true; }
+    if !seen.insert(id) { continue; }
+    match &v {
+      V::O(o) => { for (_, c) in obj_kids(o) { if vid(&c).is_some() { stack.push(c); } } }
+      V::A(a) => { for c in arr_kids(a) { if vid(&c).is_some() { stack.push(c); } } }
+      V::S(_) => {}
+    }
+  }
+  false
 }
 // ---- the plain copy of a stepper state: graph bodies (never mutated) become "$body:N" refs ----
 fn body_key(f: &DataObject, b: &DataObject) -> String {
@@ -106,27 +147,40 @@ fn unsnap(c: &DataObject, bodies: &DataArray) -> DataObject {
   if is_a(&n, "frames") { for f in n.get_array("frames").objects() { if f.is_object() { let mut fo = f.object(); resolve(&mut fo, bodies); } } }
   n
 }
-// ---- canonical hash (sorted keys) ----
-fn canon(d: &Data, s: &mut String) {
-  if d.is_object() {
-    let mut ks = d.object().objects(); ks.sort_by(|a, b| a.0.cmp(&b.0));
-    s.push('{'); for (k, v) in ks { s.push_str(&format!("{:?}:", k)); canon(&v, s); s.push(','); } s.push('}');
-  } else if d.is_array() {
-    s.push('['); for v in d.array().objects() { canon(&v, s); s.push(','); } s.push(']');
-  } else {
-    match d {
-      Data::DInt(i) => s.push_str(&i.to_string()),
-      Data::DFloat(f) => s.push_str(&format!("{:?}f", f)),
-      Data::DBoolean(b) => s.push_str(if *b { "true" } else { "false" }),
-      Data::DString(t) => s.push_str(&format!("{:?}", t)),
-      Data::DNull => s.push_str("null"),
-      _ => { let mut w = DataObject::new(); w.set_property("v", d.clone()); s.push_str(&w.to_string()); }
+// ---- canonical hash (sorted keys). Cycle-safe: a container already on the current path emits the fixed
+// back-reference marker @cycle, depth past MAX_DEPTH emits @deep; no scalar renders like either. ----
+fn canon_v(v: &V, s: &mut String, on: &mut OnPath, depth: usize) {
+  let id = match v {
+    V::S(d) => {
+      match d {
+        Data::DInt(i) => s.push_str(&i.to_string()),
+        Data::DFloat(f) => s.push_str(&format!("{:?}f", f)),
+        Data::DBoolean(b) => s.push_str(if *b { "true" } else { "false" }),
+        Data::DString(t) => s.push_str(&format!("{:?}", t)),
+        Data::DNull => s.push_str("null"),
+        _ => { let mut w = DataObject::new(); w.set_property("v", d.clone()); s.push_str(&w.to_string()); }
+      }
+      return;
     }
+    _ => vid(v).unwrap(),
+  };
+  if on.contains(&id) { s.push_str("@cycle"); return; }
+  if depth >= MAX_DEPTH { s.push_str("@deep"); return; }
+  on.insert(id);
+  match v {
+    V::O(o) => {
+      let mut ks = obj_kids(o); ks.sort_by(|a, b| a.0.cmp(&b.0));
+      s.push('{'); for (k, c) in ks.iter() { s.push_str(&format!("{:?}:", k)); canon_v(c, s, on, depth + 1); s.push(','); } s.push('}');
+    }
+    V::A(a) => { s.push('['); for c in arr_kids(a).iter() { canon_v(c, s, on, depth + 1); s.push(','); } s.push(']'); }
+    V::S(_) => {}
   }
+  on.remove(&id);
 }
-fn canon_str(d: &Data) -> String { let mut s = String::new(); canon(d, &mut s); s }
+fn canon_str(d: &Data) -> String { let mut s = String::new(); canon_v(&val(d), &mut s, &mut OnPath::new(), 0); s }
+fn canon_a(a: &DataArray) -> String { let mut s = String::new(); canon_v(&V::A(a.clone()), &mut s, &mut OnPath::new(), 0); s }
 fn hash_obj(o: &DataObject) -> String {
-  let s = canon_str(&Data::DObject(o.data_ref));
+  let mut s = String::new(); canon_v(&V::O(o.clone()), &mut s, &mut OnPath::new(), 0);
   let mut h: u64 = 0xcbf29ce484222325;
   for b in s.as_bytes() { h ^= *b as u64; h = h.wrapping_mul(0x100000001b3); }
   format!("{:016x}", h)
@@ -134,12 +188,12 @@ fn hash_obj(o: &DataObject) -> String {
 // ---- structural diff: every change {p, o, n} carries both directions; absent o/n = the key/element is absent ----
 #[derive(Clone)]
 enum P { K(String), I(usize) }
-fn emit(path: &Vec<P>, o: Option<Data>, n: Option<Data>, out: &mut DataArray, size: &mut i64) {
+fn emit(path: &Vec<P>, o: Option<&V>, n: Option<&V>, out: &mut DataArray, size: &mut i64) {
   let mut pa = DataArray::new();
   for e in path { match e { P::K(s) => pa.push_string(s), P::I(i) => pa.push_int(*i as i64) } }
   let mut c = DataObject::new(); c.put_array("p", pa);
-  if let Some(o) = o { *size += nodes(&o); c.set_property("o", o); }
-  if let Some(n) = n { *size += nodes(&n); c.set_property("n", n); }
+  if let Some(o) = o { *size += nodes_v(o, &mut OnPath::new(), 0); put_v(&mut c, "o", o); }
+  if let Some(n) = n { *size += nodes_v(n, &mut OnPath::new(), 0); put_v(&mut c, "n", n); }
   *size += 1;
   out.push_object(c);
 }
@@ -153,51 +207,92 @@ fn same_scalar(a: &Data, b: &Data) -> bool {
     _ => if a.is_object() || a.is_array() || b.is_object() || b.is_array() { false } else { canon_str(a) == canon_str(b) },
   }
 }
-fn diff(a: &Data, b: &Data, path: &mut Vec<P>, out: &mut DataArray, size: &mut i64) {
-  if a.is_object() && b.is_object() {
-    let (x, y) = (a.object(), b.object());
-    if x.data_ref == y.data_ref { return; }
-    for (k, v) in x.objects() {
-      path.push(P::K(k.clone()));
-      if y.has(&k) { diff(&v, &y.get_property(&k), path, out, size); } else { emit(path, Some(v), None, out, size); }
-      path.pop();
+// Cycle-safe: the PAIR of containers being compared is kept on the current path; meeting the same pair again
+// is a cycle and adds nothing. Past MAX_DEPTH two different containers are emitted as one whole replacement.
+type OnPair = std::collections::HashSet<(bool, usize, usize)>;
+fn diff_v(a: &V, b: &V, path: &mut Vec<P>, out: &mut DataArray, size: &mut i64, on: &mut OnPair) {
+  match (a, b) {
+    (V::O(x), V::O(y)) => {
+      if x.data_ref == y.data_ref { return; }
+      let id = (true, x.data_ref, y.data_ref);
+      if on.contains(&id) { return; }
+      if path.len() >= MAX_DEPTH { emit(path, Some(a), Some(b), out, size); return; }
+      on.insert(id);
+      for (k, v) in obj_kids(x) {
+        path.push(P::K(k.clone()));
+        if y.has(&k) { diff_v(&v, &val(&y.get_property(&k)), path, out, size, on); } else { emit(path, Some(&v), None, out, size); }
+        path.pop();
+      }
+      for (k, v) in obj_kids(y) { if !x.has(&k) { path.push(P::K(k)); emit(path, None, Some(&v), out, size); path.pop(); } }
+      on.remove(&id);
     }
-    for (k, v) in y.objects() { if !x.has(&k) { path.push(P::K(k.clone())); emit(path, None, Some(v), out, size); path.pop(); } }
-    return;
+    (V::A(x), V::A(y)) => {
+      if x.data_ref == y.data_ref { return; }
+      let id = (false, x.data_ref, y.data_ref);
+      if on.contains(&id) { return; }
+      if path.len() >= MAX_DEPTH { emit(path, Some(a), Some(b), out, size); return; }
+      on.insert(id);
+      let (xs, ys) = (arr_kids(x), arr_kids(y));
+      let (lx, ly) = (xs.len(), ys.len());
+      let m = if lx < ly { lx } else { ly };
+      for i in 0..m { path.push(P::I(i)); diff_v(&xs[i], &ys[i], path, out, size, on); path.pop(); }
+      for i in m..ly { path.push(P::I(i)); emit(path, None, Some(&ys[i]), out, size); path.pop(); }
+      for i in (m..lx).rev() { path.push(P::I(i)); emit(path, Some(&xs[i]), None, out, size); path.pop(); }
+      on.remove(&id);
+    }
+    (V::S(x), V::S(y)) => { if !same_scalar(x, y) { emit(path, Some(a), Some(b), out, size); } }
+    _ => emit(path, Some(a), Some(b), out, size),
   }
-  if a.is_array() && b.is_array() {
-    let (x, y) = (a.array(), b.array());
-    if x.data_ref == y.data_ref { return; }
-    let (lx, ly) = (x.len(), y.len());
-    let m = if lx < ly { lx } else { ly };
-    for i in 0..m { path.push(P::I(i)); diff(&x.get_property(i), &y.get_property(i), path, out, size); path.pop(); }
-    for i in m..ly { path.push(P::I(i)); emit(path, None, Some(y.get_property(i)), out, size); path.pop(); }
-    for i in (m..lx).rev() { path.push(P::I(i)); emit(path, Some(x.get_property(i)), None, out, size); path.pop(); }
-    return;
-  }
-  if same_scalar(a, b) { return; }
-  emit(path, Some(a.clone()), Some(b.clone()), out, size);
 }
-// apply one change forward (n) or backward (o); the inserted value is a fresh copy so the tape stays immutable
-fn apply(root: &DataObject, ch: &DataObject, fwd: bool) {
-  let p = ch.get_array("p");
-  let n = p.len();
-  if n == 0 { return; }
-  let key = if fwd { "n" } else { "o" };
-  let holder = if ch.has(key) { Some(copy_val(&ch.get_property(key))) } else { None };
-  let mut cur = Data::DObject(root.data_ref);
-  for j in 0..n - 1 {
+fn diff(a: &DataObject, b: &DataObject, path: &mut Vec<P>, out: &mut DataArray, size: &mut i64) {
+  diff_v(&V::O(a.clone()), &V::O(b.clone()), path, out, size, &mut OnPair::new());
+}
+// ---- paths: resolved step by step with every step checked; nothing changes until the whole path matches ----
+fn e_desc(e: &Data) -> String { if e.is_int() { format!("index {}", e.int()) } else if e.is_string() { format!("key {:?}", e.string()) } else { "a non-key element".to_string() } }
+fn kind_of(v: &V) -> &'static str { match v { V::O(_) => "an object", V::A(_) => "an array", V::S(_) => "a scalar" } }
+fn nav(cur: &V, e: &Data) -> Option<V> {
+  match cur {
+    V::A(a) => if e.is_int() && e.int() >= 0 && (e.int() as usize) < a.len() { Some(val(&a.get_property(e.int() as usize))) } else { None },
+    V::O(o) => if e.is_string() && o.has(&e.string()) { Some(val(&o.get_property(&e.string()))) } else { None },
+    V::S(_) => None,
+  }
+}
+// the container holding the LAST element of p (p non-empty); changes nothing
+fn parent_at(root: &DataObject, p: &DataArray) -> Result<V, String> {
+  let mut cur = V::O(root.clone());
+  for j in 0..p.len() - 1 {
     let e = p.get_property(j);
-    cur = if e.is_int() { cur.array().get_property(e.int() as usize) } else { cur.object().get_property(&e.string()) };
+    cur = match nav(&cur, &e) { Some(v) => v, None => return Err(format!("path {} does not match the state at element {}: {} has no {}", p.to_string(), j, kind_of(&cur), e_desc(&e))) };
   }
+  Ok(cur)
+}
+// apply one change forward (n) or backward (o); the inserted value is a fresh copy so the tape stays immutable.
+// A path that no longer matches the state's shape is an Err with NOTHING changed (it used to panic midway:
+// "Not an array"). Removing an already-absent key/element stays a no-op, as before.
+fn apply(root: &DataObject, ch: &DataObject, fwd: bool) -> Result<(), String> {
+  let p = ga(ch, "p");
+  let n = p.len();
+  if n == 0 { return Ok(()); }
+  let par = parent_at(root, &p)?;
   let last = p.get_property(n - 1);
-  if last.is_int() {
-    let mut a = cur.array(); let i = last.int() as usize;
-    match &holder { Some(h) => { let v = h.get_property("v"); if i >= a.len() { a.push_property(v); } else { a.set_property(i, v); } }, None => { if i < a.len() { a.remove_property(i); } } }
-  } else {
-    let mut o = cur.object(); let k = last.string();
-    match &holder { Some(h) => { o.set_property(&k, h.get_property("v")); }, None => { if o.has(&k) { o.remove_property(&k); } } }
+  let key = if fwd { "n" } else { "o" };
+  let set = ch.has(key);
+  match &par {
+    V::A(a) if last.is_int() && last.int() >= 0 => {
+      let (i, len) = (last.int() as usize, a.len());
+      if set && i > len { return Err(format!("path {} does not match the state: index {} is past the end (length {})", p.to_string(), i, len)); }
+      let mut a = a.clone();
+      if set { let h = copy_val(&ch.get_property(key)); let v = h.get_property("v"); if i == len { a.push_property(v); } else { a.set_property(i, v); } }
+      else if i < len { a.remove_property(i); }
+    }
+    V::O(o) if last.is_string() => {
+      let mut o = o.clone(); let k = last.string();
+      if set { let h = copy_val(&ch.get_property(key)); o.set_property(&k, h.get_property("v")); }
+      else if o.has(&k) { o.remove_property(&k); }
+    }
+    _ => return Err(format!("path {} does not match the state: {} cannot take {}", p.to_string(), kind_of(&par), e_desc(&last))),
   }
+  Ok(())
 }
 // ---- alias topology (R3) ----
 // cp/diff preserve identity WITHIN one copy but apply necessarily copies each changed path separately.
@@ -218,11 +313,17 @@ fn graph_body_key(path: &Vec<P>) -> bool {
   }
   false
 }
-fn alias_walk(d: &Data, path: &mut Vec<P>, seen: &mut HashMap<usize, DataArray>, groups: &mut DataArray) {
+fn alias_walk(d: &Data, path: &mut Vec<P>, seen: &mut HashMap<(bool, usize), DataArray>, groups: &mut DataArray) {
   if !(d.is_object() || d.is_array()) { return; }
-  let id = ref_at(d);
+  // ndata keeps objects and arrays in SEPARATE heaps: a bare data_ref is not an identity (array #k and object
+  // #k are unrelated). Keying by ref alone paired e.g. ["frames"] with ["frames",0] as one "alias", and
+  // linking that group put frames inside itself - the cycle behind the canon stack overflows.
+  let id = (d.is_object(), ref_at(d));
   if seen.contains_key(&id) {
-    if seen.get(&id).unwrap().len() > 0 { groups.push_array(seen.get(&id).unwrap().clone()); }
+    // The root (empty path) cannot be re-linked: skip the pair. Pushing only the repeated path (as before)
+    // shifted every later (first, repeated) pair - and mis-paired groups are how link_aliases makes cycles.
+    if seen.get(&id).unwrap().len() == 0 { return; }
+    groups.push_array(seen.get(&id).unwrap().clone());
     let mut p = DataArray::new();
     for e in path.iter() { match e { P::K(s) => p.push_string(s), P::I(i) => p.push_int(*i as i64) } }
     groups.push_array(p);
@@ -243,7 +344,7 @@ fn aliases(st: &DataObject) -> DataArray {
   let mut i = 0;
   while i + 1 < pairs.len() {
     let first = pairs.get_array(i); let second = pairs.get_array(i + 1);
-    let key = canon_str(&Data::DArray(first.data_ref));
+    let key = canon_a(&first);
     if !grouped.contains_key(&key) {
       let mut paths = DataArray::new(); paths.push_array(first);
       grouped.insert(key.clone(), paths); order.push(key.clone());
@@ -259,10 +360,10 @@ fn alias_size(a: &DataArray) -> i64 { let mut n = 0; for p in a.objects() { n +=
 // Bring external global references back into the live interpreter graph before it executes.
 // This is intentionally NOT debug isolation: the global handle is shared, exactly as in an
 // ordinary flow run, so a later in-place set/push mutates both the flow value and the global.
-fn relink_live(s: &mut DataObject, live: &DataObject) {
-  let groups = ga(s, "xcur"); if groups.len() == 0 { return; }
+fn relink_live(s: &mut DataObject, live: &DataObject) -> Result<(), String> {
+  let groups = ga(s, "xcur"); if groups.len() == 0 { return Ok(()); }
   let g = DataStore::globals(); let mut roots = DataObject::new();
-  roots.put_object("s", live.clone()); roots.put_object("g", g); link_aliases(&roots, &groups);
+  roots.put_object("s", live.clone()); roots.put_object("g", g); link_aliases(&roots, &groups)
 }
 // Alias groups which cross the interpreter/persistent boundary. Paths are rooted at
 // {s: stepper state, g: the REAL process globals}; global_refs deliberately does not copy.
