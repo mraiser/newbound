@@ -387,39 +387,59 @@ fn cross_aliases(st: &DataObject, names: &DataArray) -> DataArray {
   }
   out
 }
-fn link_aliases(root: &DataObject, groups: &DataArray) {
-  let mut i = 0;
-  while i < groups.len() {
-    let paths = groups.get_array(i); i += 1;
+// Re-link alias groups (each group: paths that must name ONE container). A group is checked in full before it
+// changes anything: every path must resolve in the state, and no link may put a container inside itself (a
+// stale or mis-paired path is how a link makes a cycle). A group that does not match is skipped and reported,
+// the others are linked; Err lists the skipped groups. Holds real handles; never recurses.
+fn link_aliases(root: &DataObject, groups: &DataArray) -> Result<(), String> {
+  let mut bad: Vec<String> = Vec::new();
+  for gix in 0..groups.len() {
+    let gd = groups.get_property(gix);
+    if !gd.is_array() { bad.push(format!("alias group {} is not a list of paths", gix)); continue; }
+    let paths = gd.array();
     if paths.len() < 2 { continue; }
-    let mut shared: Option<Data> = None;
-    for p in paths.objects() {
-      let pa = p.array(); let mut cur = Data::DObject(root.data_ref); let mut ok = pa.len() > 0;
-      for j in 0..pa.len() {
-        let e = pa.get_property(j);
-        if e.is_int() { if cur.is_array() && (e.int() as usize) < cur.array().len() { cur = cur.array().get_property(e.int() as usize); } else { ok = false; break; } }
-        else if cur.is_object() && cur.object().has(&e.string()) { cur = cur.object().get_property(&e.string()); } else { ok = false; break; }
+    // resolve every path first: (parent container, last element, current value, path)
+    let mut slots: Vec<(V, Data, V, DataArray)> = Vec::new(); let mut why: Option<String> = None;
+    for pd in paths.objects() {
+      if !pd.is_array() || pd.array().len() == 0 { why = Some(format!("alias group {} has an empty or non-list path", gix)); break; }
+      let pa = pd.array();
+      let par = match parent_at(root, &pa) { Ok(v) => v, Err(m) => { why = Some(m); break; } };
+      let last = pa.get_property(pa.len() - 1);
+      match nav(&par, &last) {
+        Some(v) => slots.push((par, last, v, pa)),
+        None => { why = Some(format!("path {} does not match the state: {} has no {}", pa.to_string(), kind_of(&par), e_desc(&last))); break; }
       }
-      if !ok { break; }
-      if let Some(v) = &shared {
-        if ref_at(&cur) == ref_at(v) { continue; }
-        let parent = pa.get_property(pa.len() - 1);
-        // Re-resolve the parent (cur is the child). Paths never address the root itself.
-        let mut par = Data::DObject(root.data_ref);
-        for j in 0..pa.len() - 1 { let e = pa.get_property(j); par = if e.is_int() { par.array().get_property(e.int() as usize) } else { par.object().get_property(&e.string()) }; }
-        if parent.is_int() { par.array().set_property(parent.int() as usize, v.clone()); }
-        else { par.object().set_property(&parent.string(), v.clone()); }
-      } else { shared = Some(cur); }
+    }
+    if let Some(m) = why { bad.push(m); continue; }
+    let shared = slots[0].2.clone();
+    let sid = match vid(&shared) { Some(id) => id, None => { bad.push(format!("alias group {} does not name a container", gix)); continue; } };
+    // check every link of the group before making any
+    let mut cyc: Option<String> = None;
+    for (par, _, v, pa) in slots.iter().skip(1) {
+      if vid(v) == Some(sid) { continue; }
+      let pid = vid(par).unwrap();
+      if pid == sid || reaches(&shared, pid) { cyc = Some(format!("linking {} to {} would put a container inside itself", pa.to_string(), slots[0].3.to_string())); break; }
+    }
+    if let Some(m) = cyc { bad.push(m); continue; }
+    for (par, last, v, _) in slots.iter().skip(1) {
+      if vid(v) == Some(sid) { continue; }
+      match par {
+        V::A(a) => { let mut a = a.clone(); a.set_property(last.int() as usize, data_of(&shared)); }
+        V::O(o) => { let mut o = o.clone(); o.set_property(&last.string(), data_of(&shared)); }
+        V::S(_) => {}
+      }
     }
   }
+  if bad.is_empty() { Ok(()) } else { Err(format!("{} alias group(s) not linked: {}", bad.len(), bad.join("; "))) }
 }
 fn cursor_aliases(s: &DataObject) -> DataArray {
   let (c, base) = (gi(s, "cursor"), gi(s, "base"));
   if c == base { ga(&go(&s.get_object("snaps"), &base.to_string()), "a") } else { ga(&s.get_array("tape").get_object((c - 1 - base) as usize), "a") }
 }
-fn restore_aliases(s: &mut DataObject) {
+fn restore_aliases(s: &mut DataObject) -> Result<(), String> {
   let a = cursor_aliases(s);
-  if a.len() > 0 { unshare(s); let cur = s.get_object("cur"); link_aliases(&cur, &a); }
+  if a.len() > 0 { unshare(s); let cur = s.get_object("cur"); link_aliases(&cur, &a)?; }
+  Ok(())
 }
 fn path_prefix(p: &DataArray, prefix: &DataArray) -> bool {
   if prefix.len() > p.len() { return false; }
@@ -482,7 +502,7 @@ fn gdiff(pre: &DataObject, names: &DataArray, state: &DataObject) -> DataObject 
   r.put_array("xafter", cross_aliases(state, names));
   r
 }
-fn apply_g(e: &DataObject, fwd: bool) {
+fn apply_g(e: &DataObject, fwd: bool) -> Result<(), String> {
   let gl = ga(e, "g"); let n = gl.len(); let mut g = DataStore::globals();
   // Copy every changed value through one memo, then restore topology to unchanged named keys too.
   let mut memo = Memo { o: HashMap::new(), a: HashMap::new() };
@@ -491,7 +511,7 @@ fn apply_g(e: &DataObject, fwd: bool) {
     if c.has(key) { let v = cp(&c.get_property(key), &mut memo); g.set_property(&k, v); } else if g.has(&k) { g.remove_property(&k); }
   }
   let topology = ga(e, if fwd { "gafter" } else { "gbefore" });
-  link_aliases(&g, &topology);
+  link_aliases(&g, &topology).map_err(|m| format!("persistent globals: {}", m))
 }
 // ---- views and frame helpers (on the plain copy) ----
 fn item(kind: &str, i: i64) -> DataObject { let mut o = DataObject::new(); o.put_string("kind", kind); o.put_int("index", i); o }
@@ -528,41 +548,73 @@ fn in_ready(v: &DataObject, it: &DataObject) -> bool {
 }
 // ---- tape mechanics ----
 fn unshare(s: &mut DataObject) { if gb(s, "shared") { let c = copy_obj(&s.get_object("cur")); s.put_object("cur", c); s.put_boolean("shared", false); } }
-fn apply_entry(s: &mut DataObject, e: &DataObject, fwd: bool) {
+fn put_back(s: &mut DataObject, cur: &DataObject, shared: bool) { s.put_object("cur", cur.clone()); s.put_boolean("shared", shared); }
+fn apply_entry(s: &mut DataObject, e: &DataObject, fwd: bool) -> Result<(), String> {
   unshare(s);
   let cur = s.get_object("cur");
   let ch = ga(e, "c");
   let n = ch.len();
-  for j in 0..n { apply(&cur, &ch.get_object(if fwd { j } else { n - 1 - j }), fwd); }
+  for j in 0..n {
+    let i = if fwd { j } else { n - 1 - j };
+    if let Err(m) = apply(&cur, &ch.get_object(i), fwd) { return Err(format!("tape step {} change {} ({}): {}", gi(e, "seq"), i, if fwd { "forward" } else { "inverse" }, m)); }
+  }
+  Ok(())
 }
-// move the cursor to k (base <= k <= tape end); returns the seqs of side-effecting steps crossed backwards
-fn goto(s: &mut DataObject, k: i64) -> DataArray {
-  let (c, base) = (gi(s, "cursor"), gi(s, "base"));
-  let tape = s.get_array("tape");
-  let mut fx = DataArray::new();
-  if k == c { return fx; }
-  if k < c { for q in (k..c).rev() { let e = tape.get_object((q - base) as usize); apply_g(&e, false); if gb(&e, "fx") { fx.push_int(q); } } }
-  else { for q in c..k { apply_g(&tape.get_object((q - base) as usize), true); } }
+// Moves (goto, replay_fwd) work on a COPY of cur (shared=true makes unshare copy) and log every persistent-global
+// change they make, so a tape that no longer matches the state is REFUSED with the session exactly as it was:
+// cur, shared, cursor and globals put back; live is rebuilt from cur before the next execution.
+fn goto_move(s: &mut DataObject, tape: &DataArray, c: i64, base: i64, k: i64, fx: &mut DataArray, gdone: &mut Vec<(i64, bool)>) -> Result<(), String> {
+  if k < c { for q in (k..c).rev() { let e = tape.get_object((q - base) as usize); gdone.push((q, false)); apply_g(&e, false)?; if gb(&e, "fx") { fx.push_int(q); } } }
+  else { for q in c..k { gdone.push((q, true)); apply_g(&tape.get_object((q - base) as usize), true)?; } }
   let sb = (k / SNAP_EVERY) * SNAP_EVERY;
   let snaps = s.get_object("snaps");
   let dist = if k > c { k - c } else { c - k };
   if sb >= base && snaps.has(&sb.to_string()) && (k - sb) < dist {
     let sn = snaps.get_object(&sb.to_string());
     s.put_object("cur", copy_obj(&sn.get_object("s"))); s.put_boolean("shared", false);
-    for q in sb..k { apply_entry(s, &tape.get_object((q - base) as usize), true); }
-  } else if k < c { for q in (k..c).rev() { apply_entry(s, &tape.get_object((q - base) as usize), false); } }
-  else { for q in c..k { apply_entry(s, &tape.get_object((q - base) as usize), true); } }
-  s.put_int("cursor", k); s.put_boolean("live_ok", false);
-  restore_aliases(s);
-  fx
+    for q in sb..k { apply_entry(s, &tape.get_object((q - base) as usize), true)?; }
+  } else if k < c { for q in (k..c).rev() { apply_entry(s, &tape.get_object((q - base) as usize), false)?; } }
+  else { for q in c..k { apply_entry(s, &tape.get_object((q - base) as usize), true)?; } }
+  s.put_int("cursor", k);
+  restore_aliases(s)
 }
-fn replay_fwd(s: &mut DataObject) {
+// move the cursor to k (base <= k <= tape end); returns the seqs of side-effecting steps crossed backwards
+fn goto(s: &mut DataObject, k: i64) -> Result<DataArray, String> {
+  let (c, base) = (gi(s, "cursor"), gi(s, "base"));
+  let tape = s.get_array("tape");
+  let mut fx = DataArray::new();
+  if k == c { return Ok(fx); }
+  let (old_cur, old_shared) = (s.get_object("cur"), gb(s, "shared"));
+  s.put_boolean("shared", true);
+  let mut gdone: Vec<(i64, bool)> = Vec::new();
+  let r = goto_move(s, &tape, c, base, k, &mut fx, &mut gdone);
+  s.put_boolean("live_ok", false);
+  if let Err(m) = r {
+    for (q, fwd) in gdone.iter().rev() { let _ = apply_g(&tape.get_object((*q - base) as usize), !*fwd); }
+    put_back(s, &old_cur, old_shared); s.put_int("cursor", c);
+    return Err(m);
+  }
+  Ok(fx)
+}
+fn replay_move(s: &mut DataObject, e: &DataObject, c: i64) -> Result<(), String> {
+  apply_g(e, true)?;
+  apply_entry(s, e, true)?;
+  s.put_int("cursor", c + 1);
+  restore_aliases(s)
+}
+fn replay_fwd(s: &mut DataObject) -> Result<(), String> {
   let (c, base) = (gi(s, "cursor"), gi(s, "base"));
   let e = s.get_array("tape").get_object((c - base) as usize);
-  apply_g(&e, true);
-  apply_entry(s, &e, true);
-  s.put_int("cursor", c + 1); s.put_boolean("live_ok", false);
-  restore_aliases(s);
+  let (old_cur, old_shared) = (s.get_object("cur"), gb(s, "shared"));
+  s.put_boolean("shared", true);
+  let r = replay_move(s, &e, c);
+  s.put_boolean("live_ok", false);
+  if let Err(m) = r {
+    let _ = apply_g(&e, false);
+    put_back(s, &old_cur, old_shared); s.put_int("cursor", c);
+    return Err(format!("replaying tape step {} refused - the session is unchanged at {}: {}", c, c, m));
+  }
+  Ok(())
 }
 // the tape from c on becomes a branch record; returns its id
 fn fork(s: &mut DataObject, c: i64) -> i64 {
@@ -625,7 +677,8 @@ fn exec(s: &mut DataObject, core: &Command, pick: &DataObject, took: Option<Data
     } else {
       ga(&s.get_array("tape").get_object((c - 1 - base) as usize), "xafter")
     };
-    s.put_array("xcur", groups); relink_live(s, &live);
+    s.put_array("xcur", groups);
+    if let Err(m) = relink_live(s, &live) { return Err(format!("could not restore the interpreter/global aliases before executing: {}", m)); }
     s.put_object("live", live); s.put_boolean("live_ok", true);
   }
   let mut pn = s.get_array("pnames");
@@ -646,8 +699,8 @@ fn exec(s: &mut DataObject, core: &Command, pick: &DataObject, took: Option<Data
   let alias = aliases(&ns);
   let cur = s.get_object("cur");
   let mut ch = DataArray::new(); let mut size = 0i64; let mut path: Vec<P> = Vec::new();
-  diff(&Data::DObject(cur.data_ref), &Data::DObject(nc.data_ref), &mut path, &mut ch, &mut size);
-  size += nodes(&Data::DObject(grecord.data_ref));
+  diff(&cur, &nc, &mut path, &mut ch, &mut size);
+  size += nodes_o(&grecord);
   let h = hash_obj(&nc);
   let view = mkview(&r);
   let seq = gi(s, "cursor");
@@ -689,7 +742,7 @@ fn advance(s: &mut DataObject, core: &Command, pick: &DataObject, force: bool, o
     let took = if is_o(&e, "took") { Some(e.get_object("took")) } else { None };
     let is_edit = match &took { Some(t) => gs(t, "kind") == "edit", None => false };
     if !force && ((is_edit && !explicit) || item_eq(&req, &took)) {
-      replay_fwd(s);
+      replay_fwd(s)?;
       out.put_int("replayed", gi(out, "replayed") + 1);
       return Ok(cur_view(s));
     }
@@ -899,7 +952,10 @@ match mode.as_str() {
     let k = if mode == "back" { c - if gi(&pick, "count") > 0 { gi(&pick, "count") } else { 1 } } else { if pick.has("seq") && pick.get_property("seq").is_int() { gi(&pick, "seq") } else { return err("goto needs pick {seq}"); } };
     if k < base { return err(&format!("seq {} is before the start of the tape ({}{})", k, base, if base > 0 { ", older steps were trimmed" } else { "" })); }
     if k > n { return err(&format!("seq {} is past the end of the tape ({})", k, n)); }
-    let fx = goto(&mut s, k);
+    let fx = match goto(&mut s, k) {
+      Ok(fx) => fx,
+      Err(m) => { let mut o = err(&format!("{} to {} refused - the session is unchanged at {}: {}", mode, k, c, m)); o.put_string("session", &session); return o; }
+    };
     out.put_string("status", "ok"); out.put_string("mode", &mode); out.put_int("from", c);
     out.put_array("crossed_side_effects", fx);
   }
@@ -913,30 +969,31 @@ match mode.as_str() {
     let (c, n) = (gi(&s, "cursor"), tape_len(&s));
     let v = cur_view(&s);
     if gb(&v, "ended") { return err("the run has ended - go back first"); }
-    if c < n { let id = fork(&mut s, c); out.put_boolean("forked", true); out.put_int("branch", id); }
-    restore_aliases(&mut s);
+    // check the path against the state BEFORE anything changes (fork, relink, the edit itself)
+    let last = p.get_property(p.len() - 1);
+    let fits = |par: &V| match par { V::A(a) => last.is_int() && last.int() >= 0 && (last.int() as usize) <= a.len(), V::O(_) => last.is_string(), V::S(_) => false };
+    match parent_at(&s.get_object("cur"), &p) { Ok(par) if fits(&par) => {}, _ => return err("edit path does not exist in the state") }
+    let mut forked = String::new();
+    if c < n { let id = fork(&mut s, c); out.put_boolean("forked", true); out.put_int("branch", id); forked = format!(" (the old tail was kept as branch {})", id); }
+    // the edit works on a COPY of cur: any failure below puts the old one back
+    let (old_cur, old_shared) = (s.get_object("cur"), gb(&s, "shared"));
+    s.put_boolean("shared", true);
+    if let Err(m) = restore_aliases(&mut s) { put_back(&mut s, &old_cur, old_shared); return err(&format!("edit refused{}: {}", forked, m)); }
     unshare(&mut s);
     let old_aliases = cursor_aliases(&s);
     let cur = s.get_object("cur");
     // resolve the old value (the container must exist)
-    let mut d = Data::DObject(cur.data_ref);
-    for j in 0..p.len() - 1 {
-      let e = p.get_property(j);
-      let ok = if e.is_int() { d.is_array() && (e.int() as usize) < d.array().len() } else { d.is_object() && d.object().has(&e.string()) };
-      if !ok { return err("edit path does not exist in the state"); }
-      d = if e.is_int() { d.array().get_property(e.int() as usize) } else { d.object().get_property(&e.string()) };
-    }
-    let last = p.get_property(p.len() - 1);
-    let old: Option<Data> = if last.is_int() { if d.is_array() && (last.int() as usize) < d.array().len() { Some(d.array().get_property(last.int() as usize)) } else { None } } else if d.is_object() && d.object().has(&last.string()) { Some(d.object().get_property(&last.string())) } else { None };
+    let par = match parent_at(&cur, &p) { Ok(par) if fits(&par) => par, _ => { put_back(&mut s, &old_cur, old_shared); return err(&format!("edit path does not exist in the state{}", forked)); } };
+    let old: Option<V> = nav(&par, &last);
     let mut ch = DataObject::new(); ch.put_array("p", p.clone());
-    if let Some(o) = old { let h = copy_val(&o); ch.set_property("o", h.get_property("v")); }
+    if let Some(o) = old { let h = copy_val(&data_of(&o)); ch.set_property("o", h.get_property("v")); }
     let hv = copy_val(&pick.get_property("value")); ch.set_property("n", hv.get_property("v"));
-    apply(&cur, &ch, true);
+    if let Err(m) = apply(&cur, &ch, true) { put_back(&mut s, &old_cur, old_shared); return err(&format!("edit refused{}: {}", forked, m)); }
     // An edit replaces one path: other aliases of the old value stay linked, but the edited path
     // deliberately detaches (the normal assignment semantics of the editor's value edit).
     let next_aliases = aliases_after_edit(&old_aliases, &p);
     let cur = s.get_object("cur");
-    link_aliases(&cur, &next_aliases);
+    if let Err(m) = link_aliases(&cur, &next_aliases) { put_back(&mut s, &old_cur, old_shared); return err(&format!("edit refused{}: {}", forked, m)); }
     let mut cl = DataArray::new(); cl.push_object(ch);
     let mut ev = DataObject::new(); ev.put_string("type", "edit"); ev.put_int("seq", c); ev.put_array("path", p.clone()); let hv2 = copy_val(&pick.get_property("value")); ev.set_property("value", hv2.get_property("v"));
     let mut view = copy_obj(&v); view.put_object("event", ev);
