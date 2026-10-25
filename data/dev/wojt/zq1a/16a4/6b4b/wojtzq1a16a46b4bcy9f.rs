@@ -205,6 +205,19 @@ fn apply(root: &DataObject, ch: &DataObject, fwd: bool) {
 // cursor. Graph bodies are immutable graph references, not values, and never participate in diff.
 // The map is tape data (with real size accounting), not an assertion based on the canonical hash.
 fn ref_at(d: &Data) -> usize { if d.is_object() { d.object().data_ref } else { d.array().data_ref } }
+fn graph_body_key(path: &Vec<P>) -> bool {
+  // Only the interpreter's root/frame graph slots are excluded. A user value or persistent
+  // global is allowed to have an ordinary property named "body".
+  if path.len() == 0 { return true; }
+  if path.len() == 1 { if let P::K(s) = &path[0] { return s == "s"; } }
+  if path.len() == 2 {
+    if let (P::K(a), P::I(_)) = (&path[0], &path[1]) { return a == "frames"; }
+  }
+  if path.len() == 3 {
+    if let (P::K(s), P::K(f), P::I(_)) = (&path[0], &path[1], &path[2]) { return s == "s" && f == "frames"; }
+  }
+  false
+}
 fn alias_walk(d: &Data, path: &mut Vec<P>, seen: &mut HashMap<usize, DataArray>, groups: &mut DataArray) {
   if !(d.is_object() || d.is_array()) { return; }
   let id = ref_at(d);
@@ -218,34 +231,61 @@ fn alias_walk(d: &Data, path: &mut Vec<P>, seen: &mut HashMap<usize, DataArray>,
   let mut p = DataArray::new();
   for e in path.iter() { match e { P::K(s) => p.push_string(s), P::I(i) => p.push_int(*i as i64) } }
   seen.insert(id, p);
-  if d.is_object() { for (k, v) in d.object().objects() { if k == "body" { continue; } path.push(P::K(k)); alias_walk(&v, path, seen, groups); path.pop(); } }
+  if d.is_object() { for (k, v) in d.object().objects() { if k == "body" && graph_body_key(path) { continue; } path.push(P::K(k)); alias_walk(&v, path, seen, groups); path.pop(); } }
   else { for (i, v) in d.array().objects().iter().enumerate() { path.push(P::I(i)); alias_walk(v, path, seen, groups); path.pop(); } }
 }
 fn aliases(st: &DataObject) -> DataArray {
   let mut seen = HashMap::new(); let mut pairs = DataArray::new(); let mut path = Vec::new();
   alias_walk(&Data::DObject(st.data_ref), &mut path, &mut seen, &mut pairs);
-  // A repeated reference contributes its original path once, then each later path.
-  // Join pairs by the complete original path; never index across unrelated groups.
-  let mut out = DataArray::new(); let mut used: HashMap<String, bool> = HashMap::new();
+  // alias_walk emits (first path, repeated path) pairs. Group by the FIRST path, not by
+  // adjacent pairs: with three references the pairs are (a,b),(a,c), and b must not be lost.
+  let mut grouped: HashMap<String, DataArray> = HashMap::new(); let mut order: Vec<String> = Vec::new();
   let mut i = 0;
-  while i < pairs.len() {
-    let first = pairs.get_array(i); let key = canon_str(&Data::DArray(first.data_ref));
-    if !used.contains_key(&key) {
-      used.insert(key.clone(), true);
-      let mut paths = DataArray::new(); paths.push_array(first.clone());
-      let mut j = i + 1;
-      while j + 1 < pairs.len() {
-        let candidate = pairs.get_array(j);
-        if canon_str(&Data::DArray(candidate.data_ref)) == key { paths.push_array(pairs.get_array(j + 1)); j += 2; }
-        else { j += 1; }
-      }
-      if paths.len() > 1 { out.push_array(paths); }
+  while i + 1 < pairs.len() {
+    let first = pairs.get_array(i); let second = pairs.get_array(i + 1);
+    let key = canon_str(&Data::DArray(first.data_ref));
+    if !grouped.contains_key(&key) {
+      let mut paths = DataArray::new(); paths.push_array(first);
+      grouped.insert(key.clone(), paths); order.push(key.clone());
     }
+    grouped.get_mut(&key).unwrap().push_array(second);
     i += 2;
   }
+  let mut out = DataArray::new();
+  for key in order { let paths = grouped.get(&key).unwrap(); if paths.len() > 1 { out.push_array(paths.clone()); } }
   out
 }
 fn alias_size(a: &DataArray) -> i64 { let mut n = 0; for p in a.objects() { n += 1 + p.array().len() as i64; } n }
+// Bring external global references back into the live interpreter graph before it executes.
+// This is intentionally NOT debug isolation: the global handle is shared, exactly as in an
+// ordinary flow run, so a later in-place set/push mutates both the flow value and the global.
+fn relink_live(s: &mut DataObject, live: &DataObject) {
+  let groups = ga(s, "xcur"); if groups.len() == 0 { return; }
+  let g = DataStore::globals(); let mut roots = DataObject::new();
+  roots.put_object("s", live.clone()); roots.put_object("g", g); link_aliases(&roots, &groups);
+}
+// Alias groups which cross the interpreter/persistent boundary. Paths are rooted at
+// {s: stepper state, g: the REAL process globals}; global_refs deliberately does not copy.
+fn global_refs(names: &DataArray) -> DataObject {
+  let g = DataStore::globals(); let mut named = DataObject::new();
+  for i in 0..names.len() { let k = names.get_string(i); if g.has(&k) { named.set_property(&k, g.get_property(&k)); } }
+  named
+}
+fn cross_aliases(st: &DataObject, names: &DataArray) -> DataArray {
+  let mut roots = DataObject::new(); roots.put_object("s", st.clone()); roots.put_object("g", global_refs(names));
+  let mut out = DataArray::new();
+  for group in aliases(&roots).objects() {
+    let paths = group.array(); let (mut has_s, mut has_g) = (false, false);
+    for p in paths.objects() {
+      let path = p.array();
+      if path.len() > 1 && path.get_property(0).is_string() {
+        let root = path.get_string(0); if root == "s" { has_s = true; } else if root == "g" { has_g = true; }
+      }
+    }
+    if has_s && has_g { out.push_array(paths); }
+  }
+  out
+}
 fn link_aliases(root: &DataObject, groups: &DataArray) {
   let mut i = 0;
   while i < groups.len() {
@@ -321,7 +361,7 @@ fn capture(names: &DataArray) -> DataObject {
   for i in 0..names.len() { let k = names.get_string(i); if g.has(&k) { named.set_property(&k, g.get_property(&k)); } }
   copy_obj(&named)
 }
-fn gdiff(pre: &DataObject, names: &DataArray) -> DataObject {
+fn gdiff(pre: &DataObject, names: &DataArray, state: &DataObject) -> DataObject {
   let post = capture(names); let mut out = DataArray::new();
   for (k, _) in pre.objects() {
     let had = true; let has = post.has(&k);
@@ -338,6 +378,7 @@ fn gdiff(pre: &DataObject, names: &DataArray) -> DataObject {
   }
   let mut r = DataObject::new(); r.put_array("changes", out);
   r.put_array("before_aliases", aliases(pre)); r.put_array("after_aliases", aliases(&post));
+  r.put_array("xafter", cross_aliases(state, names));
   r
 }
 fn apply_g(e: &DataObject, fwd: bool) {
