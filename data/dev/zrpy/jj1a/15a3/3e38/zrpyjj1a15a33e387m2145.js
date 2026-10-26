@@ -46,6 +46,21 @@ me.ready = function () {
         ctx.setRig("halo", "params.size.x", box.x + 0.16);
         ctx.setRig("halo", "params.size.y", box.y + 0.16);
         ctx.setRig("halo", "pos.z", -box.z / 2 + 0.02);
+        // STEP DEBUGGER (P4): the debug-state plate - a wider frame behind the
+        // halo, tinted by the op's state in the editor's debug session
+        // (host.state.dbg; see render). Hidden while waiting / not debugging.
+        ctx.setRig("dbg", "params.size.x", box.x + 0.34);
+        ctx.setRig("dbg", "params.size.y", box.y + 0.34);
+        ctx.setRig("dbg", "pos.z", -box.z / 2 - 0.01);
+        ctx.me._dbg = null;
+        // D4: the BREAKPOINT dot - the icon's top-left corner, just outside
+        // it (clear of the sockets on the top edge and the sync-in handle on
+        // the left), in front of the plate; shown by render from
+        // host.state.bps, a tap toggles it (click → host.state.onBpTap)
+        ctx.setRig("bp", "pos.x", -box.x / 2 - 0.1);
+        ctx.setRig("bp", "pos.y", box.y / 2 + 0.1);
+        ctx.setRig("bp", "pos.z", box.z / 2);
+        ctx.me._bp = -1;
         // selection = the bench accent (tokens.css: selection/focus/primary)
         const acc = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
         ctx.setRig("halo", "material", { color: /^#[0-9a-f]{3,8}$/i.test(acc) ? acc : "#f0a63c", emissive: true });
@@ -79,6 +94,47 @@ me.ready = function () {
         const hs = ctx.host && ctx.host.state;
         const sel = !!(hs && hs.selectedKey === ctx.key);
         if (sel !== ctx.me._sel && ctx.setRig) { ctx.me._sel = sel; ctx.setRig("halo", "visible", sel); }
+        // STEP DEBUGGER (P4): host.state.dbg = { deck, ops: [state...] } for
+        // the editor's FOCUSED case (null when not debugging / no frame runs
+        // it). States: waiting (hidden) | ready | running | done | skipped.
+        // Colours: dbg.colors (the editor's --fe-dbg-<state> tokens), else a
+        // page-level --fe-dbg-<state>, else the defaults below.
+        {
+          const dbg = hs && hs.dbg;
+          const km = /^d(\d+)_op(\d+)$/.exec(ctx.key || "");
+          let ds = null;
+          if (dbg && Array.isArray(dbg.ops) && km && +km[1] === dbg.deck) ds = dbg.ops[ctx.me.opIndex] || null;
+          if (ds !== ctx.me._dbg && ctx.setRig) {
+            ctx.me._dbg = ds;
+            const show = !!ds && ds !== "waiting";
+            if (show) {
+              const DEF = { ready: "#f0a63c", running: "#5aa9e6", done: "#62bd8c", skipped: "#6b6f78" };
+              const tok = String((dbg.colors && dbg.colors[ds]) || getComputedStyle(document.documentElement).getPropertyValue("--fe-dbg-" + ds)).trim();
+              const color = /^#[0-9a-f]{3,8}$/i.test(tok) ? tok : (DEF[ds] || "#8a8f98");
+              ctx.setRig("dbg", "material", { color, opacity: ds === "skipped" ? 0.35 : ds === "ready" ? 0.9 : 0.7, emissive: ds === "ready" || ds === "running" });
+            }
+            ctx.setRig("dbg", "visible", show);
+          }
+        }
+        // D4 BREAKPOINT dot: host.state.bps = { deck, ops: [opIndex...],
+        // ghost, color } for the editor's focused case. Set = a solid dot;
+        // while a debug session is open (ghost) every op shows a faint one,
+        // so a tap can set it. ctx.me._bp mirrors 0 hidden / 1 ghost / 2 set.
+        {
+          const bp = hs && hs.bps;
+          const km = /^d(\d+)_op(\d+)$/.exec(ctx.key || "");
+          let bs = 0;
+          if (bp && km && +km[1] === bp.deck) bs = (Array.isArray(bp.ops) && bp.ops.includes(ctx.me.opIndex)) ? 2 : (bp.ghost ? 1 : 0);
+          if (bs !== ctx.me._bp && ctx.setRig) {
+            ctx.me._bp = bs;
+            if (bs) {
+              const tok = String((bp && bp.color) || getComputedStyle(document.documentElement).getPropertyValue("--fe-dbg-bp")).trim();
+              const color = /^#[0-9a-f]{3,8}$/i.test(tok) ? tok : "#e5484d";
+              ctx.setRig("bp", "material", { color, opacity: bs === 2 ? 1 : 0.3, emissive: bs === 2 });
+            }
+            ctx.setRig("bp", "visible", bs > 0);
+          }
+        }
         if (!ctx.me._standalone) { ctx.rig.pos.y = base; return; }
         // a node mid wire-gesture freezes; the rest breathe
         const wiring = hs && hs.wireSrc;
@@ -95,6 +151,8 @@ me.ready = function () {
         if (!ctx.host) return;
         const node = hit && hit.node;
         const st = ctx.host.state || (ctx.host.state = {});
+        // D4: the breakpoint dot toggles the op's breakpoint (the editor owns it)
+        if (node === "bp") { if (typeof st.onBpTap === "function") st.onBpTap({ key: ctx.key, opIndex: ctx.me.opIndex }); return; }
         if (node && /^(in|out)\d+$/.test(node)) {
           // which = "in"|"out", socket ordinal = the trailing number
           const which = node.slice(0, 2) === "in" ? "in" : "out";

@@ -35,6 +35,15 @@
 // The facade (toSceneDoc) is the rendered picture; the instances are the pick
 // surface. The wire ghost lives on the facade as tip+hang-link specs moved via
 // flowproject.terminalWorld — the SAME geometry the wires render with.
+//
+// STEP DEBUGGER (P4): toolbar + keys (F10 over · F11 into · ⇧F11 out · F5
+// continue · ⇧F10 back · ⇧F5 stop · F9 breakpoint), deliveries ride
+// dev:flowtoken (reverse on ⇧F10), op state on flownode's dbg plate, the ready
+// set click-to-pick, drill in/out with the frame stack, the debug inspector
+// (frames, selection values, args/out, breakpoints) and the D5 TIMELINE: a
+// scrub strip over the session's tape (one tick per step, the cursor, branch
+// bands at the forks) — click/drag = goto, double-click = step; the inspector
+// carries the same strip plus the branch swap buttons.
 
 var me = this;
 var ME = document.getElementById(me.UUID);
@@ -43,6 +52,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   const { parse: parseFlow, propagationRounds, diffFlow } = document.querySelector('[data-control="dev:flowdoc"]').api;
   const { toSceneDoc, terminalWorld, jumpPoints, GEO, syncHandlePos } = document.querySelector('[data-control="dev:flowproject"]').api;
   const { tidy, untangle } = document.querySelector('[data-control="dev:flowlayout"]').api;
+  // STEP DEBUGGER (P4): debug_state -> editor views + the session client
+  const FD = document.querySelector('[data-control="dev:flowdebug"]').api;
 
   // ── backend plumbing (same ajax idiom as floweditor3d) ────────────────────
   const invokeP = (l2, c2, m2, a2) => new Promise((res2) => invokeCommand(l2, c2, m2, a2, res2));
@@ -262,6 +273,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // a run owns the stage: an edit mid-run would re-project the facade under
     // the tokens — revert it at once (the doc stays exactly as before)
     if (running) { try { cmd.undo(); } catch (e) {} status("running — edit refused until the run delivers", "bad"); return false; }
+    // a debug session's tape describes THIS body: edits wait for stop (⇧F5)
+    if (dbgActive()) { try { cmd.undo(); } catch (e) {} renderAll(); status("debugging — edits are locked; stop the session (⇧F5) to edit", "bad"); return false; }
     // a read-only view (graph without a source command) cannot keep edits
     if (!source) { try { cmd.undo(); } catch (e) {} status("read-only view — no source command to save edits to", "bad"); return false; }
     undoStack.push(cmd);
@@ -274,6 +287,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   function undo() {
     if (running) return;
+    if (dbgActive()) { status("debugging — stop the session (⇧F5) to undo", "bad"); return; }
     const cmd = undoStack.pop(); if (!cmd) return;
     try { cmd.undo(); } catch (e) {}
     redoStack.push(cmd);
@@ -288,6 +302,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   function redo() {
     if (running) return;
+    if (dbgActive()) { status("debugging — stop the session (⇧F5) to redo", "bad"); return; }
     const cmd = redoStack.pop(); if (!cmd) return;
     try { if (cmd.redo) cmd.redo(); } catch (e) {}
     undoStack.push(cmd);
@@ -331,6 +346,20 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // selection = the bench accent, read exactly as flownode's halo reads it
     const selTok = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
     const selColor = /^#[0-9a-f]{3,8}$/i.test(selTok) ? selTok : "#f0a63c";
+    // STEP DEBUGGER (P4): the focused case's frame in the debug session (null
+    // when not debugging or no frame runs this case) tints its wires
+    // (delivered / ready / skipped) and synchros (fired / ready / skipped);
+    // a ready one also thickens - it is pickable (a tap runs it next)
+    const dv = dbgDeckView();
+    const dcol = dv ? dbgColors() : null;
+    const DBG_W = { delivered: "done", fired: "done", ready: "ready", skipped: "skipped" };
+    const tint = (s, n, st) => {
+      const role = DBG_W[st]; if (!role || !dcol) return;
+      s.material = { ...(s.material || n.material || {}), color: dcol[role] };
+      if (st === "ready" && n.kind === "link") s.r = (n.r || 0.035) * 1.6;
+      if (st === "ready" && n.meta && n.meta.part === "mark") s.scale = { x: 1.4, y: 1.4, z: 1.4 };
+      s.meta = { ...(s.meta || n.meta), dbg: st };
+    };
     const specs = sceneDoc.nodes.map((n) => {
       const s = { ...n, id: "fx_" + n.id };
       if (n.parent !== undefined) s.parent = "fx_" + n.parent;
@@ -345,6 +374,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       // selected wire draws in the selection colour, thicker
       if (n.kind === "link" && n.meta && n.meta.role === "wire") {
         s.affordances = { tap: true, hover: true };
+        if (dv) tint(s, n, dv.wires[n.meta.index]);   // only the ACTIVE deck draws wires
         if (selWire != null && n.meta.index === selWire) {
           s.material = { ...(n.material || {}), color: selColor };
           s.r = (n.r || 0.035) * 1.8;
@@ -359,6 +389,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       if (n.meta && n.meta.role === "sync-handle") s.affordances = { tap: true, hover: true, drag: { plane: "xy" } };
       if (n.meta && n.meta.role === "sync") {
         if (n.meta.part === "mark") s.affordances = { tap: true, hover: true };
+        if (dv) tint(s, n, dv.syncs[n.meta.index]);
         if (selSync != null && n.meta.index === selSync) {
           s.material = { ...(n.material || {}), color: selColor };
           if (n.meta.part === "mark") s.scale = { x: 1.6, y: 1.6, z: 1.6 };
@@ -368,6 +399,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       s.params = n.params || (n.text ? n.text : undefined);
       return s;
     });
+    lastFacadeDbg = specs.filter((s) => s.meta && s.meta.dbg).map((s) => ({ id: s.id, role: s.meta.role, part: s.meta.part, index: s.meta.index, dbg: s.meta.dbg, color: s.material && s.material.color }));
+    // D4: breakpoint dots on the focused case's wires and synchros (ops
+    // carry theirs on the flownode) - see bpDotSpecs
+    for (const s of bpDotSpecs()) specs.push(s);
     // re-attach the ghost specs if a wire is armed (they ride the facade scene).
     // setScene is a WHOLE-scene replace on the real GL stage: it would destroy
     // every spec the scenehost owns (the flownode instances, host links, run
@@ -564,7 +599,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const c = focusedCase(); if (!c || !p) return;
     const evt = p.evt || {};
     if (p.phase === "start") {
-      if (running || (p.which !== "in" && p.which !== "out")) return;
+      if (running || dbgActive() || (p.which !== "in" && p.which !== "out")) return;
       const terms = p.opIndex === -1 ? c.input : p.opIndex === -2 ? c.output
         : (c.cmds[p.opIndex] && c.cmds[p.opIndex][p.which]);
       const term = p.term !== undefined ? p.term : Object.keys(terms || {})[p.ord];
@@ -715,7 +750,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const c = focusedCase(); if (!c || !p) return;
     const evt = p.evt || {};
     if (p.phase === "start") {
-      if (running || !c.cmds[p.idx] || (p.which !== "in" && p.which !== "out")) return;
+      if (running || dbgActive() || !c.cmds[p.idx] || (p.which !== "in" && p.which !== "out")) return;
       if (armSrc || wireMode) cancelWireGhost();
       armSync = { idx: p.idx, which: p.which, key: p.key || null };
       if (selWire != null || selSync != null) { selWire = null; selWireRef = null; selSync = null; selSyncRef = null; selSyncCase = null; }
@@ -893,11 +928,15 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   function onSceneTap(specId) {
     if (armSrc || wireMode || armSync) return;  // mid wiring/synchro gesture: not a selection
+    const bd = bpDotOfSpec(specId);            // D4: a breakpoint dot toggles its breakpoint
+    if (bd) { toggleBreakpoint(bd.kind, bd.index); return; }
     const bt = barTermOfSpec(specId);          // a bar socket: the same hint as an op's
     if (bt) { onPortTap({ node: bt.which + "0" }); return; }
     const wi = wireIndexOfSpec(specId);
+    if (wi != null && debugPickItem("wire", wi)) return;   // STEP DEBUGGER: a ready wire delivers next
     if (wi != null) { selectWire(wi); return; }
     const si = syncIndexOfSpec(specId);
+    if (si != null && debugPickItem("sync", si)) return;   // ...a ready synchro fires next
     if (si != null) { selectSync(si); return; }
     if (syncHandleOfSpec(specId)) { status("drag from a synchro handle (◆) to another op's handle to synchronize them", "ok"); return; }
     if (specId == null && selWire != null) selectWire(null);   // background tap drops it
@@ -938,7 +977,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
 
   // ── render: facade + instances + chrome ───────────────────────────────────
-  function renderAll() { renderFacade(); renderInstances(); renderChrome(); }
+  function renderAll() { syncDebugState(); renderFacade(); renderInstances(); renderChrome(); }
 
   function renderChrome() {
     const chain = caseChain(focusRoot());
@@ -981,7 +1020,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       decks.appendChild(add);
     }
     renderDiagnostics();
-    status(`${deckCount} deck${deckCount === 1 ? "" : "s"} · ${focusedCase() ? focusedCase().cmds.length : 0} ops · ${source ? "editing on" : "read-only (no source command)"}`);
+    status(`${deckCount} deck${deckCount === 1 ? "" : "s"} · ${focusedCase() ? focusedCase().cmds.length : 0} ops · ${source ? (dbgActive() ? "debugging — edits locked" : "editing on") : "read-only (no source command)"}`);
   }
 
   function setActiveDeck(k) { activeDeck = k; cancelWireGhost(); selWire = null; if (hostApi) hostApi.setState("selectedKey", null); renderAll(); }
@@ -1110,6 +1149,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   function onOpSelect(p) {
     const key = p && p.key; if (!key || !hostApi) return null;
     const m = /^d(\d+)_op(\d+)$/.exec(key);
+    // STEP DEBUGGER: a tap on a READY op of the top frame picks it (it runs next)
+    if (m && +m[1] === activeDeck && debugPickItem("op", +m[2])) return null;
     if (armSrc || wireMode || !m || +m[1] !== activeDeck) { hostApi.setState("selectedKey", key); return null; }
     return selectOp(+m[2]);
   }
@@ -1190,6 +1231,11 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // ONE selection: selecting a wire clears selectedKey, so a key alongside
     // a wire means an op was selected AFTER it — the op wins
     if (selWire != null && key) { selWire = null; selWireRef = null; renderFacade(); }
+    // STEP DEBUGGER (D3): a session owns the inspector (edits are locked)
+    if (dbgActive()) {
+      if (selSync != null && key) { selSync = null; selSyncRef = null; selSyncCase = null; renderFacade(); }
+      renderDebugInspector(body, key); return;
+    }
     if (selWire != null) {
       const c = focusedCase(); const w = c && c.cons[selWire];
       if (!w) { selWire = null; selWireRef = null; body.innerHTML = ""; return; }
@@ -1611,53 +1657,30 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // ── init ──────────────────────────────────────────────────────────────────
   // ── P4: run tokens — deliveries ride a flowtoken BEHAVIOR on the host ─────
   // The schedule is local and pure (design §3.5 — the platform returns no
-  // per-wire values): flowdoc.propagationRounds gives each case's firing
-  // order. Which CASES a live run went through is the server's to say
-  // (dev.code.trace_flow); see the case-path section below. One dev:flowtoken
-  // instance per wire is addControl'd into the
-  // scenehost, seeded with its round; ONE shared clock (host.state.run.t0)
-  // starts them together, so the token behaviors deliver round by round and
-  // report via host.state.onTokenDelivered. The editor schedules and audits;
-  // the motion is the behavior's.
+  // per-wire values): flowdoc.propagationRounds gives the DRY harness's firing
+  // order. A LIVE run is the stepper's continue (P5): its real events ride
+  // through rideRunEvents (below runFlow), and which CASES it went through is
+  // the tape's own. One dev:flowtoken instance per leg is addControl'd into
+  // the scenehost, seeded with its round; ONE shared clock starts them
+  // together, so the token behaviors deliver round by round and report via
+  // host.state.onTokenDelivered. The editor schedules and audits; the motion
+  // is the behavior's.
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
   function wireEnd(c, end, which) {
     return terminalWorld(c, end[0], which, end[1]) || terminalWorld(c, end[0], which === "out" ? "in" : "out", end[1]) || null;
   }
   // ── the run's CASE PATH (a `next` rule moves the run to the next case) ────
-  // A run is a list of SEGMENTS, one per case it executes, root first:
-  // {deck, end, stopAt, inferred}. end is how that case ended — next (the
-  // jump rides the pipe into the next deck), done, terminate, fail; stopAt is
-  // the op whose rule ended it (its schedule is cut there). A LIVE run's path
-  // is the server's (dev.code.trace_flow runs the real interpreter case by
-  // case); the interpreter does not say WHICH op's rule fired, so it is the
-  // first op carrying that rule in evaluation order — exact when the case has
-  // one such rule, marked `inferred` when it has more. A DRY run (no source)
-  // has no values: it assumes every op succeeds, so a non-match op's rule
-  // fires when its value is true; a match op's rule is unknown (noted, not
-  // taken).
+  // P5: a LIVE run IS the stepper's continue (the run is one debug session),
+  // so the case path is the TAPE's — the stepper's own events name the op
+  // whose next/terminate/fail rule ended each case (no inference, nothing
+  // predicted). A DRY run (the no-source harness) is the only one still
+  // scheduled from propagationRounds' prediction: it assumes every op
+  // succeeds, so a non-match op's rule fires when its value is true and a
+  // match op's rule is unknown (noted, not taken). Segments (root first):
+  // {deck, end, stopAt, inferred} — deck/end as the tape reports them;
+  // stopAt/inferred are the DRY plan's only (a live segment leaves them null).
   const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
   const frames = (n) => new Promise((res) => { const step = () => (n-- <= 0 ? res() : requestAnimationFrame(step)); step(); });
-  function ruleOp(c, rule) {
-    const cands = c.cmds.map((op, i) => (op && op.type !== "constant" && op.condition && op.condition.rule === rule ? i : -1)).filter((i) => i >= 0);
-    if (!cands.length) return null;
-    const order = propagationRounds(c).order || [];
-    const first = order.find((i) => cands.includes(i));
-    return { opIndex: first !== undefined ? first : cands[0], inferred: cands.length > 1 };
-  }
-  function livePlan(path) {
-    const chain = caseChain(focusRoot());
-    const segments = [];
-    for (const step of path || []) {
-      if (!chain[step.case]) break;            // the saved body outran the working one
-      const seg = { deck: step.case, end: step.end, ms: step.ms, stopAt: null, inferred: false };
-      if (step.end === "next" || step.end === "terminate" || step.end === "fail") {
-        const r = ruleOp(chain[step.case], step.end);
-        if (r) { seg.stopAt = r.opIndex; seg.inferred = r.inferred; }
-      }
-      segments.push(seg);
-    }
-    return { mode: "live", segments, notes: [] };
-  }
   function dryPlan() {
     const chain = caseChain(focusRoot());
     const segments = [], notes = [];
@@ -1816,6 +1839,121 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     renderRunInspector(R);
     return R;
   }
+  // ── P5: the run's case path and events come from the stepper ──────────────
+  // The case path is walked off the run's EVENT stream (fin.events): a `next`
+  // event {from, op, to} ends its case and moves on, the final case ends with
+  // the run's done/stall/error. Only the LAST case's root frame is still on
+  // the stack (earlier cases closed and left it), so the frames cannot report
+  // the whole path — the events can. end ∈ done|next|terminate|fail|panic|
+  // stall|next-missing (pathText's suffix map covers them).
+  function casePathFromEvents(events) {
+    const path = [];
+    let cur = -1;
+    for (const ev of events || []) {
+      if (!ev || !ev.type) continue;
+      if (ev.type === "enter" || (ev.type === "seed" && cur < 0)) {
+        if (ev.case != null && ev.case !== cur) { if (cur >= 0) path.push({ deck: cur, end: "next", stopAt: null, inferred: false }); cur = ev.case; }
+      } else if (ev.type === "next" && ev.from != null) {
+        path.push({ deck: ev.from, end: "next", stopAt: ev.op != null ? ev.op : null, inferred: false });
+        cur = ev.to != null ? ev.to : ev.from + 1;
+      } else if (ev.type === "done" || ev.type === "stall" || ev.type === "error") {
+        const c = ev.case != null ? ev.case : Math.max(0, cur);
+        const end = ev.type === "done" ? (ev.fail ? "fail" : (ev.outcome && ev.outcome !== "ok" ? ev.outcome : "done")) : ev.type;
+        path.push({ deck: c, end, stopAt: null, inferred: false });
+        cur = -1;
+      }
+    }
+    return path;
+  }
+  function runFailureText(ev, lastStop) {
+    if (!ev) return `run ended without a done event (${lastStop || "?"})`;
+    if (ev.type === "done" && ev.fail) return "the flow failed: a fail rule fired";
+    if (ev.type === "done") return `run ended (${ev.outcome || "?"})`;
+    if (ev.type === "stall" || ev.type === "error") return `${ev.type}: ${ev.msg || ev.reason || "no progress"}`;
+    return `run stopped (${lastStop || ev.type || "?"})`;
+  }
+  // ride the stepper's REAL events on the editor's picture, grouped into
+  // rounds by a shared readySeq — one dev:flowtoken per leg on one clock per
+  // round (the run animation's own machinery). path rides the jump pipe after
+  // a case's events (the tape carries no deliver INTO the next case). Events
+  // not on this picture (a drilled frame's internals, trimmed continues) are
+  // skipped — the ride never blocks or fails the result. Returns lastRun.
+  async function rideRunEvents(events, path) {
+    if (running || !hostApi) return null;
+    if (armSrc || wireMode) cancelWireGhost();
+    running = true;
+    const runBtn = $(".fe-run"); if (runBtn) { runBtn.disabled = true; runBtn.classList.add("running"); runBtn.textContent = "running…"; }
+    const reduced = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const dur = reduced ? 0.34 : 0.42;
+    const started = performance.now();
+    const delivered = [], keys = [], pathSegs = [];
+    let error = null, complete = true, inOrder = true, prevSeq = -1, round = -1, tokens = null, t0 = null;
+    const clock = () => { t0 = performance.now(); hostApi.setState("run", { id: t0, t0 }); };
+    const waitRound = async (ms2) => {
+      if (!keys.length) return;
+      const base = delivered.length, n = keys.length;
+      await Promise.race([
+        (async () => { while (delivered.length < base + n) await sleep(30); })(),
+        sleep(ms2),
+      ]);
+      if (delivered.length < base + n) complete = false;
+      for (const key of keys.splice(0)) { try { hostApi.removeControl(key); } catch (e) {} }
+    };
+    hostApi.setState("onTokenDelivered", (ev) => { if (ev && t0 && ev.runId === t0) delivered.push({ k: ev.k, round: ev.round }); });
+    try {
+      for (const ev of events) {
+        if (!ev) continue;
+        if (ev.type === "enter" && ev.frame && ev.frame.length) break;   // a drilled frame's events are not on this picture
+        if (ev.type === "next" && ev.op != null && ev.from === activeDeck && caseChain(focusRoot())[ev.from + 1]) {
+          await waitRound(6000);
+          const legs = jumpLegs(focusedCase(), ev.op).filter((l) => l && l.from && l.to);
+          round += 1;
+          clock();
+          for (let j = 0; j < legs.length; j++) {
+            const key = `run_ev${ev.seq}_${j}`;
+            await hostApi.addControl("dev", "flowtoken", Object.assign({ runId: t0, round, k: "jump" + j, dur, reduced }, legs[j]), key);
+            keys.push(key);
+          }
+          await waitRound(Math.ceil(dur * 1000) + 1500);
+          pathSegs.push({ deck: ev.from, end: "next", stopAt: ev.op, inferred: false });
+          setActiveDeck(ev.to);
+          await frames(2);
+          await sleep(reduced ? 120 : 300);
+          continue;
+        }
+        const legs = dbgLegs(focusedCase(), ev, false).filter((l) => l && l.from && l.to);
+        if (!legs.length) continue;
+        const seq = typeof ev.readySeq === "number" ? ev.readySeq : ev.seq;
+        if (seq !== prevSeq) { await waitRound(6000); prevSeq = seq; round += 1; clock(); }
+        for (let j = 0; j < legs.length; j++) {
+          const { seq: _s, ...seed } = legs[j];
+          const key = `run_ev${ev.seq}_${j}`;
+          await hostApi.addControl("dev", "flowtoken", Object.assign({ runId: t0, round, dur, reduced }, seed), key);
+          keys.push(key);
+        }
+      }
+      await waitRound(6000);
+    } catch (e) { error = String(e && e.message ? e.message : e); complete = false; }
+    finally {
+      for (const key of keys) { try { hostApi.removeControl(key); } catch (e) {} }
+      hostApi.setState("run", null);
+      hostApi.setState("onTokenDelivered", null);
+      running = false;
+      if (runBtn) { runBtn.disabled = false; runBtn.classList.remove("running"); runBtn.textContent = "run ▸"; }
+    }
+    for (let i = 1; i < delivered.length; i++) if (delivered[i].round < delivered[i - 1].round) inOrder = false;
+    const segs = (path && path.length ? path : [{ deck: 0, end: "done", stopAt: null, inferred: false }])
+      .map((p) => { const r = pathSegs.find((q) => q.deck === p.deck && q.end === "next"); return r ? Object.assign({}, p, { stopAt: r.stopAt, jumped: true }) : p; });
+    const R = lastRun = {
+      mode: "live", segments: segs, notes: [], untraced: path && path.length ? null : (path ? "no case path" : null), error,
+      path: segs, rounds: [], unreached: [], delivered,
+      complete, inOrder, ms: Math.round(performance.now() - started), tokensHosted: delivered.length,
+    };
+    const n = delivered.length, deliveries = `${n} deliver${n === 1 ? "y" : "ies"}`;
+    pushJournal(`run · ${pathText(segs)} · ${deliveries} (real events)`);
+    gate(".fe-g-run", complete && inOrder, `${deliveries} (real events), ${pathText(segs)}`);
+    return R;
+  }
   // audit: every scheduled wire delivered exactly once, in its own round,
   // rounds non-decreasing in delivery order
   function auditRun(runId, rounds, unreached, delivered, complete, ms) {
@@ -1831,7 +1969,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const wl = (c, k) => { const w = c && c.cons[k]; return esc(w ? `${nameOf(c, w.src[0])}.${w.src[1]} → ${nameOf(c, w.dest[0])}.${w.dest[1]}` : `wire ${k}`); };
     const segs = R.segments && R.segments.length ? R.segments
       : [{ deck: activeDeck, end: "done", stopAt: null, rounds: R.rounds || [], unreached: R.unreached || [] }];
-    const lbl = R.complete && R.inOrder ? (segs.length > 1 || segs[0].end !== "done" ? esc(pathText(segs)) : "delivered in propagation order") : "incomplete";
+    const lbl = R.complete && R.inOrder ? (segs.length > 1 || segs[0].end !== "done" ? esc(pathText(segs)) : (R.mode === "live" ? "delivered in event order" : "delivered in propagation order")) : "incomplete";
     let h = `<p><b>${R.mode === "dry" ? "dry run" : "run"}</b> <span class="lbl">${lbl}${R.ms != null ? ` · ${R.ms}ms` : ""}</span></p>`;
     segs.forEach((s) => {
       const c = chain[s.deck];
@@ -1864,17 +2002,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     body.innerHTML = runRoundsHtml(R);
   }
 
-  // ── P5 run parity: a LIVE editor runs the REAL command ───────────────────
-  // Ported from floweditor3d's openRunPicker/doRun/inspectRunResult. When the
-  // editor has a source (and is not the harness), the run button or R key
-  // opens an args form over the params bar (doc.root.input, coerced by bar
-  // type; no params means run at once). The run is ONE execution of the SAVED
-  // command via dev.code.trace_flow, which also reports the case path; the
-  // flowtoken animation then REPLAYS that path from the root case's first
-  // deck — following each `next` along its jump pipe into the next case —
-  // and never blocks or fails the result. The payload (status/pid stripped)
-  // goes to the inspector with an args sentence. The harness keeps the
-  // token-only (dry) run.
+  // ── P5 run parity: a LIVE editor runs on the stepper ─────────────────────
+  // When the editor has a source (and is not the harness), the run button or
+  // R key opens an args form over the params bar (doc.root.input, coerced by
+  // bar type; no params means run at once). The run is ONE debug session:
+  // debug_start (body {} = the SAVED body) + debug_step continue {wait}, and
+  // its REAL events ride the editor in rounds afterwards — the same
+  // interpreter path as the debugger, with the case path read straight off
+  // the tape (no trace_flow sentinel, no predicted schedule). The payload
+  // (the ended frame's out, or the run's failure) goes to the inspector with
+  // an args sentence. The harness keeps the token-only (dry) run.
   let lastResult = null, liveCall = false;
   function coerceArg(raw, type) {
     const t = (type || "").toLowerCase();
@@ -1891,9 +2028,11 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (!params.length) return runLive({});
     return openRunPicker(params);
   }
-  function openRunPicker(params) {
-    const body = $(".fe-inspect-body"); if (!body) return runLive({});
-    body.innerHTML = `<p><b>run</b> <span class="lbl">arguments — the params bar</span></p>`;
+  // goFn/verb: the debugger reuses this form (goFn = debugStart, verb "debug")
+  function openRunPicker(params, goFn, verb) {
+    goFn = goFn || runLive; verb = verb || "run";
+    const body = $(".fe-inspect-body"); if (!body) return goFn({});
+    body.innerHTML = `<p><b>${verb}</b> <span class="lbl">arguments — the params bar</span></p>`;
     const form = document.createElement("form"); form.className = "fe-run-args";
     const inputs = [];
     for (const [name, node] of params) {
@@ -1906,20 +2045,20 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     }
     const foot = document.createElement("div"); foot.className = "fe-run-foot";
     const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "fe-run-cancel"; cancel.textContent = "cancel";
-    const go = document.createElement("button"); go.type = "submit"; go.className = "fe-run-go"; go.textContent = "run ▸";
+    const go = document.createElement("button"); go.type = "submit"; go.className = "fe-run-go"; go.textContent = verb === "run" ? "run ▸" : verb + " ⏯";
     foot.append(cancel, go); form.appendChild(foot);
-    const close = () => { renderInspector(hostApi && hostApi.state ? hostApi.state.selectedKey : null); if (ME.tabIndex >= 0) ME.focus(); status("run cancelled"); };
+    const close = () => { renderInspector(hostApi && hostApi.state ? hostApi.state.selectedKey : null); if (ME.tabIndex >= 0) ME.focus(); status(verb + " cancelled"); };
     cancel.addEventListener("click", close);
     form.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); } });
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       const args = {};
       for (const { name, inp, type } of inputs) args[name] = coerceArg(inp.value, type);
-      runLive(args);
+      goFn(args);
     });
     body.appendChild(form);
     const first = form.querySelector("input"); if (first) first.focus();
-    status("run — fill in the params bar");
+    status(verb + " — fill in the params bar");
     return form;
   }
   async function runLive(args) {
@@ -1937,27 +2076,41 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     status(`running ${src.cmd}…`);
     const started = performance.now();
     const settle = (p) => p.then((r) => r || { status: "err", msg: "no response" }, (e) => ({ status: "err", msg: String(e && e.message ? e.message : e) }));
-    // ONE execution that also reports the case path: dev.code.trace_flow runs
-    // the saved command through the real interpreter, case by case. Only when
-    // the trace command itself is unavailable (a host that predates it — dev
-    // does not hot-swap — or no access) is the plain run made instead, with no
-    // path; trace_flow's other errors arrive before anything ran or ARE the
-    // run's result, so they are shown as-is — never a second execution.
-    const t = await settle(invokeP("dev", "code", "trace_flow", { lib: src.lib, ctl: src.ctl, cmd: src.cmd, args, nn_sessionid: "" }));
-    let r, path = null, untraced = null;
-    if (t.status === "ok" && t.result) { r = t.result; path = t.path || []; }
-    else if (/no such command|unauthorized|not found/i.test(String(t.msg || ""))) {
-      untraced = String(t.msg || "trace unavailable").slice(0, 120);
+    // ONE execution on the stepper: debug_start (body {} = the SAVED body)
+    // opens a session and debug_step continue {wait} runs it to the end —
+    // the same interpreter path as the debugger. The case path is the tape's
+    // (each case-ending event names its op), and the run's REAL events ride
+    // the editor afterwards. A session the stepper refuses (never started)
+    // falls back to the plain command run with no path; its other failures
+    // ARE the run's result and are shown as-is — never a second execution.
+    const st = await FD.client.start(src, {}, args);
+    let session = st && st.session, r, path = null, untraced = null, tapeEvents = null;
+    if (!session) {
+      untraced = String((st && st.msg) || "no session").slice(0, 120);
       r = await settle(invokeP(src.lib, src.ctl, src.cmd, args));
+    } else {
+      const fin = await FD.client.step(session, "continue", { wait: true });
+      tapeEvents = (fin && Array.isArray(fin.events) && !fin.events_truncated) ? fin.events : null;
+      const st2 = await FD.client.state(session);
+      path = casePathFromEvents(tapeEvents);
+      const ev = (st2 && st2.event) || (fin && fin.event) || null;
+      if (st2 && st2.status === "ok" && ev && ev.type === "done" && !ev.fail && ev.outcome === "ok") {
+        r = Object.assign({ status: "ok" }, (ev.out && typeof ev.out === "object" && !Array.isArray(ev.out) ? ev.out : {}));
+      } else if (st2 && st2.status === "ok" && st2.ended) {
+        r = { status: "err", msg: runFailureText(ev, st2.last_stop) };
+      } else {
+        r = { status: "err", msg: String((fin && fin.msg) || (st2 && st2.msg) || "the run did not end") };
+      }
+      try { await FD.client.stop(session); } catch (e) {}
+      session = null;
     }
-    else r = t;
     const ms = Math.round(performance.now() - started);
-    // replay the run from the ROOT case's first deck, where the server starts
+    // ride the run's REAL events from the ROOT case's first deck, where the
+    // stepper starts (events not on this picture are skipped, never fatal);
+    // untraced (no session): the dry schedule rides instead (runFlow's own)
     let R = null;
-    if (focusPath.length === 1 && (path || untraced)) {
-      const plan = path ? livePlan(path)
-        : { mode: "live", segments: [{ deck: 0, end: "done", stopAt: null, inferred: false }], notes: [], untraced };
-      try { R = await runFlow(plan); } catch (e) { R = null; }
+    if (focusPath.length === 1) {
+      try { R = tapeEvents && tapeEvents.length ? await rideRunEvents(tapeEvents, path) : (untraced ? await runFlow() : null); } catch (e) { R = null; }
     }
     liveCall = false;
     if (runBtn) { runBtn.disabled = false; runBtn.classList.remove("running"); runBtn.textContent = "run ▸"; }
@@ -1969,7 +2122,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     lastResult = { args, ok, result: r, msg, ms, unsaved, source: src, path, untraced,
       unsynchronized: rw ? { flowlang: rw.flowlang, min: rw.min, syncs: rw.n, text: rw.text } : null,
       tokens: R ? { complete: !!R.complete, inOrder: !!R.inOrder, delivered: R.delivered.length } : null };
-    const via = untraced ? " · no case path" : (R && R.segments && R.segments.length ? ` · ${pathText(R.segments)}` : "");
+    const via = untraced ? " · no case path" : (path && path.length ? ` · ${pathText(path)}` : "");
     const unsync = rw ? ` · UNSYNCHRONIZED (flowlang ${rw.flowlang} ignores synchros)` : "";
     pushJournal(ok ? `ran ${src.cmd}${via} · ${ms}ms${unsync}` : `run failed: ${msg}${unsync}`);
     if (ok && rw) status(`ran UNSYNCHRONIZED — flowlang ${rw.flowlang} ignores synchros · ${ms}ms`, "warn");
@@ -1988,8 +2141,778 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     h += `<p class="fe-run-note">args: ${esc(JSON.stringify(L.args))} — the tokens replay the propagation ORDER; per-wire values aren't reported by the platform.</p>`;
     if (L.unsaved) h += `<p class="fe-empty">ran the SAVED body — ${L.unsaved} unsaved change${L.unsaved === 1 ? "" : "s"} not included; save to run them</p>`;
     if (L.unsynchronized) h += `<p class="fe-run-unsync">⚠ ran UNSYNCHRONIZED: flowlang ${esc(L.unsynchronized.flowlang)} predates synchros (need ≥ ${esc(L.unsynchronized.min)}), so the server ignored this flow's ${L.unsynchronized.syncs} synchro${L.unsynchronized.syncs === 1 ? "" : "s"}. The replay below draws the order the synchros ASK for, not the order that ran.</p>`;
-    if (R && R.rounds) h += runRoundsHtml(R);
+    if (R && R.rounds && R.rounds.length) h += runRoundsHtml(R);
     body.innerHTML = h;
+  }
+
+  // ── STEP DEBUGGER (flow step debugger P4) ────────────────────────────────
+  // A debug SESSION (dev.flowstep P3: a recorded tape — step / back / goto /
+  // continue / breakpoints) runs the CURRENT body — unsaved edits included
+  // (doc.serialize()) — under the stepper; P5: the run button is the same
+  // session + a continue over the SAVED body, so run and debug share the one
+  // interpreter path. Every move is one debug_step then
+  // one debug_state, and the editor only DRAWS that state: dev:flowdebug maps
+  // the frames onto the doc's case objects, the focus FOLLOWS the top frame
+  // (drill into local frames, the case it runs), flownode plates show each
+  // op's state via host.state.dbg (waiting / ready / running / done /
+  // skipped), the facade tints wires and synchros, and a tap on a READY op /
+  // wire / synchro picks it (mode into, pick {kind, index}). Edits are locked
+  // while a session is open (its tape describes THIS body); stop (⇧F5)
+  // unlocks. Without a source the harness's command names the session (the
+  // body debugged is still the editor's own).
+  let dbg = null;            // { session, src, args, st, views, busy, last, follow, sig }
+  let bps = [];              // D4 breakpoints { kind, ref, root } - the EDITOR's, kept across sessions
+  let lastBpDots = [];       // D4: the facade breakpoint dots the last render drew (checks)
+  let dbgPollT = null;
+  let lastFacadeDbg = [];    // the facade specs the last render tinted (checks)
+  const dbgSrc = () => source || { lib: "scratch", ctl: "skills", cmd: "flowedit3d_body" };
+  function dbgActive() { return !!(dbg && dbg.session); }
+  function dbgColors() {
+    const cs = getComputedStyle(ME);
+    const pick = (n, d) => { const v = String(cs.getPropertyValue(n) || "").trim(); return /^#[0-9a-f]{3,8}$/i.test(v) ? v : d; };
+    return { ready: pick("--fe-dbg-ready", "#f0a63c"), running: pick("--fe-dbg-running", "#56a3d9"),
+      done: pick("--fe-dbg-done", "#62bd8c"), skipped: pick("--fe-dbg-skipped", "#6b6f78") };
+  }
+  // the session frame running the FOCUSED case (null: not debugging, or no
+  // frame runs it — e.g. the user walked to another deck)
+  function dbgDeckView() { return dbgActive() && dbg.views ? FD.deckView(dbg.views, focusRoot(), activeDeck) : null; }
+  // the focused case's op states → host.state.dbg (flownode's plate reads it)
+  function syncDebugState() {
+    if (!hostApi) return;
+    const dv = dbgDeckView();
+    hostApi.setState("dbg", dv ? { deck: activeDeck, ops: dv.ops.slice(), colors: dbgColors(), cursor: dbg.st ? dbg.st.cursor : 0 } : null);
+    syncBpState();
+  }
+  function startDebug() {
+    if (dbgActive()) return null;
+    if (running || liveCall) { status("a run is in progress", "bad"); return null; }
+    const params = Object.entries((doc && doc.root && doc.root.input) || {});
+    if (!params.length) return debugStart({});
+    return openRunPicker(params, debugStart, "debug");
+  }
+  async function debugStart(args) {
+    if (running || liveCall || disposed) return null;
+    if (dbgActive()) await debugStop();
+    if (armSrc || wireMode) cancelWireGhost();
+    if (armSync) cancelSyncGesture();
+    let body; try { body = JSON.parse(snap()); } catch (e) { status("debug: body unreadable — " + e.message, "bad"); return null; }
+    const src = dbgSrc();
+    status(`debug: opening a session on ${src.cmd}…`);
+    const r = await FD.client.start(src, body, args || {});
+    if (!r || r.status !== "ok" || !r.session) { status("debug start failed: " + ((r && r.msg) || "no session"), "bad"); return r; }
+    dbg = { session: r.session, src, args: args || {}, st: null, views: [], busy: false, last: r, follow: true, sig: "", unsaved: dirty };
+    dbgTape = []; dbgTapeCursor = -1;                    // D5: a fresh tape
+    ME.classList.add("fe-debugging");
+    pushJournal(`debug session · ${src.cmd}` + (dirty ? " (unsaved body)" : ""));
+    if (bpPlaces().length) await sendBreakpoints();   // D4: the editor's breakpoints ride every session
+    await debugRefresh();
+    renderInspector(hostApi && hostApi.state ? hostApi.state.selectedKey : null);
+    status(`debugging ${src.cmd} — F11 into · F10 over · F5 continue · ⇧F5 stop`, "ok");
+    return r;
+  }
+  // one move: into / over / out / continue / back / goto / pause / run_to …
+  async function debugStep(mode, pick) {
+    if (!dbgActive()) return (mode === "into" || mode === "over" || mode === "continue") ? startDebug() : null;
+    if (dbg.busy) return null;
+    if (dbg.st && dbg.st.running && mode !== "pause") { status("debug: a continue is running — pause first", "bad"); return null; }
+    const d = dbg; d.busy = true;
+    if (mode !== "pause") d.follow = true;     // D3: a frame focused in the stack holds only until the next move
+    const prevEv = d.st ? d.st.event : null;   // the event a back(1) undoes
+    try {
+      const r = await FD.client.step(d.session, mode, pick || {});
+      if (dbg !== d) return r;                 // stopped meanwhile
+      d.last = r;
+      if (!r || r.status !== "ok") {
+        const msg = String((r && r.msg) || "no reply");
+        status(`debug ${mode} refused: ${msg}`, "bad");
+        if (/session/i.test(msg) && /(no such|no debug session|unknown|not found|gone|missing|reaped)/i.test(msg)) debugEnded("the session is gone (reaped after idling?)");
+        return r;
+      }
+      // D4: why this move stopped (over/out/run_to: the reply says; a
+      // continue's comes with the poll that sees it end)
+      d.stop = r.running ? null : { stopped: String(r.stopped || ""), hit: r.hit || null, mode };
+      // D2: what this move SHOWS — its events (a back(1): the undone one, in
+      // reverse); continue/goto/pause/back(n) only redraw
+      const back1 = mode === "back" && !!prevEv && !(pick && pick.count > 1);
+      const evs = back1 ? [prevEv] : (!r.running && Array.isArray(r.events) && !r.events_truncated ? r.events : []);
+      // D5: the timeline's tape: every reply's event span (a move's own events,
+      // or continue/back(n)/goto's span) records its steps' events
+      if (!r.running && Array.isArray(r.events) && !r.events_truncated) dbgRecordEvents(r.events, r.cursor);
+      const ride = { mode, reverse: back1, events: evs.map((e) => e.seq), a: null, b: null };
+      if (evs.length) ride.a = await dbgShow(evs, back1, null);   // on the picture as it stands
+      if (dbg !== d) return r;
+      await debugRefresh();
+      // flew to the op going IN: the drilled deck is framed whole once drawn
+      if (ride.a && ride.a.fly && dbg === d && focusPath.length > ride.a.depth) frameDeck();
+      if (evs.length && dbg === d) ride.b = await dbgShow(evs, back1, ride.a);   // where the focus went
+      d.lastRide = ride;
+      if (r.running) debugPoll();
+      return r;
+    } finally { d.busy = false; renderDebugBar(); }
+  }
+  async function debugRefresh() {
+    if (!dbgActive()) return null;
+    const d = dbg;
+    const st = await FD.client.state(d.session);
+    if (dbg !== d) return null;
+    if (!st || st.status !== "ok") {
+      const msg = String((st && st.msg) || "no reply");
+      if (/no debug session|reaped/i.test(msg)) { debugEnded("the session is gone (reaped after idling?)"); return null; }
+      status("debug state failed: " + msg, "bad"); return null;
+    }
+    const sig = `${st.cursor}|${st.length}|${st.running}|${st.hash}`;
+    d.st = st;
+    if (sig === d.sig) { renderDebugBar(); return st; }   // a poll that saw no move
+    d.sig = sig;
+    d.views = FD.frameViews(doc.root, st);
+    const moved = d.follow ? debugFollow() : false;
+    if (moved) renderAll(); else { syncDebugState(); renderFacade(); }
+    renderDebugBar();
+    refreshInspector();
+    return st;
+  }
+  // follow the TOP frame: drill to the deepest frame the editor holds (a
+  // command frame's callee is not in this doc — the focus stays on its
+  // caller) and show the case it runs. Returns true when the focus moved.
+  function debugFollow() {
+    const chain = FD.focusChain(dbg.views); if (!chain.length) return false;
+    const deep = chain[chain.length - 1];
+    const same = chain.length === focusPath.length && chain.every((x, k) => focusPath[k].root === x.root) && activeDeck === deep.case;
+    if (same) return false;
+    focusPath = chain.map((x, k) => (k === 0 ? { root: doc.root, title: "case 1" } : { root: x.root, op: x.op, title: x.title }));
+    activeDeck = deep.case;
+    cancelWireGhost();
+    selWire = null; selWireRef = null; selSync = null; selSyncRef = null; selSyncCase = null;
+    if (hostApi) hostApi.setState("selectedKey", null);
+    return true;
+  }
+  // a tap on a READY item of the top frame runs it next; anything else is
+  // not the debugger's (the tap selects, as always)
+  function debugPickItem(kind, index) {
+    if (!dbgActive() || (dbg.st && dbg.st.running)) return false;
+    const dv = dbgDeckView(); if (!dv || !dv.top) return false;
+    const s = kind === "op" ? dv.ops[index] : kind === "wire" ? dv.wires[index] : dv.syncs[index];
+    if (s !== "ready") return false;
+    debugStep("into", { kind, index });
+    return true;
+  }
+  // ── D2: every move SHOWS what it moved ────────────────────────────────────
+  // A step's events ride the picture: each deliver rides its wire, each fired
+  // synchro pulses down its straight link, a next rule rides the jump pipe
+  // out of the case — one dev:flowtoken per leg on ONE shared clock (the run
+  // animation's machinery: host.state.run + onTokenDelivered), legs in tape
+  // order. Events on the picture AS IT STANDS ride first, then the state
+  // redraws (the wire turns delivered, the focus follows); events on the
+  // picture the focus moved to ride after the redraw. A drill (enter/leave of
+  // a local op) flies the orbit to the op on its parent's picture — before
+  // the redraw going in, after it coming out. back(1) shows the undone event
+  // in REVERSE: the token rides dest → src, the jump pipe is climbed back,
+  // the drill flies the other way. continue/goto/pause/back(n) only redraw
+  // (their replies carry no events). FD.rideEvents/drillEvents decide which
+  // events belong to a picture; the geometry is the run animation's own.
+  const DBG_RIDE_MAX = 16;
+  function dbgLegs(c, ev, reverse) {
+    const id = (sfx) => "fx_" + slug(`d${activeDeck}/${sfx}`);
+    if (ev.type === "deliver") {
+      const w = c.cons[ev.wire]; if (!w) return [];
+      return [{ k: "w" + ev.wire, seq: ev.seq, wire: id(`wire/${ev.wire}`), from: wireEnd(c, w.src, "out"), to: wireEnd(c, w.dest, "in"), reverse: !!reverse }];
+    }
+    if (ev.type === "sync") {
+      const s = (c.syncs || [])[ev.sync]; if (!s) return [];
+      return [{ k: "s" + ev.sync, seq: ev.seq, straight: true, tint: syncColorOf(), wire: id(`sync/${ev.sync}`),
+        from: syncHandlePos(c, s.src, "out"), to: syncHandlePos(c, s.dest, "in"), reverse: !!reverse }];
+    }
+    if (ev.type === "next" && ev.op != null && c.cmds[ev.op] && caseChain(focusRoot())[activeDeck + 1]) {
+      const legs = jumpLegs(c, ev.op).map((l, j) => Object.assign({ k: "j" + j, seq: ev.seq }, l));
+      return reverse ? legs.reverse().map((l) => Object.assign({}, l, { reverse: !l.reverse })) : legs;
+    }
+    return [];
+  }
+  // ride the legs one after another (leg j in round j) and wait for them all
+  async function dbgRide(legs) {
+    if (!legs.length || !hostApi || disposed) return null;
+    const reduced = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const dur = Math.max(0.12, Math.min(reduced ? 0.2 : 0.32, 2.4 / legs.length));
+    const rid = ++runSeq, keys = [], got = [];
+    const started = performance.now();
+    let finish; const allDone = new Promise((res) => { finish = res; });
+    hostApi.setState("run", { id: rid, t0: null });
+    hostApi.setState("onTokenDelivered", (e) => { if (!e || e.runId !== rid) return; got.push(e.k); if (got.length >= legs.length) finish(true); });
+    try {
+      for (let j = 0; j < legs.length; j++) {
+        const { seq, ...seed } = legs[j];
+        const key = `dbg${rid}_${j}`;
+        await hostApi.addControl("dev", "flowtoken", Object.assign({ runId: rid, round: j, dur, reduced }, seed), key);
+        keys.push(key);
+      }
+      hostApi.setState("run", { id: rid, t0: performance.now() });
+      const complete = await Promise.race([allDone, sleep((legs.length * dur + 2) * 1000).then(() => false)]);
+      return { rid, hosted: keys.length, delivered: got.slice(), complete: !!complete,
+        inOrder: got.length === legs.length && got.every((k, j) => k === legs[j].k),
+        reverse: legs.map((l) => !!l.reverse), dur, ms: Math.round(performance.now() - started) };
+    } finally {
+      for (const key of keys) { try { hostApi.removeControl(key); } catch (e) {} }
+      hostApi.setState("run", null);
+      hostApi.setState("onTokenDelivered", null);
+    }
+  }
+  // show `evs` on the focused picture; `prior` = what the first pass showed
+  async function dbgShow(evs, reverse, prior) {
+    const dv = dbgDeckView(), c = focusedCase();
+    if (!dv || !c || !hostApi || disposed) return null;
+    const seen = prior ? prior.seqs : [];
+    let on = FD.rideEvents(evs, dv).filter((ev) => !seen.includes(ev.seq));
+    if (reverse) on = on.slice().reverse();
+    if (on.length > DBG_RIDE_MAX) on = on.slice(0, DBG_RIDE_MAX);
+    const legs = [];
+    for (const ev of on) for (const L of dbgLegs(c, ev, reverse)) legs.push(L);
+    const drill = prior && prior.fly ? [] : FD.drillEvents(evs, dv).filter((ev) => !seen.includes(ev.seq));
+    if (!legs.length && !drill.length) return null;
+    const out = { deck: activeDeck, depth: focusPath.length, path: dv.path, seqs: on.map((ev) => ev.seq).concat(drill.map((ev) => ev.seq)),
+      legs: legs.map((l) => l.k), ride: null, fly: null };
+    if (legs.length) out.ride = await dbgRide(legs);
+    const ev = drill[0], op = ev ? c.cmds[ev.op] : null;
+    if (op && op.pos && dbgActive()) {
+      const target = { x: op.pos.x, y: op.pos.y, z: op.pos.z || 0 };
+      out.fly = { op: ev.op, type: ev.type, target, flew: !!(stage && stage.flyTo) };
+      if (stage && stage.flyTo) { stage.flyTo({ target }, 240); await sleep(260); }
+    }
+    return out;
+  }
+  // ── D5: the timeline scrubber ────────────────────────────────────────────
+  // The session's TAPE as a strip: one tick per step (its event type), the
+  // cursor at the tape position, the forked-off branches shaded at their fork
+  // points. Click / drag / ←→ on the strip = goto that step (no execution:
+  // goto replays or rolls back; it never runs code). Double-click = step to it
+  // (into, one step). The same strip renders in the inspector, plus the branch
+  // records (click = swap a branch back in at its fork point — the current tail
+  // is kept as a branch). Ticks come from the steps' OWN views (each reply's
+  // .event), recorded on dbgTape; continue/back(n)/goto record the reply's
+  // event span.
+  let dbgTape = [];              // step seq → its event ({} = not seen)
+  let dbgTapeCursor = -1;        // the largest seq this session has reached
+  let lastTlTicks = [];          // the ticks the last draw placed (checks)
+  let tlDrag = null;             // a drag in progress on the top strip
+  function dbgRecordEvents(evs, upto) {
+    if (!Array.isArray(evs)) return;
+    for (const e of evs) {
+      if (!e || typeof e.seq !== "number") continue;
+      dbgTape[e.seq] = { type: e.type || "?", seq: e.seq, user: e.pick === "user" };
+      if (e.seq > dbgTapeCursor) dbgTapeCursor = e.seq;
+    }
+    if (typeof upto === "number" && upto > dbgTapeCursor) dbgTapeCursor = upto;
+  }
+  function tlTickTitle(ev, seq) {
+    if (!ev) return `step ${seq}`;
+    return `#${seq} ${ev.type}` + (ev.user ? " · your pick" : "");
+  }
+  function tlDrawInto(track, st) {
+    if (!track) return [];
+    track.replaceChildren();
+    const base = st.base || 0, len = st.length || 0, cur = st.cursor || 0;
+    // position against the deepest the tape has EVER been here: a fork's new
+    // tail is shorter than the branch it replaced, and the branch band sits
+    // past the (new) end — st.length alone would push it off the strip
+    let far = len;
+    for (const b of (st.branch_list || [])) { if (typeof b.at === "number" && typeof b.steps === "number") far = Math.max(far, b.at + b.steps); }
+    const span = Math.max(1, far - base);
+    const placed = [];
+    for (let s = base; s < len; s++) {
+      const ev = dbgTape[s];
+      if (!ev) continue;                                     // a step we never saw (skipped ticks)
+      const el = document.createElement("div");
+      el.className = "fe-dbg-tl-tick t-" + String(ev.type).replace(/[^a-z]/g, "");
+      el.dataset.seq = String(s);
+      el.style.left = (((s - base) / span) * 100) + "%";
+      el.title = tlTickTitle(ev, s);
+      track.appendChild(el);
+      placed.push({ seq: s, type: ev.type });
+    }
+    // the forked-off branches shade their fork point
+    for (const b of (st.branch_list || [])) {
+      if (typeof b.at !== "number" || b.at < base) continue;
+      const el = document.createElement("div");
+      el.className = "fe-dbg-tl-branch";
+      el.style.left = (((b.at - base) / span) * 100) + "%";
+      el.style.width = Math.max(1.2, (Math.max(1, Math.min(b.steps || 1, far - b.at)) / span) * 100) + "%";
+      el.title = `branch ${b.id}: forked at step ${b.at} · ${b.steps} steps`;
+      track.appendChild(el);
+    }
+    const cur2 = document.createElement("div");
+    cur2.className = "fe-dbg-tl-cursor";
+    cur2.style.left = (Math.max(0, Math.min(span, cur - base)) / span * 100) + "%";
+    track.appendChild(cur2);
+    return placed;
+  }
+  function tlSeqAt(track, clientX) {
+    const st = dbg && dbg.st ? dbg.st : {};
+    const base = st.base || 0, len = st.length || 0;
+    const r = track.getBoundingClientRect();
+    const frac = Math.max(0, Math.min(1, (clientX - r.left) / Math.max(1, r.width)));
+    return Math.max(base, Math.min(Math.max(base, len - 1), Math.round(base + frac * Math.max(0, len - 1 - base))));
+  }
+  function renderTimeline() {
+    const on = dbgActive();
+    const strip = $(".fe-dbg-timeline");
+    if (strip) strip.hidden = !on;
+    if (!on) { lastTlTicks = []; return; }
+    const st = dbg.st || {};
+    lastTlTicks = tlDrawInto($(".fe-dbg-tl-track"), st);
+    const pos = $(".fe-dbg-tl-pos");
+    if (pos) pos.textContent = `${st.cursor || 0} / ${st.length || 0}` + ((st.branches || 0) ? ` · ${st.branches} branch${st.branches === 1 ? "" : "es"}` : "");
+  }
+  async function debugBranch(id) {
+    const st = dbg && dbg.st ? dbg.st : {};
+    const bl = (st.branch_list || []).find((b) => b.id === id);
+    if (bl && typeof bl.at === "number" && (st.cursor || 0) !== bl.at) {
+      const g = await debugStep("goto", { seq: bl.at });
+      if (!g || g.status !== "ok") return g;
+    }
+    return debugStep("branch", { id });
+  }
+  // the inspector's own strip + the branch records
+  function renderTimelineInspector(body, m) {
+    edLbl(body, `timeline · ${m.length} step${m.length === 1 ? "" : "s"} on the tape` + (m.branches ? ` · ${m.branches} branch${m.branches === 1 ? "" : "es"}` : ""));
+    const track = document.createElement("div");
+    track.className = "fe-dbgi-tl-track";
+    track.title = "click = go to that step · double-click = step to it";
+    body.appendChild(track);
+    // place the ticks on the inspector strip (same data, own geometry)
+    const base = 0, len = m.length || 0, span = Math.max(1, len);
+    for (let s = 0; s < len; s++) {
+      const ev = dbgTape[s]; if (!ev) continue;
+      const el = document.createElement("div");
+      el.className = "fe-dbgi-tl-tick t-" + String(ev.type).replace(/[^a-z]/g, "");
+      el.style.left = ((s / span) * 100) + "%";
+      el.title = tlTickTitle(ev, s);
+      track.appendChild(el);
+    }
+    const cur = document.createElement("div");
+    cur.className = "fe-dbgi-tl-cursor";
+    cur.style.left = (Math.max(0, Math.min(span, m.cursor)) / span * 100) + "%";
+    track.appendChild(cur);
+    track.addEventListener("click", (e) => {
+      if (!dbgActive() || (dbg.st && dbg.st.running)) return;
+      const r = track.getBoundingClientRect();
+      const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / Math.max(1, r.width)));
+      const seq = Math.max(0, Math.min(Math.max(0, len - 1), Math.round(frac * Math.max(0, len - 1))));
+      debugStep("goto", { seq });
+    });
+    track.addEventListener("dblclick", (e) => {
+      if (!dbgActive() || (dbg.st && dbg.st.running)) return;
+      const r = track.getBoundingClientRect();
+      const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / Math.max(1, r.width)));
+      const seq = Math.max(0, Math.min(Math.max(0, len - 1), Math.round(frac * Math.max(0, len - 1))));
+      const cur2 = (dbg.st && typeof dbg.st.cursor === "number") ? dbg.st.cursor : 0;
+      if (seq === cur2 + 1) debugStep("into");
+      else if (seq !== cur2) debugStep("goto", { seq });
+    });
+    // the branches (a fork kept the tail it replaced)
+    const bl = m.branchList || [];
+    if (bl.length) {
+      edLbl(body, `branches · ${bl.length} — swap one back in (your current tail is kept)`);
+      for (const b of bl) {
+        const box = document.createElement("div"); box.className = "fe-dbgi-branch";
+        const p = document.createElement("p"); p.className = "fe-dbgi-brnote";
+        p.textContent = `#${b.id} · forked at step ${b.at} · ${b.steps} steps · took ${b.took ? (b.took.kind + " " + b.took.index) : "—"} · ends ${b.end || "?"}`;
+        box.appendChild(p);
+        edButton(edBtns(box), `swap branch ${b.id} in`, "fe-dbgi-bswap", () => debugBranch(b.id));
+        body.appendChild(box);
+      }
+    }
+  }
+  function debugPoll() {
+    if (dbgPollT) clearTimeout(dbgPollT);
+    dbgPollT = setTimeout(async () => {
+      dbgPollT = null;
+      if (!dbgActive() || disposed) return;
+      const st = await debugRefresh();
+      if (st && st.running) debugPoll();
+      else if (st) {
+        // D5: a continue's ticks ride its last_run's event span
+        if (st.last_run && Array.isArray(st.last_run.events) && !st.last_run.events_truncated) dbgRecordEvents(st.last_run.events, st.cursor);
+        if (dbg) { dbg.stop = { stopped: String(st.last_stop || ""), hit: (st.last_run && st.last_run.hit) || null, mode: "continue" }; renderDebugBar(); refreshInspector(); }
+        const bh = dbgStopText();
+        status(bh ? `debug: ${bh} at step ${st.cursor}` : `debug: stopped${st.last_stop ? " — " + st.last_stop : ""} at step ${st.cursor}`, "ok");
+      }
+    }, 200);
+  }
+  async function debugStop() {
+    if (!dbg) return null;
+    const d = dbg;
+    debugEnded(null);
+    let r = null;
+    try { r = await FD.client.stop(d.session); } catch (e) {}
+    return r;
+  }
+  function debugEnded(why) {
+    dbg = null;
+    if (dbgPollT) { clearTimeout(dbgPollT); dbgPollT = null; }
+    ME.classList.remove("fe-debugging");
+    renderDebugBar();
+    if (!disposed && hostApi) { syncDebugState(); renderFacade(); refreshInspector(); }
+    status(why ? "debug: " + why : "debug session stopped — edits unlocked", why ? "bad" : "ok");
+  }
+  // a ready item in words, named in the top frame's case
+  function dbgItemText(v, it) {
+    const c = v && v.caseObj;
+    if (!it || it.kind === "auto") return "auto";
+    if (it.kind === "op") return `op ${c && c.cmds[it.index] ? nameOf(c, it.index) : it.index}`;
+    if (it.kind === "wire") { const w = c && c.cons[it.index]; return w ? `${nameOf(c, w.src[0])}.${w.src[1]}→${nameOf(c, w.dest[0])}.${w.dest[1]}` : `wire ${it.index}`; }
+    if (it.kind === "sync") { const s = c && c.syncs && c.syncs[it.index]; return s ? `${nameOf(c, s.src)}⇢${nameOf(c, s.dest)}` : `synchro ${it.index}`; }
+    return `${it.kind} ${it.index}`;
+  }
+  function renderDebugBar() {
+    const on = dbgActive();
+    const bar = $(".fe-dbg"); if (bar) bar.hidden = !on;
+    renderTimeline();
+    const dbtn = $(".fe-debug"); if (dbtn) { dbtn.textContent = on ? "debugging ■" : "debug ⏯"; dbtn.setAttribute("aria-pressed", String(on)); dbtn.title = on ? "Stop debugging (⇧F5)" : "Debug: step through the CURRENT body, unsaved edits included (F11 / F10 start a session)"; }
+    if (!on || !bar) return;
+    const st = dbg.st || {};
+    const live = !!st.running, ended = !!st.ended, busy = !!dbg.busy;
+    const set = (sel, dis) => { const b = $(sel); if (b) b.disabled = !!dis; };
+    set(".fe-dbg-back", busy || live || !((st.cursor || 0) > (st.base || 0)));
+    for (const s of [".fe-dbg-over", ".fe-dbg-into", ".fe-dbg-out", ".fe-dbg-cont"]) set(s, busy || live || ended);
+    set(".fe-dbg-pause", !live);
+    const pos = $(".fe-dbg-pos"); if (pos) pos.textContent = `step ${st.cursor || 0} / ${st.length || 0}`;
+    const ev = $(".fe-dbg-ev");
+    if (ev) {
+      const top = dbg.views && dbg.views.length ? dbg.views[dbg.views.length - 1] : null;
+      let t = FD.eventText(st.event, dbg.views);
+      { const bh = dbgStopText(); if (bh) t = `● ${bh} · ${t}`; }   // D4
+      const rd = (st.ready || []).filter((x) => x && x.kind !== "auto");
+      if (ended) t += " · ended";
+      else if (rd.length) t += ` · ready: ${rd.map((x) => dbgItemText(top, x)).join(", ")}` + (st.default ? ` · next ${dbgItemText(top, st.default)}` : "");
+      else if ((st.ready || []).length) t += " · next: auto";
+      if (top && top.external) t += ` · in ${top.external.name || "a callee"} (not in this flow)`;
+      if (live) t = "running… " + t;
+      ev.textContent = t;
+      ev.className = "fe-dbg-ev" + (ended ? " ended" : "") + (st.event && (st.event.type === "error" || st.event.type === "stall") ? " bad" : "") + (dbgStopText() ? " bp" : "");
+    }
+  }
+
+  // ── D3: the debug inspector ──────────────────────────────────────────────
+  // While a session is open the inspector shows the SESSION, not the editor's
+  // popovers (edits are locked anyway): the frame stack (top first; a click
+  // focuses that frame's case and the focus stops following until the next
+  // move), the ready set (click = run it next), the selection in the focused
+  // frame (an op's inputs with delivery marks + its results; a wire's source
+  // and delivered value; a synchro's state) and the frame's args / out /
+  // outcome. dbgInspModel is the same picture as data, read straight from
+  // the frame debug_state returned (checks compare the DOM rows with it).
+  let dbgInsp = null;          // the last rendered model
+  const dbgVal = (v) => { let s; try { s = JSON.stringify(v); } catch (e) { s = String(v); } if (s === undefined) s = "null"; return s.length > 160 ? s.slice(0, 159) + "…" : s; };
+  const dbgOwn = (o, k) => !!o && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k);
+  function dbgFrameTitle(v) {
+    if (v.fi === 0) return "root";
+    const nm = v.opName || (v.external && (v.external.name || v.external.cmd)) || "frame";
+    return `${v.kind || "frame"} ${nm}` + (v.iter != null ? ` [${v.iter}]` : "");
+  }
+  function dbgInspModel(key) {
+    if (!dbgActive()) return null;
+    const st = dbg.st || {}, views = dbg.views || [];
+    const dv = dbgDeckView();
+    const chainLen = FD.focusChain(views).length;
+    const top = views.length ? views[views.length - 1] : null;
+    const m = { cursor: st.cursor || 0, length: st.length || 0, ended: !!st.ended, running: !!st.running,
+      base: st.base || 0, branches: st.branches || 0, branchList: st.branch_list || [],
+      event: FD.eventText(st.event, views), focusFi: dv ? dv.fi : null, follow: !!dbg.follow,
+      frames: views.slice().reverse().map((v) => ({ fi: v.fi, title: dbgFrameTitle(v), kind: v.kind, case: v.case, phase: v.phase,
+        outcome: v.outcome, top: v.top, focused: dv === v, showable: v.fi < chainLen, external: !!v.external })),
+      ready: (st.ready || []).filter((x) => x && x.kind !== "auto").map((x) => ({ kind: x.kind, index: x.index, text: dbgItemText(top, x),
+        isDefault: !!(st.default && st.default.kind === x.kind && st.default.index === x.index) })),
+      sel: null, frame: null, stop: dbgStopText(),
+      bps: bpListModel().map((x) => ({ kind: x.kind, index: x.index, case: x.case, depth: x.depth, text: x.text, entry: x.entry })) };
+    if (!dv) return m;
+    const f = dv.frame || {}, c = dv.caseObj;
+    m.frame = { fi: dv.fi, case: dv.case, phase: dv.phase, outcome: dv.outcome, args: f.args || {}, out: f.out || {}, inprog: f.inprog || null };
+    const mk = key && /^d(\d+)_op(\d+)$/.exec(key);
+    if (selWire != null && c && c.cons[selWire]) {
+      const k = selWire, w = c.cons[k];
+      const srcObj = w.src[0] === -1 ? f.args : (Array.isArray(f.results) ? f.results[w.src[0]] : null);
+      const dstObj = w.dest[0] === -2 ? f.out : (Array.isArray(f.inputs) ? f.inputs[w.dest[0]] : null);
+      m.sel = { kind: "wire", index: k, text: `${nameOf(c, w.src[0])}.${w.src[1]} → ${nameOf(c, w.dest[0])}.${w.dest[1]}`, state: dv.wires[k],
+        src: dbgOwn(srcObj, w.src[1]) ? { has: true, value: srcObj[w.src[1]] } : { has: false, value: null },
+        dest: dbgOwn(dstObj, w.dest[1]) ? { has: true, value: dstObj[w.dest[1]] } : { has: false, value: null } };
+    } else if (selSync != null && c && Array.isArray(c.syncs) && c.syncs[selSync]) {
+      m.sel = { kind: "sync", index: selSync, text: syncText(c, c.syncs[selSync]), state: dv.syncs[selSync] };
+    } else if (mk && +mk[1] === activeDeck && c && c.cmds[+mk[2]]) {
+      const i = +mk[2], op = c.cmds[i];
+      const inp = (Array.isArray(f.inputs) && f.inputs[i]) || {}, dl = (Array.isArray(f.dlv) && f.dlv[i]) || {};
+      const res = Array.isArray(f.results) ? f.results[i] : null;
+      const resObj = res && typeof res === "object" ? res : {};
+      const inTerms = Array.from(new Set([...Object.keys(op.in || {}), ...Object.keys(inp)]));
+      const outTerms = Array.from(new Set([...Object.keys(op.out || {}), ...Object.keys(resObj)]));
+      m.sel = { kind: "op", index: i, name: nameOf(c, i), type: op.type, state: dv.ops[i], done: !!(Array.isArray(f.done) && f.done[i]),
+        running: f.inprog && f.inprog.op === i ? (f.inprog.stage || "running") : null,
+        inputs: inTerms.map((t) => ({ term: t, has: dbgOwn(inp, t), value: dbgOwn(inp, t) ? inp[t] : null, delivered: !!dl[t] })),
+        outputs: outTerms.map((t) => ({ term: t, has: dbgOwn(resObj, t), value: dbgOwn(resObj, t) ? resObj[t] : null })),
+        results: res == null ? null : res };
+    }
+    if (m.sel) m.sel.bp = hasBreakpoint(m.sel.kind, m.sel.index);   // D4
+    return m;
+  }
+  function dbgKv(parent, rows, cls) {
+    if (!rows.length) { const p = edNote(parent, "—"); p.classList.add("fe-dbgi-none"); return null; }
+    const t = document.createElement("table"); t.className = "fe-dbgi-kv" + (cls ? " " + cls : "");
+    for (const r of rows) {
+      const tr = document.createElement("tr"); tr.dataset.term = r.k; if (r.cls) tr.className = r.cls;
+      const a = document.createElement("td"); a.className = "k"; a.textContent = r.k;
+      const b = document.createElement("td"); b.className = "v"; b.textContent = r.v;
+      tr.append(a, b);
+      if (r.mark != null) { const mk = document.createElement("td"); mk.className = "m"; mk.textContent = r.mark; mk.title = r.markTitle || ""; tr.appendChild(mk); }
+      t.appendChild(tr);
+    }
+    parent.appendChild(t); return t;
+  }
+  const dbgObjRows = (o) => Object.keys(o && typeof o === "object" ? o : {}).map((k) => ({ k, v: dbgVal(o[k]) }));
+  function renderDebugInspector(body, key) {
+    const m = dbgInspModel(key); dbgInsp = m;
+    body.replaceChildren();
+    if (!m) return;
+    const head = document.createElement("p"); head.className = "fe-ed-head fe-dbgi-head";
+    head.innerHTML = `<b>debugger</b> <span class="lbl">step ${m.cursor} / ${m.length}${m.ended ? " · ended" : m.running ? " · running…" : ""}</span>`;
+    body.appendChild(head);
+    edNote(body, m.event).classList.add("fe-dbgi-ev");
+    if (m.stop) edNote(body, "● " + m.stop).classList.add("fe-dbgi-bphit");   // D4
+    renderTimelineInspector(body, m);   // D5: the tape + branches
+    // the frame stack, top first
+    edLbl(body, "frames · top first — click to focus");
+    const ul = document.createElement("ul"); ul.className = "fe-dbgi-frames";
+    for (const fr of m.frames) {
+      const li = document.createElement("li");
+      li.className = "fe-dbgi-frame" + (fr.focused ? " focused" : "") + (fr.top ? " top" : "") + (fr.showable ? "" : " external");
+      li.dataset.fi = String(fr.fi);
+      li.textContent = `${fr.title} · case ${fr.case + 1} · ${fr.phase || "—"}${fr.outcome ? " · " + fr.outcome : ""}`;
+      li.title = fr.showable ? "focus this frame's case" : "a callee this editor does not hold";
+      if (fr.showable) li.addEventListener("click", () => debugFocusFrame(fr.fi));
+      ul.appendChild(li);
+    }
+    body.appendChild(ul);
+    if (!m.follow) edButton(edBtns(body), "follow the top frame", "fe-dbgi-follow", debugFollowNow);
+    // the ready set: click = run it next
+    if (m.ready.length && !m.ended && !m.running) {
+      edLbl(body, "ready — click to run it next");
+      const rb = edBtns(body); rb.classList.add("fe-dbgi-ready");
+      for (const it of m.ready) {
+        const b = edButton(rb, it.text + (it.isDefault ? " ·default" : ""), "fe-dbgi-pick" + (it.isDefault ? " default" : ""), () => debugStep("into", { kind: it.kind, index: it.index }));
+        b.dataset.kind = it.kind; b.dataset.index = String(it.index);
+      }
+    }
+    if (!m.frame) { edNote(body, "no frame runs this case right now — click a frame above, or follow the top frame").classList.add("fe-dbgi-noframe"); renderBpList(body, m); return; }
+    // the selection, in the focused frame
+    const s = m.sel;
+    const sec = document.createElement("div"); sec.className = "fe-dbgi-sel"; body.appendChild(sec);
+    if (s && s.kind === "op") {
+      sec.dataset.kind = "op"; sec.dataset.index = String(s.index);
+      const h = document.createElement("p"); h.className = "fe-dbgi-selhead";
+      h.innerHTML = `<b>${esc(s.name)}</b> <span class="lbl">${esc(s.type)}</span> <span class="fe-dbgi-st s-${esc(s.state)}">${esc(s.state)}${s.running ? " · " + esc(s.running) : ""}</span>`;
+      sec.appendChild(h);
+      edLbl(sec, "inputs");
+      dbgKv(sec, s.inputs.map((x) => ({ k: x.term, v: x.has ? dbgVal(x.value) : "—", mark: x.delivered ? "✓" : "·", markTitle: x.delivered ? "delivered" : "not delivered yet", cls: x.delivered ? "dlv" : "pend" })), "fe-dbgi-in");
+      edLbl(sec, s.results == null ? "outputs · not evaluated" : "outputs");
+      dbgKv(sec, s.outputs.map((x) => ({ k: x.term, v: x.has ? dbgVal(x.value) : "—", cls: x.has ? "has" : "pend" })), "fe-dbgi-out");
+    } else if (s && s.kind === "wire") {
+      sec.dataset.kind = "wire"; sec.dataset.index = String(s.index);
+      const h = document.createElement("p"); h.className = "fe-dbgi-selhead";
+      h.innerHTML = `<b>wire</b> ${esc(s.text)} <span class="fe-dbgi-st s-${esc(s.state)}">${esc(s.state)}</span>`;
+      sec.appendChild(h);
+      dbgKv(sec, [{ k: "source", v: s.src.has ? dbgVal(s.src.value) : "—" }, { k: "delivered", v: s.dest.has ? dbgVal(s.dest.value) : "—" }], "fe-dbgi-wire");
+    } else if (s && s.kind === "sync") {
+      sec.dataset.kind = "sync"; sec.dataset.index = String(s.index);
+      const h = document.createElement("p"); h.className = "fe-dbgi-selhead";
+      h.innerHTML = `<b>synchro</b> ${esc(s.text)} <span class="fe-dbgi-st s-${esc(s.state)}">${esc(s.state)}</span>`;
+      sec.appendChild(h);
+    } else edNote(sec, "click an op or a wire (not a ready one — that runs it) to see its values");
+    // D4: the selection's breakpoint toggle (F9 does the same)
+    if (s) {
+      const b = edButton(edBtns(sec), s.bp ? "● breakpoint — clear (F9)" : "○ set breakpoint (F9)", "fe-dbgi-bp" + (s.bp ? " on" : ""), () => toggleBreakpoint(s.kind, s.index));
+      b.dataset.on = String(!!s.bp);
+    }
+    // the focused frame: args in, out so far
+    const fr = m.frame;
+    edLbl(body, `frame ${fr.fi === 0 ? "root" : "#" + fr.fi} · case ${fr.case + 1} · args`);
+    dbgKv(body, dbgObjRows(fr.args), "fe-dbgi-args");
+    edLbl(body, "out" + (fr.outcome ? ` · ${fr.outcome}` : "") + (fr.phase ? ` · ${fr.phase}` : ""));
+    dbgKv(body, dbgObjRows(fr.out), "fe-dbgi-fout");
+    renderBpList(body, m);
+  }
+  // D4: every breakpoint (click one = clear it), plus clear-all
+  function renderBpList(body, m) {
+    const L = m.bps || [];
+    edLbl(body, `breakpoints · ${L.length}` + (L.length ? " — click one to clear it" : " — ● dots on ops, wires and synchros, or F9 on the selection"));
+    if (!L.length) return;
+    const ul = document.createElement("ul"); ul.className = "fe-dbgi-bps";
+    L.forEach((x, i) => {
+      const li = document.createElement("li"); li.className = "fe-dbgi-bpi";
+      li.dataset.kind = x.kind; li.dataset.index = String(x.index); li.dataset.case = String(x.case); li.dataset.depth = String(x.depth);
+      li.textContent = "● " + x.text; li.title = "clear this breakpoint";
+      li.addEventListener("click", () => removeBreakpointAt(i));
+      ul.appendChild(li);
+    });
+    body.appendChild(ul);
+    edButton(edBtns(body), "clear all breakpoints", "fe-dbgi-bpclear", clearBreakpoints);
+  }
+  // focus frame fi's case (a click in the stack): the focus stops following
+  // the top frame until the next move (or "follow the top frame")
+  function debugFocusFrame(fi) {
+    if (!dbgActive()) return null;
+    const chain = FD.focusChain(dbg.views);
+    if (!(fi >= 0 && fi < chain.length)) { status("that frame runs a callee this editor doesn't hold", "bad"); return null; }
+    dbg.follow = fi === dbg.views.length - 1;
+    focusPath = chain.slice(0, fi + 1).map((x, k) => (k === 0 ? { root: doc.root, title: "case 1" } : { root: x.root, op: x.op, title: x.title }));
+    activeDeck = chain[fi].case;
+    cancelWireGhost();
+    selWire = null; selWireRef = null; selSync = null; selSyncRef = null; selSyncCase = null;
+    if (hostApi) hostApi.setState("selectedKey", null);
+    renderAll(); refreshInspector();
+    status(`debug: showing frame ${fi === 0 ? "root" : dbgFrameTitle(dbg.views[fi])} · case ${activeDeck + 1}` + (dbg.follow ? "" : " — the next move follows the top frame again"), "ok");
+    return { fi, depth: focusPath.length, deck: activeDeck, follow: dbg.follow };
+  }
+  function debugFollowNow() {
+    if (!dbgActive()) return null;
+    dbg.follow = true;
+    if (debugFollow()) renderAll(); else { syncDebugState(); renderFacade(); }
+    refreshInspector();
+    return { depth: focusPath.length, deck: activeDeck };
+  }
+
+  // ── D4: breakpoints ──────────────────────────────────────────────────────
+  // A breakpoint is { kind: op|wire|sync, ref, root }: the OBJECT it sits on
+  // and the picture (case-chain root: the doc root or a local's localdata)
+  // holding it — it follows renumbering edits and dies with its object
+  // (FD.bpPlace → null; pruned on read). They belong to the EDITOR, not the
+  // session: set before or during a session, re-sent on every debugStart and
+  // every toggle (dev.flowstep.debug_set_breakpoints; FD.bpEntry: frame
+  // [[op,"*"]…] = any iteration of each local on the way, cases = the parent
+  // cases). The stepper stops BEFORE a breakpointed op / wire / synchro is
+  // picked, on over / out / continue (never on the one a move starts from).
+  // Dots: an op's on its flownode (host.state.bps); a wire's just above its
+  // destination socket (one wire per input, so the spot is the wire's own;
+  // the hang link drops into it from above); a synchro's above its mark.
+  // Solid when set; while a session is open every op / wire / synchro of the
+  // focused case shows a faint ghost dot — a tap toggles. F9 toggles the
+  // selection's; the debug inspector has the toggle and the list.
+  function bpColor() {
+    const v = String(getComputedStyle(ME).getPropertyValue("--fe-dbg-bp") || "").trim();
+    return /^#[0-9a-f]{3,8}$/i.test(v) ? v : "#e5484d";
+  }
+  function bpPlaces() {
+    const out = [];
+    bps = bps.filter((b) => { const p = FD.bpPlace(doc && doc.root, b); if (p) out.push(Object.assign({ bp: b }, p)); return !!p; });
+    return out;
+  }
+  const bpRefOf = (kind, index, c) => !c ? null : kind === "op" ? c.cmds[index] : kind === "wire" ? c.cons[index] : (c.syncs || [])[index];
+  const bpFind = (kind, ref, root) => bps.findIndex((b) => b.kind === kind && b.ref === ref && b.root === root);
+  function hasBreakpoint(kind, index) { const ref = bpRefOf(kind, index, focusedCase()); return !!ref && bpFind(kind, ref, focusRoot()) >= 0; }
+  // the focused case's breakpoints as index lists
+  function bpDeck() {
+    const o = { op: [], wire: [], sync: [] }, c = focusedCase(), root = focusRoot();
+    if (!c) return o;
+    for (const b of bps) {
+      if (b.root !== root || !o[b.kind]) continue;
+      const k = (b.kind === "op" ? c.cmds : b.kind === "wire" ? c.cons : (c.syncs || [])).indexOf(b.ref);
+      if (k >= 0) o[b.kind].push(k);
+    }
+    return o;
+  }
+  function syncBpState() {
+    if (!hostApi || disposed) return;
+    hostApi.setState("bps", { deck: activeDeck, ops: bpDeck().op, ghost: dbgActive(), color: bpColor() });
+  }
+  // the facade dots for wires + synchros (renderFacade appends them)
+  function bpDotSpecs() {
+    lastBpDots = [];
+    const c = focusedCase(); if (!c) return [];
+    const d = bpDeck(), ghost = dbgActive(), col = bpColor(), out = [];
+    const dot = (kind, k, p) => {
+      const on = d[kind].includes(k);
+      if ((!on && !ghost) || !p) return;
+      const id = "fx_" + slug(`d${activeDeck}/bp/${kind}/${k}`);
+      out.push({ id, kind: "sphere", pos: p, params: { radius: on ? 0.07 : 0.055 },
+        material: { color: col, opacity: on ? 1 : 0.3, emissive: on },
+        affordances: { tap: true, hover: true }, meta: { role: "bp", kind, index: k, on } });
+      lastBpDots.push({ id, kind, index: k, on, pos: p });
+    };
+    c.cons.forEach((w, k) => { const e = wireEnd(c, w.dest, "in"); dot("wire", k, e ? { x: e.x, y: e.y + 0.17, z: (e.z || 0) + 0.04 } : null); });
+    (c.syncs || []).forEach((s, j) => {
+      let a = null, b = null;
+      try { a = syncHandlePos(c, s.src, "out"); b = syncHandlePos(c, s.dest, "in"); } catch (e) {}
+      dot("sync", j, a && b ? { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + 0.17, z: ((a.z || 0) + (b.z || 0)) / 2 + 0.04 } : null);
+    });
+    return out;
+  }
+  function bpDotOfSpec(specId) {
+    if (!specId) return null;
+    const o = stage && stage.objects && stage.objects.get ? stage.objects.get(specId) : null;
+    const m = o && o.spec && o.spec.meta;
+    if (m && m.role === "bp" && typeof m.index === "number") return { kind: m.kind, index: m.index };
+    const r = /^fx_d(\d+)_bp_(op|wire|sync)_(\d+)$/.exec(String(specId));
+    return r && +r[1] === activeDeck ? { kind: r[2], index: +r[3] } : null;
+  }
+  function bpRedraw() { syncBpState(); renderFacade(); refreshInspector(); renderDebugBar(); }
+  // toggle (on null) / set (true) / clear (false) kind index of the FOCUSED case
+  function toggleBreakpoint(kind, index, on) {
+    const c = focusedCase(), root = focusRoot();
+    const ref = bpRefOf(kind, index, c);
+    if (!ref) { status(`no ${kind} ${index} in this case`, "bad"); return null; }
+    const k = bpFind(kind, ref, root);
+    const want = on == null ? k < 0 : !!on;
+    if (want && k < 0) bps.push({ kind, ref, root });
+    else if (!want && k >= 0) bps.splice(k, 1);
+    bpRedraw();
+    const sent = sendBreakpoints();
+    status(`breakpoint ${want ? "set" : "cleared"} on ${dbgItemText({ caseObj: c }, { kind, index })}` + (dbgActive() ? "" : " — kept for the next debug session"), "ok");
+    return { on: want, sent };
+  }
+  function toggleSelectedBreakpoint() {
+    if (selWire != null) return toggleBreakpoint("wire", selWire);
+    if (selSync != null) return toggleBreakpoint("sync", selSync);
+    const key = hostApi && hostApi.state ? hostApi.state.selectedKey : null;
+    const mk = key && /^d(\d+)_op(\d+)$/.exec(key);
+    if (mk && +mk[1] === activeDeck) return toggleBreakpoint("op", +mk[2]);
+    status("select an op, a wire or a synchro first — F9 toggles its breakpoint", "bad");
+    return null;
+  }
+  function clearBreakpoints() {
+    bps = [];
+    bpRedraw();
+    const sent = sendBreakpoints();
+    status("breakpoints cleared", "ok");
+    return { sent };
+  }
+  async function sendBreakpoints() {
+    if (!dbgActive()) return null;
+    const d = dbg, list = bpPlaces().map((p) => FD.bpEntry(p));
+    const r = await FD.client.setBreakpoints(d.session, list);
+    if (dbg !== d) return r;
+    d.bpSent = { list, ok: !!(r && r.status === "ok"), echoed: r && Array.isArray(r.breakpoints) ? r.breakpoints : null };
+    if (!r || r.status !== "ok") status("debug: breakpoints refused — " + ((r && r.msg) || "no reply"), "bad");
+    return r;
+  }
+  // the last move's stop on a breakpoint, in words (null: it did not stop on one)
+  function dbgStopText() {
+    if (!dbgActive() || !dbg.stop || dbg.stop.stopped !== "breakpoint") return null;
+    const h = dbg.stop.hit || {}, views = dbg.views || [];
+    const top = views.length ? views[views.length - 1] : null;
+    if (h.kind === "op" || h.kind === "wire" || h.kind === "sync") return `stopped at breakpoint: ${dbgItemText(top, h)}`;
+    return "stopped at breakpoint" + (h.kind ? ` (${h.kind})` : "");
+  }
+  // every breakpoint in words (the inspector's list + checks)
+  function bpListModel() {
+    return bpPlaces().map((p) => {
+      const c = FD.caseChain(p.bp.root)[p.case];
+      const ops = FD.chainOps(doc.root, p.chain);
+      const where = ops.length ? ` · in ${ops.map((o) => (o && (o.name || o.type)) || "local").join(" › ")}` : "";
+      return { kind: p.kind, index: p.index, case: p.case, depth: p.chain.length, entry: FD.bpEntry(p),
+        text: `${dbgItemText({ caseObj: c }, { kind: p.kind, index: p.index })} · case ${p.case + 1}${where}`, bp: p.bp };
+    });
+  }
+  function removeBreakpointAt(i) {
+    const it = bpListModel()[i]; if (!it) return null;
+    const k = bps.indexOf(it.bp); if (k >= 0) bps.splice(k, 1);
+    bpRedraw();
+    return { sent: sendBreakpoints() };
   }
 
   // ── P4: the in-editor journal + diff ─────────────────────────────────────
@@ -2088,6 +3011,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   // (re)load a body as the authoritative doc — the diff baseline moves with it
   function loadBody(body, hash) {
+    if (dbgActive()) debugStop();     // a new body: the session's tape no longer describes it
     doc = parseFlow(body); baseHash = hash || "";
     focusPath = [{ root: doc.root, title: "case 1" }]; activeDeck = 0;
     undoStack = []; redoStack = []; pendingLabels = []; dirty = false;
@@ -2138,6 +3062,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       hostApi.setState("onSceneDrag", onSceneDrag);
       // taps on an op BODY (flownode.click) → op selection, the same path as wires
       hostApi.setState("onOpSelect", onOpSelect);
+      // D4: a tap on an op's breakpoint dot (flownode.click node "bp") toggles it
+      hostApi.setState("onBpTap", (p) => { if (p && typeof p.opIndex === "number" && p.opIndex >= 0) toggleBreakpoint("op", p.opIndex); });
       hostApi.setState("onOpDrag", (p) => {
         // drag an op body to move it (front-ortho plane, z kept). Undoable.
         // flownode hands ONE payload {phase, key, opIndex, evt, which?, ord?}
@@ -2147,7 +3073,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         if (p.which) { onSocketDrag(p); return; }   // socket drags WIRE (input → output)
         // live-follow: the drawn icon rides the pointer with its pick proxy —
         // and so do its wires (links re-resolve their socket ends each frame)
-        if (p.phase === "move" && !running) {
+        if (p.phase === "move" && !running && !dbgActive()) {
           const c0 = focusedCase(); const op0 = c0 && c0.cmds[p.opIndex]; const e0 = p.evt || {};
           if (op0 && op0.pos && typeof e0.dx === "number" && stage && stage.applyDelta) {
             const fid = "fx_" + slug(`d${activeDeck}/op/${p.opIndex}`);
@@ -2156,6 +3082,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
           }
           return;
         }
+        if (p.phase === "end" && dbgActive()) { renderAll(); status("debugging — stop the session (⇧F5) to move ops", "bad"); return; }
         if (p.phase !== "end" || running) return;
         const c = focusedCase(); const op = c && c.cmds[p.opIndex]; if (!op || !op.pos) return;
         const evt = p.evt || {};
@@ -2254,6 +3181,41 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       });
       refreshSaveUi();
       const runB = $(".fe-run"); if (runB) runB.addEventListener("click", () => { startRun(); });
+      // STEP DEBUGGER toolbar
+      const onClick = (sel, fn) => { const b = $(sel); if (b) b.addEventListener("click", fn); };
+      onClick(".fe-debug", () => { if (dbgActive()) debugStop(); else startDebug(); });
+      onClick(".fe-dbg-back", () => debugStep("back", { count: 1 }));
+      onClick(".fe-dbg-over", () => debugStep("over"));
+      onClick(".fe-dbg-into", () => debugStep("into"));
+      onClick(".fe-dbg-out", () => debugStep("out"));
+      onClick(".fe-dbg-cont", () => debugStep("continue", { budget: 10000 }));
+      onClick(".fe-dbg-pause", () => debugStep("pause"));
+      onClick(".fe-dbg-stop", () => debugStop());
+      // D5: scrub the tape on the top strip (click / drag / ←→; double-click steps)
+      {
+        const tr = $(".fe-dbg-tl-track");
+        if (tr) {
+          const go = (e) => { if (dbgActive() && !(dbg.st && dbg.st.running)) debugStep("goto", { seq: tlSeqAt(tr, e.clientX) }); };
+          tr.addEventListener("pointerdown", (e) => { if (!dbgActive() || (dbg.st && dbg.st.running)) return; e.preventDefault(); tlDrag = true; try { tr.setPointerCapture(e.pointerId); } catch (e2) {} go(e); });
+          tr.addEventListener("pointermove", (e) => { if (tlDrag) go(e); });
+          tr.addEventListener("pointerup", () => { tlDrag = null; });
+          tr.addEventListener("pointercancel", () => { tlDrag = null; });
+          tr.addEventListener("dblclick", (e) => {
+            if (!dbgActive() || (dbg.st && dbg.st.running)) return;
+            const seq = tlSeqAt(tr, e.clientX);
+            const cur = (dbg.st && typeof dbg.st.cursor === "number") ? dbg.st.cursor : 0;
+            if (seq === cur + 1) debugStep("into");
+            else if (seq !== cur) debugStep("goto", { seq });
+          });
+          tr.addEventListener("keydown", (e) => {
+            if (!dbgActive()) return;
+            const cur = (dbg.st && typeof dbg.st.cursor === "number") ? dbg.st.cursor : 0;
+            if (e.key === "ArrowLeft") { e.preventDefault(); debugStep("goto", { seq: cur - 1 }); }
+            else if (e.key === "ArrowRight") { e.preventDefault(); debugStep("goto", { seq: cur + 1 }); }
+          });
+        }
+      }
+      renderDebugBar();
       const sjB = $(".fe-sj-refresh"); if (sjB) sjB.addEventListener("click", () => { refreshJournal(); });
       renderChanges();
       refreshJournal();
@@ -2275,6 +3237,19 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
           setTimeout(() => { saveFlow(); }, 0);
           return;
         }
+        // STEP DEBUGGER keys — F11 into · F10 over · ⇧F11 out · F5 continue ·
+        // ⇧F10 back · ⇧F5 stop. Before the field guard (F-keys type nothing)
+        // and always preventDefault, so F5 never reloads the page mid-session.
+        if (e.key === "F5" || e.key === "F10" || e.key === "F11") {
+          e.preventDefault();
+          if (e.key === "F11") debugStep(e.shiftKey ? "out" : "into");
+          else if (e.key === "F10") { if (e.shiftKey) debugStep("back", { count: 1 }); else debugStep("over"); }
+          else if (e.shiftKey) debugStop();
+          else debugStep("continue", { budget: 10000 });
+          return;
+        }
+        // D4: F9 toggles the selection's breakpoint (session or not)
+        if (e.key === "F9") { e.preventDefault(); toggleSelectedBreakpoint(); return; }
         if (inField) return;
         if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z")) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
         if ((e.metaKey || e.ctrlKey) && (e.key === "y" || e.key === "Y")) { e.preventDefault(); redo(); return; }
@@ -2321,6 +3296,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         dispose() {
           if (disposed) return;
           disposed = true;
+          if (dbg) { const s = dbg.session; dbg = null; if (dbgPollT) { clearTimeout(dbgPollT); dbgPollT = null; } try { FD.client.stop(s); } catch (e) {} }
           cancelWireGhost(); closePicker();
           try { hostApi.setState("onTokenDelivered", null); hostApi.setState("run", null); } catch (e) {}
           for (const ch of (hostApi.children || []).slice()) { try { hostApi.removeControl(ch.key); } catch (e) {} }
@@ -2364,7 +3340,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         checkRuntime, runtime: () => runtimeInfo, runtimeWarning, syncCount: flowSyncCount, syncMinFlowlang: SYNC_MIN_FLOWLANG,
         // P5 run parity surface
         startRun, runLive, lastResult: () => lastResult, liveCall: () => liveCall, coerceArg,
-        rounds: () => propagationRounds(focusedCase()), dryPlan, livePlan,
+        rounds: () => propagationRounds(focusedCase()), dryPlan,
         changes: () => renderChanges(), refreshJournal, journalRows: () => journalRows,
         toggleJournalDiff, revertTo: (i) => journalRows[i] ? revertTo(journalRows[i]) : null,
         tokens: () => hostApi.children.filter((ch) => ch.ctl === "flowtoken").length,
@@ -2373,6 +3349,64 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         focusedPath, diagnostics: () => lastDiags.map((d) => ({ code: d.code, severity: d.severity, opIndex: d.opIndex, message: d.message })),
         walkOps, selectOp, selectedOpIndex, frameSelection, lastFrame: () => lastFrame,
         pose: () => (stage && stage.getPose ? stage.getPose() : null),
+        // STEP DEBUGGER (flow step debugger P4) surface
+        startDebug, debugStart, debugStep, debugStop, debugRefresh, debugPickItem,
+        debugSession: () => (dbg ? dbg.session : null),
+        debugState: () => (dbg ? dbg.st : null),
+        debugLastRide: () => (dbg && dbg.lastRide ? JSON.parse(JSON.stringify(dbg.lastRide)) : null),
+        debugView: () => { const dv = dbgDeckView(); return dv ? { fi: dv.fi, top: dv.top, case: dv.case, phase: dv.phase, ops: dv.ops.slice(), wires: dv.wires.slice(), syncs: dv.syncs.slice() } : null; },
+        debugFrames: () => (dbg ? dbg.views.map((v) => ({ fi: v.fi, kind: v.kind, path: v.path, case: v.case, phase: v.phase, opName: v.opName, external: v.external, ops: v.ops.slice(), wires: v.wires.slice(), syncs: v.syncs.slice() })) : []),
+        debugHostState: () => (hostApi && hostApi.state ? hostApi.state.dbg : null),
+        debugPlates: () => instances.map((inst) => ({ key: inst && inst.key, dbg: inst && inst.ctx && inst.ctx.me ? inst.ctx.me._dbg : undefined })),
+        debugFacade: () => lastFacadeDbg.slice(),
+        debugBarText: () => { const b = $(".fe-dbg"); return b && !b.hidden ? { pos: $(".fe-dbg-pos").textContent, ev: $(".fe-dbg-ev").textContent } : null; },
+        focus: () => ({ depth: focusPath.length, deck: activeDeck, titles: focusPath.map((f) => f.title) }),
+        // D3 inspector surface
+        debugFocusFrame, debugFollowNow,
+        debugInspector: () => (dbgInsp ? JSON.parse(JSON.stringify(dbgInsp)) : null),
+        debugInspectorDom: () => {
+          const body = $(".fe-inspect-body"); if (!body || !dbgActive()) return null;
+          const rows = (sel) => { const t = body.querySelector(sel); return t ? Array.from(t.querySelectorAll("tr")).map((tr) => { const td = tr.querySelectorAll("td"); return { term: tr.dataset.term, v: td[1] ? td[1].textContent : "", mark: td[2] ? td[2].textContent : null }; }) : null; };
+          const sel = body.querySelector(".fe-dbgi-sel");
+          return {
+            head: (body.querySelector(".fe-dbgi-head") || {}).textContent || "",
+            frames: Array.from(body.querySelectorAll(".fe-dbgi-frame")).map((li) => ({ fi: +li.dataset.fi, text: li.textContent, focused: li.classList.contains("focused"), top: li.classList.contains("top") })),
+            ready: Array.from(body.querySelectorAll(".fe-dbgi-pick")).map((b) => ({ kind: b.dataset.kind, index: +b.dataset.index, text: b.textContent })),
+            sel: sel && sel.dataset.kind ? { kind: sel.dataset.kind, index: +sel.dataset.index, head: (sel.querySelector(".fe-dbgi-selhead") || {}).textContent || "" } : null,
+            inputs: rows(".fe-dbgi-in"), outputs: rows(".fe-dbgi-out"), wire: rows(".fe-dbgi-wire"),
+            args: rows(".fe-dbgi-args"), out: rows(".fe-dbgi-fout"),
+            bphit: (body.querySelector(".fe-dbgi-bphit") || {}).textContent || null,
+            bpToggle: (() => { const b = body.querySelector(".fe-dbgi-bp"); return b ? { on: b.dataset.on === "true", text: b.textContent } : null; })(),
+            bps: Array.from(body.querySelectorAll(".fe-dbgi-bpi")).map((li) => ({ kind: li.dataset.kind, index: +li.dataset.index, case: +li.dataset.case, depth: +li.dataset.depth, text: li.textContent })),
+            branchSwaps: Array.from(body.querySelectorAll(".fe-dbgi-bswap")).map((b) => b.textContent),
+            tlNote: (body.querySelector(".fe-dbgi-tl-track") ? "shown" : null),
+          };
+        },
+        dbgVal,
+        // D4 breakpoints surface
+        toggleBreakpoint, toggleSelectedBreakpoint, clearBreakpoints, removeBreakpointAt, sendBreakpoints, hasBreakpoint,
+        breakpoints: () => bpListModel().map((x) => ({ kind: x.kind, index: x.index, case: x.case, depth: x.depth, text: x.text, entry: x.entry })),
+        bpEntries: () => bpPlaces().map((p) => FD.bpEntry(p)),
+        bpHostState: () => (hostApi && hostApi.state ? hostApi.state.bps : null),
+        bpPlates: () => instances.map((inst) => ({ key: inst && inst.key, bp: inst && inst.ctx && inst.ctx.me ? inst.ctx.me._bp : undefined })),
+        bpDots: () => lastBpDots.slice(),
+        bpSent: () => (dbg && dbg.bpSent ? JSON.parse(JSON.stringify(dbg.bpSent)) : null),
+        debugStopInfo: () => (dbg && dbg.stop ? JSON.parse(JSON.stringify(dbg.stop)) : null),
+        debugStopText: dbgStopText,
+        // D5 timeline surface
+        debugBranch, debugTimeline: () => {
+          const strip = $(".fe-dbg-timeline");
+          const tickEls = Array.from(document.querySelectorAll(".fe-dbg-tl-tick"));
+          const cur = document.querySelector(".fe-dbg-tl-cursor");
+          return {
+            shown: !!(strip && !strip.hidden),
+            pos: ($(".fe-dbg-tl-pos") || {}).textContent || "",
+            ticks: tickEls.map((t) => ({ seq: +t.dataset.seq, type: (t.className.match(/t-([a-z]+)/) || [])[1] || "", left: t.style.left, title: t.title })),
+            branches: Array.from(document.querySelectorAll(".fe-dbg-tl-branch")).map((b) => ({ left: b.style.left, width: b.style.width, title: b.title })),
+            cursor: cur ? { left: cur.style.left } : null,
+            tape: dbgTape.filter((x) => x).map((x) => ({ seq: x.seq, type: x.type, user: !!x.user })),
+          };
+        },
       };
     }).catch((e) => { status("boot failed: " + (e && e.message ? e.message : e), "bad"); return null; });
   }

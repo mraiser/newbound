@@ -93,6 +93,52 @@
 /* P4 */
 .nb-flowedit3d .fe-run { border-color:var(--f-3d); color:var(--good); }
 .nb-flowedit3d .fe-run.running { background:var(--f-3d); color:var(--ground); }
+/* STEP DEBUGGER (flow step debugger P4) */
+.nb-flowedit3d { --fe-dbg-ready:var(--accent, #f0a63c); --fe-dbg-running:var(--f-css, #56a3d9);
+  --fe-dbg-done:var(--good, #62bd8c); --fe-dbg-skipped:#6b6f78; }
+.nb-flowedit3d .fe-debug { border-color:var(--accent); color:var(--accent); }
+.nb-flowedit3d.fe-debugging .fe-debug { background:var(--accent); color:var(--ground); }
+.nb-flowedit3d .fe-dbg { display:flex; align-items:center; gap:6px; padding:4px 10px; flex-wrap:wrap;
+  background:color-mix(in srgb, var(--accent) 10%, var(--panel)); border-bottom:1px solid var(--accent); font-size:12px; }
+.nb-flowedit3d .fe-dbg[hidden] { display:none; }
+.nb-flowedit3d .fe-dbg-lbl { font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:.06em; font-size:11px; }
+.nb-flowedit3d .fe-dbg button { font-size:12px; padding:2px 8px; }
+.nb-flowedit3d .fe-dbg-pos { font-family:var(--mono, monospace); color:var(--text-dim); min-width:9ch; }
+.nb-flowedit3d .fe-dbg-ev { flex:1; min-width:16ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); }
+.nb-flowedit3d .fe-dbg-ev.ended { color:var(--good); } .nb-flowedit3d .fe-dbg-ev.bad { color:var(--danger); }
+.nb-flowedit3d .fe-dbg-legend { display:flex; gap:8px; font-size:11px; color:var(--text-dim); }
+.nb-flowedit3d .fe-dbg-legend i { font-style:normal; display:inline-flex; align-items:center; gap:3px; }
+.nb-flowedit3d .fe-dbg-legend i::before { content:""; width:9px; height:9px; border-radius:2px; display:inline-block; }
+.nb-flowedit3d .fe-dbg-legend .s-ready::before { background:var(--fe-dbg-ready); }
+.nb-flowedit3d .fe-dbg-legend .s-running::before { background:var(--fe-dbg-running); }
+.nb-flowedit3d .fe-dbg-legend .s-done::before { background:var(--fe-dbg-done); }
+.nb-flowedit3d .fe-dbg-legend .s-skipped::before { background:var(--fe-dbg-skipped); }
+/* D3: the debug inspector (frame stack, ready set, values) */
+.nb-flowedit3d .fe-dbgi-ev { color:var(--text); font-size:12px; margin:2px 0 6px; }
+.nb-flowedit3d .fe-dbgi-frames { list-style:none; margin:2px 0 8px; padding:0; display:flex; flex-direction:column; gap:2px; }
+.nb-flowedit3d .fe-dbgi-frame { font-family:var(--mono, monospace); font-size:11.5px; padding:3px 6px; border:1px solid var(--line); border-radius:4px; cursor:pointer; color:var(--text-dim); }
+.nb-flowedit3d .fe-dbgi-frame:hover { border-color:var(--accent); color:var(--text); }
+.nb-flowedit3d .fe-dbgi-frame.top { color:var(--text); }
+.nb-flowedit3d .fe-dbgi-frame.top::before { content:"▸ "; color:var(--fe-dbg-running); }
+.nb-flowedit3d .fe-dbgi-frame.focused { border-color:var(--fe-dbg-running); background:color-mix(in srgb, var(--fe-dbg-running) 14%, transparent); }
+.nb-flowedit3d .fe-dbgi-frame.external { cursor:default; font-style:italic; opacity:.75; }
+.nb-flowedit3d .fe-dbgi-ready { flex-wrap:wrap; }
+.nb-flowedit3d .fe-dbgi-pick { font-size:11.5px; border-color:var(--fe-dbg-ready); }
+.nb-flowedit3d .fe-dbgi-pick.default { background:color-mix(in srgb, var(--fe-dbg-ready) 22%, transparent); }
+.nb-flowedit3d .fe-dbgi-sel { margin:6px 0 8px; padding:6px; border:1px solid var(--line); border-radius:4px; }
+.nb-flowedit3d .fe-dbgi-selhead { margin:0 0 4px; }
+.nb-flowedit3d .fe-dbgi-st { font-size:11px; padding:0 5px; border-radius:3px; border:1px solid currentColor; color:var(--text-dim); }
+.nb-flowedit3d .fe-dbgi-st.s-ready { color:var(--fe-dbg-ready); }
+.nb-flowedit3d .fe-dbgi-st.s-running { color:var(--fe-dbg-running); }
+.nb-flowedit3d .fe-dbgi-st.s-done, .nb-flowedit3d .fe-dbgi-st.s-delivered, .nb-flowedit3d .fe-dbgi-st.s-fired { color:var(--fe-dbg-done); }
+.nb-flowedit3d .fe-dbgi-st.s-skipped { color:var(--fe-dbg-skipped); }
+.nb-flowedit3d .fe-dbgi-kv { width:100%; border-collapse:collapse; font-family:var(--mono, monospace); font-size:11.5px; margin:2px 0 6px; }
+.nb-flowedit3d .fe-dbgi-kv td { padding:2px 4px; border-bottom:1px solid var(--line); vertical-align:top; }
+.nb-flowedit3d .fe-dbgi-kv td.k { color:var(--text-dim); white-space:nowrap; width:1%; }
+.nb-flowedit3d .fe-dbgi-kv td.v { word-break:break-all; color:var(--text); }
+.nb-flowedit3d .fe-dbgi-kv td.m { width:1%; text-align:center; }
+.nb-flowedit3d .fe-dbgi-kv tr.dlv td.m { color:var(--fe-dbg-done); }
+.nb-flowedit3d .fe-dbgi-kv tr.pend td.v { color:var(--text-dim); }
 .nb-flowedit3d .fe-changes, .nb-flowedit3d .fe-sjournal { margin-top:8px; }
 .nb-flowedit3d .fe-changes-list, .nb-flowedit3d .fe-sjournal-list, .nb-flowedit3d .fe-run-list,
 .nb-flowedit3d .jl-diff-list { list-style:none; margin:0; padding:0; font-size:11px; }
@@ -155,3 +201,34 @@
 .nb-flowedit3d .sh-canvas .ss-label.fe-ctlmark { color:var(--ground); font-weight:700 !important; }
 .nb-flowedit3d .sh-canvas.fe-far .ss-label.fe-opname,
 .nb-flowedit3d .sh-canvas.fe-far .ss-label.fe-ctlmark { visibility:hidden; }
+
+/* D5: the tape timeline scrubber */
+.nb-flowedit3d .fe-dbg-timeline { display:flex; align-items:center; gap:8px; padding:5px 10px 6px;
+  background:color-mix(in srgb, var(--accent) 7%, var(--panel)); border-bottom:1px solid var(--line); }
+.nb-flowedit3d .fe-dbg-timeline[hidden] { display:none; }
+.nb-flowedit3d .fe-dbg-tl-lbl { font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:.06em; font-size:10px; }
+.nb-flowedit3d .fe-dbg-tl-track { flex:1; position:relative; height:22px; min-width:120px; cursor:pointer;
+  background:var(--panel-2); border:1px solid var(--line); border-radius:5px; overflow:hidden; }
+.nb-flowedit3d .fe-dbg-tl-track:focus { outline:1px solid var(--accent); outline-offset:-1px; }
+.nb-flowedit3d .fe-dbg-tl-tick { position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; }
+.nb-flowedit3d .fe-dbg-tl-tick.t-enter { background:var(--fe-dbg-running, #56a3d9); }
+.nb-flowedit3d .fe-dbg-tl-tick.t-seed { background:var(--text-faint, #888); }
+.nb-flowedit3d .fe-dbg-tl-tick.t-deliver { background:var(--fe-dbg-ready, #f0a63c); }
+.nb-flowedit3d .fe-dbg-tl-tick.t-eval { background:var(--fe-dbg-done, #62bd8c); }
+.nb-flowedit3d .fe-dbg-tl-tick.t-sync { background:#b06ee0; }
+.nb-flowedit3d .fe-dbg-tl-tick.t-next, .nb-flowedit3d .fe-dbg-tl-tick.t-leave { background:#8a6ee0; }
+.nb-flowedit3d .fe-dbg-tl-tick.t-done, .nb-flowedit3d .fe-dbg-tl-tick.t-error, .nb-flowedit3d .fe-dbg-tl-tick.t-stall {
+  background:var(--danger, #d95f56); width:3px; margin-left:-1.5px; }
+.nb-flowedit3d .fe-dbg-tl-tick.t-done { background:var(--fe-dbg-done, #62bd8c); }
+.nb-flowedit3d .fe-dbg-tl-cursor { position:absolute; top:-1px; bottom:-1px; width:3px; margin-left:-1.5px;
+  background:var(--accent); box-shadow:0 0 5px var(--accent); pointer-events:none; }
+.nb-flowedit3d .fe-dbg-tl-branch { position:absolute; bottom:0; height:4px; background:color-mix(in srgb, #b06ee0 70%, transparent); }
+.nb-flowedit3d .fe-dbg-tl-pos { font-family:var(--mono, monospace); color:var(--text-dim); min-width:9ch; font-size:11.5px; }
+.nb-flowedit3d .fe-dbgi-tl-track { position:relative; height:20px; cursor:pointer; margin:2px 0 4px;
+  background:var(--panel-2); border:1px solid var(--line); border-radius:5px; overflow:hidden; }
+.nb-flowedit3d .fe-dbgi-tl-tick { position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; }
+.nb-flowedit3d .fe-dbgi-tl-cursor { position:absolute; top:-1px; bottom:-1px; width:3px; margin-left:-1.5px;
+  background:var(--accent); box-shadow:0 0 5px var(--accent); pointer-events:none; }
+.nb-flowedit3d .fe-dbgi-tl-note { font-size:11px; color:var(--text-dim); }
+.nb-flowedit3d .fe-dbgi-branch { border:1px solid var(--line); border-radius:4px; padding:4px 6px; margin:4px 0; }
+.nb-flowedit3d .fe-dbgi-branch .fe-ed-btns { margin:2px 0 0; }
