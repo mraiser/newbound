@@ -1,34 +1,8 @@
 [
-  {
-    "claim": "Vendored ES bundles live at /app/asset/<lib>/vendor/... — nb_codemirror/cm6.js under dev, nb_three (scenestage.js, three.module.js) under app — and stock controls import them with page-relative dynamic import('../app/asset/...').",
-    "detail": "A module loaded from its real URL resolves its own internal relative imports natively, so no rewriting machinery is needed; blob-URL modules were the only reason the loader rewrote specifiers. The nb.js/store client still fetches against location.origin (tunnel-blind) — a known follow-up now fixable in one place.",
-    "tags": "bench-collapse",
-    "confidence": "high",
-    "time": 1786401039423
-  },
-  {
-    "claim": "A github-imported FFI library whose crate manifest lacks a [workspace] opt-out fails activate_lib's crate build with 'current package believes it's in a workspace' - build_all writes the lib name into the host workspace exclude, but cargo canonicalizes the crate's real path to repositories/<lib>/<root>, which the exclude does not match.",
-    "detail": "activate_lib's manifest mend (which would append [workspace]) is keyed on the string 'serde_support' being absent; hollis's tracked manifest already contained it, so the mend was skipped. Fix candidates: exclude 'repositories' wholesale, or make the [workspace] append unconditional. agent/kb only dodge this because their symlinks resolve outside the checkout.",
-    "tags": "dev.github,activate_lib,workspace,ffi",
-    "confidence": "high",
-    "time": 1786479035116
-  },
-  {
-    "claim": "dev.dev.compile of an FFI-rooted library hot-reloads the dylib synchronously (flowlang::hotswap::reload) before answering: OK means the new code is executable immediately, and a hot-load failure IS the compile outcome, never a false OK. Static newbound_core-rooted libraries keep the host-rebuild-and-restart rhythm.",
-    "tags": "ffi,compile,hot-reload",
-    "source": {
-      "doc": "newbound-agent docs/ffi-dynamic-loading.md"
-    },
-    "confidence": "high",
-    "time": 1787152443049
-  },
-  {
-    "claim": "dev.dev.activate_lib loads an FFI crate live (flowlang::hotswap::load) after building it and answers 'OK: <lib> is live - its commands are loaded and will hot-reload on rebuild'; the RESTART sentinel and the host rebuild step are gone.",
-    "tags": "ffi,activate_lib",
-    "source": {
-      "doc": "newbound-agent docs/ffi-dynamic-loading.md"
-    },
-    "confidence": "high",
-    "time": 1787152443055
-  }
-]
+{"claim": "Vendored ES bundles live at /app/asset/<lib>/vendor/... — nb_codemirror/cm6.js under dev, nb_three (scenestage.js, three.module.js) under app — and stock controls import them with page-relative dynamic import('../app/asset/...').", "detail": "A module loaded from its real URL resolves its own internal relative imports natively, so no rewriting machinery is needed; blob-URL modules were the only reason the loader rewrote specifiers. The nb.js/store client still fetches against location.origin (tunnel-blind) — a known follow-up now fixable in one place.", "tags": "bench-collapse", "confidence": "high", "time": 1786401039423},
+{"claim": "A github-imported FFI library whose crate manifest lacks a [workspace] opt-out fails activate_lib's crate build with 'current package believes it's in a workspace' - build_all writes the lib name into the host workspace exclude, but cargo canonicalizes the crate's real path to repositories/<lib>/<root>, which the exclude does not match.", "detail": "activate_lib's manifest mend (which would append [workspace]) is keyed on the string 'serde_support' being absent; hollis's tracked manifest already contained it, so the mend was skipped. Fix candidates: exclude 'repositories' wholesale, or make the [workspace] append unconditional. agent/kb only dodge this because their symlinks resolve outside the checkout.", "tags": "dev.github,activate_lib,workspace,ffi", "confidence": "high", "time": 1786479035116},
+{"claim": "dev.dev.compile of an FFI-rooted library hot-reloads the dylib synchronously (flowlang::hotswap::reload) before answering: OK means the new code is executable immediately, and a hot-load failure IS the compile outcome, never a false OK. Static newbound_core-rooted libraries keep the host-rebuild-and-restart rhythm.", "tags": "ffi,compile,hot-reload", "source": {"doc": "newbound-agent docs/ffi-dynamic-loading.md"}, "confidence": "high", "time": 1787152443049},
+{"claim": "dev.dev.activate_lib loads an FFI crate live (flowlang::hotswap::load) after building it and answers 'OK: <lib> is live - its commands are loaded and will hot-reload on rebuild'; the RESTART sentinel and the host rebuild step are gone.", "tags": "ffi,activate_lib", "source": {"doc": "newbound-agent docs/ffi-dynamic-loading.md"}, "confidence": "high", "time": 1787152443055},
+{"claim": "update_crates has no guard for a missing cmd/ crate: with cmd/Cargo.toml absent it dies at step 1 ('host build failed: failed to read cmd/Cargo.toml') AFTER step 0 has already rewritten the flowlang/ndata pins in place, stranding uncommitted pin edits in the working tree while the running binary was never rebuilt.", "detail": "Observed 2026-09-24 on the owner's checkout. The wrong recovery was also observed in the wild: hand-stripping the cmd dependency from Cargo.toml and the cmd-init block from generated_initializer.rs, which diverges from canon (canon keeps both). Correct repair: restore the touched manifests, regenerate the scaffold with newbound-agent tools/gen-cmd-crate.py (cmd/ is generated and gitignored), then re-run update_crates at the same versions — the equal-version repair re-run exists for exactly this.", "tags": "dev.dev,update_crates,cmd,git,repair,unreviewed", "confidence": "high", "time": 1790259274005},
+{"claim": "runtime/dev/update_crates/{run.log,run.sh,status.json} are TRACKED files in the newbound repo, so every update_crates or hard_reset run dirties the working tree by construction.", "detail": "Verified via git ls-files 2026-09-24 while diagnosing a confusingly dirty canon checkout. Until the paths are gitignored and untracked upstream, dirt there is runner residue, never authored work — and a blanket git add would ship one box's runner state to the remote.", "tags": "dev.dev,update_crates,hard_reset,git,gitignore,unreviewed", "confidence": "high", "time": 1790259280560},
+{"end": true}]
