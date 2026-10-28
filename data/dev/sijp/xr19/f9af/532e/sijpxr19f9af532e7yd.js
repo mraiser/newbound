@@ -77,6 +77,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
 
 const UI_FACETS = new Set(["html", "css", "js"]);
 const CMD_LANGS = ["rust", "js", "java", "python", "py", "flow"];
+const LANG_NAMES = { rust: "Rust", python: "Python", flow: "Flow", js: "JavaScript", java: "Java", py: "Python" };
+// the platform save hint: ⌘S on macOS, Ctrl+S elsewhere (C3/C12)
+const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || "");
+const SAVE_KBD = IS_MAC ? "⌘S" : "Ctrl+S";
+const TRASH_SVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg>';
+const LOCK_SVG = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 const EDITOR_LANG = { html: "html", css: "css", js: "js", data: "json", three: "json" };
 const FACET_HUES = {
   html: "var(--f-html)", css: "var(--f-css)", js: "var(--f-js)",
@@ -127,7 +133,9 @@ async function init(host, { lib, ctlId, toast }) {
   }
 
   function facetSource(facet) {
-    if (facet === "data") return JSON.stringify(record.data, null, 1);
+    if (facet === "data") {
+      return record.data === undefined ? "" : JSON.stringify(record.data, null, 1);
+    }
     if (facet === "three") {
       return typeof record.three === "string"
         ? record.three : JSON.stringify(record.three, null, 1);
@@ -136,51 +144,80 @@ async function init(host, { lib, ctlId, toast }) {
   }
 
   // ── chips + actions ───────────────────────────────────────
-  for (const facet of FACETS) {
+  // One shared tabpanel (the pane): every tab's aria-controls points at it
+  // and setFacet re-labels it (C1).
+  const paneEl = host.querySelector(".wb-pane");
+  const paneId = `${host.id}-pane`;
+  paneEl.id = paneId;
+  paneEl.setAttribute("role", "tabpanel");
+
+  function makeChip(facet, label) {
     const chip = document.createElement("button");
     chip.className = "wb-chip";
+    chip.id = `${host.id}-tab-${facet}`;
     chip.setAttribute("role", "tab");
-    chip.classList.toggle("absent", !facetPresent(facet));
-    chip.innerHTML = `<span class="dot" aria-hidden="true"></span><span></span>`;
+    chip.setAttribute("aria-selected", "false");
+    chip.setAttribute("aria-controls", paneId);
+    chip.tabIndex = -1;
+    chip.innerHTML = `<span class="dot" aria-hidden="true"></span><span class="fname"></span><span class="cnt"></span>`;
     chip.querySelector(".dot").style.background = FACET_HUES[facet];
-    chip.lastElementChild.textContent = facet === "cmd" ? "commands" : facet;
-    if (facet === "cmd" && facetPresent(facet)) {
-      const cnt = document.createElement("span");
-      cnt.className = "cnt";
-      cnt.textContent = record.cmd.length;
-      chip.appendChild(cnt);
-    }
+    chip.querySelector(".fname").textContent = label;
     chip.addEventListener("click", () => setFacet(facet));
     chipsEl.appendChild(chip);
     chips.set(facet, chip);
+    return chip;
   }
+  for (const facet of FACETS) makeChip(facet, facet === "cmd" ? "commands" : facet);
 
   // Legacy `three` facet: not in the fixed order — a read-only chip appears
   // only where the facet exists (scene-facet-design Part V).
   if (record.three !== undefined) {
-    const chip = document.createElement("button");
-    chip.className = "wb-chip";
-    chip.setAttribute("role", "tab");
-    chip.title = "the pre-redesign 3D facet — read-only; the go-forward facet is scene";
-    chip.innerHTML = `<span class="dot" aria-hidden="true"></span><span></span>`;
-    chip.querySelector(".dot").style.background = FACET_HUES.three;
-    chip.lastElementChild.textContent = "three · legacy";
-    chip.addEventListener("click", () => setFacet("three"));
-    chipsEl.appendChild(chip);
-    chips.set("three", chip);
+    makeChip("three", "three · legacy").title =
+      "the pre-redesign 3D facet — read-only; the go-forward facet is scene";
   }
 
-  const actions = document.createElement("div");
-  actions.className = "wb-actions";
-  actions.innerHTML =
-    `<input class="wb-label" placeholder="label this patch" title="short label for the journal entry (optional)">
-     <button class="wb-save" disabled>save ⌘s</button>`;
-  actions.querySelector(".wb-save").addEventListener("click", () => save());
-  chipsEl.appendChild(actions);
-  const labelInput = actions.querySelector(".wb-label");
+  // Roving tabindex (C1): ←/→ wrap around the tabs, Home/End jump.
+  chipsEl.addEventListener("keydown", (e) => {
+    if (!e.target.closest(".wb-chip")) return;
+    const order = [...chips.keys()];
+    let i = Math.max(0, order.indexOf(activeFacet));
+    if (e.key === "ArrowRight") i = (i + 1) % order.length;
+    else if (e.key === "ArrowLeft") i = (i - 1 + order.length) % order.length;
+    else if (e.key === "Home") i = 0;
+    else if (e.key === "End") i = order.length - 1;
+    else return;
+    e.preventDefault();
+    setFacet(order[i]).then(() => chips.get(order[i])?.focus());
+  });
+
+  const actionsEl = host.querySelector(".wb-actions");
+  const stateEl = actionsEl.querySelector(".wb-ctl-state");
+  const saveBtn = actionsEl.querySelector(".wb-save");
+  saveBtn.querySelector("kbd").textContent = SAVE_KBD;
+  saveBtn.addEventListener("click", () => save());
+  const labelInput = actionsEl.querySelector(".wb-label");
+
+  // A facet's chip ungreys the moment its editor holds content, before any
+  // save; the commands chip counts, or reads `none` (C1).
+  function refreshChip(facet) {
+    const chip = chips.get(facet);
+    if (!chip || facet === "three") return;
+    const cnt = chip.querySelector(".cnt");
+    if (facet === "cmd") {
+      const n = record.cmd?.length ?? 0;
+      chip.classList.toggle("absent", n === 0);
+      if (cnt) cnt.textContent = n > 0 ? String(n) : "none";
+      return;
+    }
+    const buf = editors.get(facet)?.api.getValue();
+    const present = facetPresent(facet) || Boolean(buf);
+    chip.classList.toggle("absent", !present);
+    if (cnt) cnt.textContent = present ? "" : "none";
+  }
 
   function refreshDirtyUi() {
     for (const [facet, chip] of chips) {
+      refreshChip(facet);
       const mark = chip.querySelector(".dirty");
       if (dirty.has(facet) && !mark) {
         const dot = document.createElement("span");
@@ -192,8 +229,11 @@ async function init(host, { lib, ctlId, toast }) {
         mark.remove();
       }
     }
-    const saveBtn = actions.querySelector(".wb-save");
-    if (saveBtn) saveBtn.disabled = !dirty.has(activeFacet);
+    // Save control covers EVERY dirty ui facet, from any editor (C3).
+    const dirtyUi = [...UI_FACETS].filter((f) => dirty.has(f));
+    stateEl.textContent = dirtyUi.length ? `unsaved: ${dirtyUi.join(", ")}` : "no control changes";
+    stateEl.classList.toggle("dirty", dirtyUi.length > 0);
+    saveBtn.disabled = dirtyUi.length === 0;
   }
 
   // ── facet switching ───────────────────────────────────────
@@ -231,8 +271,10 @@ async function init(host, { lib, ctlId, toast }) {
     activeFacet = facet;
     for (const [f, chip] of chips) {
       chip.classList.toggle("on", f === facet);
-      chip.setAttribute("aria-selected", f === facet);
+      chip.setAttribute("aria-selected", String(f === facet));
+      chip.tabIndex = f === facet ? 0 : -1;
     }
+    paneEl.setAttribute("aria-labelledby", chips.get(facet)?.id ?? "");
     cmdsEl.hidden = true;
     threeEl.hidden = true;
     sceneEl.hidden = true;
@@ -254,23 +296,14 @@ async function init(host, { lib, ctlId, toast }) {
       // the absent gate
       cmdsEl.hidden = false;
       renderCommands();
-    } else if (!facetPresent(facet) && !(patchMode && UI_FACETS.has(facet))) {
-      absentEl.hidden = false;
-      absentEl.textContent =
-        `this control has no ${facet} facet — creating one is not wired up yet`;
-    } else if (!facetPresent(facet) && patchMode && UI_FACETS.has(facet)) {
-      // Facet absence is a normal state: open an empty editor; saving
-      // creates the facet (empty old_snippet = create/replace).
-      absentEl.hidden = false;
-      absentEl.textContent =
-        `this control has no ${facet} facet yet — type and save to create it`;
-      const { slot } = await ensureEditor(facet);
-      editorsEl.hidden = false;
-      slot.hidden = false;
     } else if (facet === "three") {
       threeEl.hidden = false;
       await renderThree();
     } else {
+      // C2: an absent facet opens the same full-height editor as a present
+      // one — no empty-state message in its place. Saving a ui facet
+      // creates it (empty old_snippet = create/replace); the data editor
+      // stays read-only.
       const { slot } = await ensureEditor(facet);
       editorsEl.hidden = false;
       slot.hidden = false;
@@ -279,11 +312,32 @@ async function init(host, { lib, ctlId, toast }) {
   }
 
   // ── saving ────────────────────────────────────────────────
-  async function save(overwrite = false) {
-    const facet = activeFacet;
-    if (!writable || !UI_FACETS.has(facet) || !dirty.has(facet)) return;
-    const source = editors.get(facet).api.getValue();
-    return savePatch(facet, source, overwrite);
+  // Save control (and Mod-S from any facet editor) saves EVERY dirty ui
+  // facet — one journaled patch per facet, all under the same label (C3).
+  async function save() {
+    if (!writable) return;
+    const targets = [...UI_FACETS].filter((f) => dirty.has(f));
+    if (!targets.length) return;
+    const label = labelInput?.value.trim() ?? "";
+    const outcomes = [];
+    for (const facet of targets) {
+      const source = editors.get(facet).api.getValue();
+      outcomes.push({ facet, result: await savePatch(facet, source, false, label) });
+    }
+    const facetsOf = (kind) =>
+      outcomes.filter((o) => o.result === kind).map((o) => o.facet);
+    const saved = facetsOf("saved");
+    const conflicted = facetsOf("conflict");
+    const failed = facetsOf("failed");
+    if (saved.length && labelInput) labelInput.value = "";
+    refreshDirtyUi();
+    renderStrip();
+    refreshPreview();
+    const bits = [];
+    if (saved.length) bits.push(`saved ${saved.join(", ")}`);
+    if (conflicted.length) bits.push(`${conflicted.join(", ")} conflicted — see the banner`);
+    if (failed.length) bits.push(`${failed.join(", ")} failed`);
+    if (bits.length) toast.show(`patch_control_facet → ${bits.join(" · ")}`);
   }
 
   // The patch path: compute the minimal exact-match snippet
@@ -315,8 +369,10 @@ async function init(host, { lib, ctlId, toast }) {
     }
   }
 
-  async function savePatch(facet, source, overwrite) {
-    const label = labelInput?.value.trim() ?? "";
+  // One facet's save. Returns "saved" | "conflict" | "failed" | "nochange";
+  // the caller reports the whole batch. A stale base raises the conflict
+  // banner for THIS facet only — the rest of the batch still saves (C3).
+  async function savePatch(facet, source, overwrite, label = "") {
     let patch;
     let base;
     if (overwrite) {
@@ -324,7 +380,7 @@ async function init(host, { lib, ctlId, toast }) {
       const rf = await readFacet(lib, name, facet);
       if (rf.status !== "ok") {
         toast.show(`re-read failed: ${rf.msg}`);
-        return;
+        return "failed";
       }
       patch = { oldSnippet: "", newSnippet: source };
       base = rf.hash;
@@ -333,7 +389,7 @@ async function init(host, { lib, ctlId, toast }) {
       if (!patch) {
         dirty.delete(facet);
         refreshDirtyUi();
-        return;
+        return "nochange";
       }
       base = hashes.get(facet) ?? "";
     }
@@ -360,26 +416,28 @@ async function init(host, { lib, ctlId, toast }) {
           refreshPreview();
           toast.show("loaded theirs — your version is in the strip's stash");
         };
-        conflictEl.querySelector(".wc-mine").onclick = () => {
+        conflictEl.querySelector(".wc-mine").onclick = async () => {
           conflictEl.hidden = true;
-          save(true);
+          const r2 = await savePatch(facet, source, true, label);
+          refreshDirtyUi();
+          renderStrip();
+          refreshPreview();
+          toast.show(r2 === "saved"
+            ? `overwrote theirs — ${facet} saved`
+            : `the ${facet} save failed`);
         };
-        return;
+        return "conflict";
       }
       toast.show(`patch failed: ${r.msg}`);
-      return;
+      return "failed";
     }
 
     baselines.set(facet, source);
     hashes.set(facet, r.hash);
     record[facet] = source;
     dirty.delete(facet);
-    chips.get(facet)?.classList.remove("absent");
-    if (labelInput) labelInput.value = "";
     refreshDirtyUi();
-    renderStrip();
-    refreshPreview();
-    toast.show(`patch_control_facet → applied · ${r.patch_id} · live`);
+    return "saved";
   }
 
   // ── local history ─────────────────────────────────────────
@@ -419,11 +477,12 @@ async function init(host, { lib, ctlId, toast }) {
       const chip = document.createElement("span");
       chip.className = "wb-hist-chip wb-patch-chip";
       const when = new Date(p.time).toTimeString().slice(0, 5);
-      chip.title = `${p.label || "(no label)"} · ${when}`;
       chip.innerHTML = `<span class="hdot"></span><span class="ptxt"></span>`;
       chip.querySelector(".hdot").style.background = FACET_HUES[p.facet];
-      chip.querySelector(".ptxt").textContent =
-        `${p.patch_id} · ${p.author || "?"} · ${p.facet}${p.label ? ` · ${p.label}` : ""}`;
+      const full = `${p.patch_id} · ${p.author || "?"} · ${p.facet}${p.label ? ` · ${p.label}` : ""}`;
+      chip.querySelector(".ptxt").textContent = full;
+      // the chip ellipsizes (C13) — the title carries the whole line
+      chip.title = `${full} · ${when}`;
       // Revert routes per facet family: ui facets = inverse snippet patch,
       // timer/event = re-apply the old component through the setters, scene
       // = write the entry's old whole-object as a new write. Flow entries
@@ -542,26 +601,119 @@ async function init(host, { lib, ctlId, toast }) {
   // the SECURITY-group string: read-only here, edited only by the
   // deliberate set_groups act, never through a meta form.
   const metaEl = host.querySelector(".wb-meta");
+  const aboutEl = host.querySelector(".wb-about");
+
+  // C4: the first sentence of the desc reads as a plain paragraph; the
+  // rest (and the tags) sit behind "Details and config".
+  function firstSentence(t) {
+    const i = t.search(/[.!?](\s|$)/);
+    return i >= 0 ? t.slice(0, i + 1) : t;
+  }
+
+  function para(text) {
+    const p = document.createElement("p");
+    p.textContent = text;
+    return p;
+  }
+
+  // Nice-to-have (C4): a `Config keys (...)` list like `KEY (default X) —
+  // what it sets` renders as a three-column table; anything else falls
+  // back to plain paragraphs.
+  function renderAboutBody(rest) {
+    const body = aboutEl.querySelector(".wb-about-body");
+    body.replaceChildren();
+    if (!rest) return;
+    const ck = rest.match(/config keys?\s*\(([^)]*)\)\s*:?\s*/i);
+    if (ck) {
+      const rowRe = /([A-Z][A-Z0-9_]{2,})\s*\(default[:\s]*([^)]*)\)\s*(?:[—–:,-]\s*)?([^;.]*)/g;
+      const after = rest.slice(ck.index + ck[0].length);
+      const rows = [...after.matchAll(rowRe)];
+      if (rows.length >= 2) {
+        const before = rest.slice(0, ck.index).trim();
+        if (before) body.appendChild(para(before));
+        const wrap = document.createElement("div");
+        wrap.className = "wb-cfg-wrap";
+        const table = document.createElement("table");
+        table.className = "wb-cfg";
+        const thead = document.createElement("thead");
+        const hr = document.createElement("tr");
+        for (const h of [`Config key (${ck[1].trim() || "botd.properties"})`,
+                         "Default", "What it sets"]) {
+          const th = document.createElement("th");
+          th.textContent = h;
+          hr.appendChild(th);
+        }
+        thead.appendChild(hr);
+        const tbody = document.createElement("tbody");
+        for (const m of rows) {
+          const tr = document.createElement("tr");
+          for (const v of [m[1], m[2].trim() || "(empty)", m[3].trim()]) {
+            const td = document.createElement("td");
+            td.textContent = v;
+            tr.appendChild(td);
+          }
+          tbody.appendChild(tr);
+        }
+        table.append(thead, tbody);
+        wrap.appendChild(table);
+        body.appendChild(wrap);
+        const last = rows[rows.length - 1];
+        const tail = after.slice(last.index + last[0].length)
+          .replace(/^[;.\s]+/, "").trim();
+        if (tail) body.appendChild(para(tail));
+        return;
+      }
+    }
+    for (const chunk of rest.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean)) {
+      body.appendChild(para(chunk));
+    }
+  }
 
   function renderMeta() {
-    const view = metaEl.querySelector(".wm-view");
-    view.textContent = record.desc
-      || "no description — discovery reads desc";
-    view.classList.toggle("empty", !record.desc);
-    metaEl.querySelector(".wm-tags-view").textContent =
+    const view = aboutEl.querySelector(".wm-view");
+    const details = aboutEl.querySelector(".wm-details");
+    const rest = aboutEl.querySelector(".wb-about-rest");
+    const desc = record.desc ?? "";
+    const lead = desc ? firstSentence(desc) : "";
+    view.textContent = desc ? lead : "no description — discovery reads desc";
+    view.classList.toggle("empty", !desc);
+    const restText = desc.slice(lead.length).trim();
+    renderAboutBody(restText);
+    aboutEl.querySelector(".wm-tags-view").textContent =
       record.tags ? `tags: ${record.tags}` : "";
+    const hasMore = Boolean(restText) || Boolean(record.tags);
+    details.hidden = !hasMore;
+    if (!hasMore) {
+      rest.hidden = true;
+      details.setAttribute("aria-expanded", "false");
+      details.textContent = "Details and config";
+    }
     const g = metaEl.querySelector(".wm-groups-view");
-    g.textContent = record.groups
-      ? `security groups: ${record.groups}` : "security: admin only";
+    g.replaceChildren();
+    if (record.groups) {
+      g.appendChild(document.createTextNode(`groups: ${record.groups}`));
+    } else {
+      g.insertAdjacentHTML("afterbegin", LOCK_SVG);
+      g.appendChild(document.createTextNode(" admin only"));
+    }
     metaEl.querySelector(".wm-edit").hidden = !patchMode;
     metaEl.querySelector(".wm-groups-btn").hidden = !patchMode;
     // publish rides dev commands, not the write API — live mode is enough
     metaEl.querySelector(".wm-publish").hidden = false;
   }
 
-  metaEl.querySelector(".wm-edit").addEventListener("click", () => {
+  aboutEl.querySelector(".wm-details").addEventListener("click", () => {
+    const details = aboutEl.querySelector(".wm-details");
+    const rest = aboutEl.querySelector(".wb-about-rest");
+    rest.hidden = !rest.hidden;
+    details.setAttribute("aria-expanded", String(!rest.hidden));
+    details.textContent = rest.hidden ? "Details and config" : "Hide details";
+  });
+
+  metaEl.querySelector(".wm-edit").addEventListener("click", (ev) => {
     const form = metaEl.querySelector(".wm-form");
     form.hidden = !form.hidden;
+    ev.currentTarget.setAttribute("aria-expanded", String(!form.hidden));
     if (!form.hidden) {
       form.querySelector(".wm-desc").value = record.desc ?? "";
       form.querySelector(".wm-tags").value = record.tags ?? "";
@@ -607,9 +759,10 @@ async function init(host, { lib, ctlId, toast }) {
   // the enforced readers on the control record AND its inline data records
   // — the records app.read serves, so this is what gates rendering for
   // non-admin users.
-  metaEl.querySelector(".wm-groups-btn").addEventListener("click", async () => {
+  metaEl.querySelector(".wm-groups-btn").addEventListener("click", async (ev) => {
     const form = metaEl.querySelector(".wm-groups-form");
     form.hidden = !form.hidden;
+    ev.currentTarget.setAttribute("aria-expanded", String(!form.hidden));
     if (!form.hidden) {
       const input = form.querySelector(".wm-groups-in");
       input.value = record.groups ?? "";
@@ -701,8 +854,9 @@ async function init(host, { lib, ctlId, toast }) {
     await renderIdentity();
   });
 
-  host.querySelector(".wm-publish").addEventListener("click", async () => {
+  host.querySelector(".wm-publish").addEventListener("click", async (ev) => {
     publishEl.hidden = !publishEl.hidden;
+    ev.currentTarget.setAttribute("aria-expanded", String(!publishEl.hidden));
     if (publishEl.hidden) return;
     const cap = publishEl.querySelector(".wp-cap");
     cap.textContent = "loading publish context…";
@@ -891,8 +1045,9 @@ async function init(host, { lib, ctlId, toast }) {
     }
   }
 
-  host.querySelector(".wm-wiring").addEventListener("click", () => {
+  host.querySelector(".wm-wiring").addEventListener("click", (ev) => {
     wiringEl.hidden = !wiringEl.hidden;
+    ev.currentTarget.setAttribute("aria-expanded", String(!wiringEl.hidden));
     if (!wiringEl.hidden) renderWiring();
   });
   wiringEl.querySelector(".ww-timer-add").addEventListener("click", () => openWiringForm("timer"));
@@ -1007,25 +1162,70 @@ async function init(host, { lib, ctlId, toast }) {
   let codeState = null;   // {cmdName, ext, baseline, dirty}
   const paramsText = (ps) => (ps ?? []).map((p) => `${p.name}: ${p.type}`).join(", ");
 
+  const cmdsHeadEl = host.querySelector(".wb-cmds-head");
+  const guardEl = codeEl.querySelector(".wcc-guard");
+
+  // C12: ● Saved (green) / ● unsaved changes (accent) in the pane header
+  function setCodeStatus() {
+    const st = codeEl.querySelector(".wcc-status");
+    if (!codeState) { st.textContent = ""; return; }
+    st.classList.toggle("dirty", codeState.dirty);
+    st.classList.toggle("clean", !codeState.dirty);
+    st.textContent = codeState.dirty ? "unsaved changes" : "Saved";
+  }
+
   function closeCommandPane() {
     codeEl.hidden = true;
+    guardEl.hidden = true;
     codeState = null;
-    host.querySelector(".wb-cmds .wb-note").hidden = false;
+    cmdsHeadEl.hidden = false;
     host.querySelector(".wb-cmd-rows").hidden = false;
   }
-  host.querySelector(".wcc-back").addEventListener("click", closeCommandPane);
+  // C12: leaving with unsaved edits asks first — save, discard, or stay.
+  host.querySelector(".wcc-back").addEventListener("click", () => {
+    if (codeState?.dirty) {
+      guardEl.hidden = false;
+      const msg = guardEl.querySelector(".wcc-guard-msg");
+      msg.replaceChildren("You have unsaved changes to ");
+      const b = document.createElement("b");
+      b.textContent = codeState.cmdName;
+      msg.append(b, ".");
+      guardEl.querySelector(".wcc-guard-save").focus();
+      return;
+    }
+    closeCommandPane();
+  });
+  guardEl.querySelector(".wcc-guard-save").addEventListener("click", async () => {
+    await saveCommandBody();
+    guardEl.hidden = true;
+    if (!codeState?.dirty && codeEl.querySelector(".wcc-err").hidden) closeCommandPane();
+  });
+  guardEl.querySelector(".wcc-guard-discard").addEventListener("click", () => closeCommandPane());
+  guardEl.querySelector(".wcc-guard-keep").addEventListener("click", () => {
+    guardEl.hidden = true;
+  });
 
   async function openCommandPane(cmdEntry, lang) {
-    host.querySelector(".wb-cmds .wb-note").hidden = true;
+    cmdsHeadEl.hidden = true;
+    newCmdForm.hidden = true;
     host.querySelector(".wb-cmd-rows").hidden = true;
     codeEl.hidden = false;
+    guardEl.hidden = true;
     const errEl = codeEl.querySelector(".wcc-err");
     errEl.hidden = true;
     codeEl.querySelector(".wcc-name").textContent = cmdEntry.name;
     const typeEl = codeEl.querySelector(".wcc-type");
-    typeEl.textContent = lang;
-    typeEl.className = `wcc-type wb-cmd-type t-${lang}`;
+    const setPaneLang = (l) => {
+      typeEl.textContent = l;
+      typeEl.className = `wcc-type wb-cmd-type t-${l}`;
+    };
+    setPaneLang(lang);
     codeEl.querySelector(".wcc-sig").textContent = "…";
+    const saveCmdBtn = codeEl.querySelector(".wcc-save");
+    saveCmdBtn.replaceChildren(`Save ${cmdEntry.name} `);
+    const kbd = document.createElement("kbd");
+    kbd.textContent = SAVE_KBD;
+    saveCmdBtn.appendChild(kbd);
 
     const r = await readCommand(lib, name, cmdEntry.name);
     if (r.status !== "ok") {
@@ -1034,6 +1234,8 @@ async function init(host, { lib, ctlId, toast }) {
       errEl.textContent = `could not read this command's body: ${r.msg}`;
       return;
     }
+    // the resolved type is the authority — never the caller's guess (C7)
+    if (r.type) setPaneLang(r.type);
     const ext = (r.type ?? lang) === "rust" ? "rs" : (r.type ?? lang);
     const source = typeof r[ext] === "string" ? r[ext] : "";
     const sig = `(${paramsText(r.params)}) → ${r.returntype ?? "?"}`;
@@ -1048,10 +1250,13 @@ async function init(host, { lib, ctlId, toast }) {
       });
     }
     codeApi.setSource(source);
+    codeEl.querySelector(".wcc-editor .cm-content")
+      ?.setAttribute("aria-label", `${cmdEntry.name} command source`);
     const impEl = codeEl.querySelector(".wcc-imports");
     codeEl.querySelector(".wcc-imports-row").hidden = false;
     impEl.value = r.import ?? "";
     impEl.readOnly = !patchMode;
+    fitImports();
     // the signature is editable in patch mode: returntype/params live on
     // the impl record and only upsert_command writes them, so the save
     // routes there when they change. An off-list returntype (InputStream,
@@ -1080,14 +1285,33 @@ async function init(host, { lib, ctlId, toast }) {
                   params: r.params ?? [], returntype: r.returntype ?? "",
                   retBaseline: retSel.value, paramsBaseline: parEl.value,
                   baseline: source, importsBaseline: r.import ?? "", dirty: false };
-    const saveBtn = codeEl.querySelector(".wcc-save");
-    saveBtn.hidden = !patchMode;
-    saveBtn.disabled = true;
+    const saveBtn2 = codeEl.querySelector(".wcc-save");
+    saveBtn2.hidden = !patchMode;
+    saveBtn2.disabled = true;
+    setCodeStatus();
   }
   host.querySelector(".wcc-save").addEventListener("click", () => saveCommandBody());
-  host.querySelector(".wcc-imports").addEventListener("input", () => updateCodeDirty());
+  host.querySelector(".wcc-imports").addEventListener("input", () => {
+    fitImports();
+    updateCodeDirty();
+  });
   host.querySelector(".wcc-params").addEventListener("input", () => updateCodeDirty());
   host.querySelector(".wcc-ret").addEventListener("change", () => updateCodeDirty());
+  // the platform save shortcut works from the sig/imports fields too (C12);
+  // the editor's own keymap already handles Mod-S inside CodeMirror
+  codeEl.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")
+        && !e.target.closest(".wcc-editor")) {
+      e.preventDefault();
+      saveCommandBody();
+    }
+  });
+
+  // the imports textarea grows to fit its content (C12; minimum 2 rows)
+  function fitImports() {
+    const impEl = codeEl.querySelector(".wcc-imports");
+    impEl.rows = Math.max(2, impEl.value.split("\n").length);
+  }
 
   function sigDirty() {
     if (!codeState) return false;
@@ -1102,10 +1326,24 @@ async function init(host, { lib, ctlId, toast }) {
       || impEl.value !== (codeState.importsBaseline ?? "")
       || sigDirty();
     codeEl.querySelector(".wcc-save").disabled = !codeState.dirty;
+    setCodeStatus();
   }
 
+  // Reentrant guard: Mod-S can arrive from two listeners while a save is
+  // mid-flight; the second call must not double-write.
+  let codeSaving = false;
   async function saveCommandBody() {
-    if (!codeState?.dirty || !patchMode) return;
+    if (!codeState?.dirty || !patchMode || codeSaving) return;
+    codeSaving = true;
+    try {
+      await saveCommandBodyInner();
+    } finally {
+      codeSaving = false;
+      setCodeStatus();
+    }
+  }
+
+  async function saveCommandBodyInner() {
     const errEl = codeEl.querySelector(".wcc-err");
     const impEl = codeEl.querySelector(".wcc-imports");
     const source = codeApi.getValue();
@@ -1207,6 +1445,22 @@ async function init(host, { lib, ctlId, toast }) {
   const wcRet = host.querySelector(".wc-ret");
   const wcParams = host.querySelector(".wc-params");
   const wcNote = host.querySelector(".wc-note");
+  const newBtn = host.querySelector(".wb-newbtn");
+  // C11: the dashed `+ new command` button toggles the labelled form;
+  // opening focuses Name.
+  function setNewFormOpen(open) {
+    newCmdForm.hidden = !open;
+    newBtn.setAttribute("aria-expanded", String(open));
+    if (open) {
+      wcNote.textContent = "";
+      wcName.focus();
+    }
+  }
+  newBtn.addEventListener("click", () => setNewFormOpen(newCmdForm.hidden));
+  newCmdForm.querySelector(".wc-cancel").addEventListener("click", () => {
+    setNewFormOpen(false);
+    newBtn.focus();
+  });
   wcRet.replaceChildren(...RETURN_TYPES.map((t) => {
     const o = document.createElement("option");
     o.value = o.textContent = t;
@@ -1255,12 +1509,14 @@ async function init(host, { lib, ctlId, toast }) {
   newCmdForm.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const cmdName = wcName.value.trim();
-    if (!/^[a-z][a-z0-9_]*$/.test(cmdName)) {
-      wcNote.textContent = "lowercase letters, digits and _ only, starting with a letter";
+    if (!/^[a-z_][a-z0-9_]*$/.test(cmdName)) {
+      wcNote.textContent = "lowercase letters, digits and _ only, starting with a letter or _";
+      wcName.focus();
       return;
     }
     if ((record.cmd ?? []).some((c) => c.name === cmdName)) {
       wcNote.textContent = `${name} already has a command named ${cmdName}`;
+      wcName.focus();
       return;
     }
     const parsed = parseParams(wcParams.value);
@@ -1289,6 +1545,7 @@ async function init(host, { lib, ctlId, toast }) {
     wcNote.textContent = "";
     wcName.value = "";
     wcParams.value = "";
+    setNewFormOpen(false);
     const fresh = await readRec(lib, ctlId);
     if (!(fresh instanceof Error)) record.cmd = fresh.cmd ?? [];
     const made = (record.cmd ?? []).find((c) => c.name === cmdName);
@@ -1307,180 +1564,82 @@ async function init(host, { lib, ctlId, toast }) {
     }
   });
 
-  // ── right-pane extras ─────────────────────────────────────
-  function renderCommands() {
-    newCmdForm.hidden = !patchMode;
-    const rows = host.querySelector(".wb-cmd-rows");
-    if (rows.childElementCount > 0) return;
-    for (const cmdEntry of record.cmd) {
-      const row = document.createElement("div");
-      row.className = "wb-cmd-row";
-      row.innerHTML = `<span class="cname"></span><span class="wb-cmd-type"></span>`;
-      row.querySelector(".cname").textContent = cmdEntry.name;
-      const type = row.querySelector(".wb-cmd-type");
-      const setLang = (l) => {
-        type.textContent = l;
-        type.className = `wb-cmd-type t-${l}`;
-      };
-      const addFlowOpen = () => {
-        if (row.querySelector(".wb-cmd-flow")) return;
-        const open = document.createElement("button");
-        open.className = "wb-cmd-open wb-cmd-flow";
-        open.textContent = "open flow ▸";
-        open.addEventListener("click", () => {
-          location.hash = `#/flow/${lib}/${ctlId}/${cmdEntry.id}`;
-        });
-        row.insertBefore(open, type.nextSibling);
-      };
-      // The entry's language keys are legacy artifacts (java ids linger on
-      // rust commands); show them only until the command record's `type` —
-      // the authoritative field — loads.
-      const addCodeOpen = (lang) => {
-        if (row.querySelector(".wb-cmd-codeopen")) return;
-        const open = document.createElement("button");
-        open.className = "wb-cmd-open wb-cmd-codeopen";
-        open.textContent = "open ▸";
-        open.addEventListener("click", () => openCommandPane(cmdEntry, lang));
-        row.insertBefore(open, type.nextSibling);
-      };
-      const guess = commandLang(cmdEntry);
-      setLang(guess);
-      if (guess === "flow") addFlowOpen(); else addCodeOpen(guess);
-      readRec(lib, cmdEntry.id).then((cmdRec) => {
-        if (cmdRec instanceof Error || !cmdRec.type) return;
-        if (cmdRec.type !== guess) setLang(cmdRec.type);
-        if (cmdRec.type === "flow") {
-          row.querySelector(".wb-cmd-codeopen")?.remove();
-          addFlowOpen();
-        } else {
-          row.querySelector(".wb-cmd-flow")?.remove();
-          addCodeOpen(cmdRec.type);
-        }
-      });
-      const metaBtn = document.createElement("button");
-      metaBtn.className = "wb-cmd-open";
-      metaBtn.textContent = "meta ▸";
-      metaBtn.title = "the command's desc and tags";
-      row.appendChild(metaBtn);
-      if (patchMode) {
-        const del = document.createElement("button");
-        del.className = "wb-cmd-open wb-cmd-del";
-        del.textContent = "delete";
-        del.title = "removes the command and its implementation record — "
-          + "journaled on this control's timeline; revert re-authors from the entry";
-        del.addEventListener("click", async () => {
-          // the asset browser's two-click confirm, same 2.5s window
-          if (del.textContent !== "really delete?") {
-            del.textContent = "really delete?";
-            setTimeout(() => { del.textContent = "delete"; }, 2500);
-            return;
-          }
-          const r = await deleteCommand(lib, name, cmdEntry.name);
-          if (r.status !== "ok") {
-            toast.show(`delete failed: ${r.msg}`);
-            return;
-          }
-          const fresh = await readRec(lib, ctlId);
-          if (!(fresh instanceof Error)) record.cmd = fresh.cmd ?? [];
-          host.querySelector(".wb-cmd-rows").replaceChildren();
-          renderCommands();
-          chips.get("cmd")?.classList.toggle("absent", (record.cmd ?? []).length === 0);
-          toast.show(`delete_command → ${cmdEntry.name} removed (journaled ${r.patch_id})`);
-        });
-        row.appendChild(del);
+  // ── the workbench's own action toast: delete → Revert (C10). Unlike the
+  // frame toast it stays up until dismissed or replaced.
+  const wbToastEl = host.querySelector(".wb-toast");
+  wbToastEl.querySelector(".wb-toast-x").addEventListener("click", () => {
+    wbToastEl.hidden = true;
+  });
+  function wbToast(msg, action, onAction) {
+    wbToastEl.querySelector(".wb-toast-msg").textContent = msg;
+    const act = wbToastEl.querySelector(".wb-toast-act");
+    act.hidden = !action;
+    act.textContent = action ?? "";
+    act.onclick = action ? () => onAction?.() : null;
+    wbToastEl.hidden = false;
+  }
+
+  // C10's Revert: re-author the deleted command from the journal entry's
+  // `old` ({command, impl} — delete_command's shape): upsert_command for
+  // code, write_flow_body for flows, then the meta/tags/groups it carried.
+  async function revertCommandDelete(p) {
+    wbToastEl.hidden = true;
+    let old;
+    try { old = JSON.parse(p.old); } catch { old = null; }
+    const implRec = old?.impl;
+    if (!old?.command || !implRec) {
+      toast.show(`cannot revert ${p.patch_id} — its old state is unreadable`);
+      return;
+    }
+    const t = old.command.type || "rust";
+    let r;
+    if (t === "flow") {
+      let body = implRec.flow;
+      if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = null; } }
+      if (!body || typeof body !== "object") {
+        body = { input: implRec.input ?? {}, output: implRec.output ?? {},
+                 cmds: implRec.cmds ?? [], cons: implRec.cons ?? [] };
+        if (implRec.nextcase !== undefined) body.nextcase = implRec.nextcase;
       }
-      const detail = document.createElement("div");
-      detail.className = "wb-cmd-meta";
-      detail.hidden = true;
-      rows.appendChild(row);
-      rows.appendChild(detail);
-      metaBtn.addEventListener("click", async () => {
-        detail.hidden = !detail.hidden;
-        if (detail.hidden || detail.childElementCount > 0) return;
-        const meta = await commandMeta(cmdEntry);
-        if (!meta) {
-          detail.textContent = "could not read this command's records";
-          return;
-        }
-        if (!patchMode) {
-          detail.innerHTML = `<span class="cm-desc"></span><span class="cm-tags"></span><span class="cm-groups"></span>`;
-          detail.querySelector(".cm-desc").textContent =
-            meta.desc || "no description — discovery reads desc";
-          detail.querySelector(".cm-desc").classList.toggle("empty", !meta.desc);
-          detail.querySelector(".cm-tags").textContent =
-            meta.tags ? `tags: ${meta.tags}` : "";
-          detail.querySelector(".cm-groups").textContent =
-            meta.groups ? `security groups: ${meta.groups}` : "security: admin only";
-          return;
-        }
-        detail.innerHTML = `
-          <input class="cm-desc-in" placeholder="describe this command — discovery reads this">
-          <input class="cm-tags-in" placeholder="tags (comma-delimited — categorization, never security)">
-          <button class="cm-apply">set</button>
-          <span class="cm-ext"></span>
-          <input class="cm-groups-in"
-            placeholder="security groups (comma-delimited) — empty = admin only"
-            title="who can execute this command — check_security reads the readers derived from this">
-          <button class="cm-groups-apply"
-            title="the deliberate set_groups act — writes the groups string and derives the enforced readers on this command's meta + impl records">set groups</button>
-          <span class="cm-note"></span>`;
-        detail.querySelector(".cm-desc-in").value = meta.desc;
-        detail.querySelector(".cm-tags-in").value = meta.tags;
-        detail.querySelector(".cm-groups-in").value = meta.groups ?? "";
-        const groupsApply = detail.querySelector(".cm-groups-apply");
-        groupsApply.addEventListener("click", async () => {
-          const note = detail.querySelector(".cm-note");
-          const gv = detail.querySelector(".cm-groups-in").value.trim();
-          if (gv === (meta.groups ?? "").trim()) { note.textContent = "groups: nothing changed"; return; }
-          if (!gv && groupsApply.textContent !== "really clear? (admin-only)") {
-            groupsApply.textContent = "really clear? (admin-only)";
-            setTimeout(() => { groupsApply.textContent = "set groups"; }, 2500);
-            return;
-          }
-          const r = await setGroups(lib, name, cmdEntry.name, gv);
-          if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
-          meta.groups = gv;
-          groupsApply.textContent = "set groups";
-          note.textContent = "";
-          toast.show(`set_groups → readers [${(r.readers ?? []).join(", ") || "— admin only"}] on ${cmdEntry.name}`);
-        });
-        // the command-meta extension point: a slot plus one bubbling event —
-        // whatever plugin cares (if any) injects its own affordances here;
-        // the workbench neither knows nor checks who listens
-        detail.querySelector(".cm-ext").dispatchEvent(
-          new CustomEvent("nb-command-meta", { bubbles: true, detail: {
-            lib, ctl: name, cmd: cmdEntry.name, groups: meta.groups ?? "",
-            descInput: detail.querySelector(".cm-desc-in"),
-            note: detail.querySelector(".cm-note"),
-          } }));
-        detail.querySelector(".cm-apply").addEventListener("click", async () => {
-          const note = detail.querySelector(".cm-note");
-          const desc = detail.querySelector(".cm-desc-in").value.trim();
-          const tags = detail.querySelector(".cm-tags-in").value.trim();
-          const dArg = desc && desc !== meta.desc ? desc : "";
-          const tChanged = tags !== (meta.tags ?? "");
-          if (meta.desc && !desc) {
-            note.textContent = "desc can't be cleared here — set a new value instead";
-          }
-          if (!dArg && !tChanged) {
-            if (!note.textContent) note.textContent = "nothing changed";
-            return;
-          }
-          if (dArg) {
-            const r = await setCommandMeta(lib, name, cmdEntry.name, dArg, "");
-            if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
-            meta.desc = dArg;
-          }
-          if (tChanged) {
-            const r = await setTags(lib, name, cmdEntry.name, tags);
-            if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
-            meta.tags = tags;
-          }
-          note.textContent = "";
-          toast.show(tChanged && !dArg ? "set_tags → saved" : "set_command_meta → saved");
-        });
+      r = await writeFlowBody(lib, name, p.cmd, body, { label: `revert ${p.patch_id}` });
+    } else {
+      const ext = t === "rust" ? "rs" : t;
+      const codeBody = typeof implRec[ext] === "string" ? implRec[ext]
+        : typeof implRec[t] === "string" ? implRec[t] : "";
+      r = await upsertCommand(lib, name, p.cmd, {
+        lang: t, returnType: implRec.returntype || "String",
+        params: implRec.params ?? [], imports: implRec.import ?? "", codeBody,
       });
     }
+    if (r.status !== "ok" && r.kind !== "compile_error") {
+      toast.show(`revert failed: ${r.msg}`);
+      return;
+    }
+    if (implRec.desc) await setCommandMeta(lib, name, p.cmd, implRec.desc, "");
+    if (implRec.tags) await setTags(lib, name, p.cmd, implRec.tags);
+    if (implRec.groups) await setGroups(lib, name, p.cmd, implRec.groups);
+    const fresh = await readRec(lib, ctlId);
+    if (!(fresh instanceof Error)) record.cmd = fresh.cmd ?? [];
+    host.querySelector(".wb-cmd-rows").replaceChildren();
+    renderCommands();
+    refreshDirtyUi();
+    renderStrip();
+    wbToast(`Restored ${p.cmd} from ${p.patch_id}.`
+      + (r.kind === "compile_error" ? " It was stored but did not compile." : ""));
+  }
+
+  // ── right-pane extras ─────────────────────────────────────
+  // C7 rows: [LANG] name(params) → Ret + desc; the whole block is one
+  // button that opens the command, with details · meta ▸ · delete on the
+  // right. At most one sub-panel is open across ALL rows.
+  let openSub = null;   // { close } of whichever row panel is open
+
+  function renderCommands() {
+    newBtn.hidden = !patchMode;
+    const rows = host.querySelector(".wb-cmd-rows");
+    if (rows.childElementCount > 0) return;
+    openSub = null;
+    for (const cmdEntry of record.cmd ?? []) rows.appendChild(commandRow(cmdEntry));
     const note = host.querySelector(".wb-cmds .wb-note");
     if (!note.querySelector("a")) {
       const link = document.createElement("a");
@@ -1489,6 +1648,309 @@ async function init(host, { lib, ctlId, toast }) {
       link.style.color = "var(--accent)";
       note.appendChild(link);
     }
+  }
+
+  function commandRow(cmdEntry) {
+    const row = document.createElement("div");
+    row.className = "wb-cmd-row";
+    const line = document.createElement("div");
+    line.className = "wb-cmd-line";
+    row.appendChild(line);
+
+    const main = document.createElement("button");
+    main.type = "button";
+    main.className = "wb-cmd-main";
+    main.innerHTML = `<span class="wb-cmd-type"></span>
+      <span class="wb-cmd-sig"><span class="cname"></span><span class="params"></span><span class="ret"></span></span>
+      <span class="wb-cmd-desc"><i>no description yet — discovery reads desc</i></span>`;
+    main.querySelector(".cname").textContent = cmdEntry.name;
+    line.appendChild(main);
+    const typeEl = main.querySelector(".wb-cmd-type");
+    // The entry's language keys are legacy artifacts (java ids linger on
+    // rust commands); the command record's `type` is the authority, and
+    // opening uses whatever is CURRENT at click time — never a stale guess.
+    const state = { lang: commandLang(cmdEntry), meta: null, sig: null };
+    const setLang = (l) => {
+      state.lang = l;
+      typeEl.textContent = l;
+      typeEl.className = `wb-cmd-type t-${l}`;
+      main.title = l === "flow" ? "open in the flow editor" : "open the code pane";
+    };
+    setLang(state.lang);
+
+    const resolved = (async () => {
+      const cmdRec = await readRec(lib, cmdEntry.id);
+      if (cmdRec instanceof Error) return;
+      if (cmdRec.type && cmdRec.type !== state.lang) setLang(cmdRec.type);
+      const t = cmdRec.type ?? state.lang;
+      const implId = cmdRec[t];
+      if (!implId) return;
+      const impl = await readRec(lib, implId);
+      if (impl instanceof Error) return;
+      state.meta = { desc: impl.desc ?? "", tags: impl.tags ?? "",
+                     groups: impl.groups ?? "", implId };
+      const params = impl.params ? paramsText(impl.params)
+        : (t === "flow" && impl.input && typeof impl.input === "object")
+          ? Object.keys(impl.input).join(", ") : "";
+      state.sig = { params, returntype: impl.returntype ?? "" };
+      main.querySelector(".params").textContent = `(${params})`;
+      if (state.sig.returntype) {
+        main.querySelector(".ret").textContent = `→ ${state.sig.returntype}`;
+      }
+      if (state.meta.desc) {
+        main.querySelector(".wb-cmd-desc").textContent = state.meta.desc;
+      }
+    })();
+
+    main.addEventListener("click", () => {
+      if (state.lang === "flow") location.hash = `#/flow/${lib}/${ctlId}/${cmdEntry.id}`;
+      else openCommandPane(cmdEntry, state.lang);
+    });
+
+    const actionsBox = document.createElement("div");
+    actionsBox.className = "wb-cmd-actions";
+    const detailsBtn = document.createElement("button");
+    detailsBtn.className = "wb-tog";
+    detailsBtn.textContent = "details";
+    detailsBtn.setAttribute("aria-expanded", "false");
+    const metaBtn = document.createElement("button");
+    metaBtn.className = "wb-tog";
+    metaBtn.innerHTML = `meta <span class="car" aria-hidden="true">▸</span>`;
+    metaBtn.title = "the command's desc, tags and security groups";
+    metaBtn.setAttribute("aria-expanded", "false");
+    actionsBox.append(detailsBtn, metaBtn);
+    line.appendChild(actionsBox);
+
+    const sub = document.createElement("div");
+    sub.hidden = true;
+    row.appendChild(sub);
+    let subKind = null;
+
+    function closeSub() {
+      sub.hidden = true;
+      sub.replaceChildren();
+      sub.className = "";
+      subKind = null;
+      detailsBtn.setAttribute("aria-expanded", "false");
+      metaBtn.setAttribute("aria-expanded", "false");
+      if (openSub && openSub.close === closeSub) openSub = null;
+    }
+
+    async function ensureMeta() {
+      await resolved;
+      if (!state.meta) state.meta = await commandMeta(cmdEntry);
+      return state.meta;
+    }
+
+    async function openPanel(kind) {
+      if (subKind === kind) { closeSub(); return; }
+      if (openSub) openSub.close();      // only one sub-panel anywhere (C7)
+      subKind = kind;
+      openSub = { close: closeSub };
+      (kind === "details" ? detailsBtn : metaBtn).setAttribute("aria-expanded", "true");
+      sub.hidden = false;
+      if (kind === "details") await fillDetails(); else await fillMeta();
+    }
+    detailsBtn.addEventListener("click", () => openPanel("details"));
+    metaBtn.addEventListener("click", () => openPanel("meta"));
+
+    // C8: a read-only key/value summary of the command
+    async function fillDetails() {
+      sub.className = "wb-cmd-sub wb-cmd-kv";
+      sub.textContent = "…";
+      const meta = await ensureMeta();
+      if (subKind !== "details") return;
+      sub.replaceChildren();
+      const add = (k, v, cls) => {
+        const ks = document.createElement("span");
+        ks.className = "k";
+        ks.textContent = k;
+        const vs = document.createElement("span");
+        if (cls) vs.className = cls;
+        if (typeof v === "string") vs.textContent = v; else vs.appendChild(v);
+        sub.append(ks, vs);
+      };
+      const none = (t) => {
+        const s = document.createElement("span");
+        s.className = "muted";
+        s.textContent = t;
+        return s;
+      };
+      add("Description", meta?.desc ? meta.desc : none("none — discovery reads desc"));
+      add("Signature",
+        `${cmdEntry.name}(${state.sig?.params ?? ""})${state.sig?.returntype ? ` → ${state.sig.returntype}` : ""}`,
+        "mono");
+      add("Language", LANG_NAMES[state.lang] ?? state.lang);
+      add("Tags", meta?.tags ? meta.tags : none("none"));
+      add("Security", meta?.groups ? `groups: ${meta.groups}` : "admin only");
+    }
+
+    // C9: the per-command meta editor — desc / tags · set · plugin slot /
+    // groups · set groups / note. The .cm-ext slot and the bubbling
+    // nb-command-meta event are the plugin contract; the workbench never
+    // checks who listens.
+    async function fillMeta() {
+      sub.className = "wb-cmd-sub wb-cmd-meta";
+      sub.textContent = "…";
+      const meta = await ensureMeta();
+      if (subKind !== "meta") return;
+      if (!meta) {
+        sub.textContent = "could not read this command's records";
+        return;
+      }
+      if (!patchMode) {
+        sub.innerHTML = `<span class="cm-desc"></span><span class="cm-tags"></span><span class="cm-groups"></span>`;
+        sub.querySelector(".cm-desc").textContent =
+          meta.desc || "no description — discovery reads desc";
+        sub.querySelector(".cm-desc").classList.toggle("empty", !meta.desc);
+        sub.querySelector(".cm-tags").textContent =
+          meta.tags ? `tags: ${meta.tags}` : "";
+        sub.querySelector(".cm-groups").textContent =
+          meta.groups ? `security groups: ${meta.groups}` : "security: admin only";
+        return;
+      }
+      sub.innerHTML = `
+        <input class="cm-desc-in full" placeholder="describe this command — discovery reads this">
+        <input class="cm-tags-in" placeholder="tags (comma-delimited — categorization, never security)">
+        <div class="span2"><button class="cm-apply">set</button><span class="cm-ext"></span></div>
+        <input class="cm-groups-in"
+          placeholder="security groups (comma-delimited) — empty = admin only"
+          title="who can execute this command — check_security reads the readers derived from this">
+        <div class="span2"><button class="cm-groups-apply"
+          title="the deliberate set_groups act — writes the groups string and derives the enforced readers on this command's meta + impl records">set groups</button></div>
+        <p class="cm-note" role="status"></p>`;
+      const descIn = sub.querySelector(".cm-desc-in");
+      const tagsIn = sub.querySelector(".cm-tags-in");
+      const groupsIn = sub.querySelector(".cm-groups-in");
+      descIn.setAttribute("aria-label", `description of ${cmdEntry.name}`);
+      tagsIn.setAttribute("aria-label", `tags of ${cmdEntry.name}`);
+      groupsIn.setAttribute("aria-label", `security groups of ${cmdEntry.name}`);
+      descIn.value = meta.desc;
+      tagsIn.value = meta.tags;
+      groupsIn.value = meta.groups ?? "";
+      const note = sub.querySelector(".cm-note");
+      const groupsApply = sub.querySelector(".cm-groups-apply");
+      groupsApply.addEventListener("click", async () => {
+        const gv = groupsIn.value.trim();
+        if (gv === (meta.groups ?? "").trim()) { note.textContent = "groups: nothing changed"; return; }
+        if (!gv && groupsApply.textContent !== "really clear? (admin-only)") {
+          groupsApply.textContent = "really clear? (admin-only)";
+          setTimeout(() => { groupsApply.textContent = "set groups"; }, 2500);
+          return;
+        }
+        const r = await setGroups(lib, name, cmdEntry.name, gv);
+        if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
+        meta.groups = gv;
+        groupsApply.textContent = "set groups";
+        note.textContent = "";
+        toast.show(`set_groups → readers [${(r.readers ?? []).join(", ") || "— admin only"}] on ${cmdEntry.name}`);
+      });
+      // the command-meta extension point: a slot plus one bubbling event —
+      // whatever plugin cares (if any) injects its own affordances here;
+      // the workbench neither knows nor checks who listens
+      sub.querySelector(".cm-ext").dispatchEvent(
+        new CustomEvent("nb-command-meta", { bubbles: true, detail: {
+          lib, ctl: name, cmd: cmdEntry.name, groups: meta.groups ?? "",
+          descInput: descIn,
+          note,
+        } }));
+      sub.querySelector(".cm-apply").addEventListener("click", async () => {
+        const desc = descIn.value.trim();
+        const tags = tagsIn.value.trim();
+        const dArg = desc && desc !== meta.desc ? desc : "";
+        const tChanged = tags !== (meta.tags ?? "");
+        if (meta.desc && !desc) {
+          note.textContent = "desc can't be cleared here — set a new value instead";
+        }
+        if (!dArg && !tChanged) {
+          if (!note.textContent) note.textContent = "nothing changed";
+          return;
+        }
+        if (dArg) {
+          const r = await setCommandMeta(lib, name, cmdEntry.name, dArg, "");
+          if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
+          meta.desc = dArg;
+          main.querySelector(".wb-cmd-desc").textContent = dArg;
+        }
+        if (tChanged) {
+          const r = await setTags(lib, name, cmdEntry.name, tags);
+          if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
+          meta.tags = tags;
+        }
+        note.textContent = "";
+        toast.show(tChanged && !dArg ? "set_tags → saved" : "set_command_meta → saved");
+      });
+    }
+
+    // C10: delete behind an inline confirm bar; the toast offers Revert.
+    if (patchMode) {
+      const del = document.createElement("button");
+      del.className = "wb-tog del";
+      del.innerHTML = `${TRASH_SVG}delete`;
+      del.setAttribute("aria-label", `delete ${cmdEntry.name}`);
+      del.title = "removes the command and its implementation record — "
+        + "journaled on this control's timeline; revert re-authors from the entry";
+      actionsBox.appendChild(del);
+      del.addEventListener("click", () => {
+        if (openSub) openSub.close();
+        line.hidden = true;
+        const confirm = document.createElement("div");
+        confirm.className = "wb-cmd-confirm";
+        confirm.setAttribute("role", "group");
+        confirm.setAttribute("aria-label", `confirm deleting ${cmdEntry.name}`);
+        const msg = document.createElement("span");
+        msg.append("Delete ");
+        const b = document.createElement("b");
+        b.textContent = cmdEntry.name;
+        msg.append(b, "? The delete is journaled, so you can revert it from the toast or the patch history.");
+        const bar = document.createElement("div");
+        bar.className = "wb-bar";
+        const go = document.createElement("button");
+        go.className = "wb-btn danger";
+        go.textContent = `Delete ${cmdEntry.name}`;
+        const cancel = document.createElement("button");
+        cancel.className = "wb-btn";
+        cancel.textContent = "Cancel";
+        bar.append(go, cancel);
+        confirm.append(msg, bar);
+        row.insertBefore(confirm, sub);
+        cancel.focus();
+        const restore = () => {
+          confirm.remove();
+          line.hidden = false;
+          del.focus();
+        };
+        cancel.addEventListener("click", restore);
+        confirm.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") { e.stopPropagation(); restore(); }
+        });
+        go.addEventListener("click", async () => {
+          go.disabled = true;
+          const r = await deleteCommand(lib, name, cmdEntry.name);
+          if (r.status !== "ok") {
+            toast.show(`delete failed: ${r.msg}`);
+            restore();
+            return;
+          }
+          const fresh = await readRec(lib, ctlId);
+          if (!(fresh instanceof Error)) record.cmd = fresh.cmd ?? [];
+          host.querySelector(".wb-cmd-rows").replaceChildren();
+          renderCommands();
+          refreshDirtyUi();
+          renderStrip();
+          let entry = null;
+          const lp = await listPatches(lib, name, 10);
+          if (lp.status === "ok") {
+            entry = (lp.patches ?? []).find(
+              (p) => p.patch_id === r.patch_id && p.facet === "command");
+          }
+          wbToast(`Deleted ${cmdEntry.name}. Journaled as ${r.patch_id}.`,
+            entry ? "Revert" : null,
+            entry ? () => revertCommandDelete(entry) : null);
+        });
+      });
+    }
+    return row;
   }
 
   async function renderThree() {
@@ -1529,25 +1991,34 @@ async function init(host, { lib, ctlId, toast }) {
   // does not: reloading into a pane that covers the editor, with no memory
   // of having asked for it, is a puzzle rather than a convenience.
   const PV_W_KEY = "bench.preview.w", PV_OFF_KEY = "bench.preview.off";
-  const PV_DEFAULT = 400, PV_MIN = 220;
+  const PV_DEFAULT = 400, PV_MIN = 240;
   const wbRoot = host.classList.contains("nb-workbench")
     ? host : host.querySelector(".nb-workbench");
   const pvToggle = host.querySelector(".wm-preview");
   const resizer = host.querySelector(".wb-resize");
-  let pvOff = localStorage.getItem(PV_OFF_KEY) === "1";
+  // C6: a control with no html facet defaults to a hidden preview — there
+  // is nothing to render; otherwise the stored preference holds.
+  let pvOff = localStorage.getItem(PV_OFF_KEY) === "1" || !facetPresent("html");
   let pvFull = false;
   let pvW = Math.max(PV_MIN, Number(localStorage.getItem(PV_W_KEY)) || PV_DEFAULT);
 
-  const pvMax = () => Math.max(PV_MIN, (wbRoot.clientWidth || 1200) - 320);
+  // C6: the preview spans 240px up to 70% of the workbench
+  const pvMax = () => Math.max(PV_MIN, (wbRoot.clientWidth || 1200) * 0.7);
   function applyPv() {
     pvW = Math.min(Math.max(pvW, PV_MIN), pvMax());
-    wbRoot.style.setProperty("--pv-w", pvW + "px");
+    wbRoot.style.setProperty("--pv-w", Math.round(pvW) + "px");
     wbRoot.classList.toggle("pv-off", pvOff && !pvFull);
     wbRoot.classList.toggle("pv-full", pvFull);
     if (pvToggle) {
       pvToggle.setAttribute("aria-pressed", String(!pvOff));
-      pvToggle.classList.toggle("on", !pvOff);
+      pvToggle.textContent = pvOff ? "show preview" : "hide preview";
     }
+    if (resizer) {
+      resizer.setAttribute("aria-valuenow", String(Math.round(pvW)));
+      resizer.setAttribute("aria-valuemax", String(Math.round(pvMax())));
+    }
+    const readout = host.querySelector(".wb-pv-w");
+    if (readout) readout.textContent = Math.round(pvW) + "px";
     const fs = host.querySelector(".wb-pv-full");
     if (fs) {
       fs.setAttribute("aria-pressed", String(pvFull));
@@ -1593,9 +2064,13 @@ async function init(host, { lib, ctlId, toast }) {
       localStorage.setItem(PV_W_KEY, String(PV_DEFAULT));
     });
     resizer.addEventListener("keydown", (e) => {
-      const step = e.shiftKey ? 48 : 16;
+      // C6: ←/→ ±20px, Shift ±80px, Enter resets, Home/End to the limits
+      const step = e.shiftKey ? 80 : 20;
       if (e.key === "ArrowLeft") pvW -= step;
       else if (e.key === "ArrowRight") pvW += step;
+      else if (e.key === "Home") pvW = PV_MIN;
+      else if (e.key === "End") pvW = pvMax();
+      else if (e.key === "Enter") pvW = PV_DEFAULT;
       else return;
       e.preventDefault();
       applyPv();
@@ -1614,8 +2089,14 @@ async function init(host, { lib, ctlId, toast }) {
     liveFrame = null;
     const bar = document.createElement("div");
     bar.className = "wb-pv-bar";
+    // C6: Static · Live as text toggles with a · between — active = accent
+    const modes = document.createElement("div");
+    modes.className = "wb-pv-modes";
+    modes.setAttribute("role", "group");
+    modes.setAttribute("aria-label", "preview mode");
     const mk = (m, label, title) => {
       const b = document.createElement("button");
+      b.className = "wb-tog";
       b.textContent = label;
       b.title = title;
       b.setAttribute("aria-pressed", String(previewMode === m));
@@ -1627,18 +2108,42 @@ async function init(host, { lib, ctlId, toast }) {
       });
       return b;
     };
-    bar.append(
+    const sep = document.createElement("span");
+    sep.className = "sepdot";
+    sep.setAttribute("aria-hidden", "true");
+    sep.textContent = "·";
+    modes.append(
       mk("static", "static", "html+css in a shadow root — safe everywhere, with source picking"),
-      mk("live", "live ▸", "a real stock mount (js runs) via the platform's /dev/preview.html"),
+      sep,
+      mk("live", "live", "a real stock mount (js runs) via the platform's /dev/preview.html"),
     );
+    bar.appendChild(modes);
+    const readout = document.createElement("span");
+    readout.className = "wb-pv-w";
+    bar.appendChild(readout);
     const full = document.createElement("button");
-    full.className = "wb-pv-full";
+    full.className = "wb-tog wb-pv-full";
     full.addEventListener("click", () => setPvFull(!pvFull));
     bar.appendChild(full);
     previewSlot.appendChild(bar);
+    applyPv();
     const inner = document.createElement("div");
     inner.className = "wb-pv-body";
     previewSlot.appendChild(inner);
+
+    // C6: with no html there is nothing to render, in either mode
+    const htmlNow = editors.get("html")?.api.getValue() ?? record.html ?? "";
+    if (!htmlNow.trim()) {
+      const eyebrow = document.createElement("div");
+      eyebrow.className = "wb-pv-eyebrow";
+      eyebrow.innerHTML = `<span class="idot" aria-hidden="true"></span><span></span>`;
+      eyebrow.lastElementChild.textContent = `${previewMode} · nothing to render`;
+      const box = document.createElement("div");
+      box.className = "wb-pv-empty";
+      box.textContent = "This control has no html facet, so there's nothing to render.";
+      inner.append(eyebrow, box);
+      return;
+    }
 
     if (previewMode === "live") {
       const head = document.createElement("div");
