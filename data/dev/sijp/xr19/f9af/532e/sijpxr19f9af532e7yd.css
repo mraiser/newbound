@@ -348,7 +348,9 @@
 .nb-workbench .wb-cmd-rows { padding: 8px 18px 10px 8px; }
 .nb-workbench .wb-cmd-row { border-top: 1px solid var(--line-soft); }
 .nb-workbench .wb-cmd-row:first-child { border-top: none; }
-.nb-workbench .wb-cmd-line { display: flex; align-items: center; gap: 10px; padding: 3px 0; }
+/* actions ride the first line (tag + signature), not the row's middle —
+   a long desc would otherwise drag them down out of line with the tag */
+.nb-workbench .wb-cmd-line { display: flex; align-items: flex-start; gap: 10px; padding: 3px 0; }
 /* The whole tag+signature+desc block is one button that opens the command.
    The language tag is first at a fixed width (wide enough for PYTHON), so
    names line up in one column — the owner chose fixed over fit-to-text. */
@@ -400,7 +402,7 @@
 .nb-workbench .wb-cmd-type.t-java { background: var(--f-css); }
 .nb-workbench .wb-cmd-type.t-python { background: var(--f-3d); }
 .nb-workbench .wb-cmd-type.t-flow { background: var(--f-cmd); }
-.nb-workbench .wb-cmd-actions { display: flex; align-items: center; gap: 2px; flex: none; }
+.nb-workbench .wb-cmd-actions { display: flex; align-items: center; gap: 2px; flex: none; margin-top: 3px; }
 /* the inset sub-panel under a row: details (read-only kv) or the meta editor */
 .nb-workbench .wb-cmd-sub {
   margin: 0 0 12px 10px;
@@ -636,6 +638,15 @@
 .nb-workbench .wcc-imports-row { display: flex; gap: 8px; align-items: flex-start; }
 .nb-workbench .wcc-imports-row[hidden] { display: none; }
 .nb-workbench .wcc-imports-row .lbl { font: 11px var(--mono); color: var(--text-dim); padding-top: 6px; }
+/* one grid for the pane: labels right-aligned in a 64px column, inputs and
+   code on one left edge, line numbers ending where the labels end, and the
+   back link flush with the pane edge (its padding pulled out) */
+.nb-workbench .wcc-back { margin-left: -8px; }
+.nb-workbench .wcc-f-params .lbl,
+.nb-workbench .wcc-imports-row .lbl { flex: none; width: 64px; text-align: right; }
+.nb-workbench .wcc-editor .cm-lineNumbers { min-width: 72px; }
+.nb-workbench .wcc-editor .cm-lineNumbers .cm-gutterElement { padding: 0 8px 0 0; }
+.nb-workbench .wcc-editor .cm-line { padding-left: 7px; }
 .nb-workbench .wcc-imports { flex: 1; font: 12px var(--mono);
   background: var(--panel); color: var(--text); border: 1px solid var(--line);
   border-radius: 6px; padding: 4px 6px; resize: vertical; }
