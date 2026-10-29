@@ -1,4 +1,7 @@
 .nb-workbench {
+  /* native scrollbars and form widgets render dark, not light-on-dark
+     (the rendered preview opts back out below: it shows the control as is) */
+  color-scheme: dark;
   display: grid;
   /* the preview's width is one custom property, so the drag handle, the
      collapse and the fullscreen state are all just different values of it */
@@ -240,8 +243,10 @@
   padding: 10px 26px 0;
   max-width: 980px;
 }
-.nb-workbench .wb-about-line { display: flex; align-items: baseline; gap: 12px; }
-.nb-workbench .wb-about-line .wm-view { margin: 0; font-size: 13.5px; color: var(--text); flex: 1 1 auto; min-width: 0; }
+/* summary first, the Details and config link on its own line under it (as
+   the mockup has it) — beside a short summary it floated off to the right */
+.nb-workbench .wb-about-line { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.nb-workbench .wb-about-line .wm-view { margin: 0; font-size: 13.5px; color: var(--text); min-width: 0; }
 .nb-workbench .wm-view.empty { color: var(--text-dim); font-style: italic; }
 .nb-workbench .wb-about-rest {
   background: var(--panel);
@@ -325,7 +330,7 @@
   gap: 10px 14px;
   padding: 12px 18px 0;
 }
-.nb-workbench .wb-cmds-head .wb-note { padding: 0; }
+.nb-workbench .wb-cmds-head .wb-note { padding: 0; max-width: 90ch; }
 .nb-workbench .wb-newbtn {
   flex: none;
   font: 11.5px var(--mono);
@@ -339,7 +344,8 @@
 }
 .nb-workbench .wb-newbtn:hover,
 .nb-workbench .wb-newbtn[aria-expanded="true"] { background: rgba(240, 166, 60, 0.08); }
-.nb-workbench .wb-cmd-rows { padding: 8px 8px 10px; }
+/* right inset matches the head's 18px, so delete clears the pane edge */
+.nb-workbench .wb-cmd-rows { padding: 8px 18px 10px 8px; }
 .nb-workbench .wb-cmd-row { border-top: 1px solid var(--line-soft); }
 .nb-workbench .wb-cmd-row:first-child { border-top: none; }
 .nb-workbench .wb-cmd-line { display: flex; align-items: center; gap: 10px; padding: 3px 0; }
@@ -397,7 +403,7 @@
 .nb-workbench .wb-cmd-actions { display: flex; align-items: center; gap: 2px; flex: none; }
 /* the inset sub-panel under a row: details (read-only kv) or the meta editor */
 .nb-workbench .wb-cmd-sub {
-  margin: 0 10px 12px;
+  margin: 0 0 12px 10px;
   padding: 12px 14px;
   border-radius: 8px;
   background: var(--panel-3);
@@ -839,7 +845,7 @@
 .nb-workbench .wb-pv-modes .sepdot { color: var(--text-faint); }
 .nb-workbench .wb-pv-w { margin-left: auto; font: 10.5px var(--mono); color: var(--text-dim); }
 .nb-workbench .wb-pv-body { display: flex; flex-direction: column; gap: 8px;
-  height: calc(100% - 34px); padding: 8px 10px; }
+  height: calc(100% - 34px); padding: 8px 10px; color-scheme: normal; }
 .nb-workbench .wb-pv-live-head { display: flex; align-items: center;
   justify-content: space-between; gap: 8px; }
 .nb-workbench .wb-pv-frame { flex: 1; min-height: 240px; width: 100%;
@@ -870,9 +876,19 @@
   border-top: 1px solid var(--line);
   background: var(--panel);
   padding: 9px 28px;
-  overflow-x: auto;
+  min-width: 0;
+  overflow: hidden;
 }
-.nb-workbench .wb-hist-chips { display: flex; gap: 8px; }
+/* the chips scroll inside their own strip; the caption stays put and the
+   page never gains a horizontal scrollbar */
+.nb-workbench .wb-hist-chips {
+  display: flex;
+  gap: 8px;
+  flex: 1 1 0;
+  min-width: 120px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
 .nb-workbench .wb-hist-chip {
   flex: none;
   display: flex;
@@ -897,7 +913,12 @@
 }
 .nb-workbench .wb-hist-cap {
   margin-left: auto;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font: 10px var(--mono);
   color: var(--text-dim);
   letter-spacing: 0.02em;
@@ -947,6 +968,11 @@
   .nb-workbench.pv-off, .nb-workbench.pv-full { grid-template-columns: 1fr; }
   /* one column: the explicit placement above would put the editors off-grid */
   .nb-workbench .wb-left, .nb-workbench .wb-right { grid-column: 1; grid-row: auto; }
+  /* preview, then editors, then the patches strip — its desktop grid-row: 2
+     would otherwise wedge it between the two */
+  .nb-workbench .wb-left { grid-row: 1; }
+  .nb-workbench .wb-right { grid-row: 2; }
+  .nb-workbench .wb-history { grid-row: 3; }
   .nb-workbench .wb-left { border-right: none; border-bottom: 1px solid var(--line); }
   .nb-workbench .wb-resize { display: none; }
 }

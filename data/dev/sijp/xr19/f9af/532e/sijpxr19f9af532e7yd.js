@@ -1644,9 +1644,9 @@ async function init(host, { lib, ctlId, toast }) {
     if (!note.querySelector("a")) {
       const link = document.createElement("a");
       link.href = "#/flow/sample";
-      link.textContent = " View a sample flow ▸";
+      link.textContent = "View a sample flow ▸";
       link.style.color = "var(--accent)";
-      note.appendChild(link);
+      note.append(" ", link);
     }
   }
 
