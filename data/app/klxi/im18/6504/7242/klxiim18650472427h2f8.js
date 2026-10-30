@@ -25,7 +25,7 @@ me.rebuild = function(cb) {
   me.headwrap.innerHTML = me.title;
   if (ME.DATA.allowadd) {
     var addbtn = document.createElement('img');
-    addbtn.src = "../app/asset/app/add_icon-white.png";
+    addbtn.src = "../app/asset/app/icons/ui/dark/add.svg";
     addbtn.className = "addlistitembutton roundbutton";
     me.headwrap.appendChild(addbtn);
     addbtn.addEventListener('click', function() {
@@ -50,7 +50,7 @@ me.rebuild = function(cb) {
         var b1 = document.createElement('span');
         b1.className = 'item_cell item_edit';
         b1.dataset.index = i;
-        b1.innerHTML = '<img src="../app/asset/app/pencil_icon.png" class="roundbutton-small">';
+        b1.innerHTML = '<img src="../app/asset/app/icons/ui/dark/edit.svg" class="roundbutton-small">';
         el.appendChild(b1);
         b1.addEventListener('click', function() {
           var index = this.dataset.index;
@@ -62,7 +62,7 @@ me.rebuild = function(cb) {
         var b2 = document.createElement('span');
         b2.className = 'item_cell item_delete';
         b2.dataset.index = i;
-        b2.innerHTML = '<img src="../app/asset/app/delete_icon.png" class="roundbutton-small">';
+        b2.innerHTML = '<img src="../app/asset/app/icons/ui/dark/delete.svg" class="roundbutton-small">';
         el.appendChild(b2);
         b2.addEventListener('click', me.click_delete);
       }
