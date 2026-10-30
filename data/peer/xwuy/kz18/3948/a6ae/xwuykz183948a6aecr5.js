@@ -32,17 +32,25 @@ me.ready = function(){
           var authorkey = mylib.authorkey;
           if (true) { //(author && authorkey && theirlib.author == author && theirlib.authorkey == authorkey) {
             if (mylib.version > theirlib.version) {
-
-              var newhtml = '<span class="chip ispos" id="U_'+mylib.id+'"><span class="clickupdate" data-lib="'+mylib.id+'" data-version="'+mylib.version+'">'
-                + mylib.id
-                + ' v'
-                + theirlib.version
-                + ' ➤ '
-                + mylib.version
-                + '</span><img src="../app/asset/app/close-white.png" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
+              // F3: library ids and versions come from the remote peer —
+              // build the chip with DOM calls and textContent, never innerHTML.
+              var chip = document.createElement('span');
+              chip.className = 'chip ispos';
+              chip.id = 'U_' + mylib.id;
+              var click = document.createElement('span');
+              click.className = 'clickupdate';
+              click.dataset.lib = mylib.id;
+              click.dataset.version = mylib.version;
+              click.textContent = mylib.id + ' v' + theirlib.version + ' ➤ ' + mylib.version;
+              chip.appendChild(click);
+              var x = document.createElement('img');
+              x.src = '../app/asset/app/close-white.png';
+              x.className = 'roundbutton-small removeupdate mdl-chip__action chipbutton';
+              chip.appendChild(x);
 
               ME.querySelector('.availableupgrades').style.display = 'block';
-              el.insertAdjacentHTML('beforeend', newhtml);
+              el.appendChild(chip);
+              el.appendChild(document.createTextNode(' '));
             }
           }
         }
@@ -75,7 +83,8 @@ me.ready = function(){
 
   json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_shared", function(result){
     if (result.status != 'ok'){
-      ME.querySelector('.hudapps').innerHTML = result.msg;
+      // F3: result.msg is untrusted — set it as text
+      ME.querySelector('.hudapps').textContent = result.msg;
       me.data = { "list": [] };
     }
     else {
@@ -86,20 +95,29 @@ me.ready = function(){
   json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_available", function(result){
     var el = ME.querySelector('.add-control-available');
     if (result.status != 'ok'){
-      el.innerHTML = result.msg;
+      // F3: result.msg is untrusted — set it as text
+      el.textContent = result.msg;
     }
     else {
       me.available = result.data;
-      var newhtml = '';
+      // F3: control titles come from the remote peer — build the rows with
+      // DOM calls and textContent, never innerHTML.
+      var tbl = document.createElement('table');
+      tbl.className = 'tablelist';
       for (i in result.data) {
         var rdi = result.data[i];
         if (rdi.title) {
-          newhtml += '<tr><td class="add-ctl-item" data-id="'+i+'">'+rdi.title+'</tr></td>';
+          var tr = document.createElement('tr');
+          var td = document.createElement('td');
+          td.className = 'add-ctl-item';
+          td.dataset.id = i;
+          td.textContent = rdi.title;
+          tr.appendChild(td);
+          tbl.appendChild(tr);
         }
       }
-      if (newhtml == '') newhtml = '<i>there are no available controls to install on this device</i>';
-      else newhtml = '<table class="tablelist">' + newhtml + '</table>';
-      el.innerHTML = newhtml;
+      if (tbl.rows.length == 0) el.innerHTML = '<i>there are no available controls to install on this device</i>';
+      else { el.innerHTML = ''; el.appendChild(tbl); }
       el.querySelectorAll('.add-ctl-item').forEach(function(item){
         item.addEventListener('click', function(){
           var d = me.available[this.dataset.id];
@@ -163,7 +181,14 @@ me.install = function(lib, v, cb) {
     else {
       var prog = el.querySelector('.myprogress');
       if (prog) prog.remove();
-      el.insertAdjacentHTML('beforeend', "<div class='progerr'><font color='red'>Error: "+result.msg+"</font></div>");
+      // F3: result.msg is untrusted — build the error line as text
+      var err = document.createElement('div');
+      err.className = 'progerr';
+      var f = document.createElement('font');
+      f.setAttribute('color', 'red');
+      f.textContent = 'Error: ' + result.msg;
+      err.appendChild(f);
+      el.appendChild(err);
     }
   });
 }
@@ -185,11 +210,19 @@ me.update = function(){
     ME.querySelector('.hud_http_port').textContent = ME.DATA.http_port;
     ME.querySelector('#keepalive').checked = !!ME.DATA.keepalive;
 
-    var newhtml = '';
+    // F3: addresses are peer-reported — build the chips with DOM calls and
+    // textContent, never innerHTML (the href is set as a plain attribute).
+    var alist = ME.querySelector('.hud_address_list');
+    alist.innerHTML = '';
     for (var i in ME.DATA.addresses) {
-      newhtml += '<a class="chip" target="_blank" href="http://'+ME.DATA.addresses[i]+':'+ME.DATA.http_port+'?session_id='+ME.DATA.session_id+'">'+ME.DATA.addresses[i]+'</a>&nbsp;'
+      var a = document.createElement('a');
+      a.className = 'chip';
+      a.target = '_blank';
+      a.href = 'http://' + ME.DATA.addresses[i] + ':' + ME.DATA.http_port + '?session_id=' + ME.DATA.session_id;
+      a.textContent = ME.DATA.addresses[i];
+      alist.appendChild(a);
+      alist.appendChild(document.createTextNode(' '));
     }
-    ME.querySelector('.hud_address_list').innerHTML = newhtml;
 
     var c = ME.DATA.tcp ? '#84bd00' : ME.DATA.udp ? '#00f' : ME.DATA.connected ? '#ff0' : 'ccc';
     ME.querySelector('.connectionindicator').style.backgroundColor = c;

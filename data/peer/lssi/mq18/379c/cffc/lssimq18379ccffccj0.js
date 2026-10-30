@@ -225,34 +225,57 @@ ME.querySelector('.updateallpeersbutton').addEventListener('click', function(){
 });
 
 function buildUpdateDialog(){
-  var newhtml = '<table cellpadding="10px" class="updateablepeerstable"><thead><tr><th><label class="plaincheckbox"><input type="checkbox" class="toggleallupdates"><span></span></label></th><th style="text-align:left;">Peer</th><th style="text-align:left;">Available Updates</th></tr></thead><tbody>';
+  // F3: peer display names are untrusted — the static table shell is literal
+  // HTML, every row is built with DOM calls and textContent.
+  var el = ME.querySelector('.peerupdatelist');
+  el.innerHTML = '<table cellpadding="10px" class="updateablepeerstable"><thead><tr><th><label class="plaincheckbox"><input type="checkbox" class="toggleallupdates"><span></span></label></th><th style="text-align:left;">Peer</th><th style="text-align:left;">Available Updates</th></tr></thead><tbody></tbody></table>';
+  var tbody = el.querySelector('tbody');
   for (var i in me.peers) {
     var p = me.peers[i];
     if (p.connected) {
       var uuid = p.id;
-      newhtml += '<tr class="uprow r_'+uuid+'" data-peer="'+uuid+'">'
-        + '<td><label class="plaincheckbox"><input type="checkbox" class="libupdate"><span></span></label></td>'
-        + '<td>'+p.name+'<br><div style="font-size:x-small;">'+uuid+'</div></td>'
-        + '<td class="rowstatus"><i>pending...</i></td>'
-        + '</tr>';
+      var tr = document.createElement('tr');
+      tr.className = 'uprow r_' + uuid;
+      tr.dataset.peer = uuid;
+      var td = document.createElement('td');
+      td.innerHTML = '<label class="plaincheckbox"><input type="checkbox" class="libupdate"><span></span></label>';
+      tr.appendChild(td);
+      td = document.createElement('td');
+      td.textContent = p.name;
+      var sub = document.createElement('div');
+      sub.style.fontSize = 'x-small';
+      sub.textContent = uuid;
+      td.appendChild(sub);
+      tr.appendChild(td);
+      td = document.createElement('td');
+      td.className = 'rowstatus';
+      td.innerHTML = '<i>pending...</i>';
+      tr.appendChild(td);
+      tbody.appendChild(tr);
       checkForUpdates(p);
     }
   }
-  newhtml += '</tbody></table>';
-
-  var el = ME.querySelector('.peerupdatelist');
-  el.innerHTML = newhtml;
   el.querySelector('.toggleallupdates').addEventListener('click', function(){
     var b = this.checked;
     el.querySelectorAll('.libupdate').forEach(function(box){ box.checked = b; });
   });
 }
 
+// F3 helper: the chips' close button, shared by every chip builder below.
+function chipCloseImg(){
+  var x = document.createElement('img');
+  x.src = '../app/asset/app/close-white.png';
+  x.className = 'roundbutton-small removeupdate mdl-chip__action chipbutton';
+  return x;
+}
+
 function checkForUpdates(peer) {
   var uuid = peer.id;
   json('../peer/remote/'+uuid+'/app/libs', null, function(result){
     if (result.data && document.body.locallibraries) {
-      var newhtml = '';
+      // F3: library ids and versions come from the remote peer — chips are
+      // built with DOM calls and textContent, never innerHTML.
+      var chips = [];
       for (var i in result.data) {
         var theirlib = result.data[i];
         var mylib = getByProperty(document.body.locallibraries, 'id', theirlib.id);
@@ -261,13 +284,17 @@ function checkForUpdates(peer) {
           var authorkey = mylib.authorkey;
           if (true) { //(author && authorkey && theirlib.author == author && theirlib.authorkey == authorkey) {
             if (mylib.version > theirlib.version) {
-              newhtml += '<span class="chip ispos" id="U_'+mylib.id+'"><span class="clickupdate" data-lib="'+mylib.id+'" data-version="'+mylib.version+'">'
-                + mylib.id
-                + ' v'
-                + theirlib.version
-                + ' ➤ '
-                + mylib.version
-                + '</span><img src="../app/asset/app/close-white.png" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
+              var chip = document.createElement('span');
+              chip.className = 'chip ispos';
+              chip.id = 'U_' + mylib.id;
+              var click = document.createElement('span');
+              click.className = 'clickupdate';
+              click.dataset.lib = mylib.id;
+              click.dataset.version = mylib.version;
+              click.textContent = mylib.id + ' v' + theirlib.version + ' ➤ ' + mylib.version;
+              chip.appendChild(click);
+              chip.appendChild(chipCloseImg());
+              chips.push(chip);
             }
           }
         }
@@ -278,15 +305,21 @@ function checkForUpdates(peer) {
       json('../peer/remote/'+uuid+'/dev/crate_versions', null, function(cr){
         var lc = me.localcrates;
         if (cr && cr.status == 'ok' && lc && lc.status == 'ok' && (cr.flowlang != lc.flowlang || cr.ndata != lc.ndata)) {
-          newhtml += '<span class="chip clickcrates" data-flowlang="'+lc.flowlang+'" data-ndata="'+lc.ndata+'">crates: flowlang '
-            + cr.flowlang + ' ➤ ' + lc.flowlang + ' / ndata ' + cr.ndata + ' ➤ ' + lc.ndata
-            + '<img src="../app/asset/app/close-white.png" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
+          var chip = document.createElement('span');
+          chip.className = 'chip clickcrates';
+          chip.dataset.flowlang = lc.flowlang;
+          chip.dataset.ndata = lc.ndata;
+          chip.textContent = 'crates: flowlang ' + cr.flowlang + ' ➤ ' + lc.flowlang + ' / ndata ' + cr.ndata + ' ➤ ' + lc.ndata;
+          chip.appendChild(chipCloseImg());
+          chips.push(chip);
         }
         var el = ME.querySelector('.r_'+uuid);
         if (!el) return;
-        if (newhtml == '') el.remove();
+        if (chips.length == 0) el.remove();
         else {
-          el.querySelector('.rowstatus').innerHTML = newhtml;
+          var status = el.querySelector('.rowstatus');
+          status.innerHTML = '';
+          chips.forEach(function(c){ status.appendChild(c); status.appendChild(document.createTextNode(' ')); });
           el.querySelectorAll('.removeupdate').forEach(function(x){
             x.addEventListener('click', function(){
               this.closest('.chip').remove();
@@ -331,7 +364,9 @@ ME.querySelector('#updateallpeersnow').addEventListener('click', function(){
               }
               else {
                 chip.style.color = 'rgba(255,0,0,0.5)';
-                chip.insertAdjacentHTML('beforeend', '<br>Error: '+result.msg);
+                // F3: result.msg is untrusted — append it as text
+                chip.appendChild(document.createElement('br'));
+                chip.appendChild(document.createTextNode('Error: ' + result.msg));
               }
             });
           }
@@ -342,10 +377,17 @@ ME.querySelector('#updateallpeersnow').addEventListener('click', function(){
               // compile_rust would have done, so it replaces that step
               var fl = cratechip.dataset.flowlang;
               var nd = cratechip.dataset.ndata;
-              row.querySelector('.rowstatus').innerHTML = "<i>Updating platform crates to flowlang "+fl+" / ndata "+nd+"...</i>";
+              var st = row.querySelector('.rowstatus');
+              st.innerHTML = '<i></i>';
+              st.firstChild.textContent = 'Updating platform crates to flowlang '+fl+' / ndata '+nd+'...';
               json('../peer/remote/'+peer+'/dev/update_crates', 'flowlang='+encodeURIComponent(fl)+'&ndata='+encodeURIComponent(nd), function(result){
                 if (result.status == 'ok') row.querySelector('.rowstatus').innerHTML = "<i>crate update launched — open the peer's panel for progress and the restart verdict</i>";
-                else row.querySelector('.rowstatus').innerHTML = '<font color="red">Error: '+result.msg+'</font>';
+                else {
+                  // F3: result.msg is untrusted — set it as text
+                  var est = row.querySelector('.rowstatus');
+                  est.innerHTML = '<font color="red"></font>';
+                  est.firstChild.textContent = 'Error: ' + result.msg;
+                }
               });
             }
             else if (recompile) {
@@ -366,18 +408,35 @@ ME.querySelector('#updateallpeersnow').addEventListener('click', function(){
 ME.querySelector('.addpeerbutton').addEventListener('click', function(){
   json('../peer/discovery', null, function(result){
     me.discovery = result.data;
-    var newhtml = '';
+    // F3: discovery names come from unauthenticated LAN packets — build the
+    // rows with DOM calls and textContent, never innerHTML.
+    var tbl = document.createElement('table');
+    tbl.className = 'lantable';
     var now = new Date().getTime();
     for (sip in result.data) {
       var rds = result.data[sip];
       if (now - rds.time < 30000 && !getByProperty(me.peers, "id", rds.uuid)) {
-        newhtml += '<tr class="clickme" data-sip="'+sip+'"><td>'+sip+'</td><td>'+rds.name+'</td><td><span class="smalltext">'+rds.uuid+'</span></td></tr>';
+        var tr = document.createElement('tr');
+        tr.className = 'clickme';
+        tr.dataset.sip = sip;
+        var td = document.createElement('td');
+        td.textContent = sip;
+        tr.appendChild(td);
+        td = document.createElement('td');
+        td.textContent = rds.name;
+        tr.appendChild(td);
+        td = document.createElement('td');
+        var sm = document.createElement('span');
+        sm.className = 'smalltext';
+        sm.textContent = rds.uuid;
+        td.appendChild(sm);
+        tr.appendChild(td);
+        tbl.appendChild(tr);
       }
     }
-    if (newhtml == '') newhtml = '<div class="padme"><i>No new devices found on LAN</i></div>';
-    else newhtml = '<table class="lantable" border="0" cellpadding="0" cellspacing="20">' + newhtml + '</table>';
     var disc = ME.querySelector('.discovered');
-    disc.innerHTML = newhtml;
+    if (tbl.rows.length == 0) disc.innerHTML = '<div class="padme"><i>No new devices found on LAN</i></div>';
+    else { disc.innerHTML = ''; disc.appendChild(tbl); }
     disc.querySelectorAll('.clickme').forEach(function(rowEl){
       rowEl.addEventListener('click', function(){
         var sip = this.dataset.sip;
