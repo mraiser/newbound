@@ -1996,9 +1996,12 @@ async function init(host, { lib, ctlId, toast }) {
     ? host : host.querySelector(".nb-workbench");
   const pvToggle = host.querySelector(".wm-preview");
   const resizer = host.querySelector(".wb-resize");
-  // C6: a control with no html facet defaults to a hidden preview — there
-  // is nothing to render; otherwise the stored preference holds.
-  let pvOff = localStorage.getItem(PV_OFF_KEY) === "1" || !facetPresent("html");
+  // C6: a control with neither html nor js defaults to a hidden preview —
+  // there is nothing to render. A js-only control may build its whole UI in
+  // js, so it keeps the stored preference like any other.
+  const hasSource = (f) => String(record[f] ?? "").trim() !== "";
+  let pvOff = localStorage.getItem(PV_OFF_KEY) === "1" ||
+    (!hasSource("html") && !hasSource("js"));
   let pvFull = false;
   let pvW = Math.max(PV_MIN, Number(localStorage.getItem(PV_W_KEY)) || PV_DEFAULT);
 
@@ -2131,16 +2134,21 @@ async function init(host, { lib, ctlId, toast }) {
     inner.className = "wb-pv-body";
     previewSlot.appendChild(inner);
 
-    // C6: with no html there is nothing to render, in either mode
+    // C6: static renders only html+css, so with no html it has nothing to
+    // show. Live always mounts — a control's js can build its whole UI.
     const htmlNow = editors.get("html")?.api.getValue() ?? record.html ?? "";
-    if (!htmlNow.trim()) {
+    if (previewMode === "static" && !htmlNow.trim()) {
+      const jsNow = editors.get("js")?.api.getValue() ?? record.js ?? "";
       const eyebrow = document.createElement("div");
       eyebrow.className = "wb-pv-eyebrow";
       eyebrow.innerHTML = `<span class="idot" aria-hidden="true"></span><span></span>`;
-      eyebrow.lastElementChild.textContent = `${previewMode} · nothing to render`;
+      eyebrow.lastElementChild.textContent = "static · nothing to render";
       const box = document.createElement("div");
       box.className = "wb-pv-empty";
-      box.textContent = "This control has no html facet, so there's nothing to render.";
+      box.textContent = jsNow.trim()
+        ? "This control has no html facet, so static has nothing to show. " +
+          "Its js may build the UI — switch to live to run it."
+        : "This control has no html facet, so there's nothing to render.";
       inner.append(eyebrow, box);
       return;
     }
