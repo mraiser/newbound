@@ -11,6 +11,12 @@ var ME = document.getElementById(me.UUID);
 
 me.peers = [];
 
+// F4: app.scenehost.addControl is async — the key lands in byId/children only
+// after its awaits — so overlapping syncPeers calls (waitReady and the
+// send_info callback both fire it) would add the same peer twice. me.adding
+// marks the in-flight adds, keyed by peer id.
+me.adding = {};
+
 me.uiReady = function(ui){
   me.ui = ui;
   ME.querySelector('.wrap').style.display = 'block';
@@ -186,11 +192,34 @@ function syncPeers(){
     // no self-orb: your own position carries no information
     if (me.info && p.id == me.info.uuid) continue;
     want[p.id] = p;
-    if (!me.host.byId || !me.host.byId(p.id)) me.host.addControl('peer', 'peer_model', p, p.id);
+    // F4: skip a peer whose orb exists OR whose add is still in flight
+    if (!me.adding[p.id] && (!me.host.byId || !me.host.byId(p.id))) addPeerOrb(p);
   }
   for (var k = me.host.children.length - 1; k >= 0; k--) {
     var inst = me.host.children[k];
-    if (!want[inst.key]) me.host.removeControl(inst.key);
+    // F4: an in-flight add is not a leftover — its settle handler decides
+    if (!want[inst.key] && !me.adding[inst.key]) me.host.removeControl(inst.key);
+  }
+}
+
+// F4: one guarded add per peer. The flag clears when the host's promise
+// settles (success or failure); a peer that left while its add was in
+// flight is removed straight away.
+function addPeerOrb(p){
+  var id = p.id;
+  me.adding[id] = true;
+  function settled(added){
+    delete me.adding[id];
+    if (!added) return;
+    var gone = !getByProperty(peerList(), 'id', id) || (me.info && id == me.info.uuid);
+    if (gone && me.host.byId && me.host.byId(id)) me.host.removeControl(id);
+  }
+  try {
+    var pr = me.host.addControl('peer', 'peer_model', p, id);
+    if (pr && pr.then) pr.then(function(){ settled(true); }, function(){ settled(false); });
+    else settled(true);
+  } catch (x) {
+    settled(false);
   }
 }
 
