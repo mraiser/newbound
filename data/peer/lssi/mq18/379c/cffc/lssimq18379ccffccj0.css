@@ -52,7 +52,24 @@
 
 .addusercard {
   width:600px;
-  height:367px;
+  max-height: calc(100vh - 80px);
+}
+
+/* F2: below 640px the card hugs the viewport */
+@media (max-width: 640px) {
+  .addusercard {
+    width: calc(100vw - 32px);
+  }
+}
+
+/* F2: the card sizes to its content and the TAB BODY scrolls instead of
+   the card clipping (.card is overflow:hidden). The popup machinery
+   centers the card at its open-time height, so the body's cap stays
+   near half the viewport: a LAN list that grows after the open can
+   never push the card's bottom off the screen. */
+.addusercard .tab-content {
+  overflow: auto;
+  max-height: calc(50vh + 40px);
 }
 
 .bottomhugger{
@@ -93,16 +110,10 @@
 }
 
 .discovered{
-  height:100%;
-  overflow-y:scroll;
-}
-
-#autab1{
-  position: absolute;
-  top: 90px;
-  bottom: 0px;
-  left: 0px;
-  right: 0px;
+  /* F2: natural height — the tab body above does the scrolling. The
+     min-height keeps the empty LAN tab near the Connect tab's height so
+     the popup's open-time centering measurement is honest. */
+  min-height: 280px;
 }
 
 .peerupdatelist{
