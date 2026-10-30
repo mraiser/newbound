@@ -224,7 +224,7 @@ function installControl(el, lib, id, cb, data) {
 
     function handlejsapi(lib, id, result) {
       console.log("JSAPI "+lib+"/"+id+": "+JSON.stringify(result));
-      var apijs = result.data ? result.data.js : '';
+      var apijs = (result.data && result.data.js) || '';
 
       function getctlmeta(lib, id, cb) {
         if (allmetas[lib] && allmetas[lib][id]) {
@@ -251,10 +251,12 @@ function installControl(el, lib, id, cb, data) {
           el.cb = cb;
         }
 
-        var html = result.data ? result.data.html : '';
-        var css = result.data ? result.data.css : '';
-        var js = result.data ? result.data.js : '';
-        var dat = result.data ? result.data.data : [];
+        // A control may lack any facet (a js-only control has no html):
+        // an absent key must read as empty, not as the text "undefined".
+        var html = (result.data && result.data.html) || '';
+        var css = (result.data && result.data.css) || '';
+        var js = (result.data && result.data.js) || '';
+        var dat = (result.data && result.data.data) || [];
 
         var newhtml = build(el, apijs, html, css, js);
 
