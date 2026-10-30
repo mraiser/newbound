@@ -52,7 +52,7 @@
   display: inline-block;
   cursor: pointer;
   text-align: left;
-  border-radius: var(--border-radius-md);
+  border-radius: 25%; /* matches the tile plate's 16/64 corner */
   transition: box-shadow 0.3s ease;
 }
 .appcard-wrap:hover {
@@ -61,42 +61,44 @@
 .card.appcard {
   width: 100%;
   height: 100%;
-  background-image: url(../app/asset/app/icon-square-app.png);
+  /* The tile SVG carries its own opaque plate; the card is just a frame. */
+  background-image: url(../app/asset/app/icons/application.svg);
   background-position: center;
-  position: relative;
-  /* Add dark mode support for the card itself */
-  background-color: var(--surface-color);
-  border: 1px solid var(--border-color);
-  /* --- New styles for better image blending --- */
-  background-size: 90%;
-  background-blend-mode: darken;
-  background-color: #fff8;
+  background-size: 100%;
   background-repeat: no-repeat;
+  background-color: transparent;
+  border: none;
+  border-radius: 25%;
+  position: relative;
 }
+/* No band: the label sits on the tile's own graphite plate (a band would cut its outline).
+   The shadow keeps it legible over legacy light images until those are replaced. */
 .card-title {
-  padding: 16px;
-  background: rgba(124, 127, 134, 0.6);
-  color: #fff;
-  font-size: 14px;
+  padding: 10px 16px 14px;
+  background: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  color: var(--text);
+  font-size: 13px;
   font-weight: 500;
+  text-align: center;
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  transition: background-color .3s ease;
+  transition: color .3s ease;
 }
 
 
 .inactive .card-title {
-  background: rgba(0, 0, 0, 0.533);
+  color: var(--text-dim);
 }
 .remote .card-title {
-  background: rgba(240, 166, 60, 0.6);
+  color: var(--accent);
 }
 .maximize-app-icon {
   position: absolute;
-  top: 3px;
-  right: 3px;
+  top: 7%; /* clear of the 25% rounded corner */
+  right: 7%;
   opacity: 0.5;
 }
 

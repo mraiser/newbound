@@ -267,7 +267,7 @@ function checkForUpdates(peer) {
                 + theirlib.version
                 + ' ➤ '
                 + mylib.version
-                + '</span><img src="../app/asset/app/close-white.png" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
+                + '</span><img src="../app/asset/app/icons/ui/dark/close.svg" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
             }
           }
         }
@@ -280,7 +280,7 @@ function checkForUpdates(peer) {
         if (cr && cr.status == 'ok' && lc && lc.status == 'ok' && (cr.flowlang != lc.flowlang || cr.ndata != lc.ndata)) {
           newhtml += '<span class="chip clickcrates" data-flowlang="'+lc.flowlang+'" data-ndata="'+lc.ndata+'">crates: flowlang '
             + cr.flowlang + ' ➤ ' + lc.flowlang + ' / ndata ' + cr.ndata + ' ➤ ' + lc.ndata
-            + '<img src="../app/asset/app/close-white.png" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
+            + '<img src="../app/asset/app/icons/ui/dark/close.svg" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
         }
         var el = ME.querySelector('.r_'+uuid);
         if (!el) return;
