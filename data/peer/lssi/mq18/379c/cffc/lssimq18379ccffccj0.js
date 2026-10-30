@@ -298,10 +298,47 @@ function chipCloseImg(){
   return x;
 }
 
+// F5: the words for a refused or failed peer call — shared with the F10
+// update-flow rewrite (session 2), so keep it a tiny helper. 'Unauthorized'
+// is Alex's exact word for a refusal.
+function peerErrorText(result){
+  // the peer proxy suffixes the refused command ('UNAUTHORIZED: libs'), so
+  // any UNAUTHORIZED-prefixed msg is the same refusal
+  var msg = result && result.msg ? String(result.msg) : '';
+  if (msg == 'UNAUTHORIZED' || msg.indexOf('UNAUTHORIZED') == 0) return 'Unauthorized';
+  return 'Error: ' + (msg ? msg : 'no reply');
+}
+
+// F5: end a row in its error state — dim red text, checkbox disabled.
+function rowError(uuid, text){
+  var el = ME.querySelector('.r_'+uuid);
+  if (!el) return;
+  var status = el.querySelector('.rowstatus');
+  status.innerHTML = '';
+  var sp = document.createElement('span');
+  sp.className = 'rowerror';
+  sp.textContent = text;   // F3: error text is untrusted — never HTML
+  status.appendChild(sp);
+  var box = el.querySelector('.libupdate');
+  if (box) { box.checked = false; box.disabled = true; }
+}
+
 function checkForUpdates(peer) {
   var uuid = peer.id;
-  json('../peer/remote/'+uuid+'/app/libs', null, function(result){
-    if (result.data && document.body.locallibraries) {
+  // F5: the local library list may not have landed yet — fetch it first,
+  // then compare. Never drop the row silently.
+  if (document.body.locallibraries) compareWithPeer();
+  else json('../app/libs', null, function(r){
+    if (r.status == 'ok' && r.data) document.body.locallibraries = r.data;
+    compareWithPeer();
+  });
+
+  function compareWithPeer(){
+    json('../peer/remote/'+uuid+'/app/libs', null, function(result){
+      // F5: a refusal ({status:err, msg:UNAUTHORIZED}) or any other error
+      // resolves the row instead of leaving it on pending... forever.
+      if (result.status != 'ok' || !result.data) { rowError(uuid, peerErrorText(result)); return; }
+      if (!document.body.locallibraries) { rowError(uuid, 'Error: local library list unavailable'); return; }
       // F3: library ids and versions come from the remote peer — chips are
       // built with DOM calls and textContent, never innerHTML.
       var chips = [];
@@ -330,7 +367,8 @@ function checkForUpdates(peer) {
       }
       // crate pins ride the same row: a peer lagging the local flowlang/ndata
       // versions gets a distinct chip (clickcrates, NOT clickupdate - the lib
-      // installer must never treat it as a library)
+      // installer must never treat it as a library). A refused crate_versions
+      // just leaves the chip out (F5 keeps that).
       json('../peer/remote/'+uuid+'/dev/crate_versions', null, function(cr){
         var lc = me.localcrates;
         if (cr && cr.status == 'ok' && lc && lc.status == 'ok' && (cr.flowlang != lc.flowlang || cr.ndata != lc.ndata)) {
@@ -356,8 +394,8 @@ function checkForUpdates(peer) {
           });
         }
       });
-    }
-  });
+    });
+  }
 }
 
 ME.querySelector('#updateallpeersnow').addEventListener('click', function(){

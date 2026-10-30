@@ -122,3 +122,8 @@
   overflow-y:scroll;
   padding:10px;
 }
+
+/* F5: a row that ended in an error — dim red (its checkbox is disabled) */
+.rowerror{
+  color: rgba(255, 0, 0, 0.6);
+}
