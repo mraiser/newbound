@@ -2619,7 +2619,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   function dbgGone(r) {
     const msg = String((r && r.msg) || "");
     if (r && r.phase === "stopped") return r.ended_by === "reap" ? "the session was reaped after idling" : `the session has ended (${r.ended_by || "stopped"})`;
-    if (/no debug session|reaped|has ended/i.test(msg)) return "the session is gone (reaped after idling?)";
+    // NOT the run-ended refusal ("the run has ended - go back (back/goto)
+    // or stop the session"): that session is alive and back/goto still work
+    if (/no debug session|reaped|debug session '[^']*' has ended/i.test(msg)) return "the session is gone (reaped after idling?)";
     return null;
   }
   function debugEnded(why) {
