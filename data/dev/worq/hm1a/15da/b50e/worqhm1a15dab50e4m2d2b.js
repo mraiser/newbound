@@ -2201,7 +2201,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (!r || r.status !== "ok" || !r.session) { status("debug start failed: " + ((r && r.msg) || "no session"), "bad"); return r; }
     dbg = { session: r.session, src, args: args || {}, st: null, views: [], busy: false, last: r, follow: true, sig: "", unsaved: dirty,
       boundary: typeof r.boundary === "string" ? r.boundary : "", crossed: [] };   // R3: the server's session boundary, shown verbatim
-    dbgTape = []; dbgTapeCursor = -1;                    // D5: a fresh tape
+    dbgTape = []; dbgTapeCursor = -1; dbgTapeGap.clear();   // D5: a fresh tape (R6: and no gap reasons)
     ME.classList.add("fe-debugging");
     pushJournal(`debug session · ${src.cmd}` + (dirty ? " (unsaved body)" : ""));
     if (bpPlaces().length) await sendBreakpoints();   // D4: the editor's breakpoints ride every session
@@ -2242,7 +2242,13 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       const evs = back1 ? [prevEv] : (!r.running && Array.isArray(r.events) && !r.events_truncated ? r.events : []);
       // D5: the timeline's tape: every reply's event span (a move's own events,
       // or continue/back(n)/goto's span) records its steps' events
-      if (!r.running && Array.isArray(r.events) && !r.events_truncated) dbgRecordEvents(r.events, r.cursor);
+      // R6: a fork cut the tape to r.length; a branch swap put another tail
+      // at r.cursor - the old tail's ticks go first (else the strip draws the
+      // replaced branch's events as this tape's). A capped event list still
+      // carries real seqs, so it is recorded and the gap is explained.
+      if (typeof r.length === "number") dbgForget(r.length);
+      if (mode === "branch") dbgForget(r.cursor, "restored");
+      if (!r.running && Array.isArray(r.events)) dbgRecordEvents(r.events, r.cursor, !!r.events_truncated);
       const ride = { mode, reverse: back1, events: evs.map((e) => e.seq), a: null, b: null };
       if (evs.length) ride.a = await dbgShow(evs, back1, null);   // on the picture as it stands
       if (dbg !== d) return r;
@@ -2398,8 +2404,38 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   let dbgTapeCursor = -1;        // the largest seq this session has reached
   let lastTlTicks = [];          // the ticks the last draw placed (checks)
   let tlDrag = null;             // a drag in progress on the top strip
-  function dbgRecordEvents(evs, upto) {
+  // R6: why some steps of [base, length) have no tick - explained on the
+  // strip, never drawn as if complete. capped: a reply lists at most its
+  // first 400 events; restored: a swapped-in branch is not re-listed until
+  // a continue replays it.
+  const dbgTapeGap = new Set();
+  // R6: the tape from `from` on was replaced (a fork cut it to length, a
+  // branch swap put another tail there) - ticks recorded for those seqs
+  // belong to the OLD tail and must not be drawn as this tape's
+  function dbgForget(from, why) {
+    if (typeof from !== "number" || from < 0) return;
+    if (dbgTape.length > from) dbgTape.length = from;
+    if (why) dbgTapeGap.add(why);
+  }
+  function tlGapNote(st) {
+    const base = (st && st.base) || 0, len = (st && st.length) || 0;
+    let miss = 0;
+    for (let s = base; s < len; s++) if (!dbgTape[s]) miss++;
+    if (!miss) dbgTapeGap.clear();
+    const why = [];
+    if (dbgTapeGap.has("capped")) why.push("a reply lists at most its first 400 events");
+    if (dbgTapeGap.has("restored")) why.push("a swapped-in branch is not re-listed until a continue replays it");
+    if (!why.length) why.push("no reply listed them");
+    const parts = [];
+    if (base > 0) parts.push(`steps 0–${base - 1} trimmed (tape cap)`);
+    if (miss) parts.push(`${miss} step${miss === 1 ? "" : "s"} without a tick`);
+    const long = (base > 0 ? `The tape cap dropped steps 0–${base - 1}; the strip starts at step ${base}.\n` : "") +
+      (miss ? `${miss} of ${len - base} steps on the tape have no tick: ${why.join("; ")}. They are on the tape (goto reaches them); they were never listed to this editor.` : "");
+    return { miss, base, short: parts.join(" · "), long };
+  }
+  function dbgRecordEvents(evs, upto, truncated) {
     if (!Array.isArray(evs)) return;
+    if (truncated) dbgTapeGap.add("capped");
     for (const e of evs) {
       if (!e || typeof e.seq !== "number") continue;
       dbgTape[e.seq] = { type: e.type || "?", seq: e.seq, user: e.pick === "user" };
@@ -2464,7 +2500,11 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const st = dbg.st || {};
     lastTlTicks = tlDrawInto($(".fe-dbg-tl-track"), st);
     const pos = $(".fe-dbg-tl-pos");
-    if (pos) pos.textContent = `${st.cursor || 0} / ${st.length || 0}` + ((st.branches || 0) ? ` · ${st.branches} branch${st.branches === 1 ? "" : "es"}` : "");
+    const gap = tlGapNote(st);   // R6: trimmed / untracked steps are said, not hidden
+    if (pos) {
+      pos.textContent = `${st.cursor || 0} / ${st.length || 0}` + ((st.branches || 0) ? ` · ${st.branches} branch${st.branches === 1 ? "" : "es"}` : "") + (gap.short ? ` · ⚠ ${gap.short}` : "");
+      pos.title = gap.long || "tape cursor / length";
+    }
   }
   async function debugBranch(id) {
     const st = dbg && dbg.st ? dbg.st : {};
@@ -2477,7 +2517,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   // the inspector's own strip + the branch records
   function renderTimelineInspector(body, m) {
-    edLbl(body, `timeline · ${m.length} step${m.length === 1 ? "" : "s"} on the tape` + (m.branches ? ` · ${m.branches} branch${m.branches === 1 ? "" : "es"}` : ""));
+    const gap = tlGapNote(dbg && dbg.st ? dbg.st : {});   // R6
+    edLbl(body, `timeline · ${m.length} step${m.length === 1 ? "" : "s"} on the tape` + (m.branches ? ` · ${m.branches} branch${m.branches === 1 ? "" : "es"}` : "") + (gap.short ? ` · ⚠ ${gap.short}` : ""));
     const track = document.createElement("div");
     track.className = "fe-dbgi-tl-track";
     track.title = "click = go to that step · double-click = step to it";
@@ -2535,7 +2576,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       if (st && st.running) debugPoll();
       else if (st) {
         // D5: a continue's ticks ride its last_run's event span
-        if (st.last_run && Array.isArray(st.last_run.events) && !st.last_run.events_truncated) dbgRecordEvents(st.last_run.events, st.cursor);
+        if (st.last_run && Array.isArray(st.last_run.events)) dbgRecordEvents(st.last_run.events, st.cursor, !!st.last_run.events_truncated);
         if (dbg) { dbg.stop = { stopped: String(st.last_stop || ""), hit: (st.last_run && st.last_run.hit) || null, mode: "continue" }; renderDebugBar(); refreshInspector(); }
         const bh = dbgStopText();
         status(bh ? `debug: ${bh} at step ${st.cursor}` : `debug: stopped${st.last_stop ? " — " + st.last_stop : ""} at step ${st.cursor}`, "ok");
@@ -2595,6 +2636,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       const top = dbg.views && dbg.views.length ? dbg.views[dbg.views.length - 1] : null;
       let t = FD.eventText(st.event, dbg.views);
       { const bh = dbgStopText(); if (bh) t = `● ${bh} · ${t}`; }   // D4
+      // R6: a move that ran out of its step budget is NOT the end of the flow
+      if (!ended && !live && dbg.stop && dbg.stop.stopped === "budget") t = `⏸ step budget ran out${dbg.stop.mode === "continue" ? " (10,000 steps per continue)" : ""} — not the end; F5 continues · ${t}`;
       const rd = (st.ready || []).filter((x) => x && x.kind !== "auto");
       if (ended) t += " · ended";
       else if (rd.length) t += ` · ready: ${rd.map((x) => dbgItemText(top, x)).join(", ")}` + (st.default ? ` · next ${dbgItemText(top, st.default)}` : "");
@@ -3439,6 +3482,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
             branches: Array.from(document.querySelectorAll(".fe-dbg-tl-branch")).map((b) => ({ left: b.style.left, width: b.style.width, title: b.title })),
             cursor: cur ? { left: cur.style.left } : null,
             tape: dbgTape.filter((x) => x).map((x) => ({ seq: x.seq, type: x.type, user: !!x.user })),
+            gap: tlGapNote(dbg && dbg.st ? dbg.st : {}),   // R6
+            posTitle: ($(".fe-dbg-tl-pos") || {}).title || "",
           };
         },
       };
