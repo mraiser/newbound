@@ -105,15 +105,33 @@ fn reaches(from: &V, target: (bool, usize)) -> bool {
   false
 }
 // ---- the plain copy of a stepper state: graph bodies (never mutated) become "$body:N" refs ----
+// R3 D2: a command frame's body is the callee's SAVED flow, loaded at enter, so a callee re-saved mid-session gives a
+// later frame a DIFFERENT body. Key by command AND content hash: each frame restores its OWN body, while equal content
+// still dedupes to one stored body (a loop calling an unchanged callee stores it once). The content hash is the
+// canonical one, so the D3 depth-256 limit applies (two bodies differing only below depth 256 would share a key).
 fn body_key(f: &DataObject, b: &DataObject) -> String {
-  if gs(f, "kind") == "command" && f.has("cmd") { format!("cmd:{}", gs(f, "cmd")) } else { format!("ref:{}", b.data_ref) }
+  if gs(f, "kind") == "command" && f.has("cmd") { format!("cmd:{}#{}", gs(f, "cmd"), hash_obj(b)) } else { format!("ref:{}", b.data_ref) }
+}
+// exec's per-session cache {data_ref: {k, b}} of the command bodies on the CURRENT frames: the held handle pins the
+// data_ref (it cannot be reused while cached) and every snap prunes the cache to the bodies it saw, so each frame's
+// body is hashed once, not once per step.
+fn cmd_body_key(f: &DataObject, b: &DataObject, cache: &Option<DataObject>, seen: &mut Vec<String>) -> String {
+  let mut c = match cache { Some(c) if gs(f, "kind") == "command" && f.has("cmd") => c.clone(), _ => return body_key(f, b) };
+  let rk = b.data_ref.to_string();
+  seen.push(rk.clone());
+  if is_o(&c, &rk) { let e = c.get_object(&rk); if is_o(&e, "b") && e.get_object("b").data_ref == b.data_ref && e.has("k") { return gs(&e, "k"); } }
+  let k = body_key(f, b);
+  let mut e = DataObject::new(); e.put_string("k", &k); e.put_object("b", b.clone()); c.put_object(&rk, e);
+  k
 }
 fn body_ref(key: &str, b: &DataObject, bodies: &mut DataArray, keys: &mut DataArray) -> String {
   for i in 0..keys.len() { if keys.get_string(i) == key { return format!("$body:{}", i); } }
   bodies.push_object(b.clone()); keys.push_string(key);
   format!("$body:{}", bodies.len() - 1)
 }
-fn snap(st: &DataObject, bodies: &mut DataArray, keys: &mut DataArray) -> DataObject {
+fn snap(st: &DataObject, bodies: &mut DataArray, keys: &mut DataArray) -> DataObject { snap_c(st, bodies, keys, &None) }
+fn snap_c(st: &DataObject, bodies: &mut DataArray, keys: &mut DataArray, cache: &Option<DataObject>) -> DataObject {
+  let mut seen: Vec<String> = Vec::new();
   let mut m = Memo { o: HashMap::new(), a: HashMap::new() };
   let mut n = DataObject::new();
   for (k, v) in st.objects() {
@@ -125,7 +143,7 @@ fn snap(st: &DataObject, bodies: &mut DataArray, keys: &mut DataArray) -> DataOb
         let fo = f.object();
         let mut nf = DataObject::new();
         for (fk, fv) in fo.objects() {
-          if fk == "body" && fv.is_object() { let b = fv.object(); nf.put_string("body", &body_ref(&body_key(&fo, &b), &b, bodies, keys)); }
+          if fk == "body" && fv.is_object() { let b = fv.object(); nf.put_string("body", &body_ref(&cmd_body_key(&fo, &b, cache, &mut seen), &b, bodies, keys)); }
           else { let c = cp(&fv, &mut m); nf.set_property(&fk, c); }
         }
         fa.push_object(nf);
@@ -133,6 +151,7 @@ fn snap(st: &DataObject, bodies: &mut DataArray, keys: &mut DataArray) -> DataOb
       n.put_array("frames", fa);
     } else { let c = cp(&v, &mut m); n.set_property(&k, c); }
   }
+  if let Some(c) = cache { let mut c = c.clone(); for k in c.clone().keys() { if !seen.contains(&k) { c.remove_property(&k); } } }
   n
 }
 fn resolve(o: &mut DataObject, bodies: &DataArray) {
@@ -770,7 +789,8 @@ fn exec(s: &mut DataObject, core: &Command, pick: &DataObject, took: Option<Data
   let grecord = gdiff(&pre, &pn, &ns);
   let g = ga(&grecord, "changes");
   let mut bodies = s.get_array("bodies"); let mut keys = s.get_array("bodykeys");
-  let nc = snap(&ns, &mut bodies, &mut keys);
+  if !is_o(s, "bodycache") { s.put_object("bodycache", DataObject::new()); }
+  let nc = snap_c(&ns, &mut bodies, &mut keys, &Some(s.get_object("bodycache")));
   let alias = aliases(&ns);
   let cur = s.get_object("cur");
   let mut ch = DataArray::new(); let mut size = 0i64;
