@@ -77,7 +77,7 @@ me.buildUsers = function(cb) {
         if (groups == '') groups = '<i>no groups</i>';
         var islocal = id.length != 36;
         var icon = islocal ? 'user' : 'peer';
-        newhtml += '<tr data-local="' + islocal + '" data-id="' + id + '" class="userrow userrow_' + id + '"><td><img src="../app/asset/app/' + icon + '_icon.png" width="20" height="20"></td><td>' + user.displayname + ' (' + id + ')' + '</td><td>' + groups + '</td></tr>';
+        newhtml += '<tr data-local="' + islocal + '" data-id="' + id + '" class="userrow userrow_' + id + '"><td><img src="../app/asset/app/icons/ui/dark/' + icon + '.svg" width="20" height="20" alt="' + icon + '"></td><td>' + user.displayname + ' (' + id + ')' + '</td><td>' + groups + '</td></tr>';
       }
       newhtml += '</table>';
       var listdiv = ME.querySelector('.userlist');
