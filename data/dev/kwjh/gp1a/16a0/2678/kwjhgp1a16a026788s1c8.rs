@@ -89,7 +89,13 @@ if st::is_arr(&state, "frames") && state.get_array("frames").len() > 0 {
 let seq = if state.has("seq") { state.get_int("seq") } else { 0 };
 let mut ns = DataObject::new();
 ns.put_object("body", body.clone());
-let root = frames.get_object(0);
+let mut root = frames.get_object(0);
+// R6 (nested fatal): a top frame that is "ended" above a live root is the residual stack of a nested
+// error/stall. The run is over - apply step_stack's terminal frame-stack invariant (its `ended` arm ends
+// the root) WITHOUT emitting that arm's "the run has already ended" event, which is not a flow event.
+if frames.len() > 1 && root.get_string("phase") != "ended" && frames.get_object(frames.len() - 1).get_string("phase") == "ended" {
+  root.put_string("phase", "ended");
+}
 if root.get_string("phase") == "ended" {
   ns.put_array("frames", frames.clone()); ns.put_int("seq", seq);
   res.put_string("status", "ok"); res.put_object("state", ns); res.put_null("event");
@@ -156,6 +162,16 @@ let event = match stepped {
     return res;
   }
 };
+// R6 (nested fatal): the crate's own terminal rule, mirrored EXACTLY from flowlang::stepper::run's
+// terminal-event break - an error or stall event is terminal for the whole run even when a NESTED frame
+// emitted it (err_ev / stall_ev end only that frame). End the root on THIS step, as step_stack's `ended`
+// arm would on the next one, so `ended` is true on the fatal event's own reply and no residual step
+// (a synthetic error "ended") is ever executed or recorded by run / drive / debug_step.
+{
+  let et = if event.has("type") && event.get_property("type").is_string() { event.get_string("type") } else { String::new() };
+  let mut root = frames.get_object(0);
+  if root.get_string("phase") != "ended" && (et == "error" || et == "stall") { root.put_string("phase", "ended"); }
+}
 // Post-step view: ready/default from the NEW top frame with the session's semantics, ended from
 // the root phase, depth = frames. default_pick mutates only the cursor of a throwaway copy. A top
 // frame not yet in `run` (mid enter/seed) carries no ready arrays - report an empty ready and a
