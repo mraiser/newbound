@@ -2226,7 +2226,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       if (!r || r.status !== "ok") {
         const msg = String((r && r.msg) || "no reply");
         status(`debug ${mode} refused: ${msg}`, "bad");
-        if (/session/i.test(msg) && /(no such|no debug session|unknown|not found|gone|missing|reaped)/i.test(msg)) debugEnded("the session is gone (reaped after idling?)");
+        const gone = dbgGone(r) || (/session/i.test(msg) && /(no such|unknown|not found|gone|missing)/i.test(msg) ? "the session is gone (reaped after idling?)" : null);
+        if (gone) debugEnded(gone);
         return r;
       }
       // D4: why this move stopped (over/out/run_to: the reply says; a
@@ -2262,7 +2263,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (dbg !== d) return null;
     if (!st || st.status !== "ok") {
       const msg = String((st && st.msg) || "no reply");
-      if (/no debug session|reaped/i.test(msg)) { debugEnded("the session is gone (reaped after idling?)"); return null; }
+      const gone = dbgGone(st); if (gone) { debugEnded(gone); return null; }
       status("debug state failed: " + msg, "bad"); return null;
     }
     const sig = `${st.cursor}|${st.length}|${st.running}|${st.hash}`;
@@ -2549,6 +2550,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     let r = null;
     try { r = await FD.client.stop(d.session); } catch (e) {}
     return r;
+  }
+  // R4: a session the server has ended (stopped elsewhere, reaped) answers
+  // with its tombstone {status err, phase "stopped", ended_by}; an expired
+  // tombstone or a pre-R4 server says "no debug session" - either way this
+  // editor's session is over. Returns the reason text, or null.
+  function dbgGone(r) {
+    const msg = String((r && r.msg) || "");
+    if (r && r.phase === "stopped") return r.ended_by === "reap" ? "the session was reaped after idling" : `the session has ended (${r.ended_by || "stopped"})`;
+    if (/no debug session|reaped|has ended/i.test(msg)) return "the session is gone (reaped after idling?)";
+    return null;
   }
   function debugEnded(why) {
     dbg = null;
