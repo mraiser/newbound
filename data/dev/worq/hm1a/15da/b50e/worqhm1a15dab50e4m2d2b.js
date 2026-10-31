@@ -2092,12 +2092,14 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     // RUN_EVENT_CAP for the ride afterwards; past the cap only the animation
     // is skipped (events_truncated) - never the result or the path. A refused
     // run (auth, not a flow) IS the result: never a second execution.
-    let r, path = null, untraced = null, tapeEvents = null;
+    let r, path = null, untraced = null, tapeEvents = null, capped = null;
     const rr = await settle(invokeP("dev", "flowstep", "run_flow", { lib: src.lib, ctl: src.ctl, cmd: src.cmd, args, events: RUN_EVENT_CAP, budget: 0, nn_sessionid: "" }));
     if (rr.status === "ok" && rr.result && typeof rr.result === "object") {
       r = rr.result;
       path = Array.isArray(rr.path) ? rr.path.map((p) => ({ deck: p.case, end: p.end === "I-4" ? "next-missing" : p.end, stopAt: p.end === "next" && p.op != null ? p.op : null, inferred: false, ms: p.ms })) : null;
       tapeEvents = (Array.isArray(rr.events) && !rr.events_truncated) ? rr.events : null;
+      // R6: past the cap the ride is skipped - SAY so (it used to be silent)
+      if (rr.events_truncated) capped = { cap: RUN_EVENT_CAP, steps: typeof rr.steps === "number" ? rr.steps : null };
     } else {
       r = rr;
     }
@@ -2117,15 +2119,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const rawMsg = String(r.msg == null ? "" : r.msg);
     const msg = /^\s*</.test(rawMsg) ? rawMsg.replace(/<title>[\s\S]*?<\/title>/i, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : rawMsg;
     const rw = runtimeWarning(savedSyncs);
-    lastResult = { args, ok, result: r, msg, ms, unsaved, source: src, path, untraced,
+    lastResult = { args, ok, result: r, msg, ms, unsaved, source: src, path, untraced, capped,
       unsynchronized: rw ? { flowlang: rw.flowlang, min: rw.min, syncs: rw.n, text: rw.text } : null,
       tokens: R ? { complete: !!R.complete, inOrder: !!R.inOrder, delivered: R.delivered.length } : null };
     const via = untraced ? " · no case path" : (path && path.length ? ` · ${pathText(path)}` : "");
     const unsync = rw ? ` · UNSYNCHRONIZED (flowlang ${rw.flowlang} ignores synchros)` : "";
+    const capTxt = capped ? ` · no token replay (${capped.steps != null ? capped.steps + " steps, " : ""}over the ${capped.cap}-event cap)` : "";
     pushJournal(ok ? `ran ${src.cmd}${via} · ${ms}ms${unsync}` : `run failed: ${msg}${unsync}`);
     if (ok && rw) status(`ran UNSYNCHRONIZED — flowlang ${rw.flowlang} ignores synchros · ${ms}ms`, "warn");
-    else if (ok) status(`ran${via} · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} ${R.delivered.length === 1 ? "delivery" : "deliveries"} in order` : ""), "ok");
-    else status(`run failed: ${msg}`, "bad");
+    else if (ok) status(`ran${via} · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} ${R.delivered.length === 1 ? "delivery" : "deliveries"} in order` : "") + capTxt, "ok");
+    else status(`run failed: ${msg}` + capTxt, "bad");
     renderRunResult(lastResult, R);
     return lastResult;
   }
@@ -2138,6 +2141,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     h += `<pre class="fe-run-pre${L.ok ? "" : " bad"}">${esc(typeof shown === "string" ? shown : JSON.stringify(shown, null, 1))}</pre>`;
     h += `<p class="fe-run-note">args: ${esc(JSON.stringify(L.args))} — the tokens replay the propagation ORDER; per-wire values aren't reported by the platform.</p>`;
     if (L.unsaved) h += `<p class="fe-empty">ran the SAVED body — ${L.unsaved} unsaved change${L.unsaved === 1 ? "" : "s"} not included; save to run them</p>`;
+    if (L.capped) h += `<p class="fe-run-capped">no token replay: the run ${L.capped.steps != null ? "took " + L.capped.steps + " steps and " : ""}listed more than ${L.capped.cap} events, so the animation was skipped. The result above and the case path in the status line are complete.</p>`;
     if (L.unsynchronized) h += `<p class="fe-run-unsync">⚠ ran UNSYNCHRONIZED: flowlang ${esc(L.unsynchronized.flowlang)} predates synchros (need ≥ ${esc(L.unsynchronized.min)}), so the server ignored this flow's ${L.unsynchronized.syncs} synchro${L.unsynchronized.syncs === 1 ? "" : "s"}. The replay below draws the order the synchros ASK for, not the order that ran.</p>`;
     if (R && R.rounds && R.rounds.length) h += runRoundsHtml(R);
     body.innerHTML = h;
