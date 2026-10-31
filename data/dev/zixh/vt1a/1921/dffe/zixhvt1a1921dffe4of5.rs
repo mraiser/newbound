@@ -84,7 +84,9 @@ let ran = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         let d = frames.len() as i64;
         if d > max_depth { max_depth = d; }
         if keep != 0 {
-            if keep < 0 || (evs.len() as i64) < keep { evs.push_object(e.clone()); } else { ev_trunc = true; }
+            // seq = the event's 0-based index in the run, the debugger tape's
+            // own stamp (the editor's ride keys tokens and rounds by it)
+            if keep < 0 || (evs.len() as i64) < keep { let mut ec = e.clone(); ec.put_int("seq", steps - 1); evs.push_object(ec); } else { ev_trunc = true; }
         }
         let et = s_of(&e, "type");
         let at_root = !(e.has("frame") && e.get_property("frame").is_array() && e.get_array("frame").len() > 0);
