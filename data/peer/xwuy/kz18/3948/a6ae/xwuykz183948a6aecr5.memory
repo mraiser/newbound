@@ -1,0 +1,3 @@
+[
+{"claim": "headsup renders remote-sourced text - result.msg lines, .upgradelist library chips, address chips - with textContent, never innerHTML", "detail": "F3 (commit a3aa0206), same rule as peer.peer: anything a peer or the network supplies is untrusted. me.update's address chips and the upgrade-list chips are DOM-built with textContent; error msgs are appended as text nodes. The rule applies to every future line touched in this control, not just the F3 spots.", "tags": "peer.headsup,xss,security,F3", "source": {"lib": "peer", "ctl": "headsup", "facet": "js", "hash": "b7346f6136d1595e"}, "confidence": "high", "time": 1793417931028},
+{"end": true}]
