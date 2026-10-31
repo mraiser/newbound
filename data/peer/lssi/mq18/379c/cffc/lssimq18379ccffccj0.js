@@ -17,6 +17,25 @@ me.peers = [];
 // marks the in-flight adds, keyed by peer id.
 me.adding = {};
 
+// F6 + F15: ONE source of truth for a peer's link state, shared by the orb's
+// tint (peer.peer_model) and the panel's dots (peer.headsup) so sphere and
+// dots always read as the same colour. Hues are tint()'s, frozen at full
+// strength (hsl 132/212/48, s .46/.48/.60, l .54) as one hex per kind.
+var STATUS_COLORS = { tcp: '#54c069', udp: '#5186c2', relay: '#d0b443', down: '#9e9e9e' };
+document.body.peerstatus = function(p, now){
+  p = p || {};
+  if (!now) now = Date.now();
+  var kind = p.tcp ? 'tcp' : p.udp ? 'udp' : (p.relay || p.connected) ? 'relay' : 'down';
+  var age = p.last_contact ? Math.max(0, now - p.last_contact) : Infinity;
+  var f = 0;
+  if (isFinite(age)) {
+    if (age <= 30000) f = 1;
+    else if (age < 900000) f = 1 - (age - 30000) / (900000 - 30000);
+  }
+  var dots = kind == 'down' ? 0 : age <= 30000 ? 3 : age <= 300000 ? 2 : 1;
+  return { kind: kind, color: STATUS_COLORS[kind], freshness: f, dots: dots };
+};
+
 me.uiReady = function(ui){
   me.ui = ui;
   ME.querySelector('.wrap').style.display = 'block';
@@ -242,6 +261,28 @@ function startFeed(){
   if (me.feed || !me.host || !me.info) return;
   feedTick();
   if (!me.feed) me.feed = setInterval(feedTick, FEED_MS);
+  startPoll();
+}
+
+// F6: me.peers only changed on UPDATE events, so a quiet-but-connected peer's
+// last_contact never advanced and its orb faded to grey. Re-read the peer list
+// every 10 s — upsertPeerDiv refreshes the hidden data divs (headsup reads
+// them) and the feed loop's syncPeerData pushes the records into the orbs.
+// Never faster than 10 s; the timer stops itself once the control is gone.
+var POLL_MS = 10000;
+function startPoll(){
+  if (me.poll) return;
+  me.poll = setInterval(function(){
+    if (!ME.isConnected) { clearInterval(me.poll); me.poll = null; return; }
+    send_peers(function(result){
+      if (result.status != 'ok' || !result.data) return;
+      me.peers = [];
+      for (var i in result.data) {
+        me.peers.push(result.data[i]);
+        upsertPeerDiv(result.data[i]);
+      }
+    });
+  }, POLL_MS);
 }
 
 function wakeFeed(){

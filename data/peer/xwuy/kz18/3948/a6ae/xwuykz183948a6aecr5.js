@@ -224,8 +224,30 @@ me.update = function(){
       alist.appendChild(document.createTextNode(' '));
     }
 
-    var c = ME.DATA.tcp ? '#84bd00' : ME.DATA.udp ? '#00f' : ME.DATA.connected ? '#ff0' : 'ccc';
-    ME.querySelector('.connectionindicator').style.backgroundColor = c;
+    // F15: all three dots share the orb's colour verdict (document.body.peerstatus
+    // from peer.peer): the first `dots` are lit, the rest keep a faint outline in
+    // the same colour; down fills all three grey. Hover says kind + last check.
+    var ps = document.body.peerstatus;
+    var st = ps ? ps(ME.DATA, Date.now()) : null;
+    var inds = ME.querySelectorAll('.connectionindicator');
+    if (st) {
+      for (var di = 0; di < inds.length; di++) {
+        var lit = st.kind == 'down' || di < st.dots;
+        inds[di].style.backgroundColor = lit ? st.color : 'transparent';
+        inds[di].style.border = '1px solid ' + (lit ? st.color : st.color + '66');
+      }
+      var labels = { tcp: 'TCP', udp: 'UDP', relay: 'Relay', down: 'Disconnected' };
+      var ago = ME.DATA.last_contact ? Math.max(0, Date.now() - ME.DATA.last_contact) : -1;
+      var agoTxt = ago < 0 ? 'unknown' : ago < 60000 ? Math.round(ago/1000) + ' s ago'
+        : ago < 3600000 ? Math.round(ago/60000) + ' min ago' : Math.round(ago/3600000) + ' h ago';
+      inds[0].parentElement.title = labels[st.kind] + ' · last check ' + agoTxt;
+    }
+    else {
+      // peerstatus not published (panel mounted outside the peer page): the
+      // legacy single dot, with the invalid 'ccc' fixed to '#ccc'.
+      var c = ME.DATA.tcp ? '#84bd00' : ME.DATA.udp ? '#00f' : ME.DATA.connected ? '#ff0' : '#ccc';
+      inds[0].style.backgroundColor = c;
+    }
     var l = ME.DATA.latency ? ME.DATA.latency+'ms' : '--';
     ME.querySelector('.connectionlatency').textContent = l;
 

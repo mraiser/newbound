@@ -32,12 +32,24 @@ function freshness(ageMs){
 }
 function tint(){
   var p = me.data || {}, now = Date.now();
-  var h = 210, s0 = 0;                                   // grey: disconnected
-  if (p.tcp) { h = 132; s0 = 0.46; }                     // green
-  else if (p.udp) { h = 212; s0 = 0.48; }                // blue
-  else if (p.relay || p.connected) { h = 48; s0 = 0.60; } // yellow
-  var age = p.last_contact ? Math.max(0, now - p.last_contact) : Infinity;
-  var f = freshness(age);
+  // F6: prefer the page's shared verdict (document.body.peerstatus, published
+  // by peer.peer) so orb and panel dots always agree on kind and freshness;
+  // this control keeps its own saturation/lightness curve for brightness.
+  var h = 210, s0 = 0, f = 0;                            // grey: disconnected
+  var ps = document.body.peerstatus;
+  var st = ps ? ps(p, now) : null;
+  if (st) {
+    var hues = { tcp: [132, 0.46], udp: [212, 0.48], relay: [48, 0.60], down: [210, 0] };
+    var hv = hues[st.kind] || hues.down;
+    h = hv[0]; s0 = hv[1]; f = st.freshness;
+  }
+  else {
+    if (p.tcp) { h = 132; s0 = 0.46; }                     // green
+    else if (p.udp) { h = 212; s0 = 0.48; }                // blue
+    else if (p.relay || p.connected) { h = 48; s0 = 0.60; } // yellow
+    var age = p.last_contact ? Math.max(0, now - p.last_contact) : Infinity;
+    f = freshness(age);
+  }
   return hslHex(h, s0 * (0.16 + 0.84 * f), 0.54 - (1 - f) * 0.12);
 }
 
