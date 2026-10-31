@@ -2200,7 +2200,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     status(`debug: opening a session on ${src.cmd}…`);
     const r = await FD.client.start(src, body, args || {});
     if (!r || r.status !== "ok" || !r.session) { status("debug start failed: " + ((r && r.msg) || "no session"), "bad"); return r; }
-    dbg = { session: r.session, src, args: args || {}, st: null, views: [], busy: false, last: r, follow: true, sig: "", unsaved: dirty };
+    dbg = { session: r.session, src, args: args || {}, st: null, views: [], busy: false, last: r, follow: true, sig: "", unsaved: dirty,
+      boundary: typeof r.boundary === "string" ? r.boundary : "", crossed: [] };   // R3: the server's session boundary, shown verbatim
     dbgTape = []; dbgTapeCursor = -1;                    // D5: a fresh tape
     ME.classList.add("fe-debugging");
     pushJournal(`debug session · ${src.cmd}` + (dirty ? " (unsaved body)" : ""));
@@ -2231,6 +2232,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       // D4: why this move stopped (over/out/run_to: the reply says; a
       // continue's comes with the poll that sees it end)
       d.stop = r.running ? null : { stopped: String(r.stopped || ""), hit: r.hit || null, mode };
+      // R3: back/goto over opaque rust/python command steps restores the
+      // interpreter, not the world - the server lists those steps
+      // (crossed_side_effects); the bar says so until the next move
+      d.crossed = Array.isArray(r.crossed_side_effects) ? r.crossed_side_effects.slice() : [];
       // D2: what this move SHOWS — its events (a back(1): the undone one, in
       // reverse); continue/goto/pause/back(n) only redraw
       const back1 = mode === "back" && !!prevEv && !(pick && pick.count > 1);
@@ -2589,6 +2594,24 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       ev.textContent = t;
       ev.className = "fe-dbg-ev" + (ended ? " ended" : "") + (st.event && (st.event.type === "error" || st.event.type === "stall") ? " bad" : "") + (dbgStopText() ? " bp" : "");
     }
+    // R3: the session boundary - the server's facts, never invented here:
+    // the last move's crossed_side_effects, the flow's persistent keys
+    // (debug_state persistent), and debug_start's boundary as the tooltip
+    const wn = $(".fe-dbg-warn");
+    if (wn) {
+      const w = dbgWarnings(st);
+      wn.textContent = w.length ? "⚠ " + w.join(" · ⚠ ") : "";
+      wn.title = (w.length ? w.join("\n") + "\n\n" : "") + (dbg.boundary ? "session boundary: " + dbg.boundary : "");
+      wn.hidden = !w.length;
+    }
+  }
+  function dbgWarnings(st) {
+    const w = [];
+    const cx = dbg && Array.isArray(dbg.crossed) ? dbg.crossed : [];
+    const pk = st && Array.isArray(st.persistent) ? st.persistent : [];
+    if (cx.length) w.push(`rolled back over rust/python step${cx.length > 1 ? "s" : ""} ${cx.join(", ")}: outside effects NOT undone`);
+    if (pk.length) w.push(`persistent ${pk.join(", ")} not isolated: other runs share ${pk.length > 1 ? "them" : "it"}`);
+    return w;
   }
 
   // ── D3: the debug inspector ──────────────────────────────────────────────
@@ -3360,6 +3383,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         debugPlates: () => instances.map((inst) => ({ key: inst && inst.key, dbg: inst && inst.ctx && inst.ctx.me ? inst.ctx.me._dbg : undefined })),
         debugFacade: () => lastFacadeDbg.slice(),
         debugBarText: () => { const b = $(".fe-dbg"); return b && !b.hidden ? { pos: $(".fe-dbg-pos").textContent, ev: $(".fe-dbg-ev").textContent } : null; },
+        debugWarnText: () => { const w = $(".fe-dbg-warn"); return w && !w.hidden ? { text: w.textContent, title: w.title } : null; },
         focus: () => ({ depth: focusPath.length, deck: activeDeck, titles: focusPath.map((f) => f.title) }),
         // D3 inspector surface
         debugFocusFrame, debugFollowNow,

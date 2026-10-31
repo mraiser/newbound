@@ -105,6 +105,7 @@
 .nb-flowedit3d .fe-dbg button { font-size:12px; padding:2px 8px; }
 .nb-flowedit3d .fe-dbg-pos { font-family:var(--mono, monospace); color:var(--text-dim); min-width:9ch; }
 .nb-flowedit3d .fe-dbg-ev { flex:1; min-width:16ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); }
+.nb-flowedit3d .fe-dbg-warn { font-size:12px; max-width:52ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--accent-dim); }
 .nb-flowedit3d .fe-dbg-ev.ended { color:var(--good); } .nb-flowedit3d .fe-dbg-ev.bad { color:var(--danger); }
 .nb-flowedit3d .fe-dbg-legend { display:flex; gap:8px; font-size:11px; color:var(--text-dim); }
 .nb-flowedit3d .fe-dbg-legend i { font-style:normal; display:inline-flex; align-items:center; gap:3px; }
