@@ -102,3 +102,17 @@
   font-size: 12px;
   margin-left: 6px;
 }
+
+/* F11: a menu item whose action is unavailable (Add Control after a failed
+   first read) keeps its row but loses its popup and its affordance. */
+.hudpanel .menuitem-disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* F11: write-path errors in the Add Control popup */
+.add-control-error {
+  color: #d06060;
+  font-size: 12px;
+  padding: 4px 8px;
+}

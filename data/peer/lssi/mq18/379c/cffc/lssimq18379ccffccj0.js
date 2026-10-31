@@ -349,6 +349,9 @@ function peerErrorText(result){
   if (msg == 'UNAUTHORIZED' || msg.indexOf('UNAUTHORIZED') == 0) return 'Unauthorized';
   return 'Error: ' + (msg ? msg : 'no reply');
 }
+// Session 2 (F8/F11): headsup shows the same words — published the way
+// peerstatus is, so both controls keep one vocabulary.
+document.body.peerErrorText = peerErrorText;
 
 // F5: end a row in its error state — dim red text, checkbox disabled.
 function rowError(uuid, text){

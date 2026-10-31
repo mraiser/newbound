@@ -91,6 +91,10 @@ me.ready = function(){
       // F3: result.msg is untrusted — set it as text
       ME.querySelector('.hudapps').textContent = result.msg;
       me.data = { "list": [] };
+      // F11: 'NOT FOUND' only means this peer has never shared a control.
+      // Any OTHER failure makes adding unsafe (a write would replace a list
+      // we never saw), so the menu item goes dark with the reason on it.
+      if (result.msg != 'NOT FOUND') disableAddControl(errText(result));
     }
     else {
       me.data = result.data;
@@ -126,10 +130,25 @@ me.ready = function(){
       el.querySelectorAll('.add-ctl-item').forEach(function(item){
         item.addEventListener('click', function(){
           var d = me.available[this.dataset.id];
-          me.data.list.push(d);
-          json('../peer/remote/'+ME.DATA.id+'/app/write', "lib=runtime&id=controls_shared&readers=[]&writers=[]&data="+encodeURIComponent(JSON.stringify(me.data)), function(result){
-            me.refresh();
-            ME.querySelector('.add-control-popup-close').click();
+          // F11: never write over a list we haven't just seen — a stale or
+          // empty me.data would replace the peer's real dashboard. Re-read
+          // controls_shared NOW and push onto the fresh list. 'NOT FOUND'
+          // means the peer has never shared a control (start empty); any
+          // other failure writes nothing and says why in the popup.
+          var errEl = ME.querySelector('.add-control-error');
+          errEl.textContent = '';
+          json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_shared", function(rr){
+            var fresh;
+            if (rr.status == 'ok') fresh = rr.data && rr.data.list ? rr.data : { "list": [] };
+            else if (rr.msg == 'NOT FOUND') fresh = { "list": [] };
+            else { errEl.textContent = errText(rr); return; }
+            fresh.list.push(d);
+            json('../peer/remote/'+ME.DATA.id+'/app/write', "lib=runtime&id=controls_shared&readers=[]&writers=[]&data="+encodeURIComponent(JSON.stringify(fresh)), function(result){
+              if (result.status != 'ok') { errEl.textContent = errText(result); return; }
+              me.data = fresh;
+              me.refresh();
+              ME.querySelector('.add-control-popup-close').click();
+            });
           });
         });
       });
@@ -214,6 +233,17 @@ function errText(result){
   var msg = result && result.msg ? String(result.msg) : '';
   if (msg == 'UNAUTHORIZED' || msg.indexOf('UNAUTHORIZED') == 0) return 'Unauthorized';
   return 'Error: ' + (msg ? msg : 'no reply');
+}
+
+// F11: the Add Control menu item opens its popup through its data-popup
+// attribute (initPopups reads it at click time), so removing the attribute
+// IS the disable; the title carries the reason.
+function disableAddControl(reason){
+  var td = ME.querySelector('.control-settings-popup td[data-popup*="add-control-popup"]');
+  if (!td) return;
+  td.removeAttribute('data-popup');
+  td.classList.add('menuitem-disabled');
+  td.title = 'Add Control is unavailable: ' + reason;
 }
 
 // F8: Stay connected saves through security/setuser on THIS instance — it is
