@@ -1,5 +1,8 @@
 var me = this;
 var ME = document.getElementById(me.UUID);
+// F7: the panel root carries the css scope — .hudpanel hides every .adminonly
+// until the remote current_user check earns .isadmin.
+ME.classList.add('hudpanel');
 
 function animateTo(el, props, ms, cb) {
   var done = function() { for (var k in props) el.style[k] = props[k]; if (cb) cb(); };
@@ -66,7 +69,9 @@ me.ready = function(){
   json('../peer/remote/'+ME.DATA.id+'/security/current_user', null, function(result){
     if (result.status == "ok") {
       ME.querySelector('.rp-key').textContent = result.data.groups;
-      if (result.data.groups.indexOf('admin') != -1) ME.querySelector('.adminonly').style.display = 'block';
+      // F7: one class on the panel root shows EVERY .adminonly element
+      // (menu items and the Platform block), not just the first one found.
+      if (result.data.groups.indexOf('admin') != -1) ME.classList.add('isadmin');
     }
     else ME.querySelector('.rp-key').textContent = 'n/a';
   });

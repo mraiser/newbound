@@ -84,3 +84,14 @@
   width:150px;
   height:150px;
 }
+
+/* F7: everything admin-only hides until the panel root (.hudpanel, set in
+   the js) earns .isadmin from the remote current_user check. Scoped to the
+   panel so dashboard-mounted controls' own classes are untouched. */
+.hudpanel .adminonly {
+  display: none;
+}
+
+.hudpanel.isadmin .adminonly {
+  display: revert;
+}
