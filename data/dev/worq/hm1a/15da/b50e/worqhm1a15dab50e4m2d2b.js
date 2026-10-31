@@ -2005,14 +2005,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // ── P5 run parity: a LIVE editor runs on the stepper ─────────────────────
   // When the editor has a source (and is not the harness), the run button or
   // R key opens an args form over the params bar (doc.root.input, coerced by
-  // bar type; no params means run at once). The run is ONE debug session:
-  // debug_start (body {} = the SAVED body) + debug_step continue {wait}, and
-  // its REAL events ride the editor in rounds afterwards — the same
-  // interpreter path as the debugger, with the case path read straight off
-  // the tape (no trace_flow sentinel, no predicted schedule). The payload
-  // (the ended frame's out, or the run's failure) goes to the inspector with
-  // an args sentence. The harness keeps the token-only (dry) run.
+  // bar type; no params means run at once). R5: the run is ONE ordinary run
+  // (dev.flowstep.run_flow: flowlang's stepper, no debug session/tape/budget)
+  // that returns app.app.exec's envelope, the complete root case path, and
+  // its REAL events (capped for the animation only), which ride the editor in
+  // rounds afterwards - no trace_flow sentinel, no predicted schedule. The
+  // payload (the run's envelope) goes to the inspector with an args
+  // sentence. The harness keeps the token-only (dry) run.
   let lastResult = null, liveCall = false;
+  // the Run ride's event cap: an ANIMATION limit only (run_flow flags
+  // events_truncated past it; the result and case path are always whole)
+  const RUN_EVENT_CAP = 2000;
   function coerceArg(raw, type) {
     const t = (type || "").toLowerCase();
     if (t === "integer" || t === "int") { const n = parseInt(raw, 10); return isNaN(n) ? raw : n; }
@@ -2076,33 +2079,23 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     status(`running ${src.cmd}…`);
     const started = performance.now();
     const settle = (p) => p.then((r) => r || { status: "err", msg: "no response" }, (e) => ({ status: "err", msg: String(e && e.message ? e.message : e) }));
-    // ONE execution on the stepper: debug_start (body {} = the SAVED body)
-    // opens a session and debug_step continue {wait} runs it to the end —
-    // the same interpreter path as the debugger. The case path is the tape's
-    // (each case-ending event names its op), and the run's REAL events ride
-    // the editor afterwards. A session the stepper refuses (never started)
-    // falls back to the plain command run with no path; its other failures
-    // ARE the run's result and are shown as-is — never a second execution.
-    const st = await FD.client.start(src, {}, args);
-    let session = st && st.session, r, path = null, untraced = null, tapeEvents = null;
-    if (!session) {
-      untraced = String((st && st.msg) || "no session").slice(0, 120);
-      r = await settle(invokeP(src.lib, src.ctl, src.cmd, args));
+    // ONE ordinary run (R5): dev.flowstep.run_flow runs the SAVED body on
+    // flowlang's own stepper (the semantics Command::execute runs) with no
+    // debug session, tape or debugger budget, and answers with THE mapping
+    // (app.app.exec's auth + format_result; a root terminate is success with
+    // the output delivered so far) plus the COMPLETE root case path (nested
+    // frames never enter it). The run's events are recorded up to
+    // RUN_EVENT_CAP for the ride afterwards; past the cap only the animation
+    // is skipped (events_truncated) - never the result or the path. A refused
+    // run (auth, not a flow) IS the result: never a second execution.
+    let r, path = null, untraced = null, tapeEvents = null;
+    const rr = await settle(invokeP("dev", "flowstep", "run_flow", { lib: src.lib, ctl: src.ctl, cmd: src.cmd, args, events: RUN_EVENT_CAP, budget: 0, nn_sessionid: "" }));
+    if (rr.status === "ok" && rr.result && typeof rr.result === "object") {
+      r = rr.result;
+      path = Array.isArray(rr.path) ? rr.path.map((p) => ({ deck: p.case, end: p.end === "I-4" ? "next-missing" : p.end, stopAt: p.end === "next" && p.op != null ? p.op : null, inferred: false, ms: p.ms })) : null;
+      tapeEvents = (Array.isArray(rr.events) && !rr.events_truncated) ? rr.events : null;
     } else {
-      const fin = await FD.client.step(session, "continue", { wait: true });
-      tapeEvents = (fin && Array.isArray(fin.events) && !fin.events_truncated) ? fin.events : null;
-      const st2 = await FD.client.state(session);
-      path = casePathFromEvents(tapeEvents);
-      const ev = (st2 && st2.event) || (fin && fin.event) || null;
-      if (st2 && st2.status === "ok" && ev && ev.type === "done" && !ev.fail && ev.outcome === "ok") {
-        r = Object.assign({ status: "ok" }, (ev.out && typeof ev.out === "object" && !Array.isArray(ev.out) ? ev.out : {}));
-      } else if (st2 && st2.status === "ok" && st2.ended) {
-        r = { status: "err", msg: runFailureText(ev, st2.last_stop) };
-      } else {
-        r = { status: "err", msg: String((fin && fin.msg) || (st2 && st2.msg) || "the run did not end") };
-      }
-      try { await FD.client.stop(session); } catch (e) {}
-      session = null;
+      r = rr;
     }
     const ms = Math.round(performance.now() - started);
     // ride the run's REAL events from the ROOT case's first deck, where the
