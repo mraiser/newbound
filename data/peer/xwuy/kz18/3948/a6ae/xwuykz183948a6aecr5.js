@@ -205,6 +205,54 @@ ME.querySelector('.closehud').addEventListener('click', function(){
   if (par && par.api && par.api.focus) par.api.focus(null);
 });
 
+// F5/F8/F11: the words for a refused or failed call. Session 1's helper lives
+// in peer.peer (published as document.body.peerErrorText); fall back to the
+// same wording when the panel is mounted outside the peer page.
+function errText(result){
+  var f = document.body.peerErrorText;
+  if (f) return f(result);
+  var msg = result && result.msg ? String(result.msg) : '';
+  if (msg == 'UNAUTHORIZED' || msg.indexOf('UNAUTHORIZED') == 0) return 'Unauthorized';
+  return 'Error: ' + (msg ? msg : 'no reply');
+}
+
+// F8: Stay connected saves through security/setuser on THIS instance — it is
+// our setting for that peer. The record's other fields come fresh from
+// security/users (never from ME.DATA) so nothing else gets overwritten; while
+// the save is in flight me.update leaves the box alone; a failure reverts the
+// box and says why; success re-reads what the server actually holds.
+ME.querySelector('#keepalive').addEventListener('change', function(){
+  var box = this;
+  var want = box.checked;
+  var status = ME.querySelector('.keepalive-status');
+  status.textContent = '';
+  me.keepaliveSaving = true;
+  function fail(result){
+    box.checked = !want;
+    status.textContent = errText(result);
+    me.keepaliveSaving = false;
+  }
+  json('../security/users', null, function(result){
+    var u = result.status == 'ok' && result.data ? result.data[ME.DATA.id] : null;
+    if (!u) { fail(result.status == 'ok' ? {msg:'no local user record for this peer'} : result); return; }
+    var params = 'id=' + encodeURIComponent(ME.DATA.id)
+      + '&displayname=' + encodeURIComponent(u.displayname || '')
+      + '&password=' + encodeURIComponent(u.password || '')
+      + '&groups=' + encodeURIComponent(JSON.stringify(u.groups || []))
+      + '&keepalive=' + want
+      + '&address=' + (u.address ? encodeURIComponent(u.address) : 'null')
+      + '&port=' + (u.port ? encodeURIComponent(u.port) : 'null');
+    json('../security/setuser', params, function(r){
+      if (r.status != 'ok') { fail(r); return; }
+      json('../security/users', null, function(rr){
+        var u2 = rr.status == 'ok' && rr.data ? rr.data[ME.DATA.id] : null;
+        if (u2) box.checked = (u2.keepalive === true || u2.keepalive === 'true');
+        me.keepaliveSaving = false;
+      });
+    });
+  });
+});
+
 me.update = function(){
   if (me.check == ME.querySelector('.rp-uuid')) {
     ME.DATA = document.getElementById('peer_'+ME.DATA.id).DATA;
@@ -213,7 +261,12 @@ me.update = function(){
     ME.querySelector('.hud_ipaddr').textContent = ME.DATA.address;
     ME.querySelector('.hud_port').textContent = ME.DATA.p2p_port;
     ME.querySelector('.hud_http_port').textContent = ME.DATA.http_port;
-    ME.querySelector('#keepalive').checked = !!ME.DATA.keepalive;
+    // F8: keepalive is stored as a string — "false" must not read as ticked;
+    // and while a save is in flight, the save owns the box, not this refresh.
+    if (!me.keepaliveSaving) {
+      var ka = ME.DATA.keepalive;
+      ME.querySelector('#keepalive').checked = (ka === true || ka === 'true');
+    }
 
     // F3: addresses are peer-reported — build the chips with DOM calls and
     // textContent, never innerHTML (the href is set as a plain attribute).

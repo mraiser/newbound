@@ -95,3 +95,10 @@
 .hudpanel.isadmin .adminonly {
   display: revert;
 }
+
+/* F8: the save-failure words next to Stay connected */
+.hudpanel .keepalive-status {
+  color: #d06060;
+  font-size: 12px;
+  margin-left: 6px;
+}
