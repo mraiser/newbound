@@ -2100,7 +2100,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const ms = Math.round(performance.now() - started);
     // ride the run's REAL events from the ROOT case's first deck, where the
     // stepper starts (events not on this picture are skipped, never fatal);
-    // untraced (no session): the dry schedule rides instead (runFlow's own)
+    // untraced stays null since R5 (run_flow always returns the case path) -
+    // kept so lastResult's shape and the dry-schedule fallback are unchanged
     let R = null;
     if (focusPath.length === 1) {
       try { R = tapeEvents && tapeEvents.length ? await rideRunEvents(tapeEvents, path) : (untraced ? await runFlow() : null); } catch (e) { R = null; }
