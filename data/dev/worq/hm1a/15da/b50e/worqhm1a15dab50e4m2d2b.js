@@ -2610,9 +2610,14 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     status(why ? "debug: " + why : "debug session stopped — edits unlocked", why ? "bad" : "ok");
   }
   // a ready item in words, named in the top frame's case
+  // R6: only wire/sync/op items are picks. A pending rule effect ({kind: effect, op, rule}) or an op in
+  // progress ({kind: auto, op, stage}) runs next whatever is clicked - the server reports it as the default.
+  function dbgPickable(x) { return !!x && (x.kind === "op" || x.kind === "wire" || x.kind === "sync"); }
   function dbgItemText(v, it) {
     const c = v && v.caseObj;
-    if (!it || it.kind === "auto") return "auto";
+    if (!it) return "auto";
+    if (it.kind === "auto") return `op ${c && c.cmds[it.op] ? nameOf(c, it.op) : it.op} continues` + (it.stage ? ` (${it.stage})` : "");
+    if (it.kind === "effect") return `${it.rule || "rule"} rule of op ${c && c.cmds[it.op] ? nameOf(c, it.op) : it.op}`;
     if (it.kind === "op") return `op ${c && c.cmds[it.index] ? nameOf(c, it.index) : it.index}`;
     if (it.kind === "wire") { const w = c && c.cons[it.index]; return w ? `${nameOf(c, w.src[0])}.${w.src[1]}→${nameOf(c, w.dest[0])}.${w.dest[1]}` : `wire ${it.index}`; }
     if (it.kind === "sync") { const s = c && c.syncs && c.syncs[it.index]; return s ? `${nameOf(c, s.src)}⇢${nameOf(c, s.dest)}` : `synchro ${it.index}`; }
@@ -2638,10 +2643,11 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       { const bh = dbgStopText(); if (bh) t = `● ${bh} · ${t}`; }   // D4
       // R6: a move that ran out of its step budget is NOT the end of the flow
       if (!ended && !live && dbg.stop && dbg.stop.stopped === "budget") t = `⏸ step budget ran out${dbg.stop.mode === "continue" ? " (10,000 steps per continue)" : ""} — not the end; F5 continues · ${t}`;
-      const rd = (st.ready || []).filter((x) => x && x.kind !== "auto");
+      const rd = (st.ready || []).filter(dbgPickable);
+      const forced = (st.ready || []).find((x) => x && !dbgPickable(x));   // R6: runs next whatever is clicked
       if (ended) t += " · ended";
+      else if (forced) t += ` · next: ${dbgItemText(top, forced)}`;
       else if (rd.length) t += ` · ready: ${rd.map((x) => dbgItemText(top, x)).join(", ")}` + (st.default ? ` · next ${dbgItemText(top, st.default)}` : "");
-      else if ((st.ready || []).length) t += " · next: auto";
       if (top && top.external) t += ` · in ${top.external.name || "a callee"} (not in this flow)`;
       if (live) t = "running… " + t;
       ev.textContent = t;
@@ -2695,7 +2701,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       event: FD.eventText(st.event, views), focusFi: dv ? dv.fi : null, follow: !!dbg.follow,
       frames: views.slice().reverse().map((v) => ({ fi: v.fi, title: dbgFrameTitle(v), kind: v.kind, case: v.case, phase: v.phase,
         outcome: v.outcome, top: v.top, focused: dv === v, showable: v.fi < chainLen, external: !!v.external })),
-      ready: (st.ready || []).filter((x) => x && x.kind !== "auto").map((x) => ({ kind: x.kind, index: x.index, text: dbgItemText(top, x),
+      ready: (st.ready || []).filter(dbgPickable).map((x) => ({ kind: x.kind, index: x.index, text: dbgItemText(top, x),
         isDefault: !!(st.default && st.default.kind === x.kind && st.default.index === x.index) })),
       sel: null, frame: null, stop: dbgStopText(),
       bps: bpListModel().map((x) => ({ kind: x.kind, index: x.index, case: x.case, depth: x.depth, text: x.text, entry: x.entry })) };
