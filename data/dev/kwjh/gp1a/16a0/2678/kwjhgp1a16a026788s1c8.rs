@@ -35,6 +35,19 @@ fn end_state(frames: &DataArray) -> DataObject {
 fn ready_view(top: &DataObject) -> (DataArray, Option<DataObject>) {
   if top.get_string("phase") != "run" { return (DataArray::new(), None); }
   let ready = st::ready_now(top);
+  // R6: a pending rule effect ({kind: effect, op, rule}) or an op in progress ({kind: auto, op, stage}) is
+  // not pickable - the pick validation below refuses everything but wire/sync/op, and step_stack performs
+  // that item next whatever the pick - so IT is the default. default_pick only sweeps wires/syncs/ops and
+  // named an item that does not run (a wire, while the next rule fired or a list op iterated), which made
+  // breakpoints and run_to targets on that wire stop falsely and the editor's "next" lie.
+  for r in ready.objects() {
+    if !r.is_object() { continue; }
+    let o = r.object();
+    if o.has("kind") && o.get_property("kind").is_string() {
+      let k = o.get_string("kind");
+      if k != "wire" && k != "sync" && k != "op" { return (ready.clone(), Some(o.deep_copy())); }
+    }
+  }
   let dflt = match st::case_at(&top.get_object("body"), top.get_int("case")) {
     Some(c) => {
       let mut peek = st::copy_frame(top);
