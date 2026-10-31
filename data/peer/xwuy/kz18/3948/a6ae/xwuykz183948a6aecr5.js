@@ -1,8 +1,11 @@
 var me = this;
 var ME = document.getElementById(me.UUID);
 // F7: the panel root carries the css scope — .hudpanel hides every .adminonly
-// until the remote current_user check earns .isadmin.
+// until the remote current_user check earns .isadmin. The host element is
+// REUSED across mounts (installControl swaps innerHTML only), so a previous
+// peer's verdict must not linger: drop isadmin until this mount earns it.
 ME.classList.add('hudpanel');
+ME.classList.remove('isadmin');
 
 function animateTo(el, props, ms, cb) {
   var done = function() { for (var k in props) el.style[k] = props[k]; if (cb) cb(); };
