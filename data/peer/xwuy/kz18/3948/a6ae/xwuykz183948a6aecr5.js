@@ -336,7 +336,10 @@ me.update = function(){
       var c = ME.DATA.tcp ? '#84bd00' : ME.DATA.udp ? '#00f' : ME.DATA.connected ? '#ff0' : '#ccc';
       inds[0].style.backgroundColor = c;
     }
-    var l = ME.DATA.latency ? ME.DATA.latency+'ms' : '--';
+    // F15 follow-up (Phase 1 review): a down peer's last measured latency is
+    // stale — show an em dash under the grey dots until the link is back.
+    var isdown = st ? st.kind == 'down' : !(ME.DATA.tcp || ME.DATA.udp || ME.DATA.connected);
+    var l = isdown ? '—' : ME.DATA.latency ? ME.DATA.latency+'ms' : '--';
     ME.querySelector('.connectionlatency').textContent = l;
 
     setTimeout(me.update, 3000);
