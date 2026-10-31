@@ -300,6 +300,9 @@ function buildUpdateDialog(){
   var el = ME.querySelector('.peerupdatelist');
   el.innerHTML = '<table cellpadding="10px" class="updateablepeerstable"><thead><tr><th><label class="plaincheckbox"><input type="checkbox" class="toggleallupdates"><span></span></label></th><th style="text-align:left;">Peer</th><th style="text-align:left;">Available Updates</th></tr></thead><tbody></tbody></table>';
   var tbody = el.querySelector('tbody');
+  // F10: rows still checking — when the last one resolves and none is left,
+  // the dialog says so (checkDone) instead of sitting there as an empty table.
+  me.upPending = 0;
   for (var i in me.peers) {
     var p = me.peers[i];
     if (p.connected) {
@@ -322,9 +325,11 @@ function buildUpdateDialog(){
       td.innerHTML = '<i>pending...</i>';
       tr.appendChild(td);
       tbody.appendChild(tr);
+      me.upPending++;
       checkForUpdates(p);
     }
   }
+  if (me.upPending == 0) { me.upPending = 1; checkDone(); }
   el.querySelector('.toggleallupdates').addEventListener('click', function(){
     var b = this.checked;
     el.querySelectorAll('.libupdate').forEach(function(box){ box.checked = b; });
@@ -353,6 +358,171 @@ function peerErrorText(result){
 // peerstatus is, so both controls keep one vocabulary.
 document.body.peerErrorText = peerErrorText;
 
+// F12: the old author/authorkey gate was disabled (if (true)) — Marc may have
+// done that on purpose, so it stays off. Instead, when BOTH sides carry an
+// author and authorkey and they differ, the chip is marked: warning text, a
+// title naming who wrote each copy, and it starts DESELECTED (dimmed, left
+// out of Update All / Update Selected) until the user clicks it to include
+// it. Published for peer.headsup, like peerstatus and peerErrorText.
+function applyAuthorWarn(chip, mylib, theirlib){
+  var a1 = mylib.author, k1 = mylib.authorkey;
+  var a2 = theirlib.author, k2 = theirlib.authorkey;
+  if (!(a1 && k1 && a2 && k2)) return;
+  if (a1 == a2 && k1 == k2) return;
+  chip.classList.add('authwarn');
+  chip.dataset.included = '0';
+  chip.style.opacity = '0.45';
+  // F3: author names are untrusted — a title is a plain attribute, never markup
+  chip.title = 'Different author — local copy by ' + a1 + ', peer\'s copy by ' + a2 + '. Click to include this update anyway.';
+  var w = document.createElement('span');
+  w.className = 'authwarntext';
+  w.style.color = '#b26a00';
+  w.textContent = ' ⚠ different author';
+  var x = chip.querySelector('.removeupdate');
+  if (x) chip.insertBefore(w, x); else chip.appendChild(w);
+  chip.addEventListener('click', function(ev){
+    if (ev.target.closest && ev.target.closest('.removeupdate, .chipretry')) return;
+    var inc = chip.dataset.included == '1';
+    chip.dataset.included = inc ? '0' : '1';
+    chip.style.opacity = inc ? '0.45' : '1';
+  });
+}
+document.body.peerAuthorWarn = applyAuthorWarn;
+
+// F10: ONE updater behind both update flows — the Update Peers dialog's rows
+// and the panel's "can be updated" list. Installs run in the order the chips
+// are shown (shift, never pop) and the chip of the library ACTUALLY being
+// installed is the one marked. A failure turns its own chip red (textContent),
+// grows a Retry link, and never stops the rest. After the libraries, a crates
+// item replaces the recompile (the crate runner rebuilds+recompiles itself);
+// otherwise one compile_rust runs when any install answered data:true, and
+// its failure is an error, not a silent success. One run per peer at a time —
+// a second start for a running peer is ignored (run() answers false).
+var updaterRuns = {};
+document.body.peerupdater = {
+  running: function(peerId){ return !!updaterRuns[peerId]; },
+  run: function(peerId, items, hooks){
+    if (updaterRuns[peerId]) return false;
+    updaterRuns[peerId] = true;
+    hooks = hooks || {};
+    var lp = document.querySelector('.localpeerid');
+    var myuuid = me.info ? me.info.uuid : (lp ? lp.textContent : '');
+    var libs = [], cratesItem = null;
+    (items || []).forEach(function(it){
+      if (it && it.crates) cratesItem = it;
+      else if (it && it.lib) libs.push(it);
+    });
+    var sum = { updated: 0, failed: 0, crates: null, recompile: null, recompile_msg: '' };
+    var needRecompile = false;
+
+    function call(h, a, b){ try { if (hooks[h]) hooks[h](a, b); } catch (x) { console.error(x); } }
+    function chipStart(it){
+      var c = it.chipEl;
+      if (!c || !c.isConnected) return;
+      c.style.color = 'rgba(0,0,0,0.5)';
+      var x = c.querySelector('.removeupdate');
+      if (x) x.remove();
+    }
+    function chipDone(it){
+      var c = it.chipEl;
+      if (!c || !c.isConnected) return;
+      c.dataset.done = '1';
+      var ok = document.createElement('span');
+      ok.style.color = '#2e7d32';
+      ok.textContent = ' ✓';
+      c.appendChild(ok);
+    }
+    function chipError(it, text){
+      var c = it.chipEl;
+      if (!c || !c.isConnected) return;
+      c.style.color = '#b00020';
+      var br = document.createElement('br');
+      var sp = document.createElement('span');
+      sp.className = 'chiperr';
+      sp.textContent = text;   // F3: error text is untrusted — never HTML
+      var r = document.createElement('a');
+      r.className = 'chipretry';
+      r.textContent = ' Retry';
+      r.style.cursor = 'pointer';
+      r.style.textDecoration = 'underline';
+      c.appendChild(br); c.appendChild(sp); c.appendChild(r);
+      r.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        br.remove(); sp.remove(); r.remove();
+        c.style.color = '';
+        var again = it.crates ? { crates: it.crates, chipEl: c } : { lib: it.lib, version: it.version, chipEl: c };
+        document.body.peerupdater.run(peerId, [again], hooks);
+      });
+    }
+    function buildText(s){
+      var t = '';
+      if (s.failed > 0) t = s.updated + ' updated, ' + s.failed + ' failed';
+      else if (s.updated > 0) t = 'All updated';
+      if (s.crates == 'launched') t += (t ? ' — ' : '') + "crate update launched — open the peer's panel for progress and the restart verdict";
+      else if (s.crates == 'failed') t += (t ? ' — ' : '') + 'crate update failed';
+      if (s.recompile == 'ok') t += (t ? ' — ' : '') + 'Rust recompiled';
+      else if (s.recompile == 'failed') t += (t ? ' — ' : '') + 'recompile failed: ' + s.recompile_msg;
+      if (!t) t = 'Nothing to update';
+      return t;
+    }
+    function finish(){
+      sum.text = buildText(sum);
+      delete updaterRuns[peerId];
+      call('onFinish', sum);
+    }
+    function nextLib(){
+      if (libs.length == 0) { afterLibs(); return; }
+      var it = libs.shift();
+      call('onStart', it);
+      chipStart(it);
+      json('../peer/remote/'+peerId+'/dev/install_lib', 'uuid='+encodeURIComponent(myuuid)+'&lib='+encodeURIComponent(it.lib), function(result){
+        if (result && result.status == 'ok') {
+          sum.updated++;
+          if (result.data === true) needRecompile = true;
+          chipDone(it);
+          call('onDone', it);
+        }
+        else {
+          sum.failed++;
+          var text = peerErrorText(result);
+          chipError(it, text);
+          call('onError', it, text);
+        }
+        nextLib();
+      });
+    }
+    function afterLibs(){
+      if (cratesItem) {
+        var it = cratesItem;
+        call('onStart', it);
+        chipStart(it);
+        var p = 'flowlang='+encodeURIComponent(it.crates.flowlang)+'&ndata='+encodeURIComponent(it.crates.ndata);
+        json('../peer/remote/'+peerId+'/dev/update_crates', p, function(result){
+          if (result && result.status == 'ok') { sum.crates = 'launched'; chipDone(it); call('onDone', it); }
+          else { sum.crates = 'failed'; var text = peerErrorText(result); chipError(it, text); call('onError', it, text); }
+          finish();
+        });
+      }
+      else if (needRecompile) {
+        var it = { recompile: true };
+        call('onStart', it);
+        json('../peer/remote/'+peerId+'/dev/compile_rust', null, function(result){
+          if (result && result.status == 'ok') { sum.recompile = 'ok'; call('onDone', it); }
+          else {
+            sum.recompile = 'failed';
+            sum.recompile_msg = result && result.msg ? String(result.msg) : 'no reply';
+            call('onError', it, sum.recompile_msg);
+          }
+          finish();
+        });
+      }
+      else finish();
+    }
+    nextLib();
+    return true;
+  }
+};
+
 // F5: end a row in its error state — dim red text, checkbox disabled.
 function rowError(uuid, text){
   var el = ME.querySelector('.r_'+uuid);
@@ -365,6 +535,16 @@ function rowError(uuid, text){
   status.appendChild(sp);
   var box = el.querySelector('.libupdate');
   if (box) { box.checked = false; box.disabled = true; }
+}
+
+// F10: one check resolved. When every row has resolved and none remains
+// (every connected peer's chips came back empty), say so — the old code
+// removed the rows and left a silent empty table.
+function checkDone(){
+  me.upPending--;
+  if (me.upPending > 0) return;
+  var list = ME.querySelector('.peerupdatelist');
+  if (list && !list.querySelector('.uprow')) list.innerHTML = '<div class="padme"><i>All connected peers are up to date</i></div>';
 }
 
 function checkForUpdates(peer) {
@@ -381,8 +561,8 @@ function checkForUpdates(peer) {
     json('../peer/remote/'+uuid+'/app/libs', null, function(result){
       // F5: a refusal ({status:err, msg:UNAUTHORIZED}) or any other error
       // resolves the row instead of leaving it on pending... forever.
-      if (result.status != 'ok' || !result.data) { rowError(uuid, peerErrorText(result)); return; }
-      if (!document.body.locallibraries) { rowError(uuid, 'Error: local library list unavailable'); return; }
+      if (result.status != 'ok' || !result.data) { rowError(uuid, peerErrorText(result)); checkDone(); return; }
+      if (!document.body.locallibraries) { rowError(uuid, 'Error: local library list unavailable'); checkDone(); return; }
       // F3: library ids and versions come from the remote peer — chips are
       // built with DOM calls and textContent, never innerHTML.
       var chips = [];
@@ -390,9 +570,10 @@ function checkForUpdates(peer) {
         var theirlib = result.data[i];
         var mylib = getByProperty(document.body.locallibraries, 'id', theirlib.id);
         if (mylib) {
-          var author = mylib.author;
-          var authorkey = mylib.authorkey;
-          if (true) { //(author && authorkey && theirlib.author == author && theirlib.authorkey == authorkey) {
+          // F12: the old author gate (if (true) //...) stays off on purpose —
+          // a mismatch marks the chip below (applyAuthorWarn) instead of
+          // hiding it.
+          {
             if (mylib.version > theirlib.version) {
               var chip = document.createElement('span');
               chip.className = 'chip ispos';
@@ -404,6 +585,7 @@ function checkForUpdates(peer) {
               click.textContent = mylib.id + ' v' + theirlib.version + ' ➤ ' + mylib.version;
               chip.appendChild(click);
               chip.appendChild(chipCloseImg());
+              applyAuthorWarn(chip, mylib, theirlib);
               chips.push(chip);
             }
           }
@@ -425,7 +607,7 @@ function checkForUpdates(peer) {
           chips.push(chip);
         }
         var el = ME.querySelector('.r_'+uuid);
-        if (!el) return;
+        if (!el) { checkDone(); return; }
         if (chips.length == 0) el.remove();
         else {
           var status = el.querySelector('.rowstatus');
@@ -437,83 +619,64 @@ function checkForUpdates(peer) {
             });
           });
         }
+        checkDone();
       });
     });
   }
 }
 
+// F10: both flows run through document.body.peerupdater. The button goes
+// dark while any selected row runs (a second click, or a second start for a
+// peer already running, is ignored); rows never vanish — each keeps its
+// chips and shows one summary line that stays until the dialog closes.
 ME.querySelector('#updateallpeersnow').addEventListener('click', function(){
-  var myuuid = document.querySelector('.localpeerid').textContent;
-  ME.querySelectorAll('.libupdate').forEach(function(el){
-    if (el.checked) {
-      var row = el.closest('.uprow');
-      var peer = row.dataset.peer;
-      var libs = [];
-      row.querySelectorAll('.clickupdate').forEach(function(chip){
-        libs.push(chip.dataset.lib);
-      });
-
-      if (libs.length > 0 || row.querySelector('.clickcrates')) {
-
-        var recompile = false;
-
-        function fetchNext() {
-          if (libs.length > 0) {
-            var lib = libs.pop();
-            console.log(peer+"/"+lib);
-            var x = row.querySelector('.removeupdate');
-            var chip = x.parentElement;
-            chip.style.color = 'rgba(0,0,0,0.5)';
-            x.remove();
-
-            var d = 'uuid='+myuuid+'&lib='+lib;
-            json('../peer/remote/'+peer+'/dev/install_lib', d, function(result){
-              if (result.status == "ok") {
-                recompile = recompile || result.data;
-                chip.remove();
-                fetchNext();
-              }
-              else {
-                chip.style.color = 'rgba(255,0,0,0.5)';
-                // F3: result.msg is untrusted — append it as text
-                chip.appendChild(document.createElement('br'));
-                chip.appendChild(document.createTextNode('Error: ' + result.msg));
-              }
-            });
-          }
-          else {
-            var cratechip = row.querySelector('.clickcrates');
-            if (cratechip) {
-              // the crate runner's own rebuild+recompile covers everything a
-              // compile_rust would have done, so it replaces that step
-              var fl = cratechip.dataset.flowlang;
-              var nd = cratechip.dataset.ndata;
-              var st = row.querySelector('.rowstatus');
-              st.innerHTML = '<i></i>';
-              st.firstChild.textContent = 'Updating platform crates to flowlang '+fl+' / ndata '+nd+'...';
-              json('../peer/remote/'+peer+'/dev/update_crates', 'flowlang='+encodeURIComponent(fl)+'&ndata='+encodeURIComponent(nd), function(result){
-                if (result.status == 'ok') row.querySelector('.rowstatus').innerHTML = "<i>crate update launched — open the peer's panel for progress and the restart verdict</i>";
-                else {
-                  // F3: result.msg is untrusted — set it as text
-                  var est = row.querySelector('.rowstatus');
-                  est.innerHTML = '<font color="red"></font>';
-                  est.firstChild.textContent = 'Error: ' + result.msg;
-                }
-              });
-            }
-            else if (recompile) {
-              row.querySelector('.rowstatus').innerHTML = "<i>Recompiling Rust...</i>";
-              json('../peer/remote/'+peer+'/dev/compile_rust', null, function(result){
-                row.remove();
-              });
-            }
-            else row.remove();
-          }
-        }
-        fetchNext();
-      }
+  var btn = this;
+  if (btn.disabled) return;
+  var up = document.body.peerupdater;
+  var pending = 0;
+  function rowNote(row, text){
+    var n = row.querySelector('.rowsummary');
+    if (!n) {
+      n = document.createElement('div');
+      n.className = 'rowsummary';
+      row.querySelector('.rowstatus').appendChild(n);
     }
+    n.textContent = text;   // F3: summaries carry peer-reported error text
+  }
+  ME.querySelectorAll('.libupdate').forEach(function(el){
+    if (!el.checked || el.disabled) return;
+    var row = el.closest('.uprow');
+    var peer = row.dataset.peer;
+    var items = [];
+    row.querySelectorAll('.clickupdate').forEach(function(click){
+      var chip = click.closest('.chip');
+      if (!chip || chip.dataset.done == '1') return;
+      // F12: a different-author chip rides only when the user clicked it in
+      if (chip.classList.contains('authwarn') && chip.dataset.included != '1') return;
+      items.push({ lib: click.dataset.lib, version: click.dataset.version, chipEl: chip });
+    });
+    var cratechip = row.querySelector('.clickcrates');
+    if (cratechip && cratechip.dataset.done != '1') {
+      items.push({ crates: { flowlang: cratechip.dataset.flowlang, ndata: cratechip.dataset.ndata }, chipEl: cratechip });
+    }
+    if (items.length == 0) return;
+    pending++;
+    var started = up.run(peer, items, {
+      onStart: function(it){
+        if (it.recompile) rowNote(row, 'Recompiling Rust...');
+        else if (it.crates) rowNote(row, 'Updating platform crates to flowlang ' + it.crates.flowlang + ' / ndata ' + it.crates.ndata + '...');
+      },
+      onDone: function(it){},
+      onError: function(it, text){},
+      onFinish: function(summary){
+        rowNote(row, summary.text);
+        pending--;
+        if (pending <= 0) btn.disabled = false;
+      }
+    });
+    if (!started) pending--;
   });
+  if (pending > 0) btn.disabled = true;
 });
 
 ME.querySelector('.addpeerbutton').addEventListener('click', function(){

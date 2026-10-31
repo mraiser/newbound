@@ -34,9 +34,9 @@ me.ready = function(){
         var theirlib = result.data[i];
         var mylib = getByProperty(document.body.locallibraries, 'id', theirlib.id);
         if (mylib) {
-          var author = mylib.author;
-          var authorkey = mylib.authorkey;
-          if (true) { //(author && authorkey && theirlib.author == author && theirlib.authorkey == authorkey) {
+          // F12: the old author gate (if (true) //...) stays off on purpose —
+          // a mismatch marks the chip below instead of hiding it.
+          {
             if (mylib.version > theirlib.version) {
               // F3: library ids and versions come from the remote peer —
               // build the chip with DOM calls and textContent, never innerHTML.
@@ -53,6 +53,9 @@ me.ready = function(){
               x.src = '../app/asset/app/icons/ui/dark/close.svg';
               x.className = 'roundbutton-small removeupdate mdl-chip__action chipbutton';
               chip.appendChild(x);
+              // F12: published by peer.peer, like peerstatus — mark (and
+              // deselect) a different-author chip instead of hiding it.
+              if (document.body.peerAuthorWarn) document.body.peerAuthorWarn(chip, mylib, theirlib);
 
               ME.querySelector('.availableupgrades').style.display = 'block';
               el.appendChild(chip);
@@ -186,39 +189,8 @@ function buildControls(){
   }
 }
 
-me.install = function(lib, v, cb) {
-  var myuuid = document.querySelector('.localpeerid').textContent;
-  var uuid = ME.DATA.id;
-  var el = ME.querySelector('#U_'+lib);
-  animateTo(el, {width:'100%', height:'60px'}, 300, function(){
-    el.insertAdjacentHTML('beforeend', "<div class='progressbar myprogress'></div>");
-    document.body.api.ui.initProgress(ME);
-    el.querySelector('.myprogress').setProgress('indeterminate');
-  });
-  var d = 'uuid='+myuuid+'&lib='+lib;
-  json('../peer/remote/'+uuid+'/dev/install_lib', d, function(result){
-    if (result.status == "ok") {
-      recompile = recompile || result.data;
-      el.querySelector('.myprogress').setProgress(100);
-      animateTo(el, {width:'0px', height:'0px'}, 300, function(){
-        el.remove();
-      });
-      if (cb) cb();
-    }
-    else {
-      var prog = el.querySelector('.myprogress');
-      if (prog) prog.remove();
-      // F3: result.msg is untrusted — build the error line as text
-      var err = document.createElement('div');
-      err.className = 'progerr';
-      var f = document.createElement('font');
-      f.setAttribute('color', 'red');
-      f.textContent = 'Error: ' + result.msg;
-      err.appendChild(f);
-      el.appendChild(err);
-    }
-  });
-}
+// F10: me.install/updateNext are gone — the panel's updates run through the
+// shared document.body.peerupdater (see the .updateall handler below).
 
 ME.querySelector('.closehud').addEventListener('click', function(){
   var el = document.getElementById("headsupdisplay");
@@ -365,42 +337,43 @@ ME.querySelector('.cancelupdateall').addEventListener('click', function(){
   ME.querySelector('.availableupgrades').style.display = 'none';
 });
 
-function updateNext(){
-  if (ulist.length > 0) {
-    var el = ulist.shift();
-    var lib = el[0];
-    var v = el[1];
-    me.install(lib, v, updateNext);
+// F10: the panel's chain runs through the shared updater in peer.peer
+// (document.body.peerupdater): a failure marks its own chip with Retry and
+// the rest still install; the recompile result shows instead of a silent
+// fade-out; the section stays visible with one summary line, and the
+// Update All / Cancel buttons come back when the run ends.
+function upgradeSummary(text){
+  var el = ME.querySelector('.upgradesummary');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'upgradesummary';
+    ME.querySelector('.availableupgrades').insertBefore(el, ME.querySelector('.updatebuttons'));
   }
-  else {
-    if (recompile){
-      recompile = false;
-      var uuid = ME.DATA.id;
-      ME.querySelector('.upgradelist').innerHTML = "<i>Recompiling Rust...</i>";
-      json('../peer/remote/'+uuid+'/dev/compile_rust', null, function(result){
-        updateNext();
-      });
-    }
-    else{
-      var el = ME.querySelector('.availableupgrades');
-      animateTo(el, {opacity:'0'}, 300, function(){
-        el.style.display = 'none';
-        el.style.opacity = '';
-      });
-    }
-  }
+  el.textContent = text;   // F3: summaries carry peer-reported error text
 }
-
-var ulist = [];
-var recompile = false;
 ME.querySelector('.updateall').addEventListener('click', function(){
-  ME.querySelector('.updatebuttons').style.display = 'none';
-  ulist = [];
+  var up = document.body.peerupdater;
+  if (!up || up.running(ME.DATA.id)) return;
+  var items = [];
   ME.querySelectorAll('.upgradelist .chip').forEach(function(chip){
     var el = chip.querySelector('.clickupdate');
-    ulist.push([el.dataset.lib, el.dataset.version]);
+    if (!el || chip.dataset.done == '1') return;
+    // F12: a different-author chip rides only when the user clicked it in
+    if (chip.classList.contains('authwarn') && chip.dataset.included != '1') return;
+    items.push({ lib: el.dataset.lib, version: el.dataset.version, chipEl: chip });
   });
-  updateNext();
+  if (items.length == 0) { upgradeSummary('Nothing to update'); return; }
+  var buttons = ME.querySelector('.updatebuttons');
+  buttons.style.display = 'none';
+  up.run(ME.DATA.id, items, {
+    onStart: function(it){ if (it.recompile) upgradeSummary('Recompiling Rust...'); },
+    onDone: function(it){},
+    onError: function(it, text){},
+    onFinish: function(summary){
+      upgradeSummary(summary.text);
+      buttons.style.display = '';
+    }
+  });
 });
 
 ME.querySelector('.control-settings-popup').addEventListener("mouseleave", function(){
