@@ -8,9 +8,10 @@
 // forwards) and restores the persistent globals; stepping forward over the tape REPLAYS it (nothing
 // re-executes) while the requested item is the one the tape took; picking another ready item, editing a value
 // or mode reexecute FORKS: the old tail is kept as a branch record and the step executes from the restored state.
-// Modes: into | over | out | run_to (pick.target) | continue (own thread; pause flag; budget; pick.wait joins)
+// Modes: into | over | out | run_to (pick.target) | continue (own thread = the session's owner; budget; pick.wait joins)
 // | reexecute | back (pick.count) | goto (pick.seq) | edit (pick.path, pick.value) | branch (pick.id: swap the
-// tail with a recorded branch at its fork point) | pause | state | init (debug_start). Breakpoints: op/wire/sync
+// tail with a recorded branch at its fork point) | pause | stop (pick.wait_ms) | state | reap | init (debug_start).
+// Ownership, pause/stop (cooperative, at step boundaries) and reaping: see "session lifecycle (R4)". Breakpoints: op/wire/sync
 // stop BEFORE the item is picked, case after its seed, rule after the eval that fired it; stall/error end the run.
 const SNAP_EVERY: i64 = 64;
 const CAP_STEPS: i64 = 50000;
@@ -922,8 +923,12 @@ fn run_loop(s: &mut DataObject, core: &Command, mode: &str, pick: &DataObject, t
   let mut steps = 0i64; let mut stopped = "budget".to_string(); let mut unit = 0;
   let mut events = DataArray::new();
   while steps < budget {
+    // R4: pause/stop are COOPERATIVE and honored here, before EVERY step (the first included). A step already
+    // executing - an opaque op's user code - cannot be preempted: it completes, is recorded once, then we stop.
+    let ph = phase(s);
+    if ph == "pausing" { stopped = "paused".to_string(); break; }
+    if ph == "stopping" || ph == "stopped" { stopped = "stopped".to_string(); break; }
     if steps > 0 {
-      if gb(s, "pause") { stopped = "paused".to_string(); break; }
       let v = cur_view(s);
       if let Some(b) = bp_before(s, &v) { stopped = "breakpoint".to_string(); out.put_object("hit", b); break; }
     }
@@ -933,6 +938,7 @@ fn run_loop(s: &mut DataObject, core: &Command, mode: &str, pick: &DataObject, t
       Err(m) => { if steps == 0 { out.put_string("status", "err"); out.put_string("msg", &m); return out; } stopped = format!("refused: {}", m); break; }
     };
     steps += 1;
+    s.put_int("beat", now());   // R4 heartbeat: an owner that is stepping is alive, polled over HTTP or not
     let ev = go(&v, "event");
     if events.len() < MAX_EVENTS { events.push_object(ev.clone()); }
     if gb(&v, "ended") { stopped = "ended".to_string(); break; }
@@ -968,13 +974,14 @@ fn respond(s: &DataObject, mut out: DataObject, full: bool) -> DataObject {
   out.set_property("default", v.get_property("default"));
   out.put_boolean("ended", gb(&v, "ended"));
   out.put_int("depth", depth_of(&cur));
-  out.put_boolean("running", gb(s, "running"));
+  let ph = phase(s); out.put_string("phase", &ph); out.put_boolean("running", ph == "running" || ph == "pausing" || ph == "stopping");
   out.put_string("hash", &hash_obj(&cur));
   out.put_string("tape_hash", &tape_hash(s));
   out.put_int("branches", ga(s, "branches").len() as i64);
   if full {
     out.put_string("lib", &gs(s, "lib")); out.put_string("ctl", &gs(s, "ctl")); out.put_string("cmd", &gs(s, "cmd"));
     out.put_string("last_stop", &gs(s, "stopped"));
+    out.put_string("owner", &gs(s, "owner")); out.put_int("heartbeat_age_ms", now() - gi(s, "beat"));
     if is_o(s, "last_run") { let mut lr = s.get_object("last_run").clone(); out.put_object("last_run", copy_obj(&lr)); lr = DataObject::new(); let _ = lr; }
     out.put_array("breakpoints", ga(s, "bps"));
     let mut bl = DataArray::new();
@@ -999,12 +1006,163 @@ fn respond(s: &DataObject, mut out: DataObject, full: bool) -> DataObject {
   out
 }
 
+// ================= session lifecycle (R4) =================
+// A session is in exactly one phase: idle | running | pausing | stopping, then terminal (removed from
+// globals.flowstep_debug; a capped tombstone in globals.flowstep_debug_ended answers later stop/state calls).
+// ONE OWNER moves the tape: a synchronous mode call or the continue worker takes a Claim (idle -> running), and
+// only the owner leaves running - to idle on release, or through the terminal cleanup when a stop/reap asked for
+// stopping meanwhile. An idle session has no owner, so stop/reap end it directly. Pause and stop are COOPERATIVE:
+// the owner checks the phase before every step; an op already executing (rust/python/user code) cannot be
+// preempted - it completes and is recorded exactly once, then the owner stops. debug_stop waits (bounded,
+// STOP_WAIT_MS or pick.wait_ms) for that acknowledgement and answers acknowledged:false if the op outlasts it.
+// Every claim carries a fresh run token; a stale owner (token mismatch) writes nothing. LIFE guards only these
+// transitions (a few ndata reads and writes) - it is never held across a step, user code or a datastore call.
+static LIFE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static LIFE_CV: std::sync::Condvar = std::sync::Condvar::new();
+static RUN_SEQ: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+static WORKERS: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+const IDLE_MS: i64 = 30 * 60 * 1000;          // an idle session is reaped after 30 min without a debug_* call
+const HARD_MS: i64 = 2 * 60 * 60 * 1000;      // an owner with no step for 2 h (one op running that long) is asked to stop
+const STOP_WAIT_MS: i64 = 10000;              // how long debug_stop waits for the owner's acknowledgement
+const MAX_ENDED: usize = 64;                  // tombstones kept (oldest dropped first), each at most ENDED_TTL_MS
+const ENDED_TTL_MS: i64 = 6 * 60 * 60 * 1000;
+fn life() -> std::sync::MutexGuard<'static, ()> { LIFE.lock().unwrap_or_else(|e| e.into_inner()) }
+fn next_run() -> i64 { RUN_SEQ.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1 }
+fn phase(s: &DataObject) -> String { let p = gs(s, "phase"); if !p.is_empty() { p } else if gb(s, "running") { "running".to_string() } else { "idle".to_string() } }
+fn set_phase(s: &mut DataObject, p: &str) { s.put_string("phase", p); s.put_boolean("running", p == "running" || p == "pausing" || p == "stopping"); }
+fn is_current(s: &DataObject) -> bool { let id = gs(s, "id"); let all = sessions(); is_o(&all, &id) && all.get_object(&id).data_ref == s.data_ref }
+fn ended() -> DataObject { let mut g = DataStore::globals(); if !is_o(&g, "flowstep_debug_ended") { g.put_object("flowstep_debug_ended", DataObject::new()); } g.get_object("flowstep_debug_ended") }
+fn prune_ended(e: &mut DataObject) {
+  let t = now();
+  let mut v: Vec<(i64, String)> = e.objects().into_iter().map(|(k, d)| (if d.is_object() { gi(&d.object(), "at") } else { 0 }, k)).collect();
+  v.sort();
+  let n = v.len();
+  for (i, (at, k)) in v.iter().enumerate() { if t - at > ENDED_TTL_MS || n - i > MAX_ENDED { e.remove_property(k); } }
+}
+// terminal cleanup (caller holds LIFE): unlink the session only if the map still holds THIS object (a recycled
+// id never removes a newer session), mark the handle stopped (an owner or waiter holding it sees that), tombstone.
+fn terminal(s: &mut DataObject, by: &str) {
+  let id = gs(s, "id");
+  if is_current(s) { let mut all = sessions(); all.remove_property(&id); }
+  set_phase(s, "stopped"); s.put_string("owner", ""); s.put_string("ended_by", by);
+  let mut t = DataObject::new();
+  t.put_string("by", by); t.put_int("at", now()); t.put_int("cursor", gi(s, "cursor")); t.put_int("length", tape_len(s));
+  for k in ["lib", "ctl", "cmd"] { t.put_string(k, &gs(s, k)); }
+  t.put_string("last_stop", &gs(s, "stopped"));
+  let mut e = ended(); e.put_object(&id, t); prune_ended(&mut e);
+}
+struct Claim { s: DataObject, run: i64, done: bool }
+impl Claim {
+  // idle -> running for `owner`; refused unless the session is idle and still the one in the map
+  fn take(s: &DataObject, owner: &str) -> Result<Claim, String> {
+    let _g = life();
+    let mut s = s.clone();
+    let id = gs(&s, "id");
+    if !is_current(&s) { return Err(format!("debug session '{}' has ended", id)); }
+    let p = phase(&s);
+    if p != "idle" {
+      return Err(if gs(&s, "owner") == "continue" && p == "running" { "a continue is running - pause it first (mode pause)".to_string() } else { format!("the session is {} ({}) - wait for it to finish", p, gs(&s, "owner")) });
+    }
+    let run = next_run();
+    s.put_int("run", run); s.put_string("owner", owner); s.put_int("beat", now()); s.put_string("stop_by", "");
+    set_phase(&mut s, "running");
+    Ok(Claim { s, run, done: false })
+  }
+  // the owner leaves running: if this claim is still the session's run (a stale owner writes nothing) record the
+  // run's result, then idle - or the terminal cleanup when stop/reap asked for stopping. Wakes stop waiters.
+  fn release(&mut self, result: Option<(String, DataObject)>) {
+    if self.done { return; }
+    self.done = true;
+    {
+      let _g = life();
+      let mut s = self.s.clone();
+      let p = phase(&s);
+      if gi(&s, "run") == self.run && p != "stopped" {
+        if let Some((stop, res)) = result { s.put_string("stopped", &stop); s.put_object("last_run", res); }
+        s.put_int("touched", now()); s.put_int("beat", now());
+        if p == "stopping" { let by = gs(&s, "stop_by"); terminal(&mut s, if by.is_empty() { "stop" } else { &by }); }
+        else { set_phase(&mut s, "idle"); s.put_string("owner", ""); }
+      }
+    }
+    LIFE_CV.notify_all();
+  }
+}
+impl Drop for Claim { fn drop(&mut self) { self.release(None); } }
+struct WorkerCount;
+impl Drop for WorkerCount { fn drop(&mut self) { WORKERS.fetch_sub(1, std::sync::atomic::Ordering::SeqCst); } }
+// an ended session's tombstone as the answer: stop -> ok (idempotent, already:true); anything else -> err
+fn gone(id: &str, for_stop: bool) -> DataObject {
+  let e = ended();
+  if !is_o(&e, id) { return err(&format!("no debug session '{}' (stopped or reaped?)", id)); }
+  let t = e.get_object(id);
+  let mut o = if for_stop {
+    let mut o = DataObject::new(); o.put_string("status", "ok"); o.put_boolean("stopped", true); o.put_boolean("acknowledged", true); o.put_boolean("already", true); o.put_boolean("was_running", false); o
+  } else { err(&format!("debug session '{}' has ended ({})", id, gs(&t, "by"))) };
+  o.put_string("session", id); o.put_string("phase", "stopped"); o.put_string("ended_by", &gs(&t, "by")); o.put_int("ended_at", gi(&t, "at"));
+  o.put_int("cursor", gi(&t, "cursor")); o.put_int("length", gi(&t, "length"));
+  o
+}
+// mode stop: an idle session ends here; otherwise the owner is asked (stopping) and stop waits for its ack
+fn stop_session(s: &mut DataObject, pick: &DataObject) -> DataObject {
+  let id = gs(s, "id");
+  let wait_ms = if gi(pick, "wait_ms") > 0 { gi(pick, "wait_ms") } else { STOP_WAIT_MS };
+  let t0 = now();
+  let mut g = life();
+  if !is_current(s) { drop(g); return gone(&id, true); }
+  let p = phase(s);
+  let was_running = p != "idle";
+  if p == "idle" { terminal(s, "stop"); }
+  else if p != "stopping" { s.put_string("stop_by", "stop"); s.put_int("stop_at", now()); set_phase(s, "stopping"); }
+  while phase(s) != "stopped" {
+    let left = wait_ms - (now() - t0);
+    if left <= 0 { break; }
+    g = match LIFE_CV.wait_timeout(g, std::time::Duration::from_millis(left as u64)) { Ok((g2, _)) => g2, Err(e) => e.into_inner().0 };
+  }
+  let acked = phase(s) == "stopped";
+  drop(g);
+  LIFE_CV.notify_all();
+  let mut o = DataObject::new();
+  o.put_string("status", "ok"); o.put_string("session", &id);
+  o.put_boolean("stopped", acked); o.put_boolean("acknowledged", acked); o.put_boolean("already", false);
+  o.put_boolean("was_running", was_running); o.put_string("phase", &phase(s)); o.put_string("ended_by", &gs(s, "ended_by"));
+  o.put_int("cursor", gi(s, "cursor")); o.put_int("length", tape_len(s)); o.put_int("waited_ms", now() - t0);
+  if !acked { o.put_string("msg", &format!("stop requested; the step in flight did not finish within {} ms - stop is cooperative: the owner ends the session at its next step boundary (the op completes and is recorded once)", wait_ms)); }
+  o
+}
+// mode reap (the debug_reap timer): idle sessions quiet for IDLE_MS end here; an owner is never unlinked under its
+// feet - one whose heartbeat (a step) is older than HARD_MS is asked to stop and ends itself at its next boundary
+fn reap_sessions() -> DataObject {
+  let t = now();
+  let mut removed = DataArray::new(); let mut stopping = DataArray::new(); let mut kept = 0i64;
+  let ntomb;
+  {
+    let _g = life();
+    let mut all = sessions();
+    for (id, d) in all.objects() {
+      if !d.is_object() { all.remove_property(&id); removed.push_string(&id); continue; }
+      let mut s = d.object();
+      let p = phase(&s);
+      if p == "idle" {
+        if t - gi(&s, "touched").max(gi(&s, "beat")) > IDLE_MS { terminal(&mut s, "reap"); removed.push_string(&id); } else { kept += 1; }
+      } else if p == "stopping" { stopping.push_string(&id); }
+      else if t - gi(&s, "beat") > HARD_MS { s.put_string("stop_by", "reap"); s.put_int("stop_at", t); set_phase(&mut s, "stopping"); stopping.push_string(&id); }
+      else { kept += 1; }
+    }
+    let mut e = ended(); prune_ended(&mut e); ntomb = e.clone().keys().len() as i64;
+  }
+  LIFE_CV.notify_all();
+  let mut o = DataObject::new();
+  o.put_string("status", "ok"); o.put_array("removed", removed); o.put_array("stopping", stopping); o.put_int("kept", kept);
+  o.put_int("workers", WORKERS.load(std::sync::atomic::Ordering::SeqCst)); o.put_int("ended", ntomb);
+  o
+}
+
 // ================= dispatch =================
 let all = sessions();
 if mode == "init" {
   let mut body = go(&pick, "body");
   let args = go(&pick, "args");
-  let id = format!("fsd{:x}{:04x}", now(), (std::process::id() as i64 + all.clone().keys().len() as i64 * 7919) & 0xffff);
+  let id = format!("fsd{:x}{:04x}{:x}", now(), std::process::id() & 0xffff, next_run());   // R4: process-wide counter - an id is never recycled
   let mut s = DataObject::new();
   s.put_string("id", &id);
   for k in ["lib", "ctl", "cmd"] { s.put_string(k, &gs(&pick, k)); }
@@ -1025,7 +1183,7 @@ if mode == "init" {
   s.put_array("tape", DataArray::new()); s.put_object("snaps", snaps);
   s.put_array("pnames", pn); s.put_array("bps", DataArray::new());
   s.put_array("branches", DataArray::new()); s.put_int("next_branch", 0);
-  s.put_boolean("running", false); s.put_boolean("pause", false); s.put_string("stopped", "");
+  set_phase(&mut s, "idle"); s.put_string("owner", ""); s.put_int("run", 0); s.put_int("beat", now()); s.put_string("stopped", "");
   body = DataObject::new(); let _ = body;
   let mut all2 = all.clone(); all2.put_object(&id, s.clone());
   let mut o = DataObject::new(); o.put_string("status", "ok"); o.put_string("mode", "init");
@@ -1033,17 +1191,20 @@ if mode == "init" {
   o.put_string("boundary", "persistent globals are NOT isolated: the session reads and writes the real process globals (the same handles an ordinary run uses); back/goto/replay overwrite them with the tape's values, and a concurrent ordinary run or another session writing the same persistent key is neither detected nor undone - debug persistent flows where nothing else writes those keys. rust/python command ops are opaque: their effects outside the interpreter are flagged (side_effects, crossed_side_effects) but never undone.");
   return respond(&s, o, false);
 }
-if !is_o(&all, &session) { return err(&format!("no debug session '{}' (stopped or reaped?)", session)); }
-let mut s = all.get_object(&session);
+// R4 lifecycle: reap, stop and pause are transitions (see Claim); every mutating mode below runs as the owner
+if mode == "reap" { return reap_sessions(); }
+let found = { let _g = life(); if is_o(&all, &session) { Some(all.get_object(&session)) } else { None } };
+let mut s = match found { Some(s) => s, None => return gone(&session, mode == "stop") };
 s.put_int("touched", now());
 if mode == "state" { let mut o = DataObject::new(); o.put_string("status", "ok"); o.put_string("mode", "state"); return respond(&s, o, true); }
 if mode == "pause" {
-  let was = gb(&s, "running");
-  if was { s.put_boolean("pause", true); }
+  // cooperative: the owner stops before its next step (an op already executing completes and is recorded once)
+  let was = { let _g = life(); let p = phase(&s); if p == "running" { set_phase(&mut s, "pausing"); } p == "running" || p == "pausing" || p == "stopping" };
   let mut o = DataObject::new(); o.put_string("status", "ok"); o.put_string("mode", "pause"); o.put_boolean("was_running", was);
   return respond(&s, o, false);
 }
-if gb(&s, "running") { let mut o = err("a continue is running - pause it first (mode pause)"); o.put_string("session", &session); return o; }
+if mode == "stop" { return stop_session(&mut s, &pick); }
+let mut claim = match Claim::take(&s, &mode) { Ok(c) => Some(c), Err(m) => { let mut o = err(&m); o.put_string("session", &session); return o; } };
 let mut out = DataObject::new();
 match mode.as_str() {
   "back" | "goto" => {
@@ -1143,9 +1304,15 @@ match mode.as_str() {
     let mut pk = DataObject::new();
     if pick.has("kind") { pk.put_string("kind", &gs(&pick, "kind")); pk.put_int("index", gi(&pick, "index")); }
     if gb(&cur_view(&s), "ended") && gi(&s, "cursor") == tape_len(&s) { return err("the run has ended - go back (back/goto) or stop the session"); }
-    s.put_boolean("running", true); s.put_boolean("pause", false); s.put_string("stopped", "running");
-    let mut s2 = s.clone();
+    // R4: the claim (taken as owner "continue") MOVES into the worker - from here the worker is the session's
+    // only owner until it releases (idle, or the terminal cleanup if a stop/reap asked for stopping meanwhile)
+    let mut c = match claim.take() { Some(c) => c, None => return err("internal: continue without a claim") };
+    s.put_string("stopped", "running");
+    let s2 = s.clone();
+    WORKERS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let wc = WorkerCount;
     let h = std::thread::spawn(move || {
+      let _wc = wc;
       let res = match core_cmd() {
         Err(m) => err(&m),
         Ok(core) => {
@@ -1157,11 +1324,7 @@ match mode.as_str() {
         }
       };
       let stop = if gs(&res, "status") == "ok" { gs(&res, "stopped") } else { format!("error: {}", gs(&res, "msg")) };
-      s2.put_string("stopped", &stop);
-      s2.put_object("last_run", res);
-      s2.put_int("touched", now());
-      s2.put_boolean("pause", false);
-      s2.put_boolean("running", false);
+      c.release(Some((stop, res)));
     });
     out.put_string("status", "ok"); out.put_string("mode", "continue");
     if gb(&pick, "wait") {
@@ -1172,7 +1335,9 @@ match mode.as_str() {
       if gs(&lr, "status") != "ok" { out.put_string("status", "err"); out.put_string("msg", &gs(&lr, "msg")); }
     } else { out.put_boolean("waited", false); }
   }
-  _ => return err(&format!("mode '{}' is not one of into, over, out, run_to, continue, reexecute, back, goto, edit, branch, pause, state", mode)),
+  _ => return err(&format!("mode '{}' is not one of into, over, out, run_to, continue, reexecute, back, goto, edit, branch, pause, stop, state, reap", mode)),
 }
+// a synchronous owner releases BEFORE the reply is built (so it says running:false); a continue's claim is the worker's
+if let Some(mut c) = claim.take() { c.release(None); }
 s.put_int("touched", now());
 respond(&s, out, false)
