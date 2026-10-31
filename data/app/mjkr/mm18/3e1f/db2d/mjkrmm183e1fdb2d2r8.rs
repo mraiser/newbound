@@ -1163,7 +1163,8 @@ pub fn format_result(command:Command, o:DataObject) -> DataObject {
     else {
       if o.has("a") { d_formatted_result = o.get_object("a"); }
       else if o.has("data") { d_formatted_result = o.get_object("data"); }
-      else { d_formatted_result = o.objects()[0].1.object(); } // This could panic if objects() is empty or not an object
+      else if o.clone().keys().is_empty() { d_formatted_result = o; } // nothing delivered (e.g. a flow that terminated before any output): {status:ok}, not an index panic
+      else { d_formatted_result = o.objects()[0].1.object(); } // panics if the only value is not an object
     }
   }
   else {
@@ -1172,7 +1173,9 @@ pub fn format_result(command:Command, o:DataObject) -> DataObject {
     if o.has("a") { oo_data_prop = o.get_property("a"); }
     else if o.has("data") { oo_data_prop = o.get_property("data"); }
     else if o.has("msg") { oo_data_prop = o.get_property("msg"); }
-    else { oo_data_prop = o.objects()[0].1.clone(); } // This could panic if objects() is empty
+    else if o.clone().keys().is_empty() { oo_data_prop = Data::DNull; } // nothing delivered (e.g. a flow that terminated before any output): data null, not an index panic
+    else if command.lang == "flow" && o.clone().keys().len() > 1 { oo_data_prop = Data::DObject(o.data_ref); } // a multi-output flow: the whole result, never one key picked in HashMap order
+    else { oo_data_prop = o.objects()[0].1.clone(); }
 
     if command.return_type == "String" {
       d_formatted_result.set_property("msg", oo_data_prop.clone());
