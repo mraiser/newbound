@@ -293,7 +293,7 @@ function buildUpdateDialog(){
 // F3 helper: the chips' close button, shared by every chip builder below.
 function chipCloseImg(){
   var x = document.createElement('img');
-  x.src = '../app/asset/app/close-white.png';
+  x.src = '../app/asset/app/icons/ui/dark/close.svg';
   x.className = 'roundbutton-small removeupdate mdl-chip__action chipbutton';
   return x;
 }

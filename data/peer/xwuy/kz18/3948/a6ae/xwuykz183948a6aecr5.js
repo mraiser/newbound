@@ -44,7 +44,7 @@ me.ready = function(){
               click.textContent = mylib.id + ' v' + theirlib.version + ' ➤ ' + mylib.version;
               chip.appendChild(click);
               var x = document.createElement('img');
-              x.src = '../app/asset/app/close-white.png';
+              x.src = '../app/asset/app/icons/ui/dark/close.svg';
               x.className = 'roundbutton-small removeupdate mdl-chip__action chipbutton';
               chip.appendChild(x);
 
