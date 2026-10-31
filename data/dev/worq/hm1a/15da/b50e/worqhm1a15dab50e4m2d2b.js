@@ -2597,6 +2597,11 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     debugEnded(null);
     let r = null;
     try { r = await FD.client.stop(d.session); } catch (e) {}
+    // R6: stop is cooperative - an op in flight (rust/python/user code) is
+    // never preempted. When the server got no acknowledgement within its
+    // wait, the session is still ending: say so instead of "stopped".
+    if (r && r.status === "ok" && r.acknowledged === false && !disposed && !dbg)
+      status("debug: stop requested — an op in flight is still running; the server ends the session when it finishes (stop is cooperative)", "bad");
     return r;
   }
   // R4: a session the server has ended (stopped elsewhere, reaped) answers
