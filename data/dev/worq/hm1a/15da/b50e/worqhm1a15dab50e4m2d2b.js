@@ -1658,9 +1658,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // ── P4: run tokens — deliveries ride a flowtoken BEHAVIOR on the host ─────
   // The schedule is local and pure (design §3.5 — the platform returns no
   // per-wire values): flowdoc.propagationRounds gives the DRY harness's firing
-  // order. A LIVE run is the stepper's continue (P5): its real events ride
+  // order. A LIVE run is dev.flowstep.run_flow (R5 - the ordinary run on
+  // flowlang's stepper, no debug session): its recorded events ride
   // through rideRunEvents (below runFlow), and which CASES it went through is
-  // the tape's own. One dev:flowtoken instance per leg is addControl'd into
+  // the run's own complete root path. One dev:flowtoken instance per leg is addControl'd into
   // the scenehost, seeded with its round; ONE shared clock starts them
   // together, so the token behaviors deliver round by round and report via
   // host.state.onTokenDelivered. The editor schedules and audits; the motion
@@ -1670,15 +1671,18 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     return terminalWorld(c, end[0], which, end[1]) || terminalWorld(c, end[0], which === "out" ? "in" : "out", end[1]) || null;
   }
   // ── the run's CASE PATH (a `next` rule moves the run to the next case) ────
-  // P5: a LIVE run IS the stepper's continue (the run is one debug session),
-  // so the case path is the TAPE's — the stepper's own events name the op
-  // whose next/terminate/fail rule ended each case (no inference, nothing
-  // predicted). A DRY run (the no-source harness) is the only one still
+  // R5: a LIVE run is dev.flowstep.run_flow (the ordinary run - no debug
+  // session, tape or debugger budget), so the case path is the SERVER's
+  // complete root path - the stepper's own events name the op whose
+  // next/terminate/fail rule ended each case (no inference, nothing
+  // predicted; nested frames never enter it). A DRY run (the no-source
+  // harness) is the only one still
   // scheduled from propagationRounds' prediction: it assumes every op
   // succeeds, so a non-match op's rule fires when its value is true and a
   // match op's rule is unknown (noted, not taken). Segments (root first):
-  // {deck, end, stopAt, inferred} — deck/end as the tape reports them;
-  // stopAt/inferred are the DRY plan's only (a live segment leaves them null).
+  // {deck, end, stopAt, inferred} — deck/end as the run reports them; a live
+  // segment's stopAt is the server's op on a next end (else null), inferred
+  // is the DRY plan's only (always false live).
   const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
   const frames = (n) => new Promise((res) => { const step = () => (n-- <= 0 ? res() : requestAnimationFrame(step)); step(); });
   function dryPlan() {
@@ -2142,9 +2146,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // ── STEP DEBUGGER (flow step debugger P4) ────────────────────────────────
   // A debug SESSION (dev.flowstep P3: a recorded tape — step / back / goto /
   // continue / breakpoints) runs the CURRENT body — unsaved edits included
-  // (doc.serialize()) — under the stepper; P5: the run button is the same
-  // session + a continue over the SAVED body, so run and debug share the one
-  // interpreter path. Every move is one debug_step then
+  // (doc.serialize()) — under the stepper. R5: the run button does NOT open
+  // a session - it is dev.flowstep.run_flow over the SAVED body (flowlang's
+  // own stepper, the one semantics, with no tape/snapshots/debugger budget),
+  // so run and debug share the one interpreter, not the session. Every move is one debug_step then
   // one debug_state, and the editor only DRAWS that state: dev:flowdebug maps
   // the frames onto the doc's case objects, the focus FOLLOWS the top frame
   // (drill into local frames, the case it runs), flownode plates show each
