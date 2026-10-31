@@ -211,16 +211,21 @@
 .nb-flowedit3d .fe-dbg-tl-track { flex:1; position:relative; height:22px; min-width:120px; cursor:pointer;
   background:var(--panel-2); border:1px solid var(--line); border-radius:5px; overflow:hidden; }
 .nb-flowedit3d .fe-dbg-tl-track:focus { outline:1px solid var(--accent); outline-offset:-1px; }
-.nb-flowedit3d .fe-dbg-tl-tick { position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; }
-.nb-flowedit3d .fe-dbg-tl-tick.t-enter { background:var(--fe-dbg-running, #56a3d9); }
-.nb-flowedit3d .fe-dbg-tl-tick.t-seed { background:var(--text-faint, #888); }
-.nb-flowedit3d .fe-dbg-tl-tick.t-deliver { background:var(--fe-dbg-ready, #f0a63c); }
-.nb-flowedit3d .fe-dbg-tl-tick.t-eval { background:var(--fe-dbg-done, #62bd8c); }
-.nb-flowedit3d .fe-dbg-tl-tick.t-sync { background:#b06ee0; }
-.nb-flowedit3d .fe-dbg-tl-tick.t-next, .nb-flowedit3d .fe-dbg-tl-tick.t-leave { background:#8a6ee0; }
-.nb-flowedit3d .fe-dbg-tl-tick.t-done, .nb-flowedit3d .fe-dbg-tl-tick.t-error, .nb-flowedit3d .fe-dbg-tl-tick.t-stall {
+.nb-flowedit3d .fe-dbg-tl-tick { position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; background:var(--text-dim, #aaa); }
+/* R6: one palette for both strips (the inspector's ticks had none - every one was transparent) */
+.nb-flowedit3d .fe-dbgi-tl-tick { background:var(--text-dim, #aaa); }
+.nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-iter { background:#3fa7a0; }
+.nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-edit { background:#e0c341; width:3px; margin-left:-1.5px; }
+.nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-enter { background:var(--fe-dbg-running, #56a3d9); }
+.nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-seed { background:var(--text-faint, #888); }
+.nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-deliver { background:var(--fe-dbg-ready, #f0a63c); }
+.nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-eval { background:var(--fe-dbg-done, #62bd8c); }
+.nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-sync { background:#b06ee0; }
+.nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-next, .nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-leave { background:#8a6ee0; }
+.nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-terminate, .nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-finish { background:var(--fe-dbg-done, #62bd8c); width:3px; margin-left:-1.5px; }
+.nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-done, .nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-error, .nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-stall, .nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-fail {
   background:var(--danger, #d95f56); width:3px; margin-left:-1.5px; }
-.nb-flowedit3d .fe-dbg-tl-tick.t-done { background:var(--fe-dbg-done, #62bd8c); }
+.nb-flowedit3d :is(.fe-dbg-tl-tick, .fe-dbgi-tl-tick).t-done { background:var(--fe-dbg-done, #62bd8c); }
 .nb-flowedit3d .fe-dbg-tl-cursor { position:absolute; top:-1px; bottom:-1px; width:3px; margin-left:-1.5px;
   background:var(--accent); box-shadow:0 0 5px var(--accent); pointer-events:none; }
 .nb-flowedit3d .fe-dbg-tl-branch { position:absolute; bottom:0; height:4px; background:color-mix(in srgb, #b06ee0 70%, transparent); }
