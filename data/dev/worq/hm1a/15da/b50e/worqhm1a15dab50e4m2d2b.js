@@ -2253,6 +2253,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       if (typeof r.length === "number") dbgForget(r.length);
       if (mode === "branch") dbgForget(r.cursor, "restored");
       if (!r.running && Array.isArray(r.events)) dbgRecordEvents(r.events, r.cursor, !!r.events_truncated);
+      // R6: the reply's own event IS the tape's step cursor-1 (server seq) -
+      // an edit (and back/goto) reply lists no events[], so without this an
+      // edit fork kept the replaced tail's tick at the fork seq
+      if (!r.running && r.event && typeof r.event.seq === "number") dbgRecordEvents([r.event], r.cursor, false);
       const ride = { mode, reverse: back1, events: evs.map((e) => e.seq), a: null, b: null };
       if (evs.length) ride.a = await dbgShow(evs, back1, null);   // on the picture as it stands
       if (dbg !== d) return r;
