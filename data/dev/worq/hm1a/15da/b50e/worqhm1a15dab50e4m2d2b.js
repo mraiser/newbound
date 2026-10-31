@@ -2240,6 +2240,14 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       // interpreter, not the world - the server lists those steps
       // (crossed_side_effects); the bar says so until the next move
       d.crossed = Array.isArray(r.crossed_side_effects) ? r.crossed_side_effects.slice() : [];
+      // R6: the status line follows every finished move - before, a continue's
+      // "stopped — ended at step N" outlived the back/goto/into that moved the
+      // cursor (a running continue's line is set by the poll when it ends)
+      if (!r.running) {
+        const bh = dbgStopText(), why = String(r.stopped || "");
+        const tail = bh ? " — " + bh : (why && why !== "stepped" ? " — " + (why === "budget" ? "step budget ran out, not the end" : why) : "");
+        status(`debug ${mode}: at step ${r.cursor} / ${r.length}${tail}`, "ok");
+      }
       // D2: what this move SHOWS — its events (a back(1): the undone one, in
       // reverse); continue/goto/pause/back(n) only redraw
       const back1 = mode === "back" && !!prevEv && !(pick && pick.count > 1);
