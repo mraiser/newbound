@@ -210,17 +210,34 @@ fn same_scalar(a: &Data, b: &Data) -> bool {
 // Cycle-safe: the PAIR of containers being compared is kept on the current path; meeting the same pair again
 // is a cycle and adds nothing. Past MAX_DEPTH two different containers are emitted as one whole replacement.
 type OnPair = std::collections::HashSet<(bool, usize, usize)>;
-fn diff_v(a: &V, b: &V, path: &mut Vec<P>, out: &mut DataArray, size: &mut i64, on: &mut OnPair) {
+// R3 D1 (in-state): a step can SPLIT or JOIN aliases among paths present on BOTH sides without changing any value
+// at them - the change list then says nothing about it, and a later change applied through the stale share writes
+// into every former alias. diff_v keeps the cur->nc and nc->cur container maps of the common paths it walks: one
+// container meeting two different partners is a split (seen forward) or a join (a split backward). The entry is
+// then marked tx; crossing a tx entry detaches the copy before applying and links the arrival cursor's groups.
+struct Tx { f: HashMap<(bool, usize), usize>, b: HashMap<(bool, usize), usize>, hit: bool, paths: DataArray }
+fn tx_new() -> Tx { Tx { f: HashMap::new(), b: HashMap::new(), hit: false, paths: DataArray::new() } }
+fn tx_see(tx: &mut Tx, obj: bool, x: usize, y: usize, path: &Vec<P>) {
+  let mut bad = false;
+  match tx.f.get(&(obj, x)) { Some(&yy) => { if yy != y { bad = true; } } None => { tx.f.insert((obj, x), y); } }
+  match tx.b.get(&(obj, y)) { Some(&xx) => { if xx != x { bad = true; } } None => { tx.b.insert((obj, y), x); } }
+  if bad {
+    tx.hit = true;
+    if tx.paths.len() < 4 { let mut pa = DataArray::new(); for e in path { match e { P::K(s) => pa.push_string(s), P::I(i) => pa.push_int(*i as i64) } } tx.paths.push_array(pa); }
+  }
+}
+fn diff_v(a: &V, b: &V, path: &mut Vec<P>, out: &mut DataArray, size: &mut i64, on: &mut OnPair, tx: &mut Tx) {
   match (a, b) {
     (V::O(x), V::O(y)) => {
       if x.data_ref == y.data_ref { return; }
+      tx_see(tx, true, x.data_ref, y.data_ref, path);
       let id = (true, x.data_ref, y.data_ref);
       if on.contains(&id) { return; }
       if path.len() >= MAX_DEPTH { emit(path, Some(a), Some(b), out, size); return; }
       on.insert(id);
       for (k, v) in obj_kids(x) {
         path.push(P::K(k.clone()));
-        if y.has(&k) { diff_v(&v, &val(&y.get_property(&k)), path, out, size, on); } else { emit(path, Some(&v), None, out, size); }
+        if y.has(&k) { diff_v(&v, &val(&y.get_property(&k)), path, out, size, on, tx); } else { emit(path, Some(&v), None, out, size); }
         path.pop();
       }
       for (k, v) in obj_kids(y) { if !x.has(&k) { path.push(P::K(k)); emit(path, None, Some(&v), out, size); path.pop(); } }
@@ -228,6 +245,7 @@ fn diff_v(a: &V, b: &V, path: &mut Vec<P>, out: &mut DataArray, size: &mut i64, 
     }
     (V::A(x), V::A(y)) => {
       if x.data_ref == y.data_ref { return; }
+      tx_see(tx, false, x.data_ref, y.data_ref, path);
       let id = (false, x.data_ref, y.data_ref);
       if on.contains(&id) { return; }
       if path.len() >= MAX_DEPTH { emit(path, Some(a), Some(b), out, size); return; }
@@ -235,7 +253,7 @@ fn diff_v(a: &V, b: &V, path: &mut Vec<P>, out: &mut DataArray, size: &mut i64, 
       let (xs, ys) = (arr_kids(x), arr_kids(y));
       let (lx, ly) = (xs.len(), ys.len());
       let m = if lx < ly { lx } else { ly };
-      for i in 0..m { path.push(P::I(i)); diff_v(&xs[i], &ys[i], path, out, size, on); path.pop(); }
+      for i in 0..m { path.push(P::I(i)); diff_v(&xs[i], &ys[i], path, out, size, on, tx); path.pop(); }
       for i in m..ly { path.push(P::I(i)); emit(path, None, Some(&ys[i]), out, size); path.pop(); }
       for i in (m..lx).rev() { path.push(P::I(i)); emit(path, Some(&xs[i]), None, out, size); path.pop(); }
       on.remove(&id);
@@ -245,7 +263,13 @@ fn diff_v(a: &V, b: &V, path: &mut Vec<P>, out: &mut DataArray, size: &mut i64, 
   }
 }
 fn diff(a: &DataObject, b: &DataObject, path: &mut Vec<P>, out: &mut DataArray, size: &mut i64) {
-  diff_v(&V::O(a.clone()), &V::O(b.clone()), path, out, size, &mut OnPair::new());
+  diff_v(&V::O(a.clone()), &V::O(b.clone()), path, out, size, &mut OnPair::new(), &mut tx_new());
+}
+// diff plus the split/join verdict of the common paths (exec's recorder; cur and nc share no container)
+fn diff_tx(a: &DataObject, b: &DataObject, out: &mut DataArray, size: &mut i64) -> Tx {
+  let mut tx = tx_new(); let mut path: Vec<P> = Vec::new();
+  diff_v(&V::O(a.clone()), &V::O(b.clone()), &mut path, out, size, &mut OnPair::new(), &mut tx);
+  tx
 }
 // ---- paths: resolved step by step with every step checked; nothing changes until the whole path matches ----
 fn e_desc(e: &Data) -> String { if e.is_int() { format!("index {}", e.int()) } else if e.is_string() { format!("key {:?}", e.string()) } else { "a non-key element".to_string() } }
@@ -594,8 +618,17 @@ fn in_ready(v: &DataObject, it: &DataObject) -> bool {
 // ---- tape mechanics ----
 fn unshare(s: &mut DataObject) { if gb(s, "shared") { let c = copy_obj(&s.get_object("cur")); s.put_object("cur", c); s.put_boolean("shared", false); } }
 fn put_back(s: &mut DataObject, cur: &DataObject, shared: bool) { s.put_object("cur", cur.clone()); s.put_boolean("shared", shared); }
-fn apply_entry(s: &mut DataObject, e: &DataObject, fwd: bool) -> Result<(), String> {
+// the recorded alias groups AT cursor q: the base snapshot's at the base, else those of the entry before q
+fn groups_at(s: &DataObject, tape: &DataArray, base: i64, q: i64) -> DataArray {
+  if q <= base { ga(&go(&s.get_object("snaps"), &base.to_string()), "a") } else { ga(&tape.get_object((q - 1 - base) as usize), "a") }
+}
+// A tx entry (R3 D1) split or joined aliases among common paths: the copy is first DETACHED (no container shared
+// anywhere - diff emitted a change at EVERY path whose value changed, so separate copies take the changes exactly),
+// then `tgt` - the groups at the cursor this crossing arrives at - is linked. Plain entries apply as before.
+fn apply_entry(s: &mut DataObject, e: &DataObject, fwd: bool, tgt: &DataArray) -> Result<(), String> {
   unshare(s);
+  let tx = gb(e, "tx");
+  if tx { let c0 = s.get_object("cur"); let d = detached_val(&Data::DObject(c0.data_ref)); s.put_object("cur", d.get_object("v")); }
   let cur = s.get_object("cur");
   let ch = ga(e, "c");
   let n = ch.len();
@@ -603,6 +636,7 @@ fn apply_entry(s: &mut DataObject, e: &DataObject, fwd: bool) -> Result<(), Stri
     let i = if fwd { j } else { n - 1 - j };
     if let Err(m) = apply(&cur, &ch.get_object(i), fwd) { return Err(format!("tape step {} change {} ({}): {}", gi(e, "seq"), i, if fwd { "forward" } else { "inverse" }, m)); }
   }
+  if tx { if let Err(m) = link_aliases(&cur, tgt) { return Err(format!("tape step {} ({}, alias split/join): {}", gi(e, "seq"), if fwd { "forward" } else { "inverse" }, m)); } }
   Ok(())
 }
 // Moves (goto, replay_fwd) work on a COPY of cur (shared=true makes unshare copy) and log every persistent-global
@@ -617,9 +651,9 @@ fn goto_move(s: &mut DataObject, tape: &DataArray, c: i64, base: i64, k: i64, fx
   if sb >= base && snaps.has(&sb.to_string()) && (k - sb) < dist {
     let sn = snaps.get_object(&sb.to_string());
     s.put_object("cur", copy_obj(&sn.get_object("s"))); s.put_boolean("shared", false);
-    for q in sb..k { apply_entry(s, &tape.get_object((q - base) as usize), true)?; }
-  } else if k < c { for q in (k..c).rev() { apply_entry(s, &tape.get_object((q - base) as usize), false)?; } }
-  else { for q in c..k { apply_entry(s, &tape.get_object((q - base) as usize), true)?; } }
+    for q in sb..k { let e = tape.get_object((q - base) as usize); apply_entry(s, &e, true, &ga(&e, "a"))?; }
+  } else if k < c { for q in (k..c).rev() { let e = tape.get_object((q - base) as usize); let t = groups_at(s, tape, base, q); apply_entry(s, &e, false, &t)?; } }
+  else { for q in c..k { let e = tape.get_object((q - base) as usize); apply_entry(s, &e, true, &ga(&e, "a"))?; } }
   s.put_int("cursor", k);
   restore_aliases(s)
 }
@@ -643,7 +677,7 @@ fn goto(s: &mut DataObject, k: i64) -> Result<DataArray, String> {
 }
 fn replay_move(s: &mut DataObject, e: &DataObject, c: i64) -> Result<(), String> {
   apply_g(e, true)?;
-  apply_entry(s, e, true)?;
+  apply_entry(s, e, true, &ga(e, "a"))?;
   s.put_int("cursor", c + 1);
   restore_aliases(s)
 }
@@ -739,8 +773,8 @@ fn exec(s: &mut DataObject, core: &Command, pick: &DataObject, took: Option<Data
   let nc = snap(&ns, &mut bodies, &mut keys);
   let alias = aliases(&ns);
   let cur = s.get_object("cur");
-  let mut ch = DataArray::new(); let mut size = 0i64; let mut path: Vec<P> = Vec::new();
-  diff(&cur, &nc, &mut path, &mut ch, &mut size);
+  let mut ch = DataArray::new(); let mut size = 0i64;
+  let tx = diff_tx(&cur, &nc, &mut ch, &mut size);
   size += nodes_o(&grecord);
   let h = hash_obj(&nc);
   let view = mkview(&r);
@@ -752,6 +786,8 @@ fn exec(s: &mut DataObject, core: &Command, pick: &DataObject, took: Option<Data
   match &took { Some(t) => e.put_object("took", t.clone()), None => e.put_null("took") }
   e.put_boolean("user", pick.has("kind"));
   e.put_array("c", ch); e.put_array("g", g.clone());
+  // R3 D1: the step split or joined aliases among common paths (txp = up to 4 example paths, for diagnosis)
+  if tx.hit { e.put_boolean("tx", true); size += 1 + alias_size(&tx.paths); e.put_array("txp", tx.paths); }
   e.put_array("gbefore", ga(&grecord, "before_aliases")); e.put_array("gafter", ga(&grecord, "after_aliases"));
   e.put_array("xafter", ga(&grecord, "xafter"));
   size += alias_size(&alias); e.put_array("a", alias);
