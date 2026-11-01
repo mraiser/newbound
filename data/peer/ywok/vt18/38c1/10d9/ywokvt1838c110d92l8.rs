@@ -29,7 +29,7 @@ pub fn get_relays(id:String) -> DataArray {
 pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
   let mut o = o.deep_copy();
   o.remove_property("password");
-  o.remove_property("publickey");
+  // publickey stays: a peer's public key is public by design (anyone connecting needs it); only privatekey must never leave the machine, and it never appears in a user record.
   o.put_string("id", &id);
   o.put_string("name", &o.get_string("displayname"));
   
