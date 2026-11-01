@@ -40,14 +40,19 @@
   margin-left: 6px
 }
 
+/* 1b: the chips clipped — .ispos forced the chip back to inline-block
+   (overriding the shared .chip's inline-flex, since this sheet loads
+   after app's) and .clickupdate claimed calc(100% - 20px) of it, so the
+   ✓ appended on done overlapped the version text and the ⚠ author
+   warning stretched the chip around a gap. Let the shared flex chip
+   size to its content: no display override, no width claim.
+   position:relative stays for the chips' positioned children. */
 .ispos {
   position:relative;
-  display:inline-block;
 }
 
 .clickupdate{
   display:inline-block;
-  width:calc(100% - 20px);
 }
 
 .removeupdate {
@@ -83,4 +88,63 @@
 .inline.iconmode{
   width:150px;
   height:150px;
+}
+
+/* F7: everything admin-only hides until the panel root (.hudpanel, set in
+   the js) earns .isadmin from the remote current_user check. Scoped to the
+   panel so dashboard-mounted controls' own classes are untouched. */
+.hudpanel .adminonly {
+  display: none;
+}
+
+.hudpanel.isadmin .adminonly {
+  display: revert;
+}
+
+/* 6b: the empty-dashboard note (Marc: 'NOT FOUND' is the default state,
+   not an error). Dim; the admin hint inside it inherits the dimming and
+   F7's .adminonly/.isadmin rule decides whether it shows at all. */
+.hudpanel .hudapps-empty {
+  opacity: 0.55;
+  font-size: 14px;
+  padding: 12px 0;
+}
+
+/* F8: the save-failure words next to Stay connected */
+.hudpanel .keepalive-status {
+  color: #d06060;
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+/* F11: a menu item whose action is unavailable (Add Control after a failed
+   first read) keeps its row but loses its popup and its affordance. */
+.hudpanel .menuitem-disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* F11: write-path errors in the Add Control popup */
+.add-control-error {
+  color: #d06060;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+/* F13: these two were absolutely positioned (.abspos) and sat on top of the
+   P2P Port line; they stay in flow on the IP Address line now. */
+.hudpanel .addressexpandbutton,
+.hudpanel .closeaddressbutton {
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+/* F13 follow-up (5b): the shared app css declares .roundbutton-small
+   { display:inline-flex } AFTER .hideme { display:none } at equal
+   specificity, so hideme never actually hid this button — it only sat
+   unseen under the ⋯ while both were .abspos at the same spot. Start it
+   hidden here; the expand/close click handlers set inline style.display,
+   which still overrides this rule. */
+.hudpanel .closeaddressbutton.hideme {
+  display: none;
 }

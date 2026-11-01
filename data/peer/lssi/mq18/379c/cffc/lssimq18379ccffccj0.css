@@ -52,7 +52,24 @@
 
 .addusercard {
   width:600px;
-  height:367px;
+  max-height: calc(100vh - 80px);
+}
+
+/* F2: below 640px the card hugs the viewport */
+@media (max-width: 640px) {
+  .addusercard {
+    width: calc(100vw - 32px);
+  }
+}
+
+/* F2: the card sizes to its content and the TAB BODY scrolls instead of
+   the card clipping (.card is overflow:hidden). The popup machinery
+   centers the card at its open-time height, so the body's cap stays
+   near half the viewport: a LAN list that grows after the open can
+   never push the card's bottom off the screen. */
+.addusercard .tab-content {
+  overflow: auto;
+  max-height: calc(50vh + 40px);
 }
 
 .bottomhugger{
@@ -93,16 +110,10 @@
 }
 
 .discovered{
-  height:100%;
-  overflow-y:scroll;
-}
-
-#autab1{
-  position: absolute;
-  top: 90px;
-  bottom: 0px;
-  left: 0px;
-  right: 0px;
+  /* F2: natural height — the tab body above does the scrolling. The
+     min-height keeps the empty LAN tab near the Connect tab's height so
+     the popup's open-time centering measurement is honest. */
+  min-height: 280px;
 }
 
 .peerupdatelist{
@@ -110,4 +121,171 @@
   height:300px;
   overflow-y:scroll;
   padding:10px;
+}
+
+/* F5: a row that ended in an error — dim red (its checkbox is disabled) */
+.rowerror{
+  color: rgba(255, 0, 0, 0.6);
+}
+
+/* 3b: a failed chip grows an error line. .chip (app.ui) is a nowrap flex
+   row, so the chip must wrap for the error to land on its own line, and
+   the red is picked to read on the graphite chip (#b00020 didn't). The
+   headsup panel's chips live on this page too, so these cover both flows. */
+.chip.chiperrored {
+  height: auto;
+  flex-wrap: wrap;
+  white-space: normal;
+  line-height: 1.5;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.chiperrline {
+  flex-basis: 100%;
+  display: block;
+}
+.chiperrline .chiperr {
+  color: #ff8a80;
+}
+.chiperrline .chipretry {
+  margin-left: 8px;
+}
+
+/* F17: both dialogs' ✕ hung mid-right over the body — .upper-right
+   (app.ui) is absolute at top:50%, and with nothing positioned between
+   it and the card it centered on the whole card. Anchor it to the
+   header's title row instead. And .dialog-header (app.ui) is a flex
+   ROW, which sat the Add Connection title BESIDE the tabs and wrapped
+   it — stack the header's rows instead. */
+.addusercard .dialog-header,
+.updateallpeerscard .dialog-header {
+  display: block;
+}
+.addusercard .dialog-header > .padme,
+.updateallpeerscard .dialog-header > .padme {
+  position: relative;
+  white-space: nowrap;
+}
+
+/* F17: long names and UUIDs stay inside the card — fixed table layout,
+   each cell ellipsizes and carries the full value in its title. */
+.lantable {
+  table-layout: fixed;
+}
+.lantable td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* F17: 'this machine' — another Newbound instance on this host, not a
+   LAN device */
+.lanlocalchip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 8px;
+  border-radius: 9px;
+  background: var(--panel-3);
+  color: var(--text-dim);
+  font-size: x-small;
+  line-height: 18px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* 1b: the name cell is a flex row — the name shrinks and ellipsizes in
+   its own slot, the chip keeps its full size whatever the name's length. */
+.lannamewrap {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.lannamewrap .lanname {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lannamewrap .lanlocalchip {
+  flex: none;
+}
+
+/* F18a: the plain peer list — shown in place of the 3D view when WebGL is
+   unavailable (or forced with ?view=list). The .viewer stays visible as the
+   black backdrop the corner overlays rely on; the list floats over it like
+   they do. The dots keep the panel's .connectionindicator metrics and share
+   peerstatus's colours, so list, orbs and panel all read as one verdict. */
+.peerlistwrap {
+  position: fixed;
+  top: 70px;
+  left: 20px;
+  right: 20px;
+  bottom: 220px;
+  max-width: 860px;
+  overflow-y: auto;
+  color: white;
+  /* the list floats on the raw page, outside any .wrap — give it the
+     app font or it falls back to the browser serif */
+  font-family: var(--font-family);
+}
+
+.peerlistnote {
+  color: #ffffff73;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.peerlistrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  border: thin solid #ffffff22;
+  border-radius: 6px;
+  background: #ffffff0a;
+  cursor: pointer;
+}
+
+.peerlistrow:hover {
+  background: #ffffff1d;
+}
+
+.pl-dots {
+  flex: none;
+  line-height: 0;
+}
+
+.pl-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 10px;
+  margin-right: 3px;
+}
+
+.pl-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+}
+
+.pl-kind {
+  flex: none;
+  font-size: 13px;
+  color: #ffffffb3;
+}
+
+.pl-last {
+  flex: none;
+  margin-left: auto;
+  font-size: 13px;
+  color: #ffffff73;
+}
+
+.peerlistempty {
+  color: #ffffff73;
+  font-style: italic;
 }

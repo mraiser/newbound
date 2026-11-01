@@ -32,12 +32,24 @@ function freshness(ageMs){
 }
 function tint(){
   var p = me.data || {}, now = Date.now();
-  var h = 210, s0 = 0;                                   // grey: disconnected
-  if (p.tcp) { h = 132; s0 = 0.46; }                     // green
-  else if (p.udp) { h = 212; s0 = 0.48; }                // blue
-  else if (p.relay || p.connected) { h = 48; s0 = 0.60; } // yellow
-  var age = p.last_contact ? Math.max(0, now - p.last_contact) : Infinity;
-  var f = freshness(age);
+  // F6: prefer the page's shared verdict (document.body.peerstatus, published
+  // by peer.peer) so orb and panel dots always agree on kind and freshness;
+  // this control keeps its own saturation/lightness curve for brightness.
+  var h = 210, s0 = 0, f = 0;                            // grey: disconnected
+  var ps = document.body.peerstatus;
+  var st = ps ? ps(p, now) : null;
+  if (st) {
+    var hues = { tcp: [132, 0.46], udp: [212, 0.48], relay: [48, 0.60], down: [210, 0] };
+    var hv = hues[st.kind] || hues.down;
+    h = hv[0]; s0 = hv[1]; f = st.freshness;
+  }
+  else {
+    if (p.tcp) { h = 132; s0 = 0.46; }                     // green
+    else if (p.udp) { h = 212; s0 = 0.48; }                // blue
+    else if (p.relay || p.connected) { h = 48; s0 = 0.60; } // yellow
+    var age = p.last_contact ? Math.max(0, now - p.last_contact) : Infinity;
+    f = freshness(age);
+  }
   return hslHex(h, s0 * (0.16 + 0.84 * f), 0.54 - (1 - f) * 0.12);
 }
 
@@ -60,7 +72,9 @@ me.animate = function (ctx) {
   me.restY = 0.5 + ((((h >>> 8) % 1000) / 1000) - 0.5) * 0.9;   // 0.05 .. 0.95
   ctx.rig.pos.y = me.restY;
   ctx.setRig("tag", "text", me.data.displayname || me.data.name || id);
-  ctx.setRig("orb", "material", { color: tint() });
+  // a material delta REPLACES the node's material (the stage does not merge
+  // it over the token), so restate flat:true or the orb repools smooth-shaded
+  ctx.setRig("orb", "material", { color: tint(), flat: true });
 };
 
 // ── render: every frame. The force ON ME from my siblings, applied to my rig —
@@ -116,7 +130,7 @@ me.render = function (ctx, dt) {
   // tint by transport + staleness; spin the orb lazily
   if ((me._tintTick = (me._tintTick || 0) + dt) > 0.5) {
     me._tintTick = 0;
-    ctx.setRig("orb", "material", { color: tint() });
+    ctx.setRig("orb", "material", { color: tint(), flat: true });
     var name = me.data.displayname || me.data.name || me.peerId;
     if (me._shownName !== name) { me._shownName = name; ctx.setRig("tag", "text", name); }
   }
