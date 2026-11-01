@@ -72,7 +72,9 @@ me.animate = function (ctx) {
   me.restY = 0.5 + ((((h >>> 8) % 1000) / 1000) - 0.5) * 0.9;   // 0.05 .. 0.95
   ctx.rig.pos.y = me.restY;
   ctx.setRig("tag", "text", me.data.displayname || me.data.name || id);
-  ctx.setRig("orb", "material", { color: tint() });
+  // a material delta REPLACES the node's material (the stage does not merge
+  // it over the token), so restate flat:true or the orb repools smooth-shaded
+  ctx.setRig("orb", "material", { color: tint(), flat: true });
 };
 
 // ── render: every frame. The force ON ME from my siblings, applied to my rig —
@@ -128,7 +130,7 @@ me.render = function (ctx, dt) {
   // tint by transport + staleness; spin the orb lazily
   if ((me._tintTick = (me._tintTick || 0) + dt) > 0.5) {
     me._tintTick = 0;
-    ctx.setRig("orb", "material", { color: tint() });
+    ctx.setRig("orb", "material", { color: tint(), flat: true });
     var name = me.data.displayname || me.data.name || me.peerId;
     if (me._shownName !== name) { me._shownName = name; ctx.setRig("tag", "text", name); }
   }
