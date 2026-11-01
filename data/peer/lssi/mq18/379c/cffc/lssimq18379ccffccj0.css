@@ -361,3 +361,22 @@
   color: #ffffff73;
   font-style: italic;
 }
+
+/* 7b: the panel's width is adjustable — #hudresizer is a thin strip on
+   the panel's left edge (a sibling; see the html note), invisible until
+   hovered, straddling the edge 3px either side so the edge itself is
+   grabbable. The js clamps the width to [360px, 90vw] (the panel's own
+   max-width) and persists it per viewer in localStorage. */
+.hudresizer{
+  position:absolute;
+  top:0;
+  width:6px;
+  height:100%;
+  cursor:col-resize;
+  background-color:transparent;
+  transition:background-color 0.15s ease;
+}
+
+.hudresizer:hover, .hudresizer.dragging{
+  background-color:var(--accent-dim);
+}

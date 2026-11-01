@@ -136,6 +136,9 @@
 .inline.big{
   width:600px;
   height:450px;
+  /* 7b: the panel is resizable down to 360px — a big dashboard tile
+     caps at the panel's inner width instead of holding 600px. */
+  max-width:100%;
 }
 
 .inline.iconmode{
