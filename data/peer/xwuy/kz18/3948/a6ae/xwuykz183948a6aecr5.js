@@ -261,7 +261,9 @@ ME.querySelector('#keepalive').addEventListener('change', function(){
 me.update = function(){
   if (me.check == ME.querySelector('.rp-uuid')) {
     ME.DATA = document.getElementById('peer_'+ME.DATA.id).DATA;
-    ME.querySelector('.rp-name').textContent = ME.DATA.name;
+    // F14: BOTH name slots — the headline and the one inside the
+    // "libraries on <name> can be updated" sentence.
+    ME.querySelectorAll('.rp-name').forEach(function(el){ el.textContent = ME.DATA.name; });
     ME.querySelector('.rp-uuid').textContent = ME.DATA.id;
     // F13: a peer that dialled in has an empty saved address — fall back to
     // the IP the server saw on the wire (remote_address; TCP/UDP only).
