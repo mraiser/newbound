@@ -40,14 +40,19 @@
   margin-left: 6px
 }
 
+/* 1b: the chips clipped — .ispos forced the chip back to inline-block
+   (overriding the shared .chip's inline-flex, since this sheet loads
+   after app's) and .clickupdate claimed calc(100% - 20px) of it, so the
+   ✓ appended on done overlapped the version text and the ⚠ author
+   warning stretched the chip around a gap. Let the shared flex chip
+   size to its content: no display override, no width claim.
+   position:relative stays for the chips' positioned children. */
 .ispos {
   position:relative;
-  display:inline-block;
 }
 
 .clickupdate{
   display:inline-block;
-  width:calc(100% - 20px);
 }
 
 .removeupdate {
