@@ -261,7 +261,7 @@ me.popup = function(data, cb) {
     // Position and display the popup off-screen to guarantee correct measurement
     setStyles(el2, {
       position: 'fixed',
-      zIndex: '6',
+      zIndex: '20',
       left: '-9999px',
       top: '-9999px',
       display: 'block',
