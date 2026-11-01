@@ -25,11 +25,11 @@
   </div>
   <div class='padme tab-content tab1 selected'>
     IP Address: <span class='hud_ipaddr'></span>
-    <img src='../app/asset/app/icons/ui/accent/more.svg' class='roundbutton-small addressexpandbutton abspos'><img src='../app/asset/app/icons/ui/accent/close.svg' class='roundbutton-small closeaddressbutton hideme abspos'><br>
+    <img src='../app/asset/app/icons/ui/accent/more.svg' class='roundbutton-small addressexpandbutton'><img src='../app/asset/app/icons/ui/accent/close.svg' class='roundbutton-small closeaddressbutton hideme'><br>
     <div class='hud_address_list padme addressexpand hideme'></div>
     P2P Port: <span class='hud_port'></span><br>
     HTTP Port: <span class='hud_http_port'></span><br>
-    <div class='hudcrates adminonly' style='display:none;'>
+    <div class='hudcrates adminonly'>
       Platform: <span class='hud_crates'><i>checking...</i></span><br>
       <div class='hudcrateform'>
         <input type='text' class='textinput hud_flowlang' placeholder='flowlang' style='width:90px; display:inline-block;'>
@@ -48,6 +48,7 @@
       <input type='checkbox' id='keepalive'>
       <span>Stay connected</span>
     </label>
+    <span class='keepalive-status'></span>
     <br><br>
     <div class='availableupgrades hideme padme'>
       The following libraries on <span class='rp-name'></span> can be updated:
@@ -70,6 +71,7 @@
     </div>
     <div class='card-text'>
       <div class = 'add-control-available'></div>
+      <div class='add-control-error'></div>
     </div>
   </div>
 </div>
