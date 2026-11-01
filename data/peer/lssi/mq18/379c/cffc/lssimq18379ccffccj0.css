@@ -223,6 +223,9 @@
   max-width: 860px;
   overflow-y: auto;
   color: white;
+  /* the list floats on the raw page, outside any .wrap — give it the
+     app font or it falls back to the browser serif */
+  font-family: var(--font-family);
 }
 
 .peerlistnote {
