@@ -94,8 +94,10 @@ me.ready = function(){
 
   json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_shared", function(result){
     if (result.status != 'ok'){
-      // F3: result.msg is untrusted — set it as text
-      ME.querySelector('.hudapps').textContent = result.msg;
+      // F16: failures show the shared wording (errText), as text (F3).
+      // 'NOT FOUND' is not a failure — the peer has never shared a
+      // control — so the dashboard stays empty instead of naming an error.
+      ME.querySelector('.hudapps').textContent = result.msg == 'NOT FOUND' ? '' : errText(result);
       me.data = { "list": [] };
       // F11: 'NOT FOUND' only means this peer has never shared a control.
       // Any OTHER failure makes adding unsafe (a write would replace a list
@@ -110,8 +112,8 @@ me.ready = function(){
   json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_available", function(result){
     var el = ME.querySelector('.add-control-available');
     if (result.status != 'ok'){
-      // F3: result.msg is untrusted — set it as text
-      el.textContent = result.msg;
+      // F16: the shared wording (errText), as text (F3)
+      el.textContent = errText(result);
     }
     else {
       me.available = result.data;
