@@ -706,29 +706,56 @@ ME.querySelector('.addpeerbutton').addEventListener('click', function(){
     me.discovery = result.data;
     // F3: discovery names come from unauthenticated LAN packets — build the
     // rows with DOM calls and textContent, never innerHTML.
+    // F17: our own UUID is never a connection you can add, so it never
+    // lists. Loopback entries are other Newbound instances on THIS
+    // machine, not LAN devices — keep them, chip them 'this machine',
+    // and sort them after the real LAN devices.
+    function isLocalAddr(a){
+      a = String(a || '');
+      return a == '::1' || a == 'localhost' || a.indexOf('127.') == 0 || a.indexOf('::1:') == 0;
+    }
     var tbl = document.createElement('table');
     tbl.className = 'lantable';
     var now = new Date().getTime();
-    for (sip in result.data) {
+    var found = [];
+    for (var sip in result.data) {
       var rds = result.data[sip];
-      if (now - rds.time < 30000 && !getByProperty(me.peers, "id", rds.uuid)) {
-        var tr = document.createElement('tr');
-        tr.className = 'clickme';
-        tr.dataset.sip = sip;
-        var td = document.createElement('td');
-        td.textContent = sip;
-        tr.appendChild(td);
-        td = document.createElement('td');
-        td.textContent = rds.name;
-        tr.appendChild(td);
-        td = document.createElement('td');
-        var sm = document.createElement('span');
-        sm.className = 'smalltext';
-        sm.textContent = rds.uuid;
-        td.appendChild(sm);
-        tr.appendChild(td);
-        tbl.appendChild(tr);
+      if (now - rds.time < 30000 && !getByProperty(me.peers, "id", rds.uuid)
+          && !(me.info && rds.uuid == me.info.uuid)) {
+        found.push({ sip: sip, rds: rds, local: isLocalAddr(rds.address) || isLocalAddr(sip) });
       }
+    }
+    found.sort(function(a, b){ return (a.local ? 1 : 0) - (b.local ? 1 : 0); });
+    for (var fi = 0; fi < found.length; fi++) {
+      var fsip = found[fi].sip;
+      var frds = found[fi].rds;
+      var tr = document.createElement('tr');
+      tr.className = 'clickme';
+      tr.dataset.sip = fsip;
+      // F17: long values ellipsize (.lantable is fixed-layout now); each
+      // cell's title carries the full text. F3 holds: textContent only.
+      var td = document.createElement('td');
+      td.textContent = fsip;
+      td.title = fsip;
+      tr.appendChild(td);
+      td = document.createElement('td');
+      td.textContent = frds.name;
+      td.title = frds.name;
+      if (found[fi].local) {
+        var mch = document.createElement('span');
+        mch.className = 'lanlocalchip';
+        mch.textContent = 'this machine';
+        td.appendChild(mch);
+      }
+      tr.appendChild(td);
+      td = document.createElement('td');
+      var sm = document.createElement('span');
+      sm.className = 'smalltext';
+      sm.textContent = frds.uuid;
+      td.appendChild(sm);
+      td.title = frds.uuid;
+      tr.appendChild(td);
+      tbl.appendChild(tr);
     }
     var disc = ME.querySelector('.discovered');
     if (tbl.rows.length == 0) disc.innerHTML = '<div class="padme"><i>No new devices found on LAN</i></div>';

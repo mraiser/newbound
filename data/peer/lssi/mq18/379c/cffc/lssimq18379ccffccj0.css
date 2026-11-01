@@ -150,3 +150,44 @@
 .chiperrline .chipretry {
   margin-left: 8px;
 }
+
+/* F17: both dialogs' ✕ hung mid-right over the body — .upper-right
+   (app.ui) is absolute at top:50%, and with nothing positioned between
+   it and the card it centered on the whole card. Anchor it to the
+   header's title row instead. And .dialog-header (app.ui) is a flex
+   ROW, which sat the Add Connection title BESIDE the tabs and wrapped
+   it — stack the header's rows instead. */
+.addusercard .dialog-header,
+.updateallpeerscard .dialog-header {
+  display: block;
+}
+.addusercard .dialog-header > .padme,
+.updateallpeerscard .dialog-header > .padme {
+  position: relative;
+  white-space: nowrap;
+}
+
+/* F17: long names and UUIDs stay inside the card — fixed table layout,
+   each cell ellipsizes and carries the full value in its title. */
+.lantable {
+  table-layout: fixed;
+}
+.lantable td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* F17: 'this machine' — another Newbound instance on this host, not a
+   LAN device */
+.lanlocalchip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 8px;
+  border-radius: 9px;
+  background: var(--panel-3);
+  color: var(--text-dim);
+  font-size: x-small;
+  line-height: 18px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
