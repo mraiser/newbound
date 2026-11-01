@@ -263,7 +263,9 @@ me.update = function(){
     ME.DATA = document.getElementById('peer_'+ME.DATA.id).DATA;
     ME.querySelector('.rp-name').textContent = ME.DATA.name;
     ME.querySelector('.rp-uuid').textContent = ME.DATA.id;
-    ME.querySelector('.hud_ipaddr').textContent = ME.DATA.address;
+    // F13: a peer that dialled in has an empty saved address — fall back to
+    // the IP the server saw on the wire (remote_address; TCP/UDP only).
+    ME.querySelector('.hud_ipaddr').textContent = ME.DATA.address || ME.DATA.remote_address || '';
     ME.querySelector('.hud_port').textContent = ME.DATA.p2p_port;
     ME.querySelector('.hud_http_port').textContent = ME.DATA.http_port;
     // F8: keepalive is stored as a string — "false" must not read as ticked;
@@ -277,12 +279,15 @@ me.update = function(){
     // textContent, never innerHTML (the href is set as a plain attribute).
     var alist = ME.querySelector('.hud_address_list');
     alist.innerHTML = '';
-    for (var i in ME.DATA.addresses) {
+    // F13: the live connection's IP joins the list when it isn't already there
+    var addrs = (ME.DATA.addresses || []).slice();
+    if (ME.DATA.remote_address && addrs.indexOf(ME.DATA.remote_address) == -1) addrs.push(ME.DATA.remote_address);
+    for (var i in addrs) {
       var a = document.createElement('a');
       a.className = 'chip';
       a.target = '_blank';
-      a.href = 'http://' + ME.DATA.addresses[i] + ':' + ME.DATA.http_port + '?session_id=' + ME.DATA.session_id;
-      a.textContent = ME.DATA.addresses[i];
+      a.href = 'http://' + addrs[i] + ':' + ME.DATA.http_port + '?session_id=' + ME.DATA.session_id;
+      a.textContent = addrs[i];
       alist.appendChild(a);
       alist.appendChild(document.createTextNode(' '));
     }

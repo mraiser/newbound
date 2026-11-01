@@ -116,3 +116,11 @@
   font-size: 12px;
   padding: 4px 8px;
 }
+
+/* F13: these two were absolutely positioned (.abspos) and sat on top of the
+   P2P Port line; they stay in flow on the IP Address line now. */
+.hudpanel .addressexpandbutton,
+.hudpanel .closeaddressbutton {
+  vertical-align: middle;
+  margin-left: 6px;
+}

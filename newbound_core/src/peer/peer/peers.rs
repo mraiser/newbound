@@ -72,7 +72,7 @@ pub fn get_relays(id:String) -> DataArray {
 pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
   let mut o = o.deep_copy();
   o.remove_property("password");
-  o.remove_property("publickkey");
+  o.remove_property("publickey");
   o.put_string("id", &id);
   o.put_string("name", &o.get_string("displayname"));
   
@@ -102,6 +102,15 @@ pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
   o.put_boolean("relay", relay);  
   o.put_boolean("connected", connected);  
   o.put_int("last_contact", last_contact);
+
+  // F13: a dialled-in peer's saved address is empty - report the IP actually
+  // on the wire. TCP first (matching last_contact), then UDP; relay has no
+  // peer_addr, so the field stays absent there.
+  if let Some(c) = tcpc.as_ref().or(udpc.as_ref()) {
+    if let Ok(addr) = c.stream.peer_addr() {
+      o.put_string("remote_address", &addr.ip().to_string());
+    }
+  }
 
   o
 }
