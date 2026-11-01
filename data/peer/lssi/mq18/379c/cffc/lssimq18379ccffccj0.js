@@ -562,6 +562,62 @@ function peerReplyError(result, field){
 }
 document.body.peerReplyError = peerReplyError;
 
+// U2: what can this machine actually SEND? An update makes the peer call
+// back here for runtime/dev/libraries/<lib>.json (dev.lib_info) and the
+// matching zip — and those exist only where the library was PUBLISHED. A
+// version number that arrived through git has no package behind it, so the
+// chips must check. One lib_info per lib, cached for the page's life;
+// cb(null) = no package here (the read failed, or version/hash is missing).
+var pkgCache = {}, pkgWaiting = {};
+function peerPackage(lib, cb){
+  if (lib in pkgCache) { cb(pkgCache[lib]); return; }
+  if (pkgWaiting[lib]) { pkgWaiting[lib].push(cb); return; }
+  pkgWaiting[lib] = [cb];
+  json('../dev/lib_info', 'lib=' + encodeURIComponent(lib), function(r){
+    var pkg = null;
+    if (peerReplyError(r, 'data') == null && r.data && r.data.version != null && r.data.hash != null) {
+      pkg = { version: r.data.version, hash: r.data.hash };
+    }
+    pkgCache[lib] = pkg;
+    var q = pkgWaiting[lib];
+    delete pkgWaiting[lib];
+    q.forEach(function(f){ try { f(pkg); } catch (x) { console.error(x); } });
+  });
+}
+document.body.peerPackage = peerPackage;
+
+// U2: the package verdict, applied to one built chip. A real package newer
+// than the peer's copy makes the chip promise what the peer will actually
+// receive (pkg.version, not the git-derived app/libs number). Anything else
+// marks the chip nopkg: dimmed like a deselected ⚠ chip, the reason inline,
+// the full story in the title — and the run buttons never send it. Unlike
+// authwarn, clicking a nopkg chip does NOT include it.
+function applyPkgGate(chip, pkg, lib, myVersion, theirVersion, peerName){
+  if (pkg && pkg.version > theirVersion) {
+    var click = chip.querySelector('.clickupdate');
+    if (click) {
+      click.dataset.version = pkg.version;
+      click.textContent = lib + ' v' + theirVersion + ' ➤ ' + pkg.version;
+    }
+    return;
+  }
+  chip.classList.add('nopkg');
+  chip.style.opacity = '0.45';
+  // F3: the lib id, versions and peer name are untrusted — the title is a
+  // plain attribute and the note is textContent, never markup.
+  chip.title = 'This machine has no update package for ' + lib + ' v' + myVersion
+    + '. Packages are made when a library is published on this machine. Update '
+    + peerName + ' from git instead, or publish ' + lib + ' here.';
+  var w = document.createElement('span');
+  w.className = 'nopkgtext';
+  w.style.color = '#b26a00';
+  w.style.marginLeft = '6px';
+  w.textContent = 'not packaged here';
+  var x = chip.querySelector('.removeupdate');
+  if (x) chip.insertBefore(w, x); else chip.appendChild(w);
+}
+document.body.peerPkgGate = applyPkgGate;
+
 // F12: the old author/authorkey gate was disabled (if (true)) — Marc may have
 // done that on purpose, so it stays off. Instead, when BOTH sides carry an
 // author and authorkey and they differ, the chip is marked: warning text, a
@@ -589,6 +645,8 @@ function applyAuthorWarn(chip, mylib, theirlib){
   if (x) chip.insertBefore(w, x); else chip.appendChild(w);
   chip.addEventListener('click', function(ev){
     if (ev.target.closest && ev.target.closest('.removeupdate, .chipretry')) return;
+    // U2: a chip with no package can never run — clicking must not include it
+    if (chip.classList.contains('nopkg')) return;
     var inc = chip.dataset.included == '1';
     chip.dataset.included = inc ? '0' : '1';
     chip.style.opacity = inc ? '0.45' : '1';
@@ -608,7 +666,7 @@ document.body.peerAuthorWarn = applyAuthorWarn;
 var updaterRuns = {};
 document.body.peerupdater = {
   running: function(peerId){ return !!updaterRuns[peerId]; },
-  run: function(peerId, items, hooks, skipped){
+  run: function(peerId, items, hooks, skipped, nopkg){
     if (updaterRuns[peerId]) return false;
     updaterRuns[peerId] = true;
     hooks = hooks || {};
@@ -619,7 +677,7 @@ document.body.peerupdater = {
       if (it && it.crates) cratesItem = it;
       else if (it && it.lib) libs.push(it);
     });
-    var sum = { updated: 0, failed: 0, skipped: skipped > 0 ? skipped : 0, crates: null, recompile: null, recompile_msg: '' };
+    var sum = { updated: 0, failed: 0, skipped: skipped > 0 ? skipped : 0, nopkg: nopkg > 0 ? nopkg : 0, crates: null, recompile: null, recompile_msg: '' };
     var needRecompile = false;
 
     function call(h, a, b){ try { if (hooks[h]) hooks[h](a, b); } catch (x) { console.error(x); } }
@@ -676,7 +734,7 @@ document.body.peerupdater = {
         c.classList.remove('chiperrored');
         c.style.color = '';
         var again = it.crates ? { crates: it.crates, chipEl: c } : { lib: it.lib, version: it.version, chipEl: c };
-        document.body.peerupdater.run(peerId, [again], hooks, sum.skipped);
+        document.body.peerupdater.run(peerId, [again], hooks, sum.skipped, sum.nopkg);
       });
     }
     function buildText(s){
@@ -691,6 +749,8 @@ document.body.peerupdater = {
       // 3b: a deselected different-author chip was left out on purpose — the
       // summary says so instead of claiming 'All updated' past it.
       if (s.skipped > 0) t += ' — ' + s.skipped + ' skipped (different author)';
+      // U2: chips this machine holds no package for were left out — say so
+      if (s.nopkg > 0) t += ' — ' + s.nopkg + ' not packaged on this machine';
       return t;
     }
     function finish(){
@@ -800,9 +860,10 @@ function checkForUpdates(peer) {
       // resolves the row instead of leaving it on pending... forever.
       if (result.status != 'ok' || !result.data) { rowError(uuid, peerErrorText(result)); checkDone(); return; }
       if (!document.body.locallibraries) { rowError(uuid, 'Error: local library list unavailable'); checkDone(); return; }
-      // F3: library ids and versions come from the remote peer — chips are
-      // built with DOM calls and textContent, never innerHTML.
-      var chips = [];
+      // U2: a chip's final form depends on whether THIS machine holds a
+      // package for the lib (peerPackage, async) — collect the version-gap
+      // pairs first, build each chip when its verdict lands, then render.
+      var pairs = [];
       for (var i in result.data) {
         var theirlib = result.data[i];
         var mylib = getByProperty(document.body.locallibraries, 'id', theirlib.id);
@@ -810,24 +871,37 @@ function checkForUpdates(peer) {
           // F12: the old author gate (if (true) //...) stays off on purpose —
           // a mismatch marks the chip below (applyAuthorWarn) instead of
           // hiding it.
-          {
-            if (mylib.version > theirlib.version) {
-              var chip = document.createElement('span');
-              chip.className = 'chip ispos';
-              chip.id = 'U_' + mylib.id;
-              var click = document.createElement('span');
-              click.className = 'clickupdate';
-              click.dataset.lib = mylib.id;
-              click.dataset.version = mylib.version;
-              click.textContent = mylib.id + ' v' + theirlib.version + ' ➤ ' + mylib.version;
-              chip.appendChild(click);
-              chip.appendChild(chipCloseImg());
-              applyAuthorWarn(chip, mylib, theirlib);
-              chips.push(chip);
-            }
-          }
+          if (mylib.version > theirlib.version) pairs.push({ mylib: mylib, theirlib: theirlib });
         }
       }
+      // F3: library ids and versions come from the remote peer — chips are
+      // built with DOM calls and textContent, never innerHTML.
+      function buildChip(pr){
+        var chip = document.createElement('span');
+        chip.className = 'chip ispos';
+        chip.id = 'U_' + pr.mylib.id;
+        var click = document.createElement('span');
+        click.className = 'clickupdate';
+        click.dataset.lib = pr.mylib.id;
+        click.dataset.version = pr.mylib.version;
+        click.textContent = pr.mylib.id + ' v' + pr.theirlib.version + ' ➤ ' + pr.mylib.version;
+        chip.appendChild(click);
+        chip.appendChild(chipCloseImg());
+        applyAuthorWarn(chip, pr.mylib, pr.theirlib);
+        return chip;
+      }
+      var chips = new Array(pairs.length);
+      var waitPkg = pairs.length;
+      if (waitPkg == 0) withChips();
+      else pairs.forEach(function(pr, idx){
+        peerPackage(pr.mylib.id, function(pkg){
+          var chip = buildChip(pr);
+          applyPkgGate(chip, pkg, pr.mylib.id, pr.mylib.version, pr.theirlib.version, peer.name);
+          chips[idx] = chip;
+          if (--waitPkg == 0) withChips();
+        });
+      });
+      function withChips(){
       // crate pins ride the same row: a peer lagging the local flowlang/ndata
       // versions gets a distinct chip (clickcrates, NOT clickupdate - the lib
       // installer must never treat it as a library). A refused crate_versions
@@ -858,6 +932,7 @@ function checkForUpdates(peer) {
         }
         checkDone();
       });
+      }   // withChips
     });
   }
 }
@@ -886,9 +961,12 @@ ME.querySelector('#updateallpeersnow').addEventListener('click', function(){
     var peer = row.dataset.peer;
     var items = [];
     var skipped = 0;   // 3b: deselected different-author chips, named in the summary
+    var nopkg = 0;     // U2: chips this machine has no package for — never sent
     row.querySelectorAll('.clickupdate').forEach(function(click){
       var chip = click.closest('.chip');
       if (!chip || chip.dataset.done == '1') return;
+      // U2: no package behind the chip — nothing to send, count it instead
+      if (chip.classList.contains('nopkg')) { nopkg++; return; }
       // F12: a different-author chip rides only when the user clicked it in
       if (chip.classList.contains('authwarn') && chip.dataset.included != '1') { skipped++; return; }
       items.push({ lib: click.dataset.lib, version: click.dataset.version, chipEl: chip });
@@ -898,8 +976,12 @@ ME.querySelector('#updateallpeersnow').addEventListener('click', function(){
       items.push({ crates: { flowlang: cratechip.dataset.flowlang, ndata: cratechip.dataset.ndata }, chipEl: cratechip });
     }
     if (items.length == 0) {
-      // 3b: a row whose only chips are deselected ⚠ ones runs nothing — say so
-      if (skipped > 0) rowNote(row, 'Nothing to update — ' + skipped + ' skipped (different author)');
+      // 3b/U2: a row whose only chips are deselected ⚠ or nopkg ones runs
+      // nothing — say so instead of silence, and send the peer nothing
+      var note = '';
+      if (skipped > 0) note += ' — ' + skipped + ' skipped (different author)';
+      if (nopkg > 0) note += ' — ' + nopkg + ' not packaged on this machine';
+      if (note) rowNote(row, 'Nothing to update' + note);
       return;
     }
     pending++;
@@ -915,7 +997,7 @@ ME.querySelector('#updateallpeersnow').addEventListener('click', function(){
         pending--;
         if (pending <= 0) btn.disabled = false;
       }
-    }, skipped);
+    }, skipped, nopkg);
     if (!started) pending--;
   });
   if (pending > 0) btn.disabled = true;
