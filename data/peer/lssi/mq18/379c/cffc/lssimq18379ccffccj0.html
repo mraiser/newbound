@@ -14,17 +14,17 @@
     </div>
   </div>
   <div class='bottomleftcorner'>
-    LOCAL DEVICE:
-    <div class='padme'>
+    <div class='localdevlabel'>Local Device</div>
+    <div class='localdevinfo'>
       <div class='localpeername'></div>
       <div class='localpeerid'></div>
       <div class='localpeerport'></div>
       <div class='localhttpport'></div>
     </div>
-    <button class='addpeerbutton coloredbutton popupmenu' data-popup='{"selector":".addusercard","closeselector":".close-add-user","modal":true}'><img src='../app/asset/app/icons/ui/light/user-add.svg' class='mediumicon'></button>
-    <!-- button class="accesscodebutton coloredbutton"><img src='../app/asset/app/icons/ui/light/shield.svg' class='mediumicon'></button>
-    <button class="lanbutton mdl-button coloredbutton"><img src='../app/asset/app/icons/ui/light/wifi.svg' class='mediumicon'></button -->
-    <button class='updateallpeersbutton coloredbutton popupmenu' data-popup='{"selector":".updateallpeerscard","closeselector":".close-update-peers","modal":true}'><img src='../app/asset/app/icons/ui/light/upload.svg' class='mediumicon'></button>
+    <div class='localdevactions'>
+      <button class='addpeerbutton localdevbtn popupmenu' title='Add connection' data-popup='{"selector":".addusercard","closeselector":".close-add-user","modal":true}'><img src='../app/asset/app/icons/ui/light/user-add.svg' class='mediumicon'></button>
+      <button class='updateallpeersbutton localdevbtn popupmenu' title='Update peers' data-popup='{"selector":".updateallpeerscard","closeselector":".close-update-peers","modal":true}'><img src='../app/asset/app/icons/ui/light/upload.svg' class='mediumicon'></button>
+    </div>
   </div>
   
   <div class='card hideme updateallpeerscard'>
