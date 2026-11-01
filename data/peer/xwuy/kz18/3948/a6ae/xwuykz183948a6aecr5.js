@@ -457,7 +457,8 @@ ME.querySelector('.closeonclick').addEventListener("click", function(){
 function initCrates(){
   var uuid = ME.DATA.id;
   json('../peer/remote/'+uuid+'/dev/crate_versions', null, function(r){
-    if (r.status != 'ok') { var hc = ME.querySelector('.hudcrates'); if (hc) hc.remove(); return; }
+    // 7c: .hudcrates marks each of the flattened Platform grid items now
+    if (r.status != 'ok') { ME.querySelectorAll('.hudcrates').forEach(function(hc){ hc.remove(); }); return; }
     me.remotecrates = r;
     var s = 'flowlang ' + r.flowlang + ' / ndata ' + r.ndata + (r.mismatch ? ' (MANIFESTS DISAGREE)' : '');
     ME.querySelector('.hud_crates').textContent = s;

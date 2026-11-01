@@ -243,11 +243,29 @@
   min-width: 0;
 }
 
-/* 7.4: the admin-only Platform rows join the same grid (display:contents
-   puts the wrapper's children on the grid). Must follow the .isadmin
-   .adminonly revert rule — same specificity, later wins. */
-.hudpanel.isadmin .hudcrates {
-  display: contents;
+/* 7c: the Platform rows are DIRECT grid children now, each tagged
+   .hudcrates.adminonly — the display:contents wrapper they sat in left
+   Gecko with stale grid track heights when the panel was dragged
+   narrower with Info visible, drawing the crate form over the Platform
+   value and the key row. The form is a wrapping flex row, so at narrow
+   widths the inputs and buttons stack with a real gap instead of
+   lines touching. The display rule must follow the .isadmin .adminonly
+   revert — same specificity, later wins. */
+.hudpanel .hudcrateform {
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.hudpanel.isadmin .hudcrateform {
+  display: flex;
+}
+
+/* 7c: .adminonly's isadmin revert out-ranks .hideme's display:none (the
+   closeaddressbutton precedent) — keep the crate status hidden until a
+   run shows it via inline style. */
+.hudpanel .hudcratestatus.hideme {
+  display: none;
 }
 
 .hudpanel .hud_address_list {

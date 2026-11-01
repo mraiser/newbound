@@ -33,18 +33,16 @@
       <div class='hudinfovalue hud_port'></div>
       <div class='hudinfolabel'>HTTP Port</div>
       <div class='hudinfovalue hud_http_port'></div>
-      <div class='hudcrates adminonly'>
-        <div class='hudinfolabel'>Platform</div>
-        <div class='hudinfovalue hud_crates'><i>checking...</i></div>
-        <div class='hudcrateform hudinfofull'>
-          <input type='text' class='textinput hud_flowlang' placeholder='flowlang' style='width:90px; display:inline-block;'>
-          <input type='text' class='textinput hud_ndata' placeholder='ndata' style='width:90px; display:inline-block;'>
-          <button class='coloredbutton hudcrateupdate'>Update Crates</button>
-          <button class='regularbutton hudcratehardreset'>Hard Reset</button>
-          <button class='accentbutton hudcraterestart hideme'>Restart Instance</button>
-        </div>
-        <div class='hudcratestatus hudinfofull hideme' style='white-space:pre-wrap; font-family:monospace; font-size:11px; max-height:120px; overflow:auto;'></div>
+      <div class='hudinfolabel hudcrates adminonly'>Platform</div>
+      <div class='hudinfovalue hud_crates hudcrates adminonly'><i>checking...</i></div>
+      <div class='hudcrateform hudinfofull hudcrates adminonly'>
+        <input type='text' class='textinput hud_flowlang' placeholder='flowlang' style='width:90px;'>
+        <input type='text' class='textinput hud_ndata' placeholder='ndata' style='width:90px;'>
+        <button class='coloredbutton hudcrateupdate'>Update Crates</button>
+        <button class='regularbutton hudcratehardreset'>Hard Reset</button>
+        <button class='accentbutton hudcraterestart hideme'>Restart Instance</button>
       </div>
+      <div class='hudcratestatus hudinfofull hudcrates adminonly hideme' style='white-space:pre-wrap; font-family:monospace; font-size:11px; max-height:120px; overflow:auto;'></div>
       <div class='hudinfolabel'><img src="../app/asset/app/icons/ui/dark/key.svg" class="icon-small-white" title="Groups this peer grants you"></div>
       <div class='hudinfovalue rp-key'><i>checking...</i></div>
       <div class='hudinfolabel'><img src="../app/asset/app/icons/ui/dark/lock.svg" class="icon-small-white" title="Groups you grant this peer"></div>
