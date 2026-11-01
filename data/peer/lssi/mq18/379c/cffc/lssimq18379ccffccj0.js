@@ -39,7 +39,8 @@ document.body.peerstatus = function(p, now){
 me.uiReady = function(ui){
   me.ui = ui;
   ME.querySelector('.wrap').style.display = 'block';
-  ui.initNavbar(ME);
+  var auc = ME.querySelector('.addusercard');
+  ui.initNavbar(auc);
   ui.initPopups(ME);
 };
 
@@ -95,11 +96,83 @@ function animateWidth(el, target, ms, cb){
   }
 }
 
+// 7b: the panel's width is the viewer's own setting. One stored width
+// per browser profile (localStorage, try/catch — private mode throws),
+// clamped to [360, 90vw]; the open animation goes to it, not 680, and
+// the #hudresizer strip on the panel's left edge drags it live. Pointer
+// capture keeps the drag's moves on the strip, so text never selects
+// and the scene behind never sees a tap.
+var HUD_MIN = 360, HUD_W_KEY = 'peer.headsup.width';
+function hudMax(){ return Math.floor(window.innerWidth * 0.9); }
+function hudWidth(){
+  var w = 680;
+  try {
+    var s = localStorage.getItem(HUD_W_KEY);
+    if (s) w = parseInt(s, 10) || 680;
+  } catch (x) {}
+  return Math.max(HUD_MIN, Math.min(hudMax(), w));
+}
+function placeResizer(w){
+  var el = document.getElementById('headsupdisplay');
+  var r = document.getElementById('hudresizer');
+  if (!r || !el || getComputedStyle(el).display == 'none') return;
+  r.style.right = (w - 3) + 'px';
+  r.style.display = 'block';
+}
+function hideResizer(){
+  var r = document.getElementById('hudresizer');
+  if (r) r.style.display = 'none';
+}
+(function(){
+  var r = document.getElementById('hudresizer');
+  if (!r) return;
+  var dragging = false;
+  r.addEventListener('pointerdown', function(ev){
+    if (ev.button !== 0) return;
+    var el = document.getElementById('headsupdisplay');
+    if (!el || getComputedStyle(el).display == 'none') return;
+    dragging = true;
+    r.classList.add('dragging');
+    if (r.setPointerCapture) try { r.setPointerCapture(ev.pointerId); } catch (x) {}
+    document.body.style.userSelect = 'none';
+    ev.preventDefault();
+  });
+  r.addEventListener('pointermove', function(ev){
+    if (!dragging) return;
+    var el = document.getElementById('headsupdisplay');
+    var w = Math.round(el.getBoundingClientRect().right - ev.clientX);
+    w = Math.max(HUD_MIN, Math.min(hudMax(), w));
+    el.style.width = w + 'px';
+    placeResizer(w);
+    ev.preventDefault();
+  });
+  function endDrag(){
+    if (!dragging) return;
+    dragging = false;
+    r.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    var el = document.getElementById('headsupdisplay');
+    try { localStorage.setItem(HUD_W_KEY, String(el.offsetWidth)); } catch (x) {}
+  }
+  r.addEventListener('pointerup', endDrag);
+  r.addEventListener('pointercancel', endDrag);
+  // the css max-width (90%) clips the panel when the window shrinks —
+  // keep the style width and the strip honest with it
+  window.addEventListener('resize', function(){
+    var el = document.getElementById('headsupdisplay');
+    if (!el || getComputedStyle(el).display == 'none' || el.offsetWidth < 40) return;
+    var w = Math.max(HUD_MIN, Math.min(hudMax(), el.offsetWidth));
+    el.style.width = w + 'px';
+    placeResizer(w);
+  });
+})();
+
 // focus flows back from the scene (tap toggles): open/close the headsup panel
 function onSceneFocus(value){
   var el = document.getElementById('headsupdisplay');
   if (!value) {
     stopHudWatch();
+    hideResizer();
     animateWidth(el, 0, 300, function(){ el.style.display = 'none'; });
     return;
   }
@@ -109,7 +182,9 @@ function onSceneFocus(value){
   if (!p) return;
   el.style.width = '0px';
   el.style.display = 'block';
-  animateWidth(el, 680, 300);
+  // 7b: the open animation goes to the viewer's stored width, not 680
+  var w = hudWidth();
+  animateWidth(el, w, 300, function(){ placeResizer(w); });
   installControl(el, 'peer', 'headsup', function(api){}, p);
   watchHud();
 }
@@ -128,6 +203,7 @@ function watchHud(){
     if (!el || !el.isConnected) { stopHudWatch(); return; }
     if (el.getAnimations && el.getAnimations().length > 0) return;
     if (getComputedStyle(el).display == 'none' || el.offsetWidth < 40) {
+      hideResizer();   // 7b: headsup's own ✕ closes without telling anyone too
       stopHudWatch();
     }
   }, 150);
