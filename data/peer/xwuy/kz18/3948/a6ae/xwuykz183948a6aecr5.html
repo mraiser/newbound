@@ -1,28 +1,29 @@
-<div class='top-right'>
-  <div class='rp-info'>
-    <div class="connectionindicator"></div><div class="connectionindicator"></div><div class="connectionindicator"></div>
-    <div class='connectionlatency'></div>
-  </div>
-  <div class='card popupcard mini control-settings-popup'>
-    <table class="tablelist">
-      <tr><td class="refreshhud closeonclick">Refresh</td></tr>
-      <tr><td class="adminonly popupmenu closeonclick" data-popup='{"selector":".add-control-popup","closeselector":".add-control-popup-close","modal":true}'>Add Control</td></tr>
-      <tr><td class="adminonly closeonclick">Control Settings</td></tr>
-      <tr><td class="hudrestart adminonly closeonclick">Restart Services</td></tr>
-    </table>
-  </div>
-  <img src='../app/asset/app/icons/ui/dark/more-vertical.svg' class='roundbutton-small-white popupmenu morebutton' data-popup='{"selector":".control-settings-popup","closeselector":".control-settings-popup-close","popup":true}'>
-</div>
-<div class='padme'>
-  <img src='../app/asset/app/icons/ui/dark/close.svg' class='closehud roundbutton-small-white marginme'>
-  <div class='rp-info'>
+<div class='hudheader'>
+  <img src='../app/asset/app/icons/ui/dark/close.svg' class='closehud roundbutton-small-white'>
+  <div class='rp-info hudtitle'>
     <div class='headline rp-name'></div>
     <div class='rp-uuid'></div>
   </div>
-  <div class = "navbar-dark">
-    <div class = "navbar-tab navbar-tab1 selected" data-id='tab1'>Info</div>
-    <div class = "navbar-tab navbar-tab2" data-id='tab2'>Dashboard</div>
+  <div class='hudheadright'>
+    <div class='rp-info hudconn'>
+      <div class="connectionindicator"></div><div class="connectionindicator"></div><div class="connectionindicator"></div>
+      <div class='connectionlatency'></div>
+    </div>
+    <img src='../app/asset/app/icons/ui/dark/more-vertical.svg' class='roundbutton-small-white popupmenu morebutton' data-popup='{"selector":".control-settings-popup","closeselector":".control-settings-popup-close","popup":true}'>
+    <div class='card popupcard mini control-settings-popup'>
+      <table class="tablelist">
+        <tr><td class="refreshhud closeonclick">Refresh</td></tr>
+        <tr><td class="adminonly popupmenu closeonclick" data-popup='{"selector":".add-control-popup","closeselector":".add-control-popup-close","modal":true}'>Add Control</td></tr>
+        <tr><td class="adminonly closeonclick">Control Settings</td></tr>
+        <tr><td class="hudrestart adminonly closeonclick">Restart Services</td></tr>
+      </table>
+    </div>
   </div>
+</div>
+<div class="navbar-dark">
+  <div class="navbar-tab navbar-tab1 selected" data-id='tab1'>Info</div>
+  <div class="navbar-tab navbar-tab2" data-id='tab2'>Dashboard</div>
+</div>
   <div class='padme tab-content tab1 selected'>
     IP Address: <span class='hud_ipaddr'></span>
     <img src='../app/asset/app/icons/ui/accent/more.svg' class='roundbutton-small addressexpandbutton'><img src='../app/asset/app/icons/ui/accent/close.svg' class='roundbutton-small closeaddressbutton hideme'><br>
@@ -74,4 +75,3 @@
       <div class='add-control-error'></div>
     </div>
   </div>
-</div>

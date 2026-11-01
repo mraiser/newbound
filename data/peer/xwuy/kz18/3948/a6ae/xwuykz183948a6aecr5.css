@@ -13,10 +13,63 @@
   font-size:x-small;
 }
 
-.top-right{
-  position:absolute;
-  top:20px;
-  right:20px;
+/* 7.3: ONE inner gutter for the whole panel — the header, the tab bar
+   and both tab bodies start at the same x (the tab bodies' .padme is
+   24px, so the gutter is 24). */
+.hudpanel {
+  --hud-gutter: 24px;
+}
+
+/* 7.3: one header row: ✕ and the name share a vertical centre (both on
+   the 32px name line), the UUID sits under the name at the name's own
+   left edge, and the dots/latency and the ⋮ centre on the name row with
+   the ⋮ at the right gutter (the old .top-right floated them at the
+   panel corner, off the header's grid). */
+.hudheader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px var(--hud-gutter) 12px var(--hud-gutter);
+}
+
+.hudheader .closehud {
+  flex: none;
+}
+
+.hudtitle {
+  flex: 1;
+  min-width: 0;
+}
+
+.hudtitle .rp-uuid {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hudheadright {
+  position: relative;   /* the ⋮ menu card anchors here */
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;   /* the name row's height — centres the dots and the ⋮ on it */
+}
+
+.hudconn {
+  text-align: right;
+}
+
+.hudheader .connectionindicator {
+  margin-top: 0;
+}
+
+/* 7.3: the tab bar sits on the same gutter as the header and the tab
+   bodies (the kit's .navbar-dark is width:100%). Child combinator: the
+   dashboard mounts whole controls with their own navbars — untouched. */
+.hudpanel > .navbar-dark {
+  width: auto;
+  margin: 0 var(--hud-gutter);
 }
 
 .connectionindicator {
