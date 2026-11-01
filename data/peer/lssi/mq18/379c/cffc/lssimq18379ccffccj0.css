@@ -89,6 +89,16 @@
   background-color:var(--panel-3);
 }
 
+/* 7b fix-up: the buttons read as disabled because the html used the
+   light/ icon set (#394652 strokes, drawn for light grounds) on the
+   panel-2 button — the html uses the dark/ set (#d8dee6, the kit's
+   enabled text colour) now. Keyboard focus gets the kit's accent ring
+   (the .plaincheckbox focus idiom). */
+.localdevbtn:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:2px;
+}
+
 .localdevbtn .mediumicon{
   width:22px;
   height:22px;
