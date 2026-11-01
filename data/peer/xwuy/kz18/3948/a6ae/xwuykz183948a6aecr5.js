@@ -91,7 +91,8 @@ me.ready = function(){
       // (menu items and the Platform block), not just the first one found.
       if (result.data.groups.indexOf('admin') != -1) ME.classList.add('isadmin');
     }
-    else ME.querySelector('.rp-key').textContent = 'n/a';
+    // 7.4: 'unknown' is plainer than 'n/a' and matches the — convention
+    else ME.querySelector('.rp-key').textContent = 'unknown';
   });
 
   json('../security/users', null, function(result){
@@ -312,9 +313,10 @@ me.update = function(){
     ME.querySelector('.rp-uuid').textContent = ME.DATA.id;
     // F13: a peer that dialled in has an empty saved address — fall back to
     // the IP the server saw on the wire (remote_address; TCP/UDP only).
-    ME.querySelector('.hud_ipaddr').textContent = ME.DATA.address || ME.DATA.remote_address || '';
-    ME.querySelector('.hud_port').textContent = ME.DATA.p2p_port;
-    ME.querySelector('.hud_http_port').textContent = ME.DATA.http_port;
+    // 7.4: an absent value reads as an em dash, never a bare label
+    ME.querySelector('.hud_ipaddr').textContent = ME.DATA.address || ME.DATA.remote_address || '—';
+    ME.querySelector('.hud_port').textContent = ME.DATA.p2p_port || '—';
+    ME.querySelector('.hud_http_port').textContent = ME.DATA.http_port || '—';
     // F8: keepalive is stored as a string — "false" must not read as ticked;
     // and while a save is in flight, the save owns the box, not this refresh.
     if (!me.keepaliveSaving) {
@@ -337,6 +339,15 @@ me.update = function(){
       a.textContent = addrs[i];
       alist.appendChild(a);
       alist.appendChild(document.createTextNode(' '));
+    }
+
+    // 7.5: the bare ⋯ says what it opens, and a dim +N beside the IP says
+    // the peer reported more than the one address shown.
+    ME.querySelector('.addressexpandbutton').title = 'Show all addresses (' + addrs.length + ')';
+    var cnt = ME.querySelector('.hud_addr_count');
+    if (cnt) {
+      if (addrs.length > 1) { cnt.textContent = '+' + (addrs.length - 1); cnt.classList.remove('hideme'); }
+      else { cnt.textContent = ''; cnt.classList.add('hideme'); }
     }
 
     // F15: all three dots share the orb's colour verdict (document.body.peerstatus

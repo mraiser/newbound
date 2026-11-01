@@ -201,3 +201,55 @@
 .hudpanel .closeaddressbutton.hideme {
   display: none;
 }
+
+/* 7.4: Info rows as two aligned columns. Full-width rows (the address
+   list, the crate form/status, Stay connected) span both columns; the
+   key/lock icons live in the label column, their 6px glyph inset pulled
+   back so the glyphs align with the text labels above. */
+.hudpanel .hudinfogrid {
+  display: grid;
+  grid-template-columns: minmax(96px, max-content) 1fr;
+  column-gap: 16px;
+  row-gap: 10px;
+  align-items: center;
+}
+
+.hudpanel .hudinfolabel {
+  color: var(--text-dim);
+}
+
+.hudpanel .hudinfolabel .icon-small-white {
+  margin-left: -6px;
+}
+
+.hudpanel .hudinfovalue {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.hudpanel .hudinfofull {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+/* 7.4: the admin-only Platform rows join the same grid (display:contents
+   puts the wrapper's children on the grid). Must follow the .isadmin
+   .adminonly revert rule — same specificity, later wins. */
+.hudpanel.isadmin .hudcrates {
+  display: contents;
+}
+
+.hudpanel .hud_address_list {
+  padding: 2px 0 6px;
+}
+
+/* 7.5: the dim +N beside the IP when the peer reported more addresses */
+.hudpanel .hud_addr_count {
+  color: var(--text-dim);
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+.hudpanel .availableupgrades {
+  margin-top: 16px;
+}
