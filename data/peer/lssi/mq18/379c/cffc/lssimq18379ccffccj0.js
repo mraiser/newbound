@@ -39,7 +39,8 @@ document.body.peerstatus = function(p, now){
 me.uiReady = function(ui){
   me.ui = ui;
   ME.querySelector('.wrap').style.display = 'block';
-  ui.initNavbar(ME);
+  var auc = ME.querySelector('.addusercard');
+  ui.initNavbar(auc);
   ui.initPopups(ME);
 };
 
