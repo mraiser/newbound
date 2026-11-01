@@ -208,3 +208,81 @@
 .lannamewrap .lanlocalchip {
   flex: none;
 }
+
+/* F18a: the plain peer list — shown in place of the 3D view when WebGL is
+   unavailable (or forced with ?view=list). The .viewer stays visible as the
+   black backdrop the corner overlays rely on; the list floats over it like
+   they do. The dots keep the panel's .connectionindicator metrics and share
+   peerstatus's colours, so list, orbs and panel all read as one verdict. */
+.peerlistwrap {
+  position: fixed;
+  top: 70px;
+  left: 20px;
+  right: 20px;
+  bottom: 220px;
+  max-width: 860px;
+  overflow-y: auto;
+  color: white;
+}
+
+.peerlistnote {
+  color: #ffffff73;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.peerlistrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  border: thin solid #ffffff22;
+  border-radius: 6px;
+  background: #ffffff0a;
+  cursor: pointer;
+}
+
+.peerlistrow:hover {
+  background: #ffffff1d;
+}
+
+.pl-dots {
+  flex: none;
+  line-height: 0;
+}
+
+.pl-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 10px;
+  margin-right: 3px;
+}
+
+.pl-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+}
+
+.pl-kind {
+  flex: none;
+  font-size: 13px;
+  color: #ffffffb3;
+}
+
+.pl-last {
+  flex: none;
+  margin-left: auto;
+  font-size: 13px;
+  color: #ffffff73;
+}
+
+.peerlistempty {
+  color: #ffffff73;
+  font-style: italic;
+}

@@ -136,20 +136,124 @@ function stopHudWatch(){
   if (hudWatch) { clearInterval(hudWatch); hudWatch = null; }
 }
 
+// F18a: without WebGL the page was black apart from the local device box —
+// no way to reach a peer. Detect it (own context probe, scenehost's own
+// headless verdict, or a host that never becomes ready within 5 s) and show
+// a plain peer list in place of the canvas. ?view=list forces the list even
+// with WebGL — the test switch, also handy on slow machines.
+me.listMode = false;
+
+function probeWebGL(){
+  try {
+    var c = document.createElement('canvas');
+    return !!(c.getContext('webgl2') || c.getContext('webgl'));
+  } catch (x) { return false; }
+}
+
+function showPeerList(reason){
+  if (me.listMode) return;
+  me.listMode = true;
+  var wrap = ME.querySelector('.peerlistwrap');
+  wrap.style.display = 'block';
+  ME.querySelector('.peerlistnote').textContent = reason == 'forced'
+    ? 'List view (?view=list).'
+    : '3D view needs WebGL; showing the list instead.';
+  renderPeerList();
+  startPoll();   // the same 10 s re-read the 3D view uses
+}
+
+// One row per peer: the orbs' colour verdict (document.body.peerstatus —
+// the same dots the panel shows), the transport kind, and the last check.
+// Clicking a row opens the same headsup panel an orb's tap does; clicking
+// the open peer's row again closes it, like tapping its orb again.
+function renderPeerList(){
+  if (!me.listMode) return;
+  var list = ME.querySelector('.peerlist');
+  list.innerHTML = '';
+  var now = Date.now();
+  var labels = { tcp: 'TCP', udp: 'UDP', relay: 'Relay', down: 'Disconnected' };
+  var peers = peerList();
+  var shown = 0;
+  for (var i = 0; i < peers.length; i++) {
+    var p = peers[i];
+    if (me.info && p.id == me.info.uuid) continue;
+    var st = document.body.peerstatus(p, now);
+    var row = document.createElement('div');
+    row.className = 'peerlistrow';
+    row.dataset.peer = p.id;
+    var dots = document.createElement('span');
+    dots.className = 'pl-dots';
+    for (var d = 0; d < 3; d++) {
+      var dot = document.createElement('span');
+      dot.className = 'pl-dot';
+      var lit = st.kind == 'down' || d < st.dots;
+      dot.style.backgroundColor = lit ? st.color : 'transparent';
+      dot.style.border = '1px solid ' + (lit ? st.color : st.color + '66');
+      dots.appendChild(dot);
+    }
+    row.appendChild(dots);
+    var name = document.createElement('span');
+    name.className = 'pl-name';
+    name.textContent = p.name;   // F3: peer names are untrusted — never HTML
+    name.title = p.name;
+    row.appendChild(name);
+    var kind = document.createElement('span');
+    kind.className = 'pl-kind';
+    kind.textContent = labels[st.kind];
+    if (st.kind == 'down') kind.style.color = st.color;
+    row.appendChild(kind);
+    var last = document.createElement('span');
+    last.className = 'pl-last';
+    var ago = p.last_contact ? Math.max(0, now - p.last_contact) : -1;
+    last.textContent = 'last check ' + (ago < 0 ? 'unknown'
+      : ago < 60000 ? Math.round(ago / 1000) + ' s ago'
+      : ago < 3600000 ? Math.round(ago / 60000) + ' min ago'
+      : Math.round(ago / 3600000) + ' h ago');
+    row.appendChild(last);
+    row.addEventListener('click', listRowClick);
+    list.appendChild(row);
+    shown++;
+  }
+  if (shown == 0) list.innerHTML = '<div class="peerlistempty"><i>No peers connected yet — add one with the + button below.</i></div>';
+}
+
+function listRowClick(){
+  var id = this.dataset.peer;
+  var el = document.getElementById('headsupdisplay');
+  var open = el && getComputedStyle(el).display != 'none' && el.offsetWidth >= 40;
+  if (open && me.listFocus == id) { me.listFocus = null; onSceneFocus(null); }
+  else { me.listFocus = id; onSceneFocus(id); }
+}
+
 me.ready = function(){
   // The 3D constellation is hosted by app:scenehost. This control is the
   // front-end: it hosts the canvas + the other UI and ADDs a peer_model
   // instance per peer (the host's call). Each orb's own render behavior drives
   // its physics (force on itself from its siblings); each orb's click opens
   // its headsup. No declarative each-mount, no host-side sim.
-  installControl(ME.querySelector('.viewer'), 'app', 'scenehost', function(api){
-    me.host = api;
-    api.waitReady(function(){
-      api.hostData = { onFocus: onSceneFocus };
-      syncPeers();
-      startFeed();
-    });
-  }, {});
+  // F18a: WebGL before the host — a forced ?view=list or a failed context
+  // probe goes straight to the list and never mounts the scene. Otherwise
+  // the host gets 5 s to become ready, and its own GL-less verdict
+  // (api.headless — how scenehost reports booting without WebGL) also
+  // means the orbs can't draw.
+  var forced = new URLSearchParams(location.search).get('view') == 'list';
+  if (forced || !probeWebGL()) {
+    showPeerList(forced ? 'forced' : 'nowebgl');
+  }
+  else {
+    var hostTimer = setTimeout(function(){ showPeerList('nowebgl'); }, 5000);
+    installControl(ME.querySelector('.viewer'), 'app', 'scenehost', function(api){
+      me.host = api;
+      api.waitReady(function(){
+        clearTimeout(hostTimer);
+        if (api.headless) { showPeerList('nowebgl'); return; }
+        if (me.listMode) return;   // the 5 s timeout already swapped views
+        api.hostData = { onFocus: onSceneFocus };
+        syncPeers();
+        startFeed();
+      });
+    }, {});
+  }
 
   subscribe_event("peer", "UPDATE", function(data){
     var found = false;
@@ -160,6 +264,7 @@ me.ready = function(){
     upsertPeerDiv(data);
     syncPeers();
     wakeFeed();
+    if (me.listMode) renderPeerList();
   });
 
   send_peers(function(result){
@@ -196,6 +301,7 @@ me.ready = function(){
 
       syncPeers();
       startFeed();
+      if (me.listMode) renderPeerList();
     });
   });
 };
@@ -258,7 +364,9 @@ function feedTick(){
   // — keep a slow cadence to catch tints advancing as last-contact recedes.
 }
 function startFeed(){
-  if (me.feed || !me.host || !me.info) return;
+  // F18a: in list mode there is no scene to feed — the list renders off the
+  // 10 s poll instead, so headless orb instances are never added.
+  if (me.feed || !me.host || !me.info || me.listMode) return;
   feedTick();
   if (!me.feed) me.feed = setInterval(feedTick, FEED_MS);
   startPoll();
@@ -281,6 +389,7 @@ function startPoll(){
         me.peers.push(result.data[i]);
         upsertPeerDiv(result.data[i]);
       }
+      if (me.listMode) renderPeerList();
     });
   }, POLL_MS);
 }
