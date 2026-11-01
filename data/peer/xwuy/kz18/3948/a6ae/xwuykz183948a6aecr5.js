@@ -355,14 +355,18 @@ ME.querySelector('.updateall').addEventListener('click', function(){
   var up = document.body.peerupdater;
   if (!up || up.running(ME.DATA.id)) return;
   var items = [];
+  var skipped = 0;   // 3b: deselected different-author chips, named in the summary
   ME.querySelectorAll('.upgradelist .chip').forEach(function(chip){
     var el = chip.querySelector('.clickupdate');
     if (!el || chip.dataset.done == '1') return;
     // F12: a different-author chip rides only when the user clicked it in
-    if (chip.classList.contains('authwarn') && chip.dataset.included != '1') return;
+    if (chip.classList.contains('authwarn') && chip.dataset.included != '1') { skipped++; return; }
     items.push({ lib: el.dataset.lib, version: el.dataset.version, chipEl: chip });
   });
-  if (items.length == 0) { upgradeSummary('Nothing to update'); return; }
+  if (items.length == 0) {
+    upgradeSummary('Nothing to update' + (skipped > 0 ? ' — ' + skipped + ' skipped (different author)' : ''));
+    return;
+  }
   var buttons = ME.querySelector('.updatebuttons');
   buttons.style.display = 'none';
   up.run(ME.DATA.id, items, {
@@ -373,7 +377,7 @@ ME.querySelector('.updateall').addEventListener('click', function(){
       upgradeSummary(summary.text);
       buttons.style.display = '';
     }
-  });
+  }, skipped);
 });
 
 ME.querySelector('.control-settings-popup').addEventListener("mouseleave", function(){

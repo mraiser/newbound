@@ -377,7 +377,10 @@ function applyAuthorWarn(chip, mylib, theirlib){
   var w = document.createElement('span');
   w.className = 'authwarntext';
   w.style.color = '#b26a00';
-  w.textContent = ' ⚠ different author';
+  // 3b: the chip is a flex row — a flex item's leading space is trimmed (it
+  // rendered as '17⚠'), so the gap is a margin instead of a space.
+  w.style.marginLeft = '6px';
+  w.textContent = '⚠ different author';
   var x = chip.querySelector('.removeupdate');
   if (x) chip.insertBefore(w, x); else chip.appendChild(w);
   chip.addEventListener('click', function(ev){
@@ -401,7 +404,7 @@ document.body.peerAuthorWarn = applyAuthorWarn;
 var updaterRuns = {};
 document.body.peerupdater = {
   running: function(peerId){ return !!updaterRuns[peerId]; },
-  run: function(peerId, items, hooks){
+  run: function(peerId, items, hooks, skipped){
     if (updaterRuns[peerId]) return false;
     updaterRuns[peerId] = true;
     hooks = hooks || {};
@@ -412,7 +415,7 @@ document.body.peerupdater = {
       if (it && it.crates) cratesItem = it;
       else if (it && it.lib) libs.push(it);
     });
-    var sum = { updated: 0, failed: 0, crates: null, recompile: null, recompile_msg: '' };
+    var sum = { updated: 0, failed: 0, skipped: skipped > 0 ? skipped : 0, crates: null, recompile: null, recompile_msg: '' };
     var needRecompile = false;
 
     function call(h, a, b){ try { if (hooks[h]) hooks[h](a, b); } catch (x) { console.error(x); } }
@@ -435,23 +438,34 @@ document.body.peerupdater = {
     function chipError(it, text){
       var c = it.chipEl;
       if (!c || !c.isConnected) return;
-      c.style.color = '#b00020';
-      var br = document.createElement('br');
+      // 3b: the chip is a nowrap flex row, so a <br> never broke the line and
+      // #b00020 was unreadable on the graphite chip — the error lives on its
+      // own wrapped line (.chiperrline, peer.peer css) in a readable red.
+      c.classList.add('chiperrored');
+      c.style.color = '#ff8a80';
+      var line = document.createElement('span');
+      line.className = 'chiperrline';
       var sp = document.createElement('span');
       sp.className = 'chiperr';
       sp.textContent = text;   // F3: error text is untrusted — never HTML
       var r = document.createElement('a');
       r.className = 'chipretry';
-      r.textContent = ' Retry';
+      r.textContent = 'Retry';
       r.style.cursor = 'pointer';
       r.style.textDecoration = 'underline';
-      c.appendChild(br); c.appendChild(sp); c.appendChild(r);
+      line.appendChild(sp); line.appendChild(r);
+      c.appendChild(line);
       r.addEventListener('click', function(ev){
         ev.stopPropagation();
-        br.remove(); sp.remove(); r.remove();
+        // 3b: while this peer's run is still going, run() would refuse — do
+        // nothing rather than wipe the error off a chip that can't restart.
+        // (Single-threaded: past this guard, run() below always starts.)
+        if (document.body.peerupdater.running(peerId)) return;
+        line.remove();
+        c.classList.remove('chiperrored');
         c.style.color = '';
         var again = it.crates ? { crates: it.crates, chipEl: c } : { lib: it.lib, version: it.version, chipEl: c };
-        document.body.peerupdater.run(peerId, [again], hooks);
+        document.body.peerupdater.run(peerId, [again], hooks, sum.skipped);
       });
     }
     function buildText(s){
@@ -463,6 +477,9 @@ document.body.peerupdater = {
       if (s.recompile == 'ok') t += (t ? ' — ' : '') + 'Rust recompiled';
       else if (s.recompile == 'failed') t += (t ? ' — ' : '') + 'recompile failed: ' + s.recompile_msg;
       if (!t) t = 'Nothing to update';
+      // 3b: a deselected different-author chip was left out on purpose — the
+      // summary says so instead of claiming 'All updated' past it.
+      if (s.skipped > 0) t += ' — ' + s.skipped + ' skipped (different author)';
       return t;
     }
     function finish(){
@@ -648,18 +665,23 @@ ME.querySelector('#updateallpeersnow').addEventListener('click', function(){
     var row = el.closest('.uprow');
     var peer = row.dataset.peer;
     var items = [];
+    var skipped = 0;   // 3b: deselected different-author chips, named in the summary
     row.querySelectorAll('.clickupdate').forEach(function(click){
       var chip = click.closest('.chip');
       if (!chip || chip.dataset.done == '1') return;
       // F12: a different-author chip rides only when the user clicked it in
-      if (chip.classList.contains('authwarn') && chip.dataset.included != '1') return;
+      if (chip.classList.contains('authwarn') && chip.dataset.included != '1') { skipped++; return; }
       items.push({ lib: click.dataset.lib, version: click.dataset.version, chipEl: chip });
     });
     var cratechip = row.querySelector('.clickcrates');
     if (cratechip && cratechip.dataset.done != '1') {
       items.push({ crates: { flowlang: cratechip.dataset.flowlang, ndata: cratechip.dataset.ndata }, chipEl: cratechip });
     }
-    if (items.length == 0) return;
+    if (items.length == 0) {
+      // 3b: a row whose only chips are deselected ⚠ ones runs nothing — say so
+      if (skipped > 0) rowNote(row, 'Nothing to update — ' + skipped + ' skipped (different author)');
+      return;
+    }
     pending++;
     var started = up.run(peer, items, {
       onStart: function(it){
@@ -673,7 +695,7 @@ ME.querySelector('#updateallpeersnow').addEventListener('click', function(){
         pending--;
         if (pending <= 0) btn.disabled = false;
       }
-    });
+    }, skipped);
     if (!started) pending--;
   });
   if (pending > 0) btn.disabled = true;

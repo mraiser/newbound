@@ -127,3 +127,26 @@
 .rowerror{
   color: rgba(255, 0, 0, 0.6);
 }
+
+/* 3b: a failed chip grows an error line. .chip (app.ui) is a nowrap flex
+   row, so the chip must wrap for the error to land on its own line, and
+   the red is picked to read on the graphite chip (#b00020 didn't). The
+   headsup panel's chips live on this page too, so these cover both flows. */
+.chip.chiperrored {
+  height: auto;
+  flex-wrap: wrap;
+  white-space: normal;
+  line-height: 1.5;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.chiperrline {
+  flex-basis: 100%;
+  display: block;
+}
+.chiperrline .chiperr {
+  color: #ff8a80;
+}
+.chiperrline .chipretry {
+  margin-left: 8px;
+}
