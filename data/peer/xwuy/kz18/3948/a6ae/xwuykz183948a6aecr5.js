@@ -105,20 +105,25 @@ me.ready = function(){
   });
 
   json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_shared", function(result){
-    if (result.status != 'ok'){
-      // F16: failures show the shared wording (errText), as text (F3).
-      // 'NOT FOUND' is not a failure — the peer has never shared a
-      // control — so the dashboard stays empty instead of naming an error.
-      ME.querySelector('.hudapps').textContent = result.msg == 'NOT FOUND' ? '' : errText(result);
-      me.data = { "list": [] };
-      // F11: 'NOT FOUND' only means this peer has never shared a control.
-      // Any OTHER failure makes adding unsafe (a write would replace a list
-      // we never saw), so the menu item goes dark with the reason on it.
-      if (result.msg != 'NOT FOUND') disableAddControl(errText(result));
-    }
-    else {
+    if (result.status == 'ok'){
       me.data = result.data;
       buildControls();
+    }
+    else if (result.msg == 'NOT FOUND'){
+      // 6b (Marc): 'NOT FOUND' is the default state — this peer has never
+      // shared a control — not an error. Render it through buildControls
+      // like any other empty list, so both empty cases show the same note
+      // and open on the same tab. F11: Add Control stays enabled.
+      me.data = { "list": [] };
+      buildControls();
+    }
+    else {
+      // F16: failures show the shared wording (errText), as text (F3).
+      ME.querySelector('.hudapps').textContent = errText(result);
+      me.data = { "list": [] };
+      // F11: a failed read makes adding unsafe (a write would replace a
+      // list we never saw), so the menu item goes dark with the reason.
+      disableAddControl(errText(result));
     }
   });
   json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_available", function(result){
@@ -191,6 +196,24 @@ function buildControls(){
   var data = me.data;
   var wrap = ME.querySelector('.hudapps');
   wrap.innerHTML = '';
+
+  // 6b (Marc): an empty dashboard is the default state, not an error — say
+  // so instead of leaving the tab blank. The peer's name is peer-reported:
+  // textContent, never innerHTML (F3). The hint only helps someone who can
+  // use the menu, so it carries .adminonly and F7's .isadmin rule decides
+  // whether it shows.
+  var list = data && data.list ? data.list : [];
+  if (list.length == 0){
+    var note = document.createElement('div');
+    note.className = 'hudapps-empty';
+    note.textContent = (ME.DATA.name || 'This peer') + " hasn't shared any controls yet.";
+    var hint = document.createElement('div');
+    hint.className = 'adminonly';
+    hint.textContent = 'Add one with ⋮ → Add Control.';
+    note.appendChild(hint);
+    wrap.appendChild(note);
+    return;
+  }
 
   for (var i in data.list){
     var ctl = data.list[i];

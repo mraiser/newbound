@@ -101,6 +101,15 @@
   display: revert;
 }
 
+/* 6b: the empty-dashboard note (Marc: 'NOT FOUND' is the default state,
+   not an error). Dim; the admin hint inside it inherits the dimming and
+   F7's .adminonly/.isadmin rule decides whether it shows at all. */
+.hudpanel .hudapps-empty {
+  opacity: 0.55;
+  font-size: 14px;
+  padding: 12px 0;
+}
+
 /* F8: the save-failure words next to Stay connected */
 .hudpanel .keepalive-status {
   color: #d06060;
