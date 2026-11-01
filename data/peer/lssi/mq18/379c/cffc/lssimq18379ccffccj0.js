@@ -639,7 +639,9 @@ document.body.peerupdater = {
       if (!c || !c.isConnected) return;
       c.dataset.done = '1';
       var ok = document.createElement('span');
-      ok.style.color = '#2e7d32';
+      // Phase 2 step 0: #2e7d32 vanished into the graphite at the chip's 0.6
+      // dim — the ✓ borrows the status dots' green, which reads through it.
+      ok.style.color = STATUS_COLORS.tcp;
       ok.textContent = ' ✓';
       c.appendChild(ok);
     }
