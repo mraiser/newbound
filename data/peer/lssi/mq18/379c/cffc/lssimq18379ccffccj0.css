@@ -191,3 +191,20 @@
   vertical-align: middle;
   white-space: nowrap;
 }
+
+/* 1b: the name cell is a flex row — the name shrinks and ellipsizes in
+   its own slot, the chip keeps its full size whatever the name's length. */
+.lannamewrap {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.lannamewrap .lanname {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lannamewrap .lanlocalchip {
+  flex: none;
+}

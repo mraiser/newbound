@@ -739,14 +739,24 @@ ME.querySelector('.addpeerbutton').addEventListener('click', function(){
       td.title = fsip;
       tr.appendChild(td);
       td = document.createElement('td');
-      td.textContent = frds.name;
+      // 1b: the chip used to ride in the same ellipsized cell as the name,
+      // so a long name shoved it under overflow:hidden. The name ellipsizes
+      // in its own flex slot now and the chip never shrinks; the wrapper div
+      // keeps the td a real table-cell. F3 holds: textContent only.
       td.title = frds.name;
+      var nwrap = document.createElement('div');
+      nwrap.className = 'lannamewrap';
+      var nspan = document.createElement('span');
+      nspan.className = 'lanname';
+      nspan.textContent = frds.name;
+      nwrap.appendChild(nspan);
       if (found[fi].local) {
         var mch = document.createElement('span');
         mch.className = 'lanlocalchip';
         mch.textContent = 'this machine';
-        td.appendChild(mch);
+        nwrap.appendChild(mch);
       }
+      td.appendChild(nwrap);
       tr.appendChild(td);
       td = document.createElement('td');
       var sm = document.createElement('span');
