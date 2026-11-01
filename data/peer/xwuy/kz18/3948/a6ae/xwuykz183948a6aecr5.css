@@ -124,3 +124,13 @@
   vertical-align: middle;
   margin-left: 6px;
 }
+
+/* F13 follow-up (5b): the shared app css declares .roundbutton-small
+   { display:inline-flex } AFTER .hideme { display:none } at equal
+   specificity, so hideme never actually hid this button — it only sat
+   unseen under the ⋯ while both were .abspos at the same spot. Start it
+   hidden here; the expand/close click handlers set inline style.display,
+   which still overrides this rule. */
+.hudpanel .closeaddressbutton.hideme {
+  display: none;
+}
