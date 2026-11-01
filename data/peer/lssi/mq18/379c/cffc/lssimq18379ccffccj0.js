@@ -533,6 +533,13 @@ function chipCloseImg(){
 // update-flow rewrite (session 2), so keep it a tiny helper. 'Unauthorized'
 // is Alex's exact word for a refusal.
 function peerErrorText(result){
+  // U1: a caught panic arrives WRAPPED — status:ok with {status:'err', msg}
+  // inside data (Boolean/JSONObject commands) or msg (String commands) —
+  // unwrap it so callers show the real words, never '[object Object]'.
+  if (result) {
+    if (result.data && typeof result.data == 'object' && result.data.status == 'err') return peerErrorText(result.data);
+    if (result.msg && typeof result.msg == 'object' && result.msg.status == 'err') return peerErrorText(result.msg);
+  }
   // the peer proxy suffixes the refused command ('UNAUTHORIZED: libs'), so
   // any UNAUTHORIZED-prefixed msg is the same refusal
   var msg = result && result.msg ? String(result.msg) : '';
@@ -542,6 +549,18 @@ function peerErrorText(result){
 // Session 2 (F8/F11): headsup shows the same words — published the way
 // peerstatus is, so both controls keep one vocabulary.
 document.body.peerErrorText = peerErrorText;
+
+// U1: the honest read of a peer command reply. A Boolean/String/JSONObject
+// command's caught panic arrives as {status:'ok'} with {status:'err', msg}
+// in result[field] ('data' or 'msg'), so status alone lies. null = the call
+// really succeeded; otherwise the failure text, in peerErrorText's words.
+function peerReplyError(result, field){
+  if (!result || result.status != 'ok') return peerErrorText(result);
+  var v = result[field];
+  if (v && typeof v == 'object' && v.status == 'err') return peerErrorText(v);
+  return null;
+}
+document.body.peerReplyError = peerReplyError;
 
 // F12: the old author/authorkey gate was disabled (if (true)) — Marc may have
 // done that on purpose, so it stays off. Instead, when BOTH sides carry an
@@ -678,7 +697,10 @@ document.body.peerupdater = {
       call('onStart', it);
       chipStart(it);
       json('../peer/remote/'+peerId+'/dev/install_lib', 'uuid='+encodeURIComponent(myuuid)+'&lib='+encodeURIComponent(it.lib), function(result){
-        if (result && result.status == 'ok') {
+        // U1: a failed install arrives as status:ok with {status:err, msg} in
+        // data — an update happened only when the peer answered a real boolean.
+        var err = peerReplyError(result, 'data');
+        if (err == null && typeof result.data == 'boolean') {
           sum.updated++;
           if (result.data === true) needRecompile = true;
           chipDone(it);
@@ -686,7 +708,7 @@ document.body.peerupdater = {
         }
         else {
           sum.failed++;
-          var text = peerErrorText(result);
+          var text = err != null ? err : 'Error: unexpected reply';
           chipError(it, text);
           call('onError', it, text);
         }
@@ -700,8 +722,11 @@ document.body.peerupdater = {
         chipStart(it);
         var p = 'flowlang='+encodeURIComponent(it.crates.flowlang)+'&ndata='+encodeURIComponent(it.crates.ndata);
         json('../peer/remote/'+peerId+'/dev/update_crates', p, function(result){
-          if (result && result.status == 'ok') { sum.crates = 'launched'; chipDone(it); call('onDone', it); }
-          else { sum.crates = 'failed'; var text = peerErrorText(result); chipError(it, text); call('onError', it, text); }
+          // U1: update_crates is FLAT today (errors arrive unwrapped) — the
+          // helper reads that too, and guards a wrapped error in data for safety.
+          var cerr = peerReplyError(result, 'data');
+          if (cerr == null) { sum.crates = 'launched'; chipDone(it); call('onDone', it); }
+          else { sum.crates = 'failed'; chipError(it, cerr); call('onError', it, cerr); }
           finish();
         });
       }
@@ -709,10 +734,13 @@ document.body.peerupdater = {
         var it = { recompile: true };
         call('onStart', it);
         json('../peer/remote/'+peerId+'/dev/compile_rust', null, function(result){
-          if (result && result.status == 'ok') { sum.recompile = 'ok'; call('onDone', it); }
+          // U1: compile_rust (String) wraps its failure in msg — success is a
+          // real string reply only. recompile_msg carries the unwrapped text.
+          var rerr = peerReplyError(result, 'msg');
+          if (rerr == null && result && typeof result.msg == 'string') { sum.recompile = 'ok'; call('onDone', it); }
           else {
             sum.recompile = 'failed';
-            sum.recompile_msg = result && result.msg ? String(result.msg) : 'no reply';
+            sum.recompile_msg = rerr != null ? rerr.replace(/^Error: /, '') : 'unexpected reply';
             call('onError', it, sum.recompile_msg);
           }
           finish();
