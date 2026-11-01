@@ -218,8 +218,16 @@
   color: var(--text-dim);
 }
 
+/* 7b fix-up: one rhythm for every Info row. The kit's .icon-small-white
+   is a 32px box (20px glyph + 6px inset), which made the key/lock rows
+   42px apart against the text rows' 29. A 20px box with no inset draws
+   the SAME 20px glyph at the text rows' height, glyph left edge on the
+   label column (so the old -6px inset pull-back goes too). */
 .hudpanel .hudinfolabel .icon-small-white {
-  margin-left: -6px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  margin-left: 0;
 }
 
 .hudpanel .hudinfovalue {
