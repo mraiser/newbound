@@ -5,15 +5,24 @@
   background-color:black;
 }
 
+/* 7.1: the standard app title (app.ui .titlebar + nb-head) is var(--text)
+   at 1.25rem/500 — Dev and Security both use it; the green was this
+   page's own. The floating block stays (a full-width titlebar would
+   cover the scene); colour, size and weight match the standard, and the
+   ⌂ and the word share one baseline. Title, Local Device card and the
+   plain list (F18a) all sit on the same 20px left gutter. */
 .topleftcorner{
   position:fixed;
   top:20px;
   left:20px;
-  color:#83bc00;
+  color:var(--text);
 }
 
 .bigtext{
-  font-size:20px;
+  font-size:1.25rem;
+  font-weight:500;
+  display:flex;
+  align-items:baseline;
 }
 
 .bottomleftcorner{
@@ -23,13 +32,76 @@
   color:white;
 }
 
+/* 7.2: every row of the Local Device card starts at the card's left edge
+   (the old .padme indented the middle rows 24px), on an even rhythm. */
+.localdevlabel{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:var(--text-dim);
+}
+
+.localdevinfo{
+  margin:6px 0 12px;
+}
+
 .localpeername{
   color:#83bc00;
   font-size:24px;
+  line-height:1.3;
 }
 
 .localpeerid{
   font-size:small;
+  margin-bottom:2px;
+}
+
+.localpeerport, .localhttpport{
+  line-height:1.5;
+}
+
+/* 7.2: the two actions as the kit's current buttons (.regularbutton's
+   palette: panel-2 ground, 1px line, small radius) instead of the legacy
+   .coloredbutton orange pills — same 40px box, one 8px gap, titles on
+   both. */
+.localdevactions{
+  display:flex;
+  gap:8px;
+}
+
+.localdevbtn{
+  width:40px;
+  height:40px;
+  padding:8px;
+  box-sizing:border-box;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background-color:var(--panel-2);
+  border:1px solid var(--line);
+  border-radius:var(--border-radius-sm);
+  cursor:pointer;
+  transition:background-color 0.2s ease;
+}
+
+.localdevbtn:hover{
+  background-color:var(--panel-3);
+}
+
+/* 7b fix-up: the buttons read as disabled because the html used the
+   light/ icon set (#394652 strokes, drawn for light grounds) on the
+   panel-2 button — the html uses the dark/ set (#d8dee6, the kit's
+   enabled text colour) now. Keyboard focus gets the kit's accent ring
+   (the .plaincheckbox focus idiom). */
+.localdevbtn:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:2px;
+}
+
+.localdevbtn .mediumicon{
+  width:22px;
+  height:22px;
 }
 
 #headsupdisplay{
@@ -288,4 +360,23 @@
 .peerlistempty {
   color: #ffffff73;
   font-style: italic;
+}
+
+/* 7b: the panel's width is adjustable — #hudresizer is a thin strip on
+   the panel's left edge (a sibling; see the html note), invisible until
+   hovered, straddling the edge 3px either side so the edge itself is
+   grabbable. The js clamps the width to [360px, 90vw] (the panel's own
+   max-width) and persists it per viewer in localStorage. */
+.hudresizer{
+  position:absolute;
+  top:0;
+  width:6px;
+  height:100%;
+  cursor:col-resize;
+  background-color:transparent;
+  transition:background-color 0.15s ease;
+}
+
+.hudresizer:hover, .hudresizer.dragging{
+  background-color:var(--accent-dim);
 }
