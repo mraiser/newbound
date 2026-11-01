@@ -159,6 +159,10 @@ function eventText(ev, views) {
     case "eval": return `eval ${nameIn(c, ev.op)}` + (ev.fail ? " (failed)" : "") + (ev.rule ? ` · rule ${ev.rule}` : "") + where;
     case "leave": return `leave ${ev.kind || "frame"}` + (ev.outcome ? ` (${ev.outcome})` : "");
     case "next": return `next → case ${(ev.case || 0) + 2}` + where;
+    // R6: the server's done event carries outcome (ok|terminate), fail and out - a root terminate is a
+    // SUCCESS with the output delivered so far; a fail rule is a failure. Say which, and show the output.
+    case "done": return "done" + (ev.fail ? " — the flow FAILED (a fail rule fired)" : ev.outcome === "terminate" ? " (terminated — success, output so far)" : "")
+      + (!ev.fail && ev.out != null ? ` · output ${short(ev.out)}` : "") + where;
     default: return ev.type + (ev.msg ? `: ${ev.msg}` : "") + where;
   }
 }

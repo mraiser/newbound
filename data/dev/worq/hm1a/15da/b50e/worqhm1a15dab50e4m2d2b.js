@@ -1658,9 +1658,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // ── P4: run tokens — deliveries ride a flowtoken BEHAVIOR on the host ─────
   // The schedule is local and pure (design §3.5 — the platform returns no
   // per-wire values): flowdoc.propagationRounds gives the DRY harness's firing
-  // order. A LIVE run is the stepper's continue (P5): its real events ride
+  // order. A LIVE run is dev.flowstep.run_flow (R5 - the ordinary run on
+  // flowlang's stepper, no debug session): its recorded events ride
   // through rideRunEvents (below runFlow), and which CASES it went through is
-  // the tape's own. One dev:flowtoken instance per leg is addControl'd into
+  // the run's own complete root path. One dev:flowtoken instance per leg is addControl'd into
   // the scenehost, seeded with its round; ONE shared clock starts them
   // together, so the token behaviors deliver round by round and report via
   // host.state.onTokenDelivered. The editor schedules and audits; the motion
@@ -1670,15 +1671,18 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     return terminalWorld(c, end[0], which, end[1]) || terminalWorld(c, end[0], which === "out" ? "in" : "out", end[1]) || null;
   }
   // ── the run's CASE PATH (a `next` rule moves the run to the next case) ────
-  // P5: a LIVE run IS the stepper's continue (the run is one debug session),
-  // so the case path is the TAPE's — the stepper's own events name the op
-  // whose next/terminate/fail rule ended each case (no inference, nothing
-  // predicted). A DRY run (the no-source harness) is the only one still
+  // R5: a LIVE run is dev.flowstep.run_flow (the ordinary run - no debug
+  // session, tape or debugger budget), so the case path is the SERVER's
+  // complete root path - the stepper's own events name the op whose
+  // next/terminate/fail rule ended each case (no inference, nothing
+  // predicted; nested frames never enter it). A DRY run (the no-source
+  // harness) is the only one still
   // scheduled from propagationRounds' prediction: it assumes every op
   // succeeds, so a non-match op's rule fires when its value is true and a
   // match op's rule is unknown (noted, not taken). Segments (root first):
-  // {deck, end, stopAt, inferred} — deck/end as the tape reports them;
-  // stopAt/inferred are the DRY plan's only (a live segment leaves them null).
+  // {deck, end, stopAt, inferred} — deck/end as the run reports them; a live
+  // segment's stopAt is the server's op on a next end (else null), inferred
+  // is the DRY plan's only (always false live).
   const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
   const frames = (n) => new Promise((res) => { const step = () => (n-- <= 0 ? res() : requestAnimationFrame(step)); step(); });
   function dryPlan() {
@@ -2005,14 +2009,17 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // ── P5 run parity: a LIVE editor runs on the stepper ─────────────────────
   // When the editor has a source (and is not the harness), the run button or
   // R key opens an args form over the params bar (doc.root.input, coerced by
-  // bar type; no params means run at once). The run is ONE debug session:
-  // debug_start (body {} = the SAVED body) + debug_step continue {wait}, and
-  // its REAL events ride the editor in rounds afterwards — the same
-  // interpreter path as the debugger, with the case path read straight off
-  // the tape (no trace_flow sentinel, no predicted schedule). The payload
-  // (the ended frame's out, or the run's failure) goes to the inspector with
-  // an args sentence. The harness keeps the token-only (dry) run.
+  // bar type; no params means run at once). R5: the run is ONE ordinary run
+  // (dev.flowstep.run_flow: flowlang's stepper, no debug session/tape/budget)
+  // that returns app.app.exec's envelope, the complete root case path, and
+  // its REAL events (capped for the animation only), which ride the editor in
+  // rounds afterwards - no trace_flow sentinel, no predicted schedule. The
+  // payload (the run's envelope) goes to the inspector with an args
+  // sentence. The harness keeps the token-only (dry) run.
   let lastResult = null, liveCall = false;
+  // the Run ride's event cap: an ANIMATION limit only (run_flow flags
+  // events_truncated past it; the result and case path are always whole)
+  const RUN_EVENT_CAP = 2000;
   function coerceArg(raw, type) {
     const t = (type || "").toLowerCase();
     if (t === "integer" || t === "int") { const n = parseInt(raw, 10); return isNaN(n) ? raw : n; }
@@ -2076,38 +2083,31 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     status(`running ${src.cmd}…`);
     const started = performance.now();
     const settle = (p) => p.then((r) => r || { status: "err", msg: "no response" }, (e) => ({ status: "err", msg: String(e && e.message ? e.message : e) }));
-    // ONE execution on the stepper: debug_start (body {} = the SAVED body)
-    // opens a session and debug_step continue {wait} runs it to the end —
-    // the same interpreter path as the debugger. The case path is the tape's
-    // (each case-ending event names its op), and the run's REAL events ride
-    // the editor afterwards. A session the stepper refuses (never started)
-    // falls back to the plain command run with no path; its other failures
-    // ARE the run's result and are shown as-is — never a second execution.
-    const st = await FD.client.start(src, {}, args);
-    let session = st && st.session, r, path = null, untraced = null, tapeEvents = null;
-    if (!session) {
-      untraced = String((st && st.msg) || "no session").slice(0, 120);
-      r = await settle(invokeP(src.lib, src.ctl, src.cmd, args));
+    // ONE ordinary run (R5): dev.flowstep.run_flow runs the SAVED body on
+    // flowlang's own stepper (the semantics Command::execute runs) with no
+    // debug session, tape or debugger budget, and answers with THE mapping
+    // (app.app.exec's auth + format_result; a root terminate is success with
+    // the output delivered so far) plus the COMPLETE root case path (nested
+    // frames never enter it). The run's events are recorded up to
+    // RUN_EVENT_CAP for the ride afterwards; past the cap only the animation
+    // is skipped (events_truncated) - never the result or the path. A refused
+    // run (auth, not a flow) IS the result: never a second execution.
+    let r, path = null, untraced = null, tapeEvents = null, capped = null;
+    const rr = await settle(invokeP("dev", "flowstep", "run_flow", { lib: src.lib, ctl: src.ctl, cmd: src.cmd, args, events: RUN_EVENT_CAP, budget: 0, nn_sessionid: "" }));
+    if (rr.status === "ok" && rr.result && typeof rr.result === "object") {
+      r = rr.result;
+      path = Array.isArray(rr.path) ? rr.path.map((p) => ({ deck: p.case, end: p.end === "I-4" ? "next-missing" : p.end, stopAt: p.end === "next" && p.op != null ? p.op : null, inferred: false, ms: p.ms })) : null;
+      tapeEvents = (Array.isArray(rr.events) && !rr.events_truncated) ? rr.events : null;
+      // R6: past the cap the ride is skipped - SAY so (it used to be silent)
+      if (rr.events_truncated) capped = { cap: RUN_EVENT_CAP, steps: typeof rr.steps === "number" ? rr.steps : null };
     } else {
-      const fin = await FD.client.step(session, "continue", { wait: true });
-      tapeEvents = (fin && Array.isArray(fin.events) && !fin.events_truncated) ? fin.events : null;
-      const st2 = await FD.client.state(session);
-      path = casePathFromEvents(tapeEvents);
-      const ev = (st2 && st2.event) || (fin && fin.event) || null;
-      if (st2 && st2.status === "ok" && ev && ev.type === "done" && !ev.fail && ev.outcome === "ok") {
-        r = Object.assign({ status: "ok" }, (ev.out && typeof ev.out === "object" && !Array.isArray(ev.out) ? ev.out : {}));
-      } else if (st2 && st2.status === "ok" && st2.ended) {
-        r = { status: "err", msg: runFailureText(ev, st2.last_stop) };
-      } else {
-        r = { status: "err", msg: String((fin && fin.msg) || (st2 && st2.msg) || "the run did not end") };
-      }
-      try { await FD.client.stop(session); } catch (e) {}
-      session = null;
+      r = rr;
     }
     const ms = Math.round(performance.now() - started);
     // ride the run's REAL events from the ROOT case's first deck, where the
     // stepper starts (events not on this picture are skipped, never fatal);
-    // untraced (no session): the dry schedule rides instead (runFlow's own)
+    // untraced stays null since R5 (run_flow always returns the case path) -
+    // kept so lastResult's shape and the dry-schedule fallback are unchanged
     let R = null;
     if (focusPath.length === 1) {
       try { R = tapeEvents && tapeEvents.length ? await rideRunEvents(tapeEvents, path) : (untraced ? await runFlow() : null); } catch (e) { R = null; }
@@ -2119,15 +2119,16 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const rawMsg = String(r.msg == null ? "" : r.msg);
     const msg = /^\s*</.test(rawMsg) ? rawMsg.replace(/<title>[\s\S]*?<\/title>/i, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : rawMsg;
     const rw = runtimeWarning(savedSyncs);
-    lastResult = { args, ok, result: r, msg, ms, unsaved, source: src, path, untraced,
+    lastResult = { args, ok, result: r, msg, ms, unsaved, source: src, path, untraced, capped,
       unsynchronized: rw ? { flowlang: rw.flowlang, min: rw.min, syncs: rw.n, text: rw.text } : null,
       tokens: R ? { complete: !!R.complete, inOrder: !!R.inOrder, delivered: R.delivered.length } : null };
     const via = untraced ? " · no case path" : (path && path.length ? ` · ${pathText(path)}` : "");
     const unsync = rw ? ` · UNSYNCHRONIZED (flowlang ${rw.flowlang} ignores synchros)` : "";
+    const capTxt = capped ? ` · no token replay (${capped.steps != null ? capped.steps + " steps, " : ""}over the ${capped.cap}-event cap)` : "";
     pushJournal(ok ? `ran ${src.cmd}${via} · ${ms}ms${unsync}` : `run failed: ${msg}${unsync}`);
     if (ok && rw) status(`ran UNSYNCHRONIZED — flowlang ${rw.flowlang} ignores synchros · ${ms}ms`, "warn");
-    else if (ok) status(`ran${via} · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} ${R.delivered.length === 1 ? "delivery" : "deliveries"} in order` : ""), "ok");
-    else status(`run failed: ${msg}`, "bad");
+    else if (ok) status(`ran${via} · ${ms}ms` + (R && R.complete && R.inOrder ? ` · ${R.delivered.length} ${R.delivered.length === 1 ? "delivery" : "deliveries"} in order` : "") + capTxt, "ok");
+    else status(`run failed: ${msg}` + capTxt, "bad");
     renderRunResult(lastResult, R);
     return lastResult;
   }
@@ -2140,6 +2141,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     h += `<pre class="fe-run-pre${L.ok ? "" : " bad"}">${esc(typeof shown === "string" ? shown : JSON.stringify(shown, null, 1))}</pre>`;
     h += `<p class="fe-run-note">args: ${esc(JSON.stringify(L.args))} — the tokens replay the propagation ORDER; per-wire values aren't reported by the platform.</p>`;
     if (L.unsaved) h += `<p class="fe-empty">ran the SAVED body — ${L.unsaved} unsaved change${L.unsaved === 1 ? "" : "s"} not included; save to run them</p>`;
+    if (L.capped) h += `<p class="fe-run-capped">no token replay: the run ${L.capped.steps != null ? "took " + L.capped.steps + " steps and " : ""}listed more than ${L.capped.cap} events, so the animation was skipped. The result above and the case path in the status line are complete.</p>`;
     if (L.unsynchronized) h += `<p class="fe-run-unsync">⚠ ran UNSYNCHRONIZED: flowlang ${esc(L.unsynchronized.flowlang)} predates synchros (need ≥ ${esc(L.unsynchronized.min)}), so the server ignored this flow's ${L.unsynchronized.syncs} synchro${L.unsynchronized.syncs === 1 ? "" : "s"}. The replay below draws the order the synchros ASK for, not the order that ran.</p>`;
     if (R && R.rounds && R.rounds.length) h += runRoundsHtml(R);
     body.innerHTML = h;
@@ -2148,9 +2150,10 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   // ── STEP DEBUGGER (flow step debugger P4) ────────────────────────────────
   // A debug SESSION (dev.flowstep P3: a recorded tape — step / back / goto /
   // continue / breakpoints) runs the CURRENT body — unsaved edits included
-  // (doc.serialize()) — under the stepper; P5: the run button is the same
-  // session + a continue over the SAVED body, so run and debug share the one
-  // interpreter path. Every move is one debug_step then
+  // (doc.serialize()) — under the stepper. R5: the run button does NOT open
+  // a session - it is dev.flowstep.run_flow over the SAVED body (flowlang's
+  // own stepper, the one semantics, with no tape/snapshots/debugger budget),
+  // so run and debug share the one interpreter, not the session. Every move is one debug_step then
   // one debug_state, and the editor only DRAWS that state: dev:flowdebug maps
   // the frames onto the doc's case objects, the focus FOLLOWS the top frame
   // (drill into local frames, the case it runs), flownode plates show each
@@ -2200,8 +2203,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     status(`debug: opening a session on ${src.cmd}…`);
     const r = await FD.client.start(src, body, args || {});
     if (!r || r.status !== "ok" || !r.session) { status("debug start failed: " + ((r && r.msg) || "no session"), "bad"); return r; }
-    dbg = { session: r.session, src, args: args || {}, st: null, views: [], busy: false, last: r, follow: true, sig: "", unsaved: dirty };
-    dbgTape = []; dbgTapeCursor = -1;                    // D5: a fresh tape
+    dbg = { session: r.session, src, args: args || {}, st: null, views: [], busy: false, last: r, follow: true, sig: "", unsaved: dirty,
+      boundary: typeof r.boundary === "string" ? r.boundary : "", crossed: [] };   // R3: the server's session boundary, shown verbatim
+    dbgTape = []; dbgTapeCursor = -1; dbgTapeGap.clear();   // D5: a fresh tape (R6: and no gap reasons)
     ME.classList.add("fe-debugging");
     pushJournal(`debug session · ${src.cmd}` + (dirty ? " (unsaved body)" : ""));
     if (bpPlaces().length) await sendBreakpoints();   // D4: the editor's breakpoints ride every session
@@ -2225,19 +2229,42 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       if (!r || r.status !== "ok") {
         const msg = String((r && r.msg) || "no reply");
         status(`debug ${mode} refused: ${msg}`, "bad");
-        if (/session/i.test(msg) && /(no such|no debug session|unknown|not found|gone|missing|reaped)/i.test(msg)) debugEnded("the session is gone (reaped after idling?)");
+        const gone = dbgGone(r) || (/session/i.test(msg) && /(no such|unknown|not found|gone|missing)/i.test(msg) ? "the session is gone (reaped after idling?)" : null);
+        if (gone) debugEnded(gone);
         return r;
       }
       // D4: why this move stopped (over/out/run_to: the reply says; a
       // continue's comes with the poll that sees it end)
       d.stop = r.running ? null : { stopped: String(r.stopped || ""), hit: r.hit || null, mode };
+      // R3: back/goto over opaque rust/python command steps restores the
+      // interpreter, not the world - the server lists those steps
+      // (crossed_side_effects); the bar says so until the next move
+      d.crossed = Array.isArray(r.crossed_side_effects) ? r.crossed_side_effects.slice() : [];
+      // R6: the status line follows every finished move - before, a continue's
+      // "stopped — ended at step N" outlived the back/goto/into that moved the
+      // cursor (a running continue's line is set by the poll when it ends)
+      if (!r.running) {
+        const bh = dbgStopText(), why = String(r.stopped || "");
+        const tail = bh ? " — " + bh : (why && why !== "stepped" ? " — " + (why === "budget" ? "step budget ran out, not the end" : why) : "");
+        status(`debug ${mode}: at step ${r.cursor} / ${r.length}${tail}`, "ok");
+      }
       // D2: what this move SHOWS — its events (a back(1): the undone one, in
       // reverse); continue/goto/pause/back(n) only redraw
       const back1 = mode === "back" && !!prevEv && !(pick && pick.count > 1);
       const evs = back1 ? [prevEv] : (!r.running && Array.isArray(r.events) && !r.events_truncated ? r.events : []);
       // D5: the timeline's tape: every reply's event span (a move's own events,
       // or continue/back(n)/goto's span) records its steps' events
-      if (!r.running && Array.isArray(r.events) && !r.events_truncated) dbgRecordEvents(r.events, r.cursor);
+      // R6: a fork cut the tape to r.length; a branch swap put another tail
+      // at r.cursor - the old tail's ticks go first (else the strip draws the
+      // replaced branch's events as this tape's). A capped event list still
+      // carries real seqs, so it is recorded and the gap is explained.
+      if (typeof r.length === "number") dbgForget(r.length);
+      if (mode === "branch") dbgForget(r.cursor, "restored");
+      if (!r.running && Array.isArray(r.events)) dbgRecordEvents(r.events, r.cursor, !!r.events_truncated);
+      // R6: the reply's own event IS the tape's step cursor-1 (server seq) -
+      // an edit (and back/goto) reply lists no events[], so without this an
+      // edit fork kept the replaced tail's tick at the fork seq
+      if (!r.running && r.event && typeof r.event.seq === "number") dbgRecordEvents([r.event], r.cursor, false);
       const ride = { mode, reverse: back1, events: evs.map((e) => e.seq), a: null, b: null };
       if (evs.length) ride.a = await dbgShow(evs, back1, null);   // on the picture as it stands
       if (dbg !== d) return r;
@@ -2257,7 +2284,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (dbg !== d) return null;
     if (!st || st.status !== "ok") {
       const msg = String((st && st.msg) || "no reply");
-      if (/no debug session|reaped/i.test(msg)) { debugEnded("the session is gone (reaped after idling?)"); return null; }
+      const gone = dbgGone(st); if (gone) { debugEnded(gone); return null; }
       status("debug state failed: " + msg, "bad"); return null;
     }
     const sig = `${st.cursor}|${st.length}|${st.running}|${st.hash}`;
@@ -2393,8 +2420,38 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   let dbgTapeCursor = -1;        // the largest seq this session has reached
   let lastTlTicks = [];          // the ticks the last draw placed (checks)
   let tlDrag = null;             // a drag in progress on the top strip
-  function dbgRecordEvents(evs, upto) {
+  // R6: why some steps of [base, length) have no tick - explained on the
+  // strip, never drawn as if complete. capped: a reply lists at most its
+  // first 400 events; restored: a swapped-in branch is not re-listed until
+  // a continue replays it.
+  const dbgTapeGap = new Set();
+  // R6: the tape from `from` on was replaced (a fork cut it to length, a
+  // branch swap put another tail there) - ticks recorded for those seqs
+  // belong to the OLD tail and must not be drawn as this tape's
+  function dbgForget(from, why) {
+    if (typeof from !== "number" || from < 0) return;
+    if (dbgTape.length > from) dbgTape.length = from;
+    if (why) dbgTapeGap.add(why);
+  }
+  function tlGapNote(st) {
+    const base = (st && st.base) || 0, len = (st && st.length) || 0;
+    let miss = 0;
+    for (let s = base; s < len; s++) if (!dbgTape[s]) miss++;
+    if (!miss) dbgTapeGap.clear();
+    const why = [];
+    if (dbgTapeGap.has("capped")) why.push("a reply lists at most its first 400 events");
+    if (dbgTapeGap.has("restored")) why.push("a swapped-in branch is not re-listed until a continue replays it");
+    if (!why.length) why.push("no reply listed them");
+    const parts = [];
+    if (base > 0) parts.push(`steps 0–${base - 1} trimmed (tape cap)`);
+    if (miss) parts.push(`${miss} step${miss === 1 ? "" : "s"} without a tick`);
+    const long = (base > 0 ? `The tape cap dropped steps 0–${base - 1}; the strip starts at step ${base}.\n` : "") +
+      (miss ? `${miss} of ${len - base} steps on the tape have no tick: ${why.join("; ")}. They are on the tape (goto reaches them); they were never listed to this editor.` : "");
+    return { miss, base, short: parts.join(" · "), long };
+  }
+  function dbgRecordEvents(evs, upto, truncated) {
     if (!Array.isArray(evs)) return;
+    if (truncated) dbgTapeGap.add("capped");
     for (const e of evs) {
       if (!e || typeof e.seq !== "number") continue;
       dbgTape[e.seq] = { type: e.type || "?", seq: e.seq, user: e.pick === "user" };
@@ -2459,7 +2516,11 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     const st = dbg.st || {};
     lastTlTicks = tlDrawInto($(".fe-dbg-tl-track"), st);
     const pos = $(".fe-dbg-tl-pos");
-    if (pos) pos.textContent = `${st.cursor || 0} / ${st.length || 0}` + ((st.branches || 0) ? ` · ${st.branches} branch${st.branches === 1 ? "" : "es"}` : "");
+    const gap = tlGapNote(st);   // R6: trimmed / untracked steps are said, not hidden
+    if (pos) {
+      pos.textContent = `${st.cursor || 0} / ${st.length || 0}` + ((st.branches || 0) ? ` · ${st.branches} branch${st.branches === 1 ? "" : "es"}` : "") + (gap.short ? ` · ⚠ ${gap.short}` : "");
+      pos.title = gap.long || "tape cursor / length";
+    }
   }
   async function debugBranch(id) {
     const st = dbg && dbg.st ? dbg.st : {};
@@ -2472,7 +2533,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
   // the inspector's own strip + the branch records
   function renderTimelineInspector(body, m) {
-    edLbl(body, `timeline · ${m.length} step${m.length === 1 ? "" : "s"} on the tape` + (m.branches ? ` · ${m.branches} branch${m.branches === 1 ? "" : "es"}` : ""));
+    const gap = tlGapNote(dbg && dbg.st ? dbg.st : {});   // R6
+    edLbl(body, `timeline · ${m.length} step${m.length === 1 ? "" : "s"} on the tape` + (m.branches ? ` · ${m.branches} branch${m.branches === 1 ? "" : "es"}` : "") + (gap.short ? ` · ⚠ ${gap.short}` : ""));
     const track = document.createElement("div");
     track.className = "fe-dbgi-tl-track";
     track.title = "click = go to that step · double-click = step to it";
@@ -2530,7 +2592,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       if (st && st.running) debugPoll();
       else if (st) {
         // D5: a continue's ticks ride its last_run's event span
-        if (st.last_run && Array.isArray(st.last_run.events) && !st.last_run.events_truncated) dbgRecordEvents(st.last_run.events, st.cursor);
+        if (st.last_run && Array.isArray(st.last_run.events)) dbgRecordEvents(st.last_run.events, st.cursor, !!st.last_run.events_truncated);
         if (dbg) { dbg.stop = { stopped: String(st.last_stop || ""), hit: (st.last_run && st.last_run.hit) || null, mode: "continue" }; renderDebugBar(); refreshInspector(); }
         const bh = dbgStopText();
         status(bh ? `debug: ${bh} at step ${st.cursor}` : `debug: stopped${st.last_stop ? " — " + st.last_stop : ""} at step ${st.cursor}`, "ok");
@@ -2543,7 +2605,24 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     debugEnded(null);
     let r = null;
     try { r = await FD.client.stop(d.session); } catch (e) {}
+    // R6: stop is cooperative - an op in flight (rust/python/user code) is
+    // never preempted. When the server got no acknowledgement within its
+    // wait, the session is still ending: say so instead of "stopped".
+    if (r && r.status === "ok" && r.acknowledged === false && !disposed && !dbg)
+      status("debug: stop requested — an op in flight is still running; the server ends the session when it finishes (stop is cooperative)", "bad");
     return r;
+  }
+  // R4: a session the server has ended (stopped elsewhere, reaped) answers
+  // with its tombstone {status err, phase "stopped", ended_by}; an expired
+  // tombstone or a pre-R4 server says "no debug session" - either way this
+  // editor's session is over. Returns the reason text, or null.
+  function dbgGone(r) {
+    const msg = String((r && r.msg) || "");
+    if (r && r.phase === "stopped") return r.ended_by === "reap" ? "the session was reaped after idling" : `the session has ended (${r.ended_by || "stopped"})`;
+    // NOT the run-ended refusal ("the run has ended - go back (back/goto)
+    // or stop the session"): that session is alive and back/goto still work
+    if (/no debug session|reaped|debug session '[^']*' has ended/i.test(msg)) return "the session is gone (reaped after idling?)";
+    return null;
   }
   function debugEnded(why) {
     dbg = null;
@@ -2554,9 +2633,14 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     status(why ? "debug: " + why : "debug session stopped — edits unlocked", why ? "bad" : "ok");
   }
   // a ready item in words, named in the top frame's case
+  // R6: only wire/sync/op items are picks. A pending rule effect ({kind: effect, op, rule}) or an op in
+  // progress ({kind: auto, op, stage}) runs next whatever is clicked - the server reports it as the default.
+  function dbgPickable(x) { return !!x && (x.kind === "op" || x.kind === "wire" || x.kind === "sync"); }
   function dbgItemText(v, it) {
     const c = v && v.caseObj;
-    if (!it || it.kind === "auto") return "auto";
+    if (!it) return "auto";
+    if (it.kind === "auto") return `op ${c && c.cmds[it.op] ? nameOf(c, it.op) : it.op} continues` + (it.stage ? ` (${it.stage})` : "");
+    if (it.kind === "effect") return `${it.rule || "rule"} rule of op ${c && c.cmds[it.op] ? nameOf(c, it.op) : it.op}`;
     if (it.kind === "op") return `op ${c && c.cmds[it.index] ? nameOf(c, it.index) : it.index}`;
     if (it.kind === "wire") { const w = c && c.cons[it.index]; return w ? `${nameOf(c, w.src[0])}.${w.src[1]}→${nameOf(c, w.dest[0])}.${w.dest[1]}` : `wire ${it.index}`; }
     if (it.kind === "sync") { const s = c && c.syncs && c.syncs[it.index]; return s ? `${nameOf(c, s.src)}⇢${nameOf(c, s.dest)}` : `synchro ${it.index}`; }
@@ -2580,15 +2664,36 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       const top = dbg.views && dbg.views.length ? dbg.views[dbg.views.length - 1] : null;
       let t = FD.eventText(st.event, dbg.views);
       { const bh = dbgStopText(); if (bh) t = `● ${bh} · ${t}`; }   // D4
-      const rd = (st.ready || []).filter((x) => x && x.kind !== "auto");
+      // R6: a move that ran out of its step budget is NOT the end of the flow
+      if (!ended && !live && dbg.stop && dbg.stop.stopped === "budget") t = `⏸ step budget ran out${dbg.stop.mode === "continue" ? " (10,000 steps per continue)" : ""} — not the end; F5 continues · ${t}`;
+      const rd = (st.ready || []).filter(dbgPickable);
+      const forced = (st.ready || []).find((x) => x && !dbgPickable(x));   // R6: runs next whatever is clicked
       if (ended) t += " · ended";
+      else if (forced) t += ` · next: ${dbgItemText(top, forced)}`;
       else if (rd.length) t += ` · ready: ${rd.map((x) => dbgItemText(top, x)).join(", ")}` + (st.default ? ` · next ${dbgItemText(top, st.default)}` : "");
-      else if ((st.ready || []).length) t += " · next: auto";
       if (top && top.external) t += ` · in ${top.external.name || "a callee"} (not in this flow)`;
       if (live) t = "running… " + t;
       ev.textContent = t;
       ev.className = "fe-dbg-ev" + (ended ? " ended" : "") + (st.event && (st.event.type === "error" || st.event.type === "stall") ? " bad" : "") + (dbgStopText() ? " bp" : "");
     }
+    // R3: the session boundary - the server's facts, never invented here:
+    // the last move's crossed_side_effects, the flow's persistent keys
+    // (debug_state persistent), and debug_start's boundary as the tooltip
+    const wn = $(".fe-dbg-warn");
+    if (wn) {
+      const w = dbgWarnings(st);
+      wn.textContent = w.length ? "⚠ " + w.join(" · ⚠ ") : "";
+      wn.title = (w.length ? w.join("\n") + "\n\n" : "") + (dbg.boundary ? "session boundary: " + dbg.boundary : "");
+      wn.hidden = !w.length;
+    }
+  }
+  function dbgWarnings(st) {
+    const w = [];
+    const cx = dbg && Array.isArray(dbg.crossed) ? dbg.crossed : [];
+    const pk = st && Array.isArray(st.persistent) ? st.persistent : [];
+    if (cx.length) w.push(`rolled back over rust/python step${cx.length > 1 ? "s" : ""} ${cx.join(", ")}: outside effects NOT undone`);
+    if (pk.length) w.push(`persistent ${pk.join(", ")} not isolated: other runs share ${pk.length > 1 ? "them" : "it"}`);
+    return w;
   }
 
   // ── D3: the debug inspector ──────────────────────────────────────────────
@@ -2619,7 +2724,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       event: FD.eventText(st.event, views), focusFi: dv ? dv.fi : null, follow: !!dbg.follow,
       frames: views.slice().reverse().map((v) => ({ fi: v.fi, title: dbgFrameTitle(v), kind: v.kind, case: v.case, phase: v.phase,
         outcome: v.outcome, top: v.top, focused: dv === v, showable: v.fi < chainLen, external: !!v.external })),
-      ready: (st.ready || []).filter((x) => x && x.kind !== "auto").map((x) => ({ kind: x.kind, index: x.index, text: dbgItemText(top, x),
+      ready: (st.ready || []).filter(dbgPickable).map((x) => ({ kind: x.kind, index: x.index, text: dbgItemText(top, x),
         isDefault: !!(st.default && st.default.kind === x.kind && st.default.index === x.index) })),
       sel: null, frame: null, stop: dbgStopText(),
       bps: bpListModel().map((x) => ({ kind: x.kind, index: x.index, case: x.case, depth: x.depth, text: x.text, entry: x.entry })) };
@@ -3360,6 +3465,7 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
         debugPlates: () => instances.map((inst) => ({ key: inst && inst.key, dbg: inst && inst.ctx && inst.ctx.me ? inst.ctx.me._dbg : undefined })),
         debugFacade: () => lastFacadeDbg.slice(),
         debugBarText: () => { const b = $(".fe-dbg"); return b && !b.hidden ? { pos: $(".fe-dbg-pos").textContent, ev: $(".fe-dbg-ev").textContent } : null; },
+        debugWarnText: () => { const w = $(".fe-dbg-warn"); return w && !w.hidden ? { text: w.textContent, title: w.title } : null; },
         focus: () => ({ depth: focusPath.length, deck: activeDeck, titles: focusPath.map((f) => f.title) }),
         // D3 inspector surface
         debugFocusFrame, debugFollowNow,
@@ -3405,6 +3511,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
             branches: Array.from(document.querySelectorAll(".fe-dbg-tl-branch")).map((b) => ({ left: b.style.left, width: b.style.width, title: b.title })),
             cursor: cur ? { left: cur.style.left } : null,
             tape: dbgTape.filter((x) => x).map((x) => ({ seq: x.seq, type: x.type, user: !!x.user })),
+            gap: tlGapNote(dbg && dbg.st ? dbg.st : {}),   // R6
+            posTitle: ($(".fe-dbg-tl-pos") || {}).title || "",
           };
         },
       };
