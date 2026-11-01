@@ -4,19 +4,38 @@
   <div class="wb-plugins" hidden></div>
   <div class="wb-left"></div>
   <div class="wb-resize" role="separator" aria-orientation="vertical" tabindex="0"
-       aria-label="preview width" title="drag to resize the preview — double-click to reset"></div>
+       aria-label="preview width" aria-valuemin="240"
+       title="drag to resize the preview — double-click to reset"><span class="grip" aria-hidden="true"></span></div>
   <div class="wb-right">
-    <div class="wb-chips" role="tablist" aria-label="facets"></div>
+    <div class="wb-chipbar">
+      <div class="wb-chips" role="tablist" aria-label="facets"></div>
+      <div class="wb-actions">
+        <span class="wb-ctl-state" role="status">no control changes</span>
+        <input class="wb-label" placeholder="label this patch"
+               aria-label="label this patch (optional)"
+               title="short label for the journal entry (optional)">
+        <button class="wb-save" disabled
+          title="saves every facet with unsaved changes — one journaled patch per facet">Save control <kbd></kbd></button>
+      </div>
+    </div>
+    <div class="wb-about">
+      <div class="wb-about-line">
+        <p class="wm-view"></p>
+        <button class="wm-details wb-link" aria-expanded="false" hidden>Details and config</button>
+      </div>
+      <div class="wb-about-rest" hidden>
+        <div class="wb-about-body"></div>
+        <p class="wm-tags-view"></p>
+      </div>
+    </div>
     <div class="wb-meta">
-      <span class="wm-view"></span>
-      <span class="wm-tags-view"></span>
       <span class="wm-groups-view" title="security groups — who can see and run this control; empty = admin only"></span>
-      <button class="wm-preview" aria-pressed="true" title="show or hide the preview pane">preview</button>
-      <button class="wm-edit" hidden>meta ▸</button>
-      <button class="wm-publish" hidden>publish ▸</button>
-      <button class="wm-wiring">timers/events ▸</button>
-      <button class="wm-groups-btn" hidden
-        title="security groups — the deliberate set_groups act: writes the groups string and derives the enforced readers on this control and its inline data">groups ▸</button>
+      <button class="wm-preview wb-tog" aria-pressed="true" title="show or hide the preview pane">hide preview</button>
+      <button class="wm-edit wb-tog" aria-expanded="false" hidden>meta <span class="car" aria-hidden="true">▸</span></button>
+      <button class="wm-publish wb-tog" aria-expanded="false" hidden>publish <span class="car" aria-hidden="true">▸</span></button>
+      <button class="wm-wiring wb-tog" aria-expanded="false">timers/events <span class="car" aria-hidden="true">▸</span></button>
+      <button class="wm-groups-btn wb-tog" aria-expanded="false" hidden
+        title="security groups — the deliberate set_groups act: writes the groups string and derives the enforced readers on this control and its inline data">groups <span class="car" aria-hidden="true">▸</span></button>
       <form class="wm-form" hidden>
         <input class="wm-desc" placeholder="describe this control — agents discover it through desc">
         <input class="wm-tags" placeholder="tags (comma-delimited — categorization, never security)">
@@ -91,38 +110,59 @@
     <div class="wb-pane">
       <div class="wb-editors"></div>
       <div class="wb-cmds" hidden>
-        <p class="wb-note">Commands are the control's verbs — callable from its
-        js, from other controls, and by agents.</p>
-        <form class="wb-newcmd" hidden>
-          <input class="wc-name" placeholder="new command name" aria-label="New command name">
-          <select class="wc-lang" aria-label="Language">
-            <option value="rust">rust</option>
-            <option value="python">python</option>
-            <option value="flow">flow</option>
-          </select>
-          <label class="wc-lbl">returns <select class="wc-ret" aria-label="Return type"></select></label>
-          <input class="wc-params" placeholder="params — a: String, n: Integer"
-                 aria-label="Parameters">
-          <button type="submit" class="wc-go">+ new command</button>
-          <span class="wc-note"></span>
+        <div class="wb-cmds-head">
+          <p class="wb-note">Commands are the control's verbs — callable from its
+          js, from other controls, and by agents. Click a command to open it.</p>
+          <button class="wb-newbtn" hidden aria-expanded="false">+ new command</button>
+        </div>
+        <form class="wb-newcmd" hidden aria-label="new command">
+          <label class="wc-field wc-f-name"><span class="wc-lab">Name</span>
+            <input class="wc-name" placeholder="e.g. hover" autocomplete="off"></label>
+          <label class="wc-field wc-f-params"><span class="wc-lab">Params</span>
+            <input class="wc-params" placeholder="selector: String, timeout_ms: Integer"
+                   autocomplete="off"></label>
+          <label class="wc-field"><span class="wc-lab">Returns</span>
+            <select class="wc-ret"></select></label>
+          <label class="wc-field"><span class="wc-lab">Language</span>
+            <select class="wc-lang">
+              <option value="rust">Rust</option>
+              <option value="python">Python</option>
+              <option value="flow">Flow</option>
+            </select></label>
+          <div class="wc-acts">
+            <button type="submit" class="wc-create wb-btn primary">Create command</button>
+            <button type="button" class="wc-cancel wb-btn">Cancel</button>
+          </div>
+          <p class="wc-note" role="alert"></p>
         </form>
         <div class="wb-cmd-rows"></div>
         <div class="wb-cmd-code" hidden>
           <div class="wcc-head">
-            <button class="wcc-back">◂ commands</button>
-            <span class="wcc-name"></span>
+            <button class="wcc-back wb-tog">‹ commands</button>
             <span class="wcc-type wb-cmd-type"></span>
+            <span class="wcc-name"></span>
             <span class="wcc-sig"></span>
-            <button class="wcc-save" hidden disabled>save ⌘s</button>
+            <span class="wcc-spacer"></span>
+            <span class="wcc-status clean" role="status"></span>
+            <button class="wcc-save" hidden disabled></button>
+          </div>
+          <div class="wcc-guard" role="alert" hidden>
+            <span class="wcc-guard-msg"></span>
+            <div class="wcc-guard-acts">
+              <button class="wcc-guard-save wb-btn primary">Save and go back</button>
+              <button class="wcc-guard-discard wb-btn">Discard changes</button>
+              <button class="wcc-guard-keep wb-tog">keep editing</button>
+            </div>
           </div>
           <div class="wcc-sig-row" hidden>
-            <span class="lbl">params</span>
-            <input class="wcc-params" spellcheck="false" aria-label="Parameters"
-              placeholder="a: String, n: Integer"
-              title="the command's parameters — a signature change saves through upsert_command (a whole-body write)">
-            <span class="lbl">returns</span>
-            <select class="wcc-ret" aria-label="Return type"
-              title="the command's return type — a signature change saves through upsert_command (a whole-body write)"></select>
+            <label class="wcc-field wcc-f-params"><span class="lbl">params</span>
+              <input class="wcc-params" spellcheck="false"
+                placeholder="a: String, n: Integer"
+                title="the command's parameters — a signature change saves through upsert_command (a whole-body write)">
+              <span class="wcc-help">name: Type, separated by commas</span></label>
+            <label class="wcc-field"><span class="lbl">returns</span>
+              <select class="wcc-ret"
+                title="the command's return type — a signature change saves through upsert_command (a whole-body write)"></select></label>
           </div>
           <label class="wcc-imports-row" hidden>
             <span class="lbl">imports</span>
@@ -155,6 +195,11 @@
     (fallback) — the shared journal needs the write API on this
     instance</span>
   </footer>
+  <div class="wb-toast" role="status" hidden>
+    <span class="wb-toast-msg"></span>
+    <button class="wb-toast-act wb-btn" hidden></button>
+    <button class="wb-toast-x wb-btn icon" aria-label="dismiss">✕</button>
+  </div>
 </section>
 <div class="data-control" data-control="dev:facets" hidden></div>
 <div class="data-control" data-control="dev:viewctx" hidden></div>

@@ -1,0 +1,49 @@
+/* Inline / sprite SVGs inherit currentColor. This mask helper makes the same
+   SVG files inherit color when markup cannot inline an SVG. */
+.nb-icon {
+  display: inline-block;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: none;
+  vertical-align: -.25em;
+  background-color: currentColor;
+  -webkit-mask: var(--nb-icon) center / contain no-repeat;
+  mask: var(--nb-icon) center / contain no-repeat;
+}
+.nb-icon--add { --nb-icon: url("./ui/add.svg"); }
+.nb-icon--close { --nb-icon: url("./ui/close.svg"); }
+.nb-icon--edit { --nb-icon: url("./ui/edit.svg"); }
+.nb-icon--delete { --nb-icon: url("./ui/delete.svg"); }
+.nb-icon--search { --nb-icon: url("./ui/search.svg"); }
+.nb-icon--settings { --nb-icon: url("./ui/settings.svg"); }
+.nb-icon--menu { --nb-icon: url("./ui/menu.svg"); }
+.nb-icon--more { --nb-icon: url("./ui/more.svg"); }
+.nb-icon--more-vertical { --nb-icon: url("./ui/more-vertical.svg"); }
+.nb-icon--play { --nb-icon: url("./ui/play.svg"); }
+.nb-icon--stop { --nb-icon: url("./ui/stop.svg"); }
+.nb-icon--refresh { --nb-icon: url("./ui/refresh.svg"); }
+.nb-icon--download { --nb-icon: url("./ui/download.svg"); }
+.nb-icon--upload { --nb-icon: url("./ui/upload.svg"); }
+.nb-icon--chevron-up { --nb-icon: url("./ui/chevron-up.svg"); }
+.nb-icon--chevron-down { --nb-icon: url("./ui/chevron-down.svg"); }
+.nb-icon--chevron-right { --nb-icon: url("./ui/chevron-right.svg"); }
+.nb-icon--arrow-left { --nb-icon: url("./ui/arrow-left.svg"); }
+.nb-icon--expand { --nb-icon: url("./ui/expand.svg"); }
+.nb-icon--collapse { --nb-icon: url("./ui/collapse.svg"); }
+.nb-icon--maximize { --nb-icon: url("./ui/maximize.svg"); }
+.nb-icon--minimize { --nb-icon: url("./ui/minimize.svg"); }
+.nb-icon--info { --nb-icon: url("./ui/info.svg"); }
+.nb-icon--lock { --nb-icon: url("./ui/lock.svg"); }
+.nb-icon--key { --nb-icon: url("./ui/key.svg"); }
+.nb-icon--user { --nb-icon: url("./ui/user.svg"); }
+.nb-icon--user-add { --nb-icon: url("./ui/user-add.svg"); }
+.nb-icon--group { --nb-icon: url("./ui/group.svg"); }
+.nb-icon--wifi { --nb-icon: url("./ui/wifi.svg"); }
+.nb-icon--shield { --nb-icon: url("./ui/shield.svg"); }
+.nb-icon--check { --nb-icon: url("./ui/check.svg"); }
+.nb-icon--copy { --nb-icon: url("./ui/copy.svg"); }
+.nb-icon--save { --nb-icon: url("./ui/save.svg"); }
+.nb-icon--link { --nb-icon: url("./ui/link.svg"); }
+.nb-icon--folder { --nb-icon: url("./ui/folder.svg"); }
+.nb-icon--logout { --nb-icon: url("./ui/logout.svg"); }
+.nb-icon--peer { --nb-icon: url("./ui/peer.svg"); }

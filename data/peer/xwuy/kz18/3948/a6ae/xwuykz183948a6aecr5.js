@@ -39,7 +39,7 @@ me.ready = function(){
                 + theirlib.version
                 + ' ➤ '
                 + mylib.version
-                + '</span><img src="../app/asset/app/close-white.png" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
+                + '</span><img src="../app/asset/app/icons/ui/dark/close.svg" class="roundbutton-small removeupdate mdl-chip__action chipbutton"></span> ';
 
               ME.querySelector('.availableupgrades').style.display = 'block';
               el.insertAdjacentHTML('beforeend', newhtml);

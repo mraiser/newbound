@@ -147,7 +147,12 @@ if store.exists(&lib, &ctlid) {
   } else {
       if store.exists(&lib, &nuid) {
           nucmd_doc = store.get_data(&lib, &nuid).get_object("data");
-          if nucmd_doc.has("rust") {
+          // the impl pointer lives under the record's CURRENT type key
+          // (rust/python/javascript/flow) — not always "rust"
+          let old_t = if nucmd_doc.has("type") { nucmd_doc.get_string("type") } else { "rust".to_string() };
+          if nucmd_doc.has(&old_t) {
+              rustid = nucmd_doc.get_string(&old_t);
+          } else if nucmd_doc.has("rust") {
               rustid = nucmd_doc.get_string("rust");
           }
       }
@@ -158,8 +163,12 @@ if store.exists(&lib, &ctlid) {
   }
 
   nucmd_doc.put_string("name", &cmd);
-  nucmd_doc.put_string("type", "rust");
-  nucmd_doc.put_string("rust", &rustid);
+  // the command record's type and impl-pointer key follow the LANGUAGE —
+  // hard-coding "rust" broke python/javascript upserts: the body landed
+  // under the lang key while attachmentkeynames said "rs", so the store
+  // write died on the missing 'rs' attachment
+  nucmd_doc.put_string("type", &lang);
+  nucmd_doc.put_string(&lang, &rustid);
   
   // Preserve an existing command's readers/writers across the upsert — the
   // meta record's readers are exactly what check_security consults, so
@@ -182,11 +191,19 @@ if store.exists(&lib, &ctlid) {
   
   let ext = if lang == "rust" { "rs" } else { &lang };
   
-  if !nurust.has("attachmentkeynames") {
-      let mut a = DataArray::new();
-      a.push_string("rs");
-      nurust.put_array("attachmentkeynames", a);
+  // the attachment key must name the key actually written below (ext),
+  // and an existing list must gain it when a command is retyped
+  let mut atts = if nurust.has("attachmentkeynames") {
+      nurust.get_array("attachmentkeynames")
+  } else {
+      DataArray::new()
+  };
+  let mut has_ext = false;
+  for i in 0..atts.len() {
+      if atts.get_string(i) == ext { has_ext = true; break; }
   }
+  if !has_ext { atts.push_string(ext); }
+  nurust.put_array("attachmentkeynames", atts);
   
   nurust.put_string("import", &imports);
   
