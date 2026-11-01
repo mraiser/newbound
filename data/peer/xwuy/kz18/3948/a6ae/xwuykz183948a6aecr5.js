@@ -26,6 +26,18 @@ me.ready = function(){
   document.body.api.ui.initPopups(ME);
   initCrates();
 
+  // 1b: remember which tab the user picks, per peer, ON THE HOST element —
+  // every refresh swaps the mount's innerHTML but the host div stays, so
+  // buildControls can put the user back on the tab they chose. Only the
+  // panel's own navbar is bound (the first .navbar-dark in the subtree;
+  // dashboard controls mount later, under .hudapps).
+  ME.querySelector('.navbar-dark').querySelectorAll('.navbar-tab').forEach(function(t){
+    t.addEventListener('click', function(){
+      ME.lastTab = this.dataset.id;
+      ME.lastTabPeer = ME.DATA.id;
+    });
+  });
+
   var uuid = ME.DATA.id;
   json('../peer/remote/'+uuid+'/app/libs', null, function(result){
     if (result.data && document.body.locallibraries) {
@@ -165,8 +177,16 @@ me.ready = function(){
 };
 
 function buildControls(){
-  var tab2 = document.querySelector('.navbar-tab2');
-  if (tab2) tab2.click();
+  // 1b: the old lookup was document-wide (document.querySelector), so it
+  // could click a navbar-tab2 belonging to some other control on the page.
+  // Scope it to the panel. And only jump to Dashboard when the user hasn't
+  // picked a tab for THIS peer: the host element survives re-mounts (see
+  // the F7 note at the top), so the pick recorded on it by the navbar
+  // listener in me.ready outlives a refresh — Refresh no longer yanks an
+  // Info reader back to Dashboard.
+  var want = (ME.lastTabPeer == ME.DATA.id && ME.lastTab) ? ME.lastTab : 'tab2';
+  var tab = ME.querySelector('.navbar-dark .navbar-tab[data-id="' + want + '"]');
+  if (tab) tab.click();
 
   var data = me.data;
   var wrap = ME.querySelector('.hudapps');
