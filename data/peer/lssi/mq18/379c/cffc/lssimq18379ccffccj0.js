@@ -626,7 +626,11 @@ document.body.peerupdater = {
     function chipStart(it){
       var c = it.chipEl;
       if (!c || !c.isConnected) return;
-      c.style.color = 'rgba(0,0,0,0.5)';
+      // step 6: rgba(0,0,0,.5) was black-on-graphite, unreadable. Keep the
+      // chip's own text colour and dim the WHOLE chip with opacity instead;
+      // chipDone keeps the dim (the ✓ stays green), chipError restores full
+      // strength so the error line reads.
+      c.style.opacity = '0.6';
       var x = c.querySelector('.removeupdate');
       if (x) x.remove();
     }
@@ -647,6 +651,7 @@ document.body.peerupdater = {
       // own wrapped line (.chiperrline, peer.peer css) in a readable red.
       c.classList.add('chiperrored');
       c.style.color = '#ff8a80';
+      c.style.opacity = '1';   // step 6: an errored chip is not dimmed
       var line = document.createElement('span');
       line.className = 'chiperrline';
       var sp = document.createElement('span');
