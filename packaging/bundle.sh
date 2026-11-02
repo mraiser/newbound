@@ -42,6 +42,7 @@ if command -v sha256sum >/dev/null; then SUM="sha256sum"; else SUM="shasum -a 25
 echo "${PBS_SHA256}  ${OUT}/cache/${PBS_FILE}" | $SUM -c -
 tar -xzf "${OUT}/cache/${PBS_FILE}" -C "$DEST"     # -> $DEST/python
 PYTHON="$(cd "$DEST/python/bin" && pwd)/python3"
+PYLIB="$(cd "$DEST/python/lib" && pwd)"
 
 # 2. newbound, linked against that Python and finding it next to itself.
 case "$TARGET" in
@@ -50,7 +51,11 @@ case "$TARGET" in
 esac
 # Its own target dir: these flags must not replace a development build.
 BUILD_DIR="target/bundle-${TARGET}"
-PYO3_PYTHON="$PYTHON" RUSTFLAGS="-C link-args=-Wl,-rpath,${RPATH}" CARGO_TARGET_DIR="$BUILD_DIR" \
+# python-build-standalone reports its build-time LIBDIR (/install/lib), so
+# PyO3 cannot find libpython by itself: link against the bundled one
+# explicitly (never a system libpython that happens to be on the linker's
+# default path).
+PYO3_PYTHON="$PYTHON" RUSTFLAGS="-L native=${PYLIB} -C link-args=-Wl,-rpath,${RPATH}" CARGO_TARGET_DIR="$BUILD_DIR" \
   cargo build --release --features=serde_support,python_runtime
 cp "$BUILD_DIR/release/newbound" "$DEST/"
 if [[ "$TARGET" == *-apple-darwin ]]; then
