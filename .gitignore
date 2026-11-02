@@ -20,6 +20,14 @@
 !newbound.sh
 !default.nix
 !config.properties_example
+!Dockerfile
+!.dockerignore
+
+# Packaging and CI
+!packaging/
+!packaging/**
+!.github/
+!.github/**
 
 # Core store libraries (the data/ tree is the product)
 !data/

@@ -1,0 +1,38 @@
+name: docker
+
+# Builds the image and smoke-tests it; nothing is pushed.
+on:
+  push:
+    paths: ["Dockerfile", ".dockerignore", "packaging/**", ".github/workflows/docker.yml"]
+  pull_request:
+    paths: ["Dockerfile", ".dockerignore", "packaging/**", ".github/workflows/docker.yml"]
+  workflow_dispatch:
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          push: false
+          tags: newbound:ci
+      - name: The embedded Python starts in the image
+        run: |
+          out=$(docker run --rm newbound:ci ./newbound pytest 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "embedded Python 3.13"
+      - name: The server answers
+        run: |
+          docker run -d --name nb -p 8080:8080 newbound:ci
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/ || true)
+            case "$code" in 2*|3*) echo "HTTP $code"; exit 0 ;; esac
+            sleep 1
+          done
+          docker logs nb
+          exit 1

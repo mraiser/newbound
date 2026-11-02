@@ -36,6 +36,20 @@ If you are deploying an app (rather than developing one), you probably want to t
 cargo run --release
 ```
 
+### Prebuilt bundles and Docker (Python included)
+
+`packaging/bundle.sh <target>` builds a self-contained bundle - the server
+built with the embedded Python runtime, a relocatable CPython 3.13 next to
+it, and the core libraries - that runs without a Rust toolchain or system
+Python (see `packaging/BUNDLE.md`). Release tags (`v*`) attach bundles for
+Linux x86_64/arm64 and macOS arm64 to the GitHub release. The Docker image
+is the same bundle on Debian:
+
+```
+docker build -t newbound .
+docker run -p 8080:8080 -v newbound-data:/newbound/data newbound
+```
+
 ## What is Newbound?    
 Newbound is an Integrated Development Environment (IDE) and a comprehensive software development platform conceived and actively developed by Newbound LLC. It is engineered from the ground up to provide a uniquely minimalistic yet exceptionally powerful and flexible ecosystem for crafting a wide array of digital solutions, including APIs, applications, and services. In a true testament to its capabilities, the entire Newbound environment is self-hosted and built using Newbound itself.
 
