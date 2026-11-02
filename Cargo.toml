@@ -27,3 +27,9 @@ wry = { version="0.27.0", optional=true }
 [[bin]]
 name = "newbound"
 path = "src/main.rs"
+
+# flowlang's unreleased Python platform work (mraiser/flow branch
+# claude/bold-hawking-tqujwg). Remove once flowlang 0.3.42 is published and
+# the version requirements above are bumped to it.
+[patch.crates-io]
+flowlang = { git = "https://github.com/mraiser/flow", branch = "claude/bold-hawking-tqujwg" }
