@@ -36,6 +36,20 @@ If you are deploying an app (rather than developing one), you probably want to t
 cargo run --release
 ```
 
+### Prebuilt bundles and Docker (Python included)
+
+`packaging/bundle.sh <target>` builds a self-contained bundle - the server
+built with the embedded Python runtime, a relocatable CPython 3.13 next to
+it, and the core libraries - that runs without a Rust toolchain or system
+Python (see `packaging/BUNDLE.md`). Release tags (`v*`) attach bundles for
+Linux x86_64/arm64 and macOS arm64 to the GitHub release. The Docker image
+is the same bundle on Debian:
+
+```
+docker build -t newbound .
+docker run -p 8080:8080 -v newbound-data:/newbound/data newbound
+```
+
 ## What is Newbound?    
 Newbound is an Integrated Development Environment (IDE) and a comprehensive software development platform conceived and actively developed by Newbound LLC. It is engineered from the ground up to provide a uniquely minimalistic yet exceptionally powerful and flexible ecosystem for crafting a wide array of digital solutions, including APIs, applications, and services. In a true testament to its capabilities, the entire Newbound environment is self-hosted and built using Newbound itself.
 
@@ -154,10 +168,12 @@ The following is a pretty good system prompt for working with Newbound using an 
     Writing Commands in Rust
     Follow all the principles outlined above, especially regarding ndata handle ownership, cloning, and the "no-wrap" rule.
     Writing Commands in Python
-    Python is a first-class language in Flowlang, making it ideal for LLM tooling and data scripting.
-    Argument Passing: ndata types are passed from Rust to Python by handle, not by value. Your Python function will receive arguments as instances of special wrapper classes: NDataObject, NDataArray, and NDataBytes.
-    Best Practice: Manipulate these NDataObject / NDataArray instances directly. This is highly efficient as it avoids costly serialization and allows your Python code to operate on the same underlying memory as Rust.
-    Return Values: You can return NDataObject and NDataArray instances. If you return a native Python type like a str, int, or dict, Flowlang will automatically convert it into the appropriate ndata structure.
+    Python is a first-class language in Flowlang (build with the python_runtime feature). Write the function BODY only, with imports in the separate imports field; declared params are in scope with type hints (String→str, Integer→int, Float→float, Boolean→bool, JSONObject→NDataObject, JSONArray→NDataArray, InputStream→NDataBytes).
+    Argument Passing: JSONObject/JSONArray/InputStream arguments arrive as NDataObject / NDataArray / NDataBytes - handles on the shared ndata data, not copies. They behave like dict / list / bytes (o["k"], o.get, o.items(), a.append, slicing, ==, len, in), so write ordinary Python against them; to_dict() / to_list() / ndata_py.to_py(x) give native copies when a library needs a real dict.
+    Return Values: Return the value itself - str, int, float, bool, None, dict, list, tuple, bytes, or an ndata object; the platform wraps it exactly as for a Rust command. A FLAT command returns a dict (the whole response). Conversion is exact or an error: ints must fit in 64 bits; set, Decimal and datetime must be converted explicitly (sorted(x), str(x), x.isoformat()).
+    Errors and Output: raise exceptions for failures - the caller gets the message, your body line and the traceback. print() and logging go to the server log, labelled with the command.
+    Calling Other Commands: import flowlang; flowlang.api.<lib>.<ctl>.<cmd>(args...) or flowlang.call(lib, ctl, cmd, *args, **kwargs) runs any command in any language and returns its value; a failure raises flowlang.CommandError. Another Python command's module imports as: from <lib>.<ctl> import <cmd>.
+    After writing or editing a Python command, run dev.code.check_python(lib, ctl, cmd): it compiles, imports and type-checks the command and reports problems at your body lines. Full reference: the dev library's docs/python-commands.md.
     Front-End Control Development (JS/HTML/CSS)
     Controls are the user interface components, composed of three discrete code sections.
     Structure: Keep HTML, CSS, and JavaScript code in their separate, respective sections.

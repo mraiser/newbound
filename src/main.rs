@@ -44,6 +44,22 @@ fn main() {
         flowlang::mcp::mcp::mcp::run();
         return;
       }
+
+      // newbound pytest [pytest args]: pytest inside the embedded Python
+      // runtime, with every library's commands - newbound's Rust commands
+      // included - reachable through flowlang.call / flowlang.api.
+      if x == "pytest" {
+        #[cfg(feature = "python_runtime")]
+        {
+          init_globals();
+          std::process::exit(flowlang::pyenv::run_pytest(params[2..].to_vec()));
+        }
+        #[cfg(not(feature = "python_runtime"))]
+        {
+          eprintln!("newbound pytest needs the embedded Python runtime: build with --features=serde_support,python_runtime");
+          std::process::exit(2);
+        }
+      }
     }
 
     #[cfg(not(feature = "webview"))]

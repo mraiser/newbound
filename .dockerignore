@@ -1,0 +1,7 @@
+target
+dist
+venv
+repositories
+.git
+config.properties
+**/__pycache__

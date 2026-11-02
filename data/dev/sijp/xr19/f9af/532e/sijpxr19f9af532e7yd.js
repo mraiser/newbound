@@ -1241,14 +1241,18 @@ async function init(host, { lib, ctlId, toast }) {
     const sig = `(${paramsText(r.params)}) → ${r.returntype ?? "?"}`;
     codeEl.querySelector(".wcc-sig").textContent = sig;
 
+    // Python commands get the Python grammar; rust/java still tint as js,
+    // the closest grammar the editor bundle has (not semantic).
+    const paneLanguage = ["python", "py"].includes(r.type ?? lang) ? "python" : "js";
     if (!codeApi) {
       codeApi = await mount("editor", codeEl.querySelector(".wcc-editor"), {
-        language: "js",   // closest tinting for rust/python; not semantic
+        language: paneLanguage,
         readOnly: !patchMode,
         onChange: () => updateCodeDirty(),
         onSave: () => saveCommandBody(),
       });
     }
+    codeApi.setLanguage?.(paneLanguage);   // the pane is reused across commands
     codeApi.setSource(source);
     codeEl.querySelector(".wcc-editor .cm-content")
       ?.setAttribute("aria-label", `${cmdEntry.name} command source`);
