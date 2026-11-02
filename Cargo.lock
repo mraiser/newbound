@@ -574,8 +574,8 @@ dependencies = [
 
 [[package]]
 name = "flowlang"
-version = "0.3.41"
-source = "git+https://github.com/mraiser/flow?branch=claude%2Fbold-hawking-tqujwg#4f4b9fcd8cf4765b27875d41faa0bff00ed55642"
+version = "0.3.42"
+source = "git+https://github.com/mraiser/flow?branch=claude%2Fbold-hawking-tqujwg#1cf654706c6cc69922a918c4aa3d8dd3318bb855"
 dependencies = [
  "deno_core",
  "jni 0.21.1",
