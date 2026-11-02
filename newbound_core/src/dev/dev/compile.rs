@@ -60,6 +60,33 @@ let root = store.get_lib_root(&lib);
 
 let changed = build(&lib, &ctl, &cmd, &root);
 
+// A Python command has no cargo artifact: build() above generated its
+// source, and that is all there is to build. Its compile result is a quick
+// check instead - compile + import in a separate Python process, no mypy -
+// so syntax and import errors are reported like compile errors.
+// dev.code.check_python adds the mypy type check.
+let cmd_id = store.lookup_cmd_id(&lib, &ctl, &cmd);
+if store.get_data(&lib, &cmd_id).get_object("data").get_string("type") == "python" {
+    let r = flowlang::pycmd::check_quick(&lib, &cmd_id);
+    let outcome = if r.get_string("status") != "ok" {
+        format!("error: {}", r.get_string("msg"))
+    } else if r.get_boolean("clean") {
+        "OK".to_string()
+    } else {
+        let mut lines = Vec::new();
+        for p in r.get_array("problems").objects() {
+            let p = p.object();
+            if p.get_string("severity") == "error" {
+                lines.push(format!("error: {} ({}, {})", p.get_string("message"), r.get_string("command"), p.get_string("where")));
+            }
+        }
+        lines.join("\n")
+    };
+    let mut c = result_cache();
+    c.put_string(&key, &outcome);
+    return package(&outcome);
+}
+
 if !changed {
     // PRONG 3: unchanged code returns the last REAL result, not assumed success.
     // Fixes the known save-twice-reports-success bug (within a service session).
