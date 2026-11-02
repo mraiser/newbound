@@ -146,6 +146,8 @@
 .system-settings .ss-frame {
   display: flex;
   flex-direction: column;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
 }
 .system-settings .ss-head {
   flex: none;
@@ -267,3 +269,31 @@
 .system-settings .regularbutton.ss-btn-danger { background: transparent; border-color: var(--danger); color: #e08585; }
 .system-settings .regularbutton.ss-btn-danger:hover { background: rgba(193, 90, 90, 0.10); }
 .system-settings button.regularbutton { font-family: inherit; line-height: 1.2; }
+
+/* Short screens (720p laptops, 1024x600 netbooks): a tighter rhythm so more
+   fits before scrolling; the pinned footer keeps Save reachable. */
+@media (max-height: 760px) {
+  .system-settings .ss-head { padding-top: 8px; padding-bottom: 8px; }
+  .system-settings .ss-title { font-size: 16px; }
+  .system-settings .ss-sub { display: none; }
+  .system-settings .ss-section { padding-top: 14px; }
+  .system-settings .ss-section + .ss-section, .system-settings details.ss-adv { margin-top: 14px; }
+  .system-settings .ss-sec-head { margin-bottom: 10px; }
+  .system-settings .ss-field + .ss-field { margin-top: 12px; }
+  .system-settings .textinput { padding: 8px 10px; }
+  .system-settings .ss-choice-box { padding: 7px 10px; }
+  .system-settings .ss-help { margin-top: 4px; font-size: 12.5px; }
+  .system-settings .ss-help-top { margin-top: 0; }
+  .system-settings .ss-addr { margin-top: 12px; padding: 8px 10px; }
+  .system-settings .ss-foot { padding-top: 8px; padding-bottom: 8px; }
+  .system-settings .regularbutton, .system-settings .clearbutton, .system-settings .coloredbutton { padding: 8px 14px; }
+}
+
+@media (max-width: 480px) {
+  .system-settings .ss-head { padding-left: 16px; }
+  .system-settings .ss-body { padding: 4px 16px 16px; }
+  .system-settings .ss-foot { padding-left: 16px; padding-right: 16px; }
+  .system-settings .ss-pair { grid-template-columns: 1fr; }
+  .system-settings .ss-foot > a { flex: 1 1 auto; text-align: center; }
+  .system-settings .ss-foot > .coloredbutton { flex-basis: 100%; }
+}
