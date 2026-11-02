@@ -89,10 +89,114 @@ ME.querySelectorAll('.close-app-settings').forEach(function(el) {
   });
 });
 
+// --- Settings dialog: read side ---
+var SS = ME.querySelector('.system-settings');
+
+// "Show help": remembered per browser. Storage may be missing or throw; then help starts off.
+me.readShowHelp = function(store) {
+  try { return (store || window.localStorage).getItem('app-settings-showhelp') === '1'; } catch (e) { return false; }
+};
+me.writeShowHelp = function(on, store) {
+  try { (store || window.localStorage).setItem('app-settings-showhelp', on ? '1' : '0'); } catch (e) {}
+};
+(function() {
+  var sw = SS.querySelector('.ss-showhelp-input');
+  var on = me.readShowHelp();
+  sw.checked = on;
+  SS.classList.toggle('ss-showhelp', on);
+  sw.addEventListener('change', function() {
+    SS.classList.toggle('ss-showhelp', sw.checked);
+    me.writeShowHelp(sw.checked);
+  });
+})();
+
+// "Who can open this device": the radios map to http_address.
+function bindChoice() {
+  var r = SS.querySelector('input[name=ss-bind]:checked');
+  return r ? r.value : '0.0.0.0';
+}
+me.httpAddress = function() {
+  var v = bindChoice();
+  return v == 'custom' ? dget('ipaddr').value.trim() : v;
+};
+function setBind(addr) {
+  var v = (addr == '127.0.0.1' || addr == '0.0.0.0') ? addr : 'custom';
+  SS.querySelector('input[name=ss-bind][value="' + v + '"]').checked = true;
+  dget('ipaddr').value = v == 'custom' ? (addr || '') : '';
+}
+
+// The LAN IPv4 other devices would use: the page's own hostname when it was
+// opened from elsewhere, else the first private IPv4 (not docker's 172.17.0.1),
+// else the first non-loopback IPv4.
+me.lanAddress = function(addresses, hostname) {
+  var h = hostname || '';
+  if (h && h != 'localhost' && h != '127.0.0.1' && h != '::1' && h != '[::1]') return h;
+  var v4 = (addresses || []).filter(function(a) {
+    return /^\d{1,3}(\.\d{1,3}){3}$/.test(a) && a.indexOf('127.') != 0 && a.indexOf('169.254.') != 0;
+  });
+  var priv = v4.filter(function(a) {
+    if (a == '172.17.0.1') return false;
+    if (a.indexOf('192.168.') == 0 || a.indexOf('10.') == 0) return true;
+    var m = /^172\.(\d+)\./.exec(a);
+    return m && +m[1] >= 16 && +m[1] <= 31;
+  });
+  return priv[0] || v4[0] || null;
+};
+
+function refreshSettings() {
+  var choice = bindChoice();
+  SS.querySelector('.ss-custom-ip').classList.toggle('ss-show', choice == 'custom');
+  var addr = me.httpAddress();
+  var port = dget('portnum').value.trim();
+  var p = port === '' ? '…' : (+port === 0 ? '<port chosen at start>' : port);
+  var local = SS.querySelector('.ss-addr-local');
+  var lan = SS.querySelector('.ss-addr-lan');
+  local.textContent = (choice == 'custom' ? 'http://' + (addr || '…') + ':' : 'http://localhost:') + p;
+  var other = null;
+  if (choice == '0.0.0.0') other = me.lanIP || '<this computer\'s IP>';
+  else if (choice == 'custom') other = addr || '…';
+  lan.textContent = other ? 'http://' + other + ':' + p : 'Not reachable';
+  lan.classList.toggle('ss-dim', !other);
+}
+SS.querySelectorAll('input[name=ss-bind]').forEach(function(r) {
+  r.addEventListener('change', function() {
+    refreshSettings();
+    if (r.value == 'custom' && r.checked) dget('ipaddr').focus();
+  });
+});
+['ipaddr', 'portnum'].forEach(function(id) { dget(id).addEventListener('input', refreshSettings); });
+
+// Start page options: active apps, built as elements. A saved start page that
+// isn't active still gets an option, so an untouched save never changes it.
+function fillStartPage(dbval, apps) {
+  var active = apps ? String(apps).split(',').map(function(s) { return s.trim(); }) : null;
+  var names = {};
+  for (var i in me.list) if (!me.list[i].remote) names[me.list[i].id] = me.list[i].name;
+  var select = dget('defaultbot');
+  select.options.length = 0;
+  var found = false;
+  var add = function(id, label) {
+    var opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = label;
+    select.appendChild(opt);
+  };
+  for (var j in me.list) {
+    var rdi = me.list[j];
+    if (rdi.remote) continue;
+    if (active ? active.indexOf(rdi.id) != -1 : rdi.active) {
+      add(rdi.id, rdi.name);
+      if (rdi.id == dbval) found = true;
+    }
+  }
+  if (dbval && !found) add(dbval, (names[dbval] || dbval) + ' (inactive)');
+  select.value = dbval;
+}
+
 ME.querySelector('.save-system-settings').addEventListener('click', function() {
   var o = {
     machineid: dget("devicename").value,
-    http_address: dget("ipaddr").value,
+    http_address: me.httpAddress(),
     http_port: dget("portnum").value,
     default_app: dget("defaultbot").value
   };
@@ -103,21 +207,16 @@ ME.querySelector('.open-system-settings').addEventListener('click', function() {
   send_settings({}, function(result) {
     if (result.data) {
       dget("devicename").value = result.data.machineid;
-      dget("ipaddr").value = result.data.http_address;
+      setBind(result.data.http_address);
       dget("portnum").value = parseInt(result.data.http_port);
-
-      var dbval = result.data.default_app;
-      var select = dget('defaultbot');
-      select.options.length = 0;
-      var defaultbot = "";
-      for (var item in me.list) {
-        var rdi = me.list[item];
-        if (rdi.active)
-          defaultbot += "<option value='" + rdi.id + "'>" + rdi.name + "</option>";
-      }
-      select.innerHTML = defaultbot;
-      select.value = dbval;
+      fillStartPage(result.data.default_app, result.data.apps);
+      refreshSettings();
     }
+  });
+  json('../peer/info', null, function(r) {
+    var d = r && r.data ? r.data : r;
+    me.lanIP = me.lanAddress(d && d.addresses, location.hostname);
+    refreshSettings();
   });
 });
 
@@ -161,9 +260,10 @@ ME.querySelector('.open-system-settings').addEventListener('click', function() {
   json('../dev/crate_versions', null, function(r) {
     var section = ME.querySelector('.crate-section');
     if (r.status == 'ok') {
-      section.style.display = 'block';
+      section.style.display = '';
       dget('flowlangver').value = r.flowlang;
       dget('ndataver').value = r.ndata;
+      section.querySelector('.ss-sum-meta').textContent = 'flowlang ' + r.flowlang + ' · ndata ' + r.ndata;
     } else {
       section.style.display = 'none';
     }
@@ -199,7 +299,7 @@ ME.querySelector('.hard-reset').addEventListener('click', function() {
 ME.querySelector('.save-and-restart').addEventListener('click', function() {
   var o = {
     machineid: dget('devicename').value,
-    http_address: dget('ipaddr').value,
+    http_address: me.httpAddress(),
     http_port: dget('portnum').value,
     default_app: dget('defaultbot').value
   };
