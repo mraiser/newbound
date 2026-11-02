@@ -5,7 +5,10 @@ name: release
 # the packaging, or a manual run, builds them as workflow artifacts only.
 on:
   push:
+    # tags always build; on a branch, only a change to the packaging does
+    # (path filters apply to branch pushes, not to tag pushes)
     tags: ["v*"]
+    branches: ["**"]
     paths: ["packaging/**", ".github/workflows/release.yml"]
   workflow_dispatch:
 
