@@ -178,7 +178,14 @@ A syntax error is reported on every call until the body is fixed - the old
 code never runs silently - and `dev.dev.compile` (every upsert/patch) reports
 it as a compile error. `console.log`/`info`/`debug` write to stdout (stderr
 under `newbound mcp`), `console.warn`/`error`/`trace` to stderr, as complete
-lines labelled with the command: `[js mylib:myctl:cmd] message`.
+lines labelled with the command: `[js mylib:myctl:cmd] message`. A timer's
+output carries the label of the command that set it, whenever it fires.
+
+Under `newbound mcp` a JavaScript or TypeScript command is a tool like any
+other, named `mylib-myctl-cmd`, once it has a description:
+`upsert_command` takes none, so set one with `dev.code.set_command_meta`.
+The next `tools/list` shows it, with an input schema from the declared
+params; no restart is needed.
 
 Global state persists between calls, as with Python. A panic inside the
 engine restarts it with fresh state.
