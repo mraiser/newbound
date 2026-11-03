@@ -63,7 +63,7 @@ let id = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| store.lo
     }
 };
 let lang = store.get_data(&lib, &id).get_object("data").get_string("type");
-if lang != "javascript" && lang != "js" {
+if !["javascript", "js", "typescript", "ts"].contains(&lang.as_str()) {
     let mut o = DataObject::new();
     o.put_string("status", "err");
     o.put_string("msg", &format!("{}:{}:{} is a {} command, not a JavaScript command", lib, ctl, cmd, lang));

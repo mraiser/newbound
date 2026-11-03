@@ -14,7 +14,9 @@ let root = store.get_lib_root(&lib);
 // the tsc type check. build() writes its editor files (<cmd>.js with JSDoc
 // types, flowlang.d.ts).
 let cmd_type = store.get_data(&lib, &store.lookup_cmd_id(&lib, &ctl, &cmd)).get_object("data").get_string("type");
-if cmd_type == "javascript" || cmd_type == "js" {
+// TypeScript is the same case: flowlang runs it from an esbuild bundle,
+// which build() makes and check_quick reports on.
+if cmd_type == "javascript" || cmd_type == "js" || cmd_type == "typescript" || cmd_type == "ts" {
     let _ = std::panic::catch_unwind(|| build(&lib, &ctl, &cmd, &root));
     #[cfg(feature = "javascript_runtime")]
     let outcome = {

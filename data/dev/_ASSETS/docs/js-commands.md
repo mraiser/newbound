@@ -1,9 +1,12 @@
-# JavaScript commands
+# JavaScript and TypeScript commands
 
-How to write, run, check and test JavaScript commands. Requires a build with
-the JavaScript runtime, against a flowlang that has the rebuilt engine (the
-release after 0.3.42): `cargo build --release --features=serde_support,javascript_runtime`.
-Commands run in one embedded V8 isolate (deno_core) - no Node, no npm.
+How to write, run, check and test JavaScript and TypeScript commands.
+Requires a build with the JavaScript runtime, against a flowlang that has the
+rebuilt engine (the release after 0.3.42):
+`cargo build --release --features=serde_support,javascript_runtime`.
+Commands run in one embedded V8 isolate (deno_core) - no Node - with the web
+platform APIs (`fetch`, `URL`, ...) built in, and npm packages bundled in by
+esbuild.
 
 ## Writing a command
 
@@ -33,11 +36,70 @@ error (`missing required parameter: x`), as for a Rust command.
 | FLAT | - | an object: the whole response |
 | Any | any JSON value | any JSON value |
 
+A command written in TypeScript has the language `typescript`; its
+parameters are typed from the declarations (String→`string`, Integer→`number`,
+JSONObject→`Record<string, any>`, ...), and the rest is as below. TypeScript
+commands need esbuild (see *Imports and npm packages*), which compiles them;
+`dev.code.check_js` type-checks them (strictly).
+
 Values cross by value, with JSON semantics: objects, arrays, strings,
 numbers, booleans and `null` convert both ways, and `undefined` returns as
 `null`. Integers beyond 2^53 lose precision (JavaScript numbers are doubles).
 Returning a function, symbol, BigInt, `Map` or `Set` is an error that names
 it - convert explicitly (`Object.fromEntries(map)`, `[...set]`, `String(big)`).
+
+## Web APIs
+
+`fetch` (with `Headers`, `Request`, `Response`, `AbortController` /
+`AbortSignal.timeout`), `URL` / `URLSearchParams`, `TextEncoder` /
+`TextDecoder` (UTF-8), `atob` / `btoa`, `crypto.getRandomValues` /
+`crypto.randomUUID`, `structuredClone`, `performance.now`, `EventTarget`,
+`Event` and `DOMException` behave as in a browser:
+
+    // body (weather(city: String) -> JSONObject)
+    const url = new URL("https://api.example.com/v1/weather");
+    url.searchParams.set("q", city);
+    const r = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(5000) });
+    if (!r.ok) throw new Error(`weather service: ${r.status} ${r.statusText}`);
+    return await r.json();
+
+A request runs off the engine's thread, so other commands keep running while
+it is in flight. TLS is verified against the operating system's trust store
+(and `SSL_CERT_FILE`); `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` are honoured.
+An HTTP error status is a `Response` (check `ok`); a network failure rejects
+with a `TypeError`. Bodies are read whole (up to 256 MiB) - there are no
+streams, `Blob` or `FormData` - and the call's time limit covers the request.
+
+Node's built-ins are not there: no `require`, `process`, `Buffer`, `fs` or
+`http`. For files and processes, write the command (or a helper command) in
+Rust or Python and call it with `flowlang.call`.
+
+## Imports and npm packages
+
+A command's `imports` field holds ES `import` statements. Packages resolve
+from `node_modules` next to `data/` - run `npm install <package>` there -
+CommonJS and ESM alike:
+
+    // imports
+    import { z } from "zod";
+    import groupBy from "lodash/groupBy.js";
+
+    // body (summarize(rows: JSONArray) -> JSONObject)
+    const Row = z.object({ team: z.string(), points: z.number() });
+    const parsed = z.array(Row).parse(rows);
+    return groupBy(parsed, (r) => r.team);
+
+Such a command (and every TypeScript command) runs from a bundle made by
+esbuild, which must be installed: `npm install esbuild` next to `data/` (or
+on the PATH, or `FLOWLANG_ESBUILD`). The build writes the command as
+`<lib>/<ctl>/<cmd>.js` (`.ts`) in the library's crate `src/` - its imports,
+then the body as the module's default export - and bundles it into
+`<cmd>.bundle.js`, rebuilt when the command, its imports or the npm lockfile
+change (the first call after a change builds it if the build did not). A
+missing package, or one that needs Node's built-ins, is reported at its
+imports line when the command is saved. At run time, errors point into your
+code through the bundle's source map - `(body line 2)`,
+`flowlang:mylib/myctl/cmd.js:9:7` - and into packages as `npm:<path>`.
 
 ## Async, timers and time limits
 
@@ -99,19 +161,23 @@ engine restarts it with fresh state.
 
 ## Checking and testing
 
-- `dev.dev.compile` (run by every upsert/patch) compiles the body in V8 and
-  reports syntax errors at body lines, without running it.
+- `dev.dev.compile` (run by every upsert/patch) compiles the body in V8 -
+  or, for a command with imports or in TypeScript, bundles it with esbuild,
+  resolving its imports - and reports problems at body and imports lines,
+  without running it.
 - `dev.code.check_js(lib, ctl, cmd)` adds a TypeScript type check when `tsc`
   is found (`$FLOWLANG_TSC`, `node_modules/.bin/tsc` next to `data/`, or `tsc`
-  on the PATH): `npm install typescript` next to `data/` is enough. The body is
-  checked as `// @ts-check` JavaScript with JSDoc types from the declared
-  parameters and return type, against `flowlang.d.ts` - so names the engine
-  does not provide (`fetch`, `require`, `process`) are errors, and
+  on the PATH): `npm install typescript` next to `data/` is enough. A
+  JavaScript body is checked as `// @ts-check` JavaScript with JSDoc types
+  from the declared parameters and return type, a TypeScript one strictly,
+  both against `flowlang.d.ts` and the packages' own types - so names the
+  engine does not provide (`require`, `process`, `Buffer`) are errors, and
   `flowlang.api` calls are checked against the callee's declared parameters.
   Problems come back at body lines; `clean` is false on any error.
-- The build writes `<lib>/<ctl>/<cmd>.js` (the command as a typed function)
-  and `flowlang.d.ts` into the library's crate `src/`, so editors complete and
-  check command bodies. They are generated: edit the command, not the file.
+- The build writes `<lib>/<ctl>/<cmd>.js` / `.ts` (the command as a typed
+  module) and `flowlang.d.ts` into the library's crate `src/`, so editors
+  complete and check command bodies. They are generated: edit the command,
+  not the file.
 - `newbound jstest [files or directories]` runs `*.test.js` files in the same
   engine, so tests call any command:
 
@@ -130,6 +196,8 @@ engine restarts it with fresh state.
 
 ## Not yet
 
-`import` / npm packages, `fetch` and other web APIs, TypeScript commands,
-and a JavaScript command calling back into JavaScript through a non-JavaScript
-command (above).
+Test files cannot `import` (they reach packages through the commands they
+call); there are no streaming bodies, `Blob` or `FormData`; and a JavaScript
+command calling back into JavaScript through a non-JavaScript command fails
+(above). Values cross between languages as copies (JSON), never as shared
+handles.
