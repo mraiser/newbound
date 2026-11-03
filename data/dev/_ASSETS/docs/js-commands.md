@@ -234,7 +234,7 @@ engine restarts it with fresh state.
   module) and `flowlang.d.ts` into the library's crate `src/`, so editors
   complete and check command bodies. They are generated: edit the command,
   not the file.
-- `newbound jstest [files or directories]` runs `*.test.js` files in the same
+- `newbound jstest [files or directories]` runs `*.test.js` and `*.test.ts` files in the same
   engine, so tests call any command:
 
       test("adds", () => {
@@ -262,6 +262,11 @@ engine restarts it with fresh state.
   Such a file runs from an esbuild bundle (esbuild must be installed); its
   line numbers, top-level `await` and `test`/`assert` are as without
   imports. An import that does not resolve fails the file at its line.
+
+  A `*.test.ts` file is TypeScript - types, interfaces, enums, `import type`
+  - and always runs from a bundle, so it needs esbuild. As with TypeScript
+  commands, esbuild strips the types without checking them: a type error
+  does not fail a test run.
 
 ## Not yet
 
