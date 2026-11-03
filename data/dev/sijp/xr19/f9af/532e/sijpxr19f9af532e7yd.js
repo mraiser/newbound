@@ -76,8 +76,9 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   }
 
 const UI_FACETS = new Set(["html", "css", "js"]);
-const CMD_LANGS = ["rust", "js", "java", "python", "py", "flow"];
-const LANG_NAMES = { rust: "Rust", python: "Python", flow: "Flow", js: "JavaScript", java: "Java", py: "Python" };
+const CMD_LANGS = ["rust", "js", "javascript", "typescript", "ts", "java", "python", "py", "flow"];
+const LANG_NAMES = { rust: "Rust", python: "Python", flow: "Flow", js: "JavaScript", javascript: "JavaScript",
+                     typescript: "TypeScript", ts: "TypeScript", java: "Java", py: "Python" };
 // the platform save hint: ⌘S on macOS, Ctrl+S elsewhere (C3/C12)
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || "");
 const SAVE_KBD = IS_MAC ? "⌘S" : "Ctrl+S";
@@ -1241,9 +1242,12 @@ async function init(host, { lib, ctlId, toast }) {
     const sig = `(${paramsText(r.params)}) → ${r.returntype ?? "?"}`;
     codeEl.querySelector(".wcc-sig").textContent = sig;
 
-    // Python commands get the Python grammar; rust/java still tint as js,
+    // Python commands get the Python grammar, TypeScript commands the
+    // TypeScript one; JavaScript gets js, and rust/java still tint as js,
     // the closest grammar the editor bundle has (not semantic).
-    const paneLanguage = ["python", "py"].includes(r.type ?? lang) ? "python" : "js";
+    const paneLang = r.type ?? lang;
+    const paneLanguage = ["python", "py"].includes(paneLang) ? "python"
+      : ["typescript", "ts"].includes(paneLang) ? "ts" : "js";
     if (!codeApi) {
       codeApi = await mount("editor", codeEl.querySelector(".wcc-editor"), {
         language: paneLanguage,
@@ -1432,8 +1436,8 @@ async function init(host, { lib, ctlId, toast }) {
 
   // ── new command (upsert_command / write_flow_body) ────────
   // The platform's own valid sets (upsert_command validates both), plus a
-  // starter body per return type so a fresh rust/python command COMPILES
-  // on creation instead of landing red.
+  // starter body per return type so a fresh rust/python/javascript/
+  // typescript command COMPILES on creation instead of landing red.
   const PARAM_TYPES = ["String", "Integer", "Double", "Float", "Boolean",
                        "JSONObject", "JSONArray", "Any"];
   const RETURN_TYPES = [...PARAM_TYPES, "File", "FLAT", "NULL"];
@@ -1442,6 +1446,13 @@ async function init(host, { lib, ctlId, toast }) {
     Boolean: "false", JSONObject: "DataObject::new()", JSONArray: "DataArray::new()",
     FLAT: "DataObject::new()", Any: "DataObject::new()",
     File: '"".to_string()', NULL: "DataObject::new()",
+  };
+  // JavaScript and TypeScript alike: a value of the declared type, so the
+  // TypeScript check (dev.code.check_js) is clean too.
+  const JS_STARTER = {
+    String: 'return "";', Integer: "return 0;", Double: "return 0;", Float: "return 0;",
+    Boolean: "return false;", JSONObject: "return {};", JSONArray: "return [];",
+    FLAT: "return {};", Any: "return null;", File: 'return "";', NULL: "return null;",
   };
   const newCmdForm = host.querySelector(".wb-newcmd");
   const wcName = host.querySelector(".wc-name");
@@ -1538,7 +1549,9 @@ async function init(host, { lib, ctlId, toast }) {
       const ret = wcRet.value;
       const body = wcLang.value === "python"
         ? "return None"
-        : RUST_STARTER[ret] ?? "DataObject::new()";
+        : ["javascript", "typescript"].includes(wcLang.value)
+          ? JS_STARTER[ret] ?? "return null;"
+          : RUST_STARTER[ret] ?? "DataObject::new()";
       r = await upsertCommand(lib, name, cmdName,
         { lang: wcLang.value, returnType: ret, params: parsed.params, codeBody: body });
     }

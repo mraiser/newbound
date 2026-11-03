@@ -21,6 +21,7 @@ const LANGUAGES = {
   html: () => html(),
   css: () => css(),
   js: () => javascript(),
+  ts: () => javascript({ typescript: true }),
   json: () => json(),
   python: () => python(),
 };

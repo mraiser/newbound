@@ -398,7 +398,10 @@
   background: var(--text-dim);
 }
 .nb-workbench .wb-cmd-type.t-rust { background: var(--f-data); }
-.nb-workbench .wb-cmd-type.t-js { background: var(--f-js); }
+.nb-workbench .wb-cmd-type.t-js,
+.nb-workbench .wb-cmd-type.t-javascript,
+.nb-workbench .wb-cmd-type.t-typescript,
+.nb-workbench .wb-cmd-type.t-ts { background: var(--f-js); }
 .nb-workbench .wb-cmd-type.t-java { background: var(--f-css); }
 .nb-workbench .wb-cmd-type.t-python { background: var(--f-3d); }
 .nb-workbench .wb-cmd-type.t-flow { background: var(--f-cmd); }
