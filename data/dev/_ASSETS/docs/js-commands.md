@@ -234,7 +234,7 @@ engine restarts it with fresh state.
   module) and `flowlang.d.ts` into the library's crate `src/`, so editors
   complete and check command bodies. They are generated: edit the command,
   not the file.
-- `newbound jstest [files or directories]` runs `*.test.js` and `*.test.ts` files in the same
+- `newbound jstest [--no-check] [files or directories]` runs `*.test.js` and `*.test.ts` files in the same
   engine, so tests call any command:
 
       test("adds", () => {
@@ -264,9 +264,17 @@ engine restarts it with fresh state.
   imports. An import that does not resolve fails the file at its line.
 
   A `*.test.ts` file is TypeScript - types, interfaces, enums, `import type`
-  - and always runs from a bundle, so it needs esbuild. As with TypeScript
-  commands, esbuild strips the types without checking them: a type error
-  does not fail a test run.
+  - and always runs from a bundle, so it needs esbuild.
+
+  Before anything runs, tsc type-checks the `*.test.ts` files (strictly)
+  and any `*.test.js` that starts with `// @ts-check`, in one pass: against
+  `flowlang.d.ts` (so `flowlang.api` calls are checked against the callees'
+  declared params), with `test` and `assert` typed - `assert.equal`'s two
+  sides must be comparable - and imports resolved as at run time. A file
+  with type errors is reported at its lines and its tests do not run;
+  errors in a helper file the tests import are reported under its name.
+  `--no-check` skips the check. tsc is found as for `check_js`; without it,
+  a note says the files were not checked and the tests run anyway.
 
 ## Not yet
 

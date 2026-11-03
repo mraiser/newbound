@@ -45,7 +45,8 @@ fn main() {
         return;
       }
 
-      // newbound jstest [files or directories]: *.test.js files run in the
+      // newbound jstest [--no-check] [files or directories]: *.test.js and
+      // *.test.ts files (type-checked first) run in the
       // JavaScript engine, with every library's commands reachable through
       // flowlang.call / flowlang.api.
       if x == "jstest" {
