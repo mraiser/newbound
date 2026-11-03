@@ -3,6 +3,18 @@ let key = format!("{}:{}:{}", &lib, &ctl, &cmd);
 let store = DataStore::new();
 let root = store.get_lib_root(&lib);
 
+// A JavaScript command has nothing to build either: flowlang runs its body
+// straight from the store. Building the crate for it anyway answered
+// "cargo exited 0 but no artifact advanced" wherever no artifact existed
+// yet (a bundle, a fresh checkout), so upsert_command reported a stored,
+// runnable JavaScript command as a compile error.
+let cmd_type = store.get_data(&lib, &store.lookup_cmd_id(&lib, &ctl, &cmd)).get_object("data").get_string("type");
+if cmd_type == "javascript" || cmd_type == "js" {
+    let mut c = result_cache();
+    c.put_string(&key, "OK");
+    return package("OK");
+}
+
 let changed = build(&lib, &ctl, &cmd, &root);
 
 // A Python command has no cargo artifact: build() above generated its
