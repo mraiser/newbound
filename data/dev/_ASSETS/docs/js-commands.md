@@ -120,6 +120,31 @@ imports line when the command is saved. At run time, errors point into your
 code through the bundle's source map - `(body line 2)`,
 `flowlang:mylib/myctl/cmd.js:9:7` - and into packages as `npm:<path>`.
 
+## Sharing code between commands
+
+A command imports another JavaScript or TypeScript command, in any library,
+as a module - as a Python command does `from mylib.text import format`:
+
+    // imports
+    import format, { slugify } from "flowlang:mylib/text/format";
+
+The default export is that command's function, called directly (no casting,
+no envelope). Whatever its own `imports` field `export`s comes along, so a
+command can carry helpers for others:
+
+    // imports of mylib:text:format
+    export const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+Imports chain, and JavaScript and TypeScript commands import each other.
+Editing an imported command rebuilds the commands that import it on their
+next call (or `newbound jsbundle`), and `check_js` checks types across the
+import (an imported command's own type errors are reported by its own
+check). Each importing command bundles its own copy, so module-level state
+belongs to the importing command; state that commands share belongs in
+ndata. An import naming no JavaScript or TypeScript command is reported at
+its imports line when the command is saved - call Rust, Python and flow
+commands with `flowlang.call`.
+
 ## Async, timers and time limits
 
 A command may `await`, or return a Promise: it answers with what the promise

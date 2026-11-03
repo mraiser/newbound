@@ -67,6 +67,7 @@
 # esbuild bundles of JavaScript/TypeScript commands that import packages (built
 # from the store and node_modules; never source)
 **/*.bundle.js
+**/*.bundle.tsconfig.json
 # Per-instance local state inside tracked runtime/dev
 runtime/dev/libraries/
 runtime/dev/repos.json
