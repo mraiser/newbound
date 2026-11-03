@@ -8,9 +8,15 @@
 # Python packages for commands: extend the image -
 #   FROM newbound
 #   RUN ./venv/bin/pip install <packages>
+#
+# With the JavaScript runtime (bundle.sh's js variant):
+#   docker build --build-arg NEWBOUND_VARIANT=js -t newbound:js .
+# Commands that run from esbuild bundles (imports, TypeScript) need their
+# bundles current in the build context - run `newbound jsbundle` first.
 
 FROM rust:1.90.0-bookworm AS build
 ARG TARGETARCH
+ARG NEWBOUND_VARIANT=
 WORKDIR /src
 COPY . .
 RUN case "$TARGETARCH" in \
@@ -18,8 +24,8 @@ RUN case "$TARGETARCH" in \
       arm64) T=aarch64-unknown-linux-gnu ;; \
       *) echo "unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
     esac \
- && packaging/bundle.sh "$T" /dist \
- && mv "/dist/newbound-$T" /dist/newbound
+ && packaging/bundle.sh "$T" /dist $NEWBOUND_VARIANT \
+ && mv "/dist/newbound-$T${NEWBOUND_VARIANT:+-$NEWBOUND_VARIANT}" /dist/newbound
 
 FROM debian:bookworm-slim
 # git: the dev library's repository features use it when present
