@@ -64,11 +64,15 @@ it - convert explicitly (`Object.fromEntries(map)`, `[...set]`, `String(big)`).
     return await r.json();
 
 A request runs off the engine's thread, so other commands keep running while
-it is in flight. TLS is verified against the operating system's trust store
-(and `SSL_CERT_FILE`); `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` are honoured.
-An HTTP error status is a `Response` (check `ok`); a network failure rejects
-with a `TypeError`. Bodies are read whole (up to 256 MiB) - there are no
-streams, `Blob` or `FormData` - and the call's time limit covers the request.
+it is in flight. TLS is verified against Mozilla's root certificates - or,
+when `SSL_CERT_FILE` is set, against the certificates in that file instead
+(for a private CA or an intercepting proxy); `HTTPS_PROXY` / `HTTP_PROXY` /
+`NO_PROXY` are honoured. An HTTP error status is a `Response` (check `ok`); a
+network failure rejects with a `TypeError`. Bodies are read whole (up to
+256 MiB) and are not decompressed - there are no streams, `Blob` or
+`FormData` - and the call's time limit covers the request. This is client
+side only, and the HTTP client is interim: outbound requests are to move
+into a newbound control.
 
 Node's built-ins are not there: no `require`, `process`, `Buffer`, `fs` or
 `http`. For files and processes, write the command (or a helper command) in
