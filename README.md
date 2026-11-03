@@ -5,7 +5,7 @@ Welcome to the official GitHub repository for Newbound!
 
 [API](https://www.newbound.io/documentation/reference.html) | [DISCORD](https://discord.gg/p2YvGGm2RR) | [DOC](https://www.newbound.io/documentation/index.html) | [WEB](https://www.newbound.io) | [CORP](https://www.newbound.com/site/index.html)
 
-NOTE: The reload, java_runtime, and javascript_runtime features are known to be buggy at this time.
+NOTE: The reload and java_runtime features are known to be buggy at this time. The javascript_runtime feature builds once newbound requires a flowlang newer than 0.3.42; JavaScript commands are documented in `data/dev/_ASSETS/docs/js-commands.md`.
 
 ### Installation
 
@@ -174,6 +174,12 @@ The following is a pretty good system prompt for working with Newbound using an 
     Errors and Output: raise exceptions for failures - the caller gets the message, your body line and the traceback. print() and logging go to the server log, labelled with the command.
     Calling Other Commands: import flowlang; flowlang.api.<lib>.<ctl>.<cmd>(args...) or flowlang.call(lib, ctl, cmd, *args, **kwargs) runs any command in any language and returns its value; a failure raises flowlang.CommandError. Another Python command's module imports as: from <lib>.<ctl> import <cmd>.
     After writing or editing a Python command, run dev.code.check_python(lib, ctl, cmd): it compiles, imports and type-checks the command and reports problems at your body lines. Full reference: the dev library's docs/python-commands.md.
+    Writing Commands in JavaScript
+    JavaScript commands need a build with the javascript_runtime feature. Write the function BODY only; declared params are in scope (String→string, Integer/Float→number, Boolean→boolean, JSONObject→object, JSONArray→array). A body that uses await is an async function. There is no Node: no import/require, npm, fetch or process - only the ECMAScript standard library plus console, setTimeout/setInterval/clearTimeout/clearInterval/queueMicrotask and flowlang.
+    Argument Passing and Return Values: values cross by value with JSON semantics. Return the value itself (or a Promise of it); the platform wraps it exactly as for a Rust command. A FLAT command returns an object (the whole response). A function, symbol, BigInt, Map or Set cannot be returned - convert it (Object.fromEntries(map), [...set], String(big)).
+    Errors and Output: throw for failures - the caller gets the message, your body line and the stack. console.log goes to the server log, labelled with the command. Every call has a time limit (30 s by default).
+    Calling Other Commands: flowlang.api.<lib>.<ctl>.<cmd>(args...) or flowlang.call(lib, ctl, cmd, {name: value}) runs any command in any language and returns its value (await it if the callee is an async JavaScript command); a failure throws flowlang.CommandError.
+    After writing or editing a JavaScript command, run dev.code.check_js(lib, ctl, cmd): it compiles the command and, when TypeScript's tsc is installed, type-checks it, reporting problems at your body lines. Full reference: the dev library's docs/js-commands.md.
     Front-End Control Development (JS/HTML/CSS)
     Controls are the user interface components, composed of three discrete code sections.
     Structure: Keep HTML, CSS, and JavaScript code in their separate, respective sections.

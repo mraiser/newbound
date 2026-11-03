@@ -63,11 +63,35 @@ let root = store.get_lib_root(&lib);
 // "cargo exited 0 but no artifact advanced" wherever no artifact existed
 // yet (a bundle, a fresh checkout), so upsert_command reported a stored,
 // runnable JavaScript command as a compile error.
+//
+// Its compile result is a quick check instead - a V8 syntax check, no tsc -
+// so syntax errors are reported like compile errors; dev.code.check_js adds
+// the tsc type check. build() writes its editor files (<cmd>.js with JSDoc
+// types, flowlang.d.ts).
 let cmd_type = store.get_data(&lib, &store.lookup_cmd_id(&lib, &ctl, &cmd)).get_object("data").get_string("type");
 if cmd_type == "javascript" || cmd_type == "js" {
+    let _ = std::panic::catch_unwind(|| build(&lib, &ctl, &cmd, &root));
+    #[cfg(feature = "javascript_runtime")]
+    let outcome = {
+        let r = flowlang::jscmd::check_quick(&lib, &store.lookup_cmd_id(&lib, &ctl, &cmd));
+        if r.get_string("status") != "ok" {
+            format!("error: {}", r.get_string("msg"))
+        } else if r.get_boolean("clean") {
+            "OK".to_string()
+        } else {
+            let mut lines = Vec::new();
+            for p in r.get_array("problems").objects() {
+                let p = p.object();
+                lines.push(format!("error: {} ({}, {})", p.get_string("message"), r.get_string("command"), p.get_string("where")));
+            }
+            lines.join("\n")
+        }
+    };
+    #[cfg(not(feature = "javascript_runtime"))]
+    let outcome = "OK".to_string();
     let mut c = result_cache();
-    c.put_string(&key, "OK");
-    return package("OK");
+    c.put_string(&key, &outcome);
+    return package(&outcome);
 }
 
 let changed = build(&lib, &ctl, &cmd, &root);

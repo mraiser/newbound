@@ -62,6 +62,8 @@
 # --- Re-exclusions inside allowed trees ---
 # Generated typed API, one per crate src/ (builder-written, overlay-aware)
 **/src/api.rs
+# Generated JavaScript declarations for the whole store (builder-written, overlay-aware)
+**/src/flowlang.d.ts
 # Per-instance local state inside tracked runtime/dev
 runtime/dev/libraries/
 runtime/dev/repos.json

@@ -45,6 +45,22 @@ fn main() {
         return;
       }
 
+      // newbound jstest [files or directories]: *.test.js files run in the
+      // JavaScript engine, with every library's commands reachable through
+      // flowlang.call / flowlang.api.
+      if x == "jstest" {
+        #[cfg(feature = "javascript_runtime")]
+        {
+          init_globals();
+          std::process::exit(flowlang::jscmd::run_tests(params[2..].to_vec()));
+        }
+        #[cfg(not(feature = "javascript_runtime"))]
+        {
+          eprintln!("newbound jstest needs the JavaScript runtime: build with --features=serde_support,javascript_runtime");
+          std::process::exit(2);
+        }
+      }
+
       // newbound pytest [pytest args]: pytest inside the embedded Python
       // runtime, with every library's commands - newbound's Rust commands
       // included - reachable through flowlang.call / flowlang.api.
