@@ -156,10 +156,15 @@ returns its value as is - a Promise when it is async. Failures throw:
 not fit, `flowlang.CommandError` when the command fails (raises, panics, or
 returns an error envelope).
 
-One combination is not supported yet: a JavaScript command calling a Rust,
-Python or flow command that in turn calls a JavaScript command. That inner
-call fails with a message saying so, rather than deadlocking the engine.
-JavaScript calling JavaScript directly is fine.
+A Rust, Python or flow command called this way runs on a worker thread
+while the JavaScript caller waits, so it can call JavaScript commands in
+turn - JavaScript -> Rust -> JavaScript, to any depth. The inner command
+runs in the same engine as the outer one (same globals), its exception
+reaches the outer command as the middle command's `CommandError`, and the
+outer call's time limit covers the whole chain. The inner command has to
+finish without the event loop, because the middle command is waiting for
+it: one that awaits fails with a message saying so (it can still be called
+from JavaScript directly, where its Promise is returned).
 
 ## Errors and output
 
@@ -217,5 +222,5 @@ engine restarts it with fresh state.
 
 Test files cannot `import` (they reach packages through the commands they
 call); there are no streaming bodies, `Blob` or `FormData`; and a JavaScript
-command calling back into JavaScript through a non-JavaScript command fails
+command called back through a Rust, Python or flow command cannot await
 (above).
