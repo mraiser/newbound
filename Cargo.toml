@@ -11,7 +11,7 @@ edition = "2021"
 serde_support = ["serde","serde_json","flowlang/serde_support","ndata/serde_support","newbound_core/serde_support"]
 webview = ["wry","newbound_core/webview"]
 java_runtime = ["flowlang/java_runtime","newbound_core/java_runtime"]
-python_runtime = ["flowlang/python_runtime","newbound_core/python_runtime"]
+python_runtime = ["flowlang/python_runtime","newbound_core/python_runtime","dep:pyo3-ffi","dep:pyo3-build-config"]
 javascript_runtime = ["flowlang/javascript_runtime","newbound_core/javascript_runtime"]
 
 [dependencies]
@@ -23,6 +23,12 @@ ndata = "0.3.17"
 serde = { version = "^1.0", features = ["derive"], optional = true }
 serde_json = { version = "^1.0", optional = true }
 wry = { version="0.27.0", optional=true }
+# Not used by the code: a direct dependency on pyo3-ffi (already in the graph
+# through flowlang) is what lets build.rs read the Python PyO3 was built for.
+pyo3-ffi = { version = "0.30", optional = true }
+
+[build-dependencies]
+pyo3-build-config = { version = "0.30", optional = true }
 
 [[bin]]
 name = "newbound"

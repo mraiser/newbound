@@ -8,6 +8,8 @@ use ndata::dataobject::DataObject;
 
 fn main() {
   env::set_var("RUST_BACKTRACE", "1");
+  #[cfg(feature = "python_runtime")]
+  pin_library_python();
   {
     let data_ref = flowlang::init("data");
     generated_initializer::initialize_all_commands(data_ref);
@@ -225,4 +227,34 @@ fn recompile(only: Option<String>) {
   println!("{} compiled, {} failed{}", libs.len() - failed.len(), failed.len(),
     if failed.is_empty() { String::new() } else { format!(" ({})", failed.join(", ")) });
   if !failed.is_empty() { std::process::exit(1); }
+}
+
+/// Pins the Python that library dylibs are built against to this host's own.
+///
+/// A dylib library carries its own copy of PyO3, built by a `cargo build`
+/// this process spawns (recompile, rebuild_lib, dev.code edits), and it is
+/// loaded into this process, whose libpython it then calls. PyO3 picks the
+/// Python to build for from that child's environment (PYO3_PYTHON, then
+/// VIRTUAL_ENV/CONDA_PREFIX, then `python`/`python3` on PATH, in the
+/// crate's own directory - an overlaid crate is a symlink into another
+/// repo), which need not be the Python the host was built for. When they
+/// differ the dylib does not load - built for 3.12, it needs
+/// _PyThreadState_UncheckedGet, which a 3.13 libpython no longer exports.
+///
+/// So every child build gets PYO3_PYTHON (which PyO3 checks first): the
+/// Python bundled next to the executable when there is one (a release
+/// bundle runs on it), else the interpreter the host itself was built with.
+/// A PYO3_PYTHON already in the environment is left alone.
+#[cfg(feature = "python_runtime")]
+fn pin_library_python() {
+  if env::var_os("PYO3_PYTHON").is_some() { return; }
+  let bundled = flowlang::pycmd::bundled_python_home()
+    .map(|home| home.join("bin").join("python3"))
+    .filter(|p| p.is_file());
+  let built = option_env!("NEWBOUND_PYO3_PYTHON")
+    .map(std::path::PathBuf::from)
+    .filter(|p| p.is_file());
+  if let Some(python) = bundled.or(built) {
+    env::set_var("PYO3_PYTHON", python);
+  }
 }
