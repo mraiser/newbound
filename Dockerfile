@@ -14,9 +14,14 @@
 # Commands that run from esbuild bundles (imports, TypeScript) need their
 # bundles current in the build context - run `newbound jsbundle` first.
 
-FROM rust:1.90.0-bookworm AS build
-ARG TARGETARCH
 ARG NEWBOUND_VARIANT=
+# The toolchain for the variant: the JavaScript runtime (deno_core) needs
+# Rust 1.91 or newer; the default build keeps its pinned 1.90.
+FROM rust:1.90.0-bookworm AS toolchain-default
+FROM rust:1.91.1-bookworm AS toolchain-js
+FROM toolchain-${NEWBOUND_VARIANT:-default} AS build
+ARG TARGETARCH
+ARG NEWBOUND_VARIANT
 WORKDIR /src
 COPY . .
 RUN case "$TARGETARCH" in \

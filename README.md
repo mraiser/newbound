@@ -5,7 +5,7 @@ Welcome to the official GitHub repository for Newbound!
 
 [API](https://www.newbound.io/documentation/reference.html) | [DISCORD](https://discord.gg/p2YvGGm2RR) | [DOC](https://www.newbound.io/documentation/index.html) | [WEB](https://www.newbound.io) | [CORP](https://www.newbound.com/site/index.html)
 
-NOTE: The reload and java_runtime features are known to be buggy at this time. The javascript_runtime feature builds once newbound requires a flowlang newer than 0.3.42; JavaScript and TypeScript commands are documented in `data/dev/_ASSETS/docs/js-commands.md`.
+NOTE: The reload and java_runtime features are known to be buggy at this time. The javascript_runtime feature needs Rust 1.91 or newer (`cargo build --release --features=serde_support,javascript_runtime`; release bundles and the Docker image come in a `-js` variant with it); JavaScript and TypeScript commands are documented in `data/dev/_ASSETS/docs/js-commands.md`.
 
 ### Installation
 
