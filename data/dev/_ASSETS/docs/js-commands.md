@@ -250,9 +250,21 @@ engine restarts it with fresh state.
   Directories are searched recursively, skipping `node_modules`, `target` and
   hidden directories. Exit status: 0 all passed, 1 a failure, 2 nothing ran.
 
+  A test file may start with `import` statements, as a command's imports
+  field does - npm packages, files beside it, and commands' modules - so a
+  command's helpers can be tested directly:
+
+      import fmt, { slugify } from "flowlang:mylib/text/format";
+      import { sample } from "./fixtures.js";
+
+      test("slugify", () => assert.equal(slugify("Hello World"), "hello-world"));
+
+  Such a file runs from an esbuild bundle (esbuild must be installed); its
+  line numbers, top-level `await` and `test`/`assert` are as without
+  imports. An import that does not resolve fails the file at its line.
+
 ## Not yet
 
-Test files cannot `import` (they reach packages through the commands they
-call); there are no streaming bodies, `Blob` or `FormData`; and a JavaScript
+There are no streaming bodies, `Blob` or `FormData`; and a JavaScript
 command called back through a Rust, Python or flow command cannot await
 (above).
