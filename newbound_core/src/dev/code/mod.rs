@@ -1,5 +1,6 @@
 // This file is auto-generated and managed by the flowlang build script.
 use flowlang::rustcmd::Transform;
+pub mod check_js;
 pub mod check_python;
 pub mod trace_flow;
 pub mod find;
@@ -93,4 +94,5 @@ pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
     cmds.push(("zhwgvy1a10c906584k214".to_string(), find::execute, "".to_string()));
     cmds.push(("msuuqu1a165e00598r1161".to_string(), trace_flow::execute, "".to_string()));
     cmds.push(("tgzgxv1a19e04dfe3g1".to_string(), check_python::execute, "".to_string()));
+    cmds.push(("uuowqh1a1a0efa6baj1".to_string(), check_js::execute, "".to_string()));
 }

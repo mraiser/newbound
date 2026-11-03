@@ -2,7 +2,9 @@ let api = crate::api::new();
 let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
 
 // Validate lang
-let valid_langs = ["rust", "python", "java", "javascript", "flow"];
+// "typescript" runs in the JavaScript engine (flowlang compiles it with
+// esbuild); its body and imports are stored like a JavaScript command's.
+let valid_langs = ["rust", "python", "java", "javascript", "typescript", "flow"];
 if !valid_langs.contains(&lang.as_str()) {
     let mut o = DataObject::new();
     o.put_string("status", "err");

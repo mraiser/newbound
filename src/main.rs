@@ -45,6 +45,43 @@ fn main() {
         return;
       }
 
+      // newbound jstest [--no-check] [files or directories]: *.test.js and
+      // *.test.ts files (type-checked first) run in the
+      // JavaScript engine, with every library's commands reachable through
+      // flowlang.call / flowlang.api.
+      if x == "jstest" {
+        #[cfg(feature = "javascript_runtime")]
+        {
+          init_globals();
+          std::process::exit(flowlang::jscmd::run_tests(params[2..].to_vec()));
+        }
+        #[cfg(not(feature = "javascript_runtime"))]
+        {
+          eprintln!("newbound jstest needs the JavaScript runtime: build with --features=serde_support,javascript_runtime");
+          std::process::exit(2);
+        }
+      }
+
+      // newbound jsbundle: the esbuild bundle of every JavaScript/TypeScript
+      // command that runs from one (imports, or TypeScript) - build output a
+      // package ships so that its deployments need no esbuild or
+      // node_modules. Exits 1 if any cannot be built.
+      if x == "jsbundle" {
+        #[cfg(feature = "javascript_runtime")]
+        {
+          let (done, failed) = flowlang::builder::javascript::build_bundles(&flowlang::datastore::DataStore::new());
+          for label in &done { println!("bundled {}", label); }
+          for (label, why) in &failed { eprintln!("FAILED {}: {}", label, why); }
+          println!("{} bundled, {} failed", done.len(), failed.len());
+          std::process::exit(if failed.is_empty() { 0 } else { 1 });
+        }
+        #[cfg(not(feature = "javascript_runtime"))]
+        {
+          eprintln!("newbound jsbundle needs the JavaScript runtime: build with --features=serde_support,javascript_runtime");
+          std::process::exit(2);
+        }
+      }
+
       // newbound pytest [pytest args]: pytest inside the embedded Python
       // runtime, with every library's commands - newbound's Rust commands
       // included - reachable through flowlang.call / flowlang.api.

@@ -4,16 +4,29 @@
 # python/ (python-build-standalone, pinned below), and the core store. No
 # Rust toolchain or system Python is needed to run it.
 #
-#   packaging/bundle.sh <target> [outdir]
-#   target: x86_64-unknown-linux-gnu | aarch64-unknown-linux-gnu | aarch64-apple-darwin
+#   packaging/bundle.sh <target> [outdir] [variant]
+#   target:  x86_64-unknown-linux-gnu | aarch64-unknown-linux-gnu | aarch64-apple-darwin
+#   variant: js - also the JavaScript runtime (V8: the binary grows by about
+#            50 MB), and the esbuild bundles of the JavaScript/TypeScript
+#            commands that run from one, built here (`newbound jsbundle`:
+#            needs esbuild and the npm packages next to data/ when any
+#            bundle is missing or stale) and shipped at their paths, so the
+#            bundle needs neither. Without a variant, nothing JavaScript is
+#            built or shipped.
 #
-# Produces <outdir>/newbound-<target>/ and <outdir>/newbound-<target>.tar.gz
-# (outdir defaults to dist/). Runs in the root of a newbound checkout and
-# needs a Rust toolchain, curl and tar.
+# Produces <outdir>/newbound-<target>[-js]/ and its .tar.gz (outdir defaults
+# to dist/). Runs in the root of a newbound checkout and needs a Rust
+# toolchain, curl and tar.
 set -euo pipefail
 
-TARGET="${1:?usage: packaging/bundle.sh <target> [outdir]}"
+TARGET="${1:?usage: packaging/bundle.sh <target> [outdir] [variant]}"
 OUT="${2:-dist}"
+VARIANT="${3:-}"
+case "$VARIANT" in
+  "") FEATURES="serde_support,python_runtime"; SUFFIX="" ;;
+  js) FEATURES="serde_support,python_runtime,javascript_runtime"; SUFFIX="-js" ;;
+  *) echo "unknown variant: $VARIANT (the one variant is js)" >&2; exit 2 ;;
+esac
 
 # python-build-standalone release 20260718, CPython 3.13.14
 # (install_only_stripped); sha256 from the release's SHA256SUMS.
@@ -28,7 +41,7 @@ esac
 PBS_FILE="cpython-${PY_VERSION}+${PBS_TAG}-${TARGET}-install_only_stripped.tar.gz"
 PBS_URL="https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/cpython-${PY_VERSION}%2B${PBS_TAG}-${TARGET}-install_only_stripped.tar.gz"
 
-NAME="newbound-${TARGET}"
+NAME="newbound-${TARGET}${SUFFIX}"
 DEST="${OUT}/${NAME}"
 rm -rf "$DEST"
 mkdir -p "$DEST" "${OUT}/cache"
@@ -50,13 +63,13 @@ case "$TARGET" in
   *)              RPATH='$ORIGIN/python/lib' ;;
 esac
 # Its own target dir: these flags must not replace a development build.
-BUILD_DIR="target/bundle-${TARGET}"
+BUILD_DIR="target/bundle-${TARGET}${SUFFIX}"
 # python-build-standalone reports its build-time LIBDIR (/install/lib), so
 # PyO3 cannot find libpython by itself: link against the bundled one
 # explicitly (never a system libpython that happens to be on the linker's
 # default path).
 PYO3_PYTHON="$PYTHON" RUSTFLAGS="-L native=${PYLIB} -C link-args=-Wl,-rpath,${RPATH}" CARGO_TARGET_DIR="$BUILD_DIR" \
-  cargo build --release --features=serde_support,python_runtime
+  cargo build --release --features="$FEATURES"
 cp "$BUILD_DIR/release/newbound" "$DEST/"
 if [[ "$TARGET" == *-apple-darwin ]]; then
   # Make sure the binary references libpython through its rpath.
@@ -73,6 +86,20 @@ cp config.properties_example "$DEST/config.properties"
 cp license.md README.md "$DEST/"
 cp packaging/BUNDLE.md "$DEST/"
 
+# 3b. js: the bundles - built (or confirmed current) here, by the bundle's
+#     own binary run against this checkout's data/, then shipped at the
+#     same paths next to data/. A command whose bundle cannot be built stops
+#     the build: the bundle would not run it.
+if [ "$VARIANT" = js ]; then
+  "$(cd "$DEST" && pwd)/newbound" jsbundle
+  find . -name '*.bundle.js' -type f \
+    -not -path './target/*' -not -path "./${OUT#./}/*" -not -path './node_modules/*' -not -path './.git/*' \
+    | while read -r f; do
+        mkdir -p "$DEST/$(dirname "$f")"
+        cp "$f" "$DEST/$f"
+      done
+fi
+
 # 4. Smoke test: the binary starts its embedded Python from the bundle (no
 #    PYTHONHOME, no library path). The bundle's site-packages is empty and
 #    the user's is excluded, so `newbound pytest` must report that pytest is
@@ -84,6 +111,20 @@ echo "$SMOKE" | grep -q "embedded Python ${PY_VERSION}" || {
   exit 1
 }
 echo "smoke test: embedded Python ${PY_VERSION} starts from the bundle"
+
+# 4b. js: the JavaScript engine starts from the bundle, with its web APIs.
+if [ "$VARIANT" = js ]; then
+  JSTEST=$(mktemp -d)
+  echo 'test("engine", () => { assert.equal(typeof fetch, "function"); assert.equal(1 + 1, 2); });' > "$JSTEST/smoke.test.js"
+  SMOKE=$(cd "$DEST" && env -u PYTHONHOME -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH ./newbound jstest "$JSTEST" 2>&1) || {
+    echo "smoke test failed: the bundled binary did not run JavaScript:" >&2
+    echo "$SMOKE" >&2
+    rm -rf "$JSTEST"
+    exit 1
+  }
+  rm -rf "$JSTEST"
+  echo "smoke test: the JavaScript engine runs from the bundle"
+fi
 
 tar -czf "${OUT}/${NAME}.tar.gz" -C "$OUT" "$NAME"
 echo "${OUT}/${NAME}.tar.gz"

@@ -10,6 +10,12 @@ on:
 
 jobs:
   image:
+    strategy:
+      fail-fast: false
+      matrix:
+        # "": the default image; js: with the JavaScript runtime
+        variant: ["", "js"]
+    name: image${{ matrix.variant && format(' ({0})', matrix.variant) || '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -21,11 +27,18 @@ jobs:
           load: true
           push: false
           tags: newbound:ci
+          build-args: NEWBOUND_VARIANT=${{ matrix.variant }}
       - name: The embedded Python starts in the image
         run: |
           out=$(docker run --rm newbound:ci ./newbound pytest 2>&1 || true)
           echo "$out"
           echo "$out" | grep -q "embedded Python 3.13"
+      - name: JavaScript runs in the image
+        if: matrix.variant == 'js'
+        run: |
+          out=$(docker run --rm newbound:ci sh -c 'echo "test(\"engine\", () => { assert.equal(typeof fetch, \"function\"); assert.equal(1 + 1, 2); });" > /tmp/smoke.test.js && ./newbound jstest /tmp/smoke.test.js' 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "1 passed, 0 failed"
       - name: The server answers
         run: |
           docker run -d --name nb -p 8080:8080 newbound:ci

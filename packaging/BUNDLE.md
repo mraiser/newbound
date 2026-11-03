@@ -25,3 +25,16 @@ Python packages for your commands go in a virtual environment next to
 Writing Rust commands needs the Rust toolchain and a source checkout; Python
 and flow commands work as is. See the dev library's
 `docs/python-commands.md` for Python commands.
+
+## JavaScript (the `-js` bundles)
+
+A `newbound-<target>-js` bundle is also built with the JavaScript runtime.
+JavaScript and TypeScript commands run as is; those that import npm packages
+and every TypeScript command run from esbuild bundles, which ship in this
+bundle next to `data/` (as `newbound_core/src/.../*.bundle.js` and the like)
+- no Node, npm or esbuild needed. A command changed after the bundle was made
+needs a new bundle: install esbuild and its packages next to `data/`
+(`npm install esbuild <packages>`) and it is rebuilt on its next call, or
+rebuild the bundle where they are. See the dev library's
+`docs/js-commands.md`.
+

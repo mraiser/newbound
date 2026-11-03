@@ -1,8 +1,9 @@
 name: release
 
-# Self-contained bundles with Python embedded (packaging/bundle.sh): built
-# for every v* tag, and attached to that tag's GitHub release. A change to
-# the packaging, or a manual run, builds them as workflow artifacts only.
+# Self-contained bundles with Python embedded (packaging/bundle.sh), each
+# also as a -js variant with the JavaScript runtime: built for every v* tag,
+# and attached to that tag's GitHub release. A change to the packaging, or a
+# manual run, builds them as workflow artifacts only.
 on:
   push:
     # tags always build; on a branch, only a change to the packaging does
@@ -17,24 +18,30 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
+        platform:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-22.04
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-22.04-arm
           - target: aarch64-apple-darwin
             os: macos-14
-    runs-on: ${{ matrix.os }}
+        # "": the default bundle; js: newbound-<target>-js, with the
+        # JavaScript runtime (packaging/BUNDLE.md)
+        variant: ["", "js"]
+    name: bundle (${{ matrix.platform.target }}${{ matrix.variant && format(', {0}', matrix.variant) || '' }})
+    runs-on: ${{ matrix.platform.os }}
     timeout-minutes: 60
+    env:
+      NAME: newbound-${{ matrix.platform.target }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Build the bundle (includes a smoke test)
-        run: packaging/bundle.sh ${{ matrix.target }} dist
+      - name: Build the bundle (includes the smoke tests)
+        run: packaging/bundle.sh ${{ matrix.platform.target }} dist ${{ matrix.variant }}
       - uses: actions/upload-artifact@v4
         with:
-          name: newbound-${{ matrix.target }}
-          path: dist/newbound-${{ matrix.target }}.tar.gz
+          name: ${{ env.NAME }}
+          path: dist/${{ env.NAME }}.tar.gz
           if-no-files-found: error
 
   release:
