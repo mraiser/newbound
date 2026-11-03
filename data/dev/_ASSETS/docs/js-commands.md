@@ -30,11 +30,11 @@ error (`missing required parameter: x`), as for a Rust command.
 | Declared | Argument arrives as | Return may be |
 |---|---|---|
 | String / Integer, Float, Double / Boolean | `string` / `number` / `boolean` | the same |
-| JSONObject | a plain object | an object |
-| JSONArray | an array | an array |
-| InputStream | ndata's hex string (`"48 69"`) | the same |
+| JSONObject | a handle on the caller's ndata object | an object or handle |
+| JSONArray | a handle on the caller's ndata array | an array or handle |
+| InputStream | a `Uint8Array` | a `Uint8Array` (or any typed array / `ArrayBuffer`) |
 | FLAT | - | an object: the whole response |
-| Any | any JSON value | any JSON value |
+| Any | any of the above | any of the above |
 
 A command written in TypeScript has the language `typescript`; its
 parameters are typed from the declarations (String→`string`, Integer→`number`,
@@ -42,11 +42,26 @@ JSONObject→`Record<string, any>`, ...), and the rest is as below. TypeScript
 commands need esbuild (see *Imports and npm packages*), which compiles them;
 `dev.code.check_js` type-checks them (strictly).
 
-Values cross by value, with JSON semantics: objects, arrays, strings,
-numbers, booleans and `null` convert both ways, and `undefined` returns as
-`null`. Integers beyond 2^53 lose precision (JavaScript numbers are doubles).
-Returning a function, symbol, BigInt, `Map` or `Set` is an error that names
-it - convert explicitly (`Object.fromEntries(map)`, `[...set]`, `String(big)`).
+Objects and arrays are live, as in Python: an argument is a handle on the
+caller's own ndata, not a copy - change it and the caller, and any Rust or
+Python command holding it, sees the change. Every object or array read from
+a handle is a handle too. Handles behave like plain objects and arrays:
+`o.key`, `in`, `delete`, `Object.keys`/`entries`, spread, `for...of`,
+`JSON.stringify`; and for arrays `Array.isArray`, `length`, indexing, `push`,
+`map`, `sort` and the rest. Each read makes a new handle, so compare
+contents, not identity (`o.a === o.a` is false when `a` is an object).
+
+Writing a plain object or array into a handle (or returning one) stores new
+ndata, as a dict does from Python; writing a handle stores that same object,
+and returning a handle returns it. `toJSON` is honoured (a `Date` is stored
+as its ISO string), `undefined` removes an object's key, `NaN` and the
+infinities are null, and numbers beyond 2^53 lose precision (JavaScript
+numbers are doubles). A function, symbol, BigInt, `Map`, `Set`, Promise or a
+cyclic structure cannot be stored: a TypeError names it - convert explicitly
+(`Object.fromEntries(map)`, `[...set]`, `String(big)`).
+
+The global `ndata` has `ndata.isHandle(x)`, `ndata.toJS(x)` (a plain deep
+copy), and `ndata.object()` / `ndata.array()` (new, empty ndata).
 
 ## Web APIs
 
@@ -203,5 +218,4 @@ engine restarts it with fresh state.
 Test files cannot `import` (they reach packages through the commands they
 call); there are no streaming bodies, `Blob` or `FormData`; and a JavaScript
 command calling back into JavaScript through a non-JavaScript command fails
-(above). Values cross between languages as copies (JSON), never as shared
-handles.
+(above).
