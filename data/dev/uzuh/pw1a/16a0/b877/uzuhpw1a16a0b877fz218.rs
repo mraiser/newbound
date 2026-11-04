@@ -44,7 +44,7 @@ fn has_cycle(adj: &Vec<Vec<usize>>) -> bool {
   for u in 0..adj.len() { if st[u] == 0 && dfs(u, adj, &mut st) { return true; } }
   false
 }
-// static scan: I-1 (awaited by name, no wire targets it), I-2 (wire+synchro cycle), I-4 (next in the last case);
+// static scan: I-2 (wire+synchro cycle), I-4 (next in the last case);
 // also collects every persistent name reachable (locals, chain, flow callees) for the globals snapshot.
 fn scan(case: &DataObject, path: &str, f: &mut Vec<String>, keys: &mut Vec<String>, seen: &mut Vec<String>, depth: usize) {
   let cmds = case.get_array("cmds"); let n = cmds.len();
@@ -62,9 +62,8 @@ fn scan(case: &DataObject, path: &str, f: &mut Vec<String>, keys: &mut Vec<Strin
   } }
   for i in 0..n {
     let op = cmds.get_object(i);
-    for name in op.get_object("in").keys() {
-      if names.contains(&name) && !exact.contains(&(i as i64, name.clone())) { f.push(format!("I-1 {} op {} input '{}' is awaited by name but no wire targets it", path, i, name)); }
-    }
+    // (No I-1 "awaited by name" finding: since flowlang 0.3.47 an input no wire targets is
+    // null, not awaited, so such a body runs.)
     if op.has("condition") && op.get_property("condition").is_object() && op.get_object("condition").get_string("rule") == "next" && !case.has("nextcase") {
       f.push(format!("I-4 {} op {} has a next rule in the last case", path, i));
     }

@@ -21,8 +21,11 @@ fn main() {
         let cmd = &params[4];
         let data = DataObject::from_string(&params[5]);
         let o = flowlang::command::Command::lookup(lib, ctl, cmd).execute(data);
-//        println!("exec {}::{}::{} ->\n\n{}", lib, ctl, cmd, o.unwrap().to_string());
-        println!("\n{}", o.unwrap().to_string());
+        match o {
+          Ok(o) => println!("\n{}", o.to_string()),
+          // A failed flow: {status: "err", msg: what failed and where, flow_error: the details}.
+          Err(e) => { println!("\n{}", e.to_envelope().to_string()); std::process::exit(1); }
+        }
         return;
       }
 

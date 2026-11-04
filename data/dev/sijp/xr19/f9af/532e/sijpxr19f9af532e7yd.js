@@ -1657,14 +1657,8 @@ async function init(host, { lib, ctlId, toast }) {
     if (rows.childElementCount > 0) return;
     openSub = null;
     for (const cmdEntry of record.cmd ?? []) rows.appendChild(commandRow(cmdEntry));
-    const note = host.querySelector(".wb-cmds .wb-note");
-    if (!note.querySelector("a")) {
-      const link = document.createElement("a");
-      link.href = "#/flow/sample";
-      link.textContent = "View a sample flow ▸";
-      link.style.color = "var(--accent)";
-      note.append(" ", link);
-    }
+    // (No "View a sample flow" link: #/flow/sample has no specimen to show in
+    // the platform-served IDE, so dev.frame only says it is unavailable.)
   }
 
   function commandRow(cmdEntry) {

@@ -65,19 +65,26 @@ if id.is_empty() {
 
 let command = Command::new(&lib, &id);
 
-// Cast parameters according to the command's expected signature
-command.cast_params(args.clone());
+// Cast parameters according to the command's expected signature; arguments
+// that do not fit are the caller's error, not a panic.
+if let Err(m) = command.try_cast_params(args.clone()) {
+    let mut out = DataObject::new();
+    out.put_string("status", "err");
+    out.put_string("msg", &m);
+    return out;
+}
 
 // Execute the command in an isolated unwind context to catch panics
-let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-    let o = command.execute(args).unwrap();
-    return o;
-}));
+let result = panic::catch_unwind(panic::AssertUnwindSafe(|| command.execute(args)));
 
 let mut out = DataObject::new();
 
 match result {
-    Ok(o) => {
+    // A failed flow: {status: "err", msg: what failed and where, flow_error: the details}.
+    Ok(Err(e)) => {
+        out = e.to_envelope();
+    },
+    Ok(Ok(o)) => {
         out.put_string("status", "ok");
         // o is the wrapper's packaging ({"a": <value>} for generated code;
         // a flow can return multiple named outputs). Unwrap it the way
