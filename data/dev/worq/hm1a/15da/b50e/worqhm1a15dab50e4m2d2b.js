@@ -225,11 +225,12 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   //            (authoritative, sets baseHash) and saves journal back to it.
   //            null = a read-only view (no save/journal/revert).
   //   title  — {prefix, name, suffix}; onBack — leaving the editor's root.
-  // With NO props at all this stays the P2-P4 gate harness: the specimen
-  // doubles as the live body and saves exercise scratch.skills.flowedit3d_body.
+  // With NO props at all this is the harness: the specimen as a read-only view
+  // (no source: no save/journal/revert). A harness that needs saves passes its
+  // own `source` - this control names no library outside newbound_core.
   const PROPS = ME.DATA || {};
   const harness = !PROPS.graph && !PROPS.source;
-  let source = harness ? { lib: "scratch", ctl: "skills", cmd: "flowedit3d_body" } : (PROPS.source || null);
+  let source = harness ? null : (PROPS.source || null);
   // P5 palette parity: floweditor3d's node kinds (its .fx-pal-item data-kind
   // set). primitive / command open a picker — the op's terminals come from the
   // chosen signature; the rest create at once with floweditor3d's op shapes.
@@ -2026,6 +2027,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (t === "decimal" || t === "float") { const n = parseFloat(raw); return isNaN(n) ? raw : n; }
     if (t === "boolean" || t === "bool") return raw === "true";
     if (t === "object" || t === "array" || t === "jsonobject" || t === "jsonarray") { try { return JSON.parse(raw); } catch (e) { return raw; } }
+    // Any: a JSON value when the text is one ([1,2], 5, true, "x"), else the text itself
+    if (t === "any") { try { return JSON.parse(raw); } catch (e) { return raw; } }
     return raw;
   }
   function startRun() {
@@ -2168,7 +2171,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
   let lastBpDots = [];       // D4: the facade breakpoint dots the last render drew (checks)
   let dbgPollT = null;
   let lastFacadeDbg = [];    // the facade specs the last render tinted (checks)
-  const dbgSrc = () => source || { lib: "scratch", ctl: "skills", cmd: "flowedit3d_body" };
+  // Without a source the session is only labelled: debug_start runs the body it is given.
+  const dbgSrc = () => source || { lib: "dev", ctl: "flowedit3d", cmd: "specimen" };
   function dbgActive() { return !!(dbg && dbg.session); }
   function dbgColors() {
     const cs = getComputedStyle(ME);
