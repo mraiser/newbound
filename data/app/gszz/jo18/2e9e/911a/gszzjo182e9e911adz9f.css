@@ -311,6 +311,7 @@
 /* Run progress: a checklist fed by update_crates_status. */
 .system-settings .ss-prog { display: none; margin-top: 14px; }
 .system-settings .ss-prog.ss-show { display: block; }
+.system-settings .ss-prog.ss-hold { display: none; } /* finished, while a restart is pending */
 .system-settings .ss-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .system-settings .ss-steps li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: center; font-size: 13px; color: var(--text-faint); }
 .system-settings .ss-steps .ss-st { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--line); }

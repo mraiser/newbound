@@ -281,7 +281,18 @@ function ssUpdate() {
   save.disabled = me.ssBusy || !loaded || (!st.pending && (st.n == 0 || !st.valid));
   only.hidden = st.pending || !st.restart;
   only.disabled = me.ssBusy || !loaded || !st.valid;
+  progHold();
   return st;
+}
+
+// While a saved restart is still pending (P2), a finished checklist is hidden:
+// its own ending ("no restart is needed", or a second Restart now) could
+// contradict the footer. A running checklist always shows.
+function progHold() {
+  var hold = !!me.restartPending;
+  SS.querySelectorAll('.ss-prog').forEach(function(p) {
+    p.classList.toggle('ss-hold', hold && p.dataset.state != 'running');
+  });
 }
 
 function ssFootErr(msg) {
@@ -504,6 +515,7 @@ me.renderRun = function(r) {
   var prog = eq('.ss-prog-' + kind);
   eq('.ss-prog-' + (kind == 'update' ? 'hardreset' : 'update')).classList.remove('ss-show');
   var state = r.state;
+  prog.dataset.state = state || '';
   var failed = state == 'failed' || state == 'stalled';
   if (state != 'running' && state != 'done' && !failed) {
     prog.classList.remove('ss-show');
@@ -581,6 +593,7 @@ me.renderRun = function(r) {
   me.runActive = state == 'running';
   if (state == 'done') loadEngine();
   engineUpdate();
+  progHold();
 };
 
 // Follows the run every 3 s while it runs. Right after a start the runner may
@@ -683,18 +696,20 @@ ME.querySelector('.open-system-settings').addEventListener('click', function() {
   engineErr('.ss-upd-err', '');
   engineErr('.ss-hr-err', '');
   loadEngine();
-  if (me.runPoll) return;  // a run started from this page is still being followed
-  // On open, only a run that is going right now shows its checklist; an old
-  // done or failed record stays hidden until the user starts a run.
+  if (me.runActive) return;  // a run started or followed from this page keeps its checklist
+  // On open, only a run that is going right now shows its checklist. A done or
+  // failed one is hidden at once, not when the status read answers, and stays
+  // hidden until the user starts a run (E12).
+  clearInterval(me.runPoll);
+  me.runPoll = null;
+  SS.querySelectorAll('.ss-prog').forEach(function(prog) {
+    prog.classList.remove('ss-show');
+    setLog(prog, false);  // a log a failed run opened doesn't stay open for the next one
+  });
+  engineUpdate();
   json('../dev/update_crates_status', null, function(r) {
     me.runSeen = r ? r.time : null;
     if (r && r.state == 'running') { me.renderRun(r); pollRun(false); }
-    else {
-      eq('.ss-prog-update').classList.remove('ss-show');
-      eq('.ss-prog-hardreset').classList.remove('ss-show');
-      me.runActive = false;
-      engineUpdate();
-    }
   });
 });
 
