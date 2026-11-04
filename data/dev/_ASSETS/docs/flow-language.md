@@ -13,7 +13,12 @@ propagation loop, and step 3 of section 1.5 is the case-start rule. Flow step
 debugger P0 added section 1.5.4 (step semantics, frames, events and the
 stepper fixtures). Flow step debugger P6 (2026-10, flowlang 0.3.40) moved the
 stepper into the crate (`src/stepper.rs`); `Code::execute` is a continue-to-end
-over it, and I-4 / a stuck case are errors, not a panic / hang. Where the
+over it, and I-4 / a stuck case are errors, not a panic / hang. Since flowlang
+0.3.44 `Code::execute` takes the stepper's steps through `flowlang::fastrun`
+(native bookkeeping, no events; the stepper stays the definition, and flowlang's
+tests/fastrun_parity.rs holds the two to the same results, errors and step
+counts). Since 0.3.45 a failure carries what failed and where (section 1.6.1).
+Where the
 interpreter and this text disagree, the interpreter is the truth and this text
 has the bug. Editor design (the bench doc's sections 3-7, still cited by section
 number in the editors' comments) is not part of the language and is not
@@ -140,9 +145,9 @@ For each case, in order:
 6. **End test.** If the pass began with every wire and every synchro already
    fired, the case ends. Otherwise, repeat from step 4. A wire or synchro that
    can never fire (I-1, I-2) makes the case stuck. Since Flow step debugger P6
-   `Code::execute` is a continue-to-end over the stepper (`flowlang::stepper`)
-   and reports a stuck case as an error (`Err(CodeException::Fail)`) instead of
-   hanging; earlier interpreters looped forever, so a stuck flow was never run.
+   `Code::execute` reports a stuck case as an error (code `stall`, section
+   1.6.1) instead of hanging; earlier interpreters looped forever, so a stuck
+   flow was never run.
 
 **Running an op** (steps 3-5) means: evaluate its body (section 1.3, once per
 element for list and loop, section 1.5.2), then its condition (section 1.5.1),
@@ -170,8 +175,8 @@ The rules:
 
 - **next** - the case ends now, and execution continues at `nextcase` with
   fresh state. If no `nextcase` is reachable (I-4), the run ends with an
-  error: since Flow step debugger P6 `Code::execute` returns
-  `Err(CodeException::Fail)` instead of panicking.
+  error: since Flow step debugger P6 `Code::execute` returns an error (code
+  `I-4`, section 1.6.1) instead of panicking.
 - **terminate** - the flow ends now, and `out` as delivered so far is the
   result. Inside a local, only the local's flow ends; the local op completes
   with that partial `out`.
@@ -633,3 +638,32 @@ rejections: an editor must be able to open a broken flow to fix it.
 | I-10 | a condition on a constant is dead |
 | S-1 | a synchro endpoint is not one of two distinct ops of this case (inert at runtime) |
 | S-2 | a synchro is already implied by a wire path, or is a duplicate (info) |
+
+### 1.6.1 Failures
+
+A flow that fails returns `Err(CodeException::Fail(FlowError))` (flowlang 0.3.45
+and later). A `FlowError` has:
+
+- `code` - `fail` (a fail rule), `stall` (a stuck case: I-1 or I-2), `I-4`,
+  `absent-output`, `panic` (a primitive, command or literal failed, or the graph
+  is malformed), `depth` (frames nested more than 64 deep) or `budget` (more
+  than 1,000,000 steps).
+- `msg` - the stepper's message. A stall names the wires and synchros that never
+  fired and the ops that never ran.
+- `at` - the path of sites from the root frame down to the failure. Each site is
+  `{case, op, iter, type, name}`: one per local or flow-command frame the failure
+  passed through, then the op (or the case, for a stall, I-4 or a wire) where it
+  happened. These are the stepper's frame path and case.
+- `cause` - for a fail rule that fired because a local or flow command op failed
+  (its success flag false, section 1.5.4 Frames), that failure, with its own
+  path. Causes nest.
+
+Its one-line form, and the `msg` of the `{"status": "err", "msg", "flow_error"}`
+envelope that app.app.exec, dev.code.invoke_command, peer.service.exec, the
+websocket command path and `newbound exec` return:
+
+    flow failed (fail) at op 0 local "check": its fail rule fired; because flow failed (fail) at op 0 local "check" > op 0 match "ok": its fail rule fired
+
+Arguments that do not fit a command's declared parameter types come back as
+`{"status": "err", "msg": "parameter 'b' of testflow:test_add must be an Integer,
+not \"x7\""}` (flowlang's `Command::try_cast_params`), not as a panic.
