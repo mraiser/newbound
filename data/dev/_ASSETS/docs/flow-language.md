@@ -68,17 +68,24 @@ The `type` field selects one of these operations:
   `lib:ctlId:cmdId`). flowlang resolves it with `Command::new(lib, cmdId)`,
   where the third segment is the command's record id, so the ctl segment is
   not consulted. The inputs
-  are the call's arguments. Results map onto the op's outputs BY POSITION,
-  not by name: a flow callee supplies its output-bar keys, and any other
-  callee supplies its single key `a`. Terminal maps are unordered, so a
-  command op should have exactly one output (I-7).
+  are the call's arguments. A flow callee supplies its output-bar keys, and
+  any other callee supplies its single key `a`. When the op and the callee
+  each have exactly one output they map by position, whatever their names;
+  otherwise each of the op's outputs takes the callee's output of the same
+  name, and an op output the callee lacks is error `absent-output` (flowlang
+  0.3.47 and later; before, every mapping was by position over unordered
+  keys, so several outputs mapped at random - the retired I-7).
 - **local** - runs `localdata`, an inline Case with its chain, as a nested flow
   whose args are the op's inputs. The local flow's `out` becomes the op's
   outputs. With no `localdata`, every output is null. `next` and `terminate`
   inside a local stay inside it (section 1.5.1).
 - **constant** - `name` is the literal. `ctype` is one of int, decimal,
   boolean, string, object or array (anything else gives null), and every
-  output gets the value. A constant never evaluates a condition (I-10).
+  output gets the value. A string literal has its escapes read (`\n \t \r
+  \b \f \/ \\ \"` and `\uXXXX`); anything else is kept as written, a bare
+  quote or a lone backslash included (flowlang 0.3.47; before, such text
+  failed as "bad string literal"). A constant never evaluates a condition
+  (I-10).
 - **persistent** - `name` is a key in the process-wide globals. With an input
   (at most one, I-6), the op stores that input first. Then every output reads
   the global, or null if it is unset. Globals outlive the call: a persistent op
@@ -88,6 +95,9 @@ The `type` field selects one of these operations:
   match (I-5). The comparison result is the op's success flag for its
   condition.
 - **undefined** - a placeholder. A wire into it marks it done.
+
+Any other `type` is an error naming it (flowlang 0.3.47; before, the op
+yielded `{}`).
 
 ### 1.4 Terminals and wires
 
@@ -122,14 +132,12 @@ For each case, in order:
 2. **Result.** `out` is the chain's shared result object (section 1.1).
    Terminals hold null until they are delivered.
 3. **Case start.** Visit each op in index order. An input terminal is
-   pre-marked delivered (value null) when its NAME is no wire's dest name
-   anywhere in the case. The match is global and by name only, which is the
-   I-1 sharp edge: an unwired input whose name is wired on some other op waits
-   forever. The op runs now when every input is pre-marked (or it has none)
-   AND it has no incoming synchro (section 1.5.3, rule 3). Note: flowlang
-   stops pre-marking an op's inputs at its first awaited one, and terminal
-   order is unspecified. So an op that mixes wired and unwired inputs may wait
-   forever; only I-1-clean flows are defined.
+   pre-marked delivered (value null) when no wire targets it. The op runs now
+   when every input is pre-marked (or it has none) AND it has no incoming
+   synchro (section 1.5.3, rule 3). (Before flowlang 0.3.47 an input was
+   pre-marked only when its NAME was no wire's dest name anywhere in the case,
+   so an unwired input whose name was wired on some other op, or on the return
+   bar, waited forever.)
 4. **Wire pass.** Visit each wire that has not fired, in order. Its source is
    available if it is the params bar (value `args[name]`, or null) or an op
    that is done (value `result[name]`). An available wire fires:
@@ -144,7 +152,7 @@ For each case, in order:
    now ready.
 6. **End test.** If the pass began with every wire and every synchro already
    fired, the case ends. Otherwise, repeat from step 4. A wire or synchro that
-   can never fire (I-1, I-2) makes the case stuck. Since Flow step debugger P6
+   can never fire (a cycle, I-2) makes the case stuck. Since Flow step debugger P6
    `Code::execute` reports a stuck case as an error (code `stall`, section
    1.6.1) instead of hanging; earlier interpreters looped forever, so a stuck
    flow was never run.
@@ -325,18 +333,14 @@ Values recorded in events are deep copies, because ndata handles are shared.
   reads src DONE, not synchro fired: the wire path can run dest before the
   synchro itself fires (rule 4). Rule 3, the case-start rule, follows from
   this, because no src is done at case start.
-- **Awaited.** An input is AWAITED when its name is the dest name of some
-  wire anywhere in the case, the return bar included. This is flowlang's
-  global by-name match (section 1.5, step 3). It is kept for parity: an
-  unwired input that shares a name with any wired terminal, even a return-bar
-  key, waits forever (I-1). Every input that is not awaited is pre-delivered
-  as null at `seed`. flowlang stops pre-marking at an op's first awaited input
-  in HashMap order, which is random, so a mixed op may hang under it; the
-  stepper pre-marks all of them. Only I-1-clean flows are defined.
-- **Re-arm.** A delivery into an op that is already done, which makes its
-  inputs complete again, makes it ready again. This is flowlang's re-run
-  (section 1.5, step 4), and it is reachable only with fan-in greater than 1
-  (I-1).
+- **Awaited.** An input is AWAITED when a wire targets it (section 1.5, step
+  3). Every input that is not awaited is pre-delivered as null at `seed`.
+  (Before flowlang 0.3.47 an input was awaited when its name was the dest name
+  of some wire anywhere in the case, the return bar included, so an unwired
+  input sharing a name with a wired terminal waited forever.)
+- **No re-arm.** A delivery into an op that is already done is ignored and
+  reported as I-1 on the `deliver` event; the op runs once. (flowlang before
+  P6 ran it again.) A second delivery before the op runs replaces the value.
 - **Atomic ops.** An op in progress is atomic within its case. While its
   frame is open or its iterations run, nothing else in its case may be picked
   until it is done or a rule fires. flowlang runs it synchronously, and rule 6
@@ -430,7 +434,8 @@ these fields.
   (owner ruling). `cmd` is `lib:ctlId:cmdId`, and flowlang resolves it with
   `Command::new(lib, cmdId)`, so the callee may be in any library (fixture
   flow_op). The body is the callee's SAVED flow. On `leave`, its `out` maps
-  onto the op's outputs BY POSITION (I-7), and outcomes are as for a local,
+  onto the op's outputs by name, or by position one to one (section 1.3,
+  command), and outcomes are as for a local,
   except that finish is discarded.
 - **command, rust/python callee**: no frame. It is one opaque `eval`, and
   its single key `a` maps onto the op's one output. It never fails: the
@@ -523,7 +528,8 @@ static detections.
   model of these rules, not the stepper's code.
 - `parity(lib, ctl, cmd, args, presets, policy)` compares a run with
   Code::execute. It compares the result envelope and every persistent global
-  the flow can reach. A body with a static I-1, I-2 or I-4 finding is never
+  the flow can reach. A body with a static I-2 or I-4 finding (I-1 too,
+  before flowlang 0.3.47) is never
   run under Code::execute.
 
 In P1, local ops and command ops were single `eval` steps whose inner flows ran
@@ -576,7 +582,8 @@ runs a frame stack:
   is the gate. The steps are `enter`, then the child's own steps, then `leave`
   (outcome ok, terminate or fail), then the op's closing `eval`
   (`from_frame: true`). A fail becomes b = false and an empty result at the
-  caller's condition. Command outputs map by position (I-7).
+  caller's condition. Command outputs map as in section 1.3 (by name, or by
+  position one to one).
 - A list or loop op runs as `iter` steps. Each `iter` is followed by its body:
   one `eval` (with `iter: k`), or `enter` ... `leave` and then the closing
   `eval`. The eval for the last iteration carries `done`, the collected `out`,
@@ -626,13 +633,13 @@ rejections: an editor must be able to open a broken flow to fix it.
 
 | code | invariant |
 |---|---|
-| I-1 | each op input has exactly one incoming wire (fan-in 1); see section 1.5 step 3 |
+| I-1 | each op input has exactly one incoming wire (fan-in 1); an unwired input is null (section 1.5 step 3) |
 | I-2 | wires (op -> op) plus synchros are acyclic; a cycle hangs or stalls the case |
 | I-3 | terminal names are unique per side of an op or bar |
 | I-4 | a `next` rule needs a `nextcase` later in the chain |
 | I-5 | a match op has exactly one input and a scalar ctype |
 | I-6 | a persistent op has at most one input |
-| I-7 | a command op has exactly one output (outputs are mapped by position) |
+| I-7 | retired in flowlang 0.3.47: a command op's outputs map by name (by position only one to one), so several outputs are well defined |
 | I-8 | a loop output's `loop` names an input of the same op |
 | I-9 | `pos` has x, y and z |
 | I-10 | a condition on a constant is dead |

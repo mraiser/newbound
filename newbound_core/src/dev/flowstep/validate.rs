@@ -122,11 +122,12 @@ fn load(case: &DataObject) -> Shadow {
   let mut syncs = Vec::new();
   if case.has("syncs") { for s in case.get_array("syncs").objects() { let s = s.object(); syncs.push((s.get_int("src"), s.get_int("dest"))); } }
   let n = cmds.len();
-  let names: Vec<String> = cons.iter().map(|c| c.3.clone()).collect();
+  // an op input is awaited only when a wire targets THAT input (flowlang 0.3.47); every other
+  // input is pre-delivered as null
   let mut got = Vec::new(); let mut vals = Vec::new();
-  for op in &cmds {
+  for (i, op) in cmds.iter().enumerate() {
     let mut g = Vec::new(); let mut v = DataObject::new();
-    for k in op.get_object("in").keys() { if !names.contains(&k) { g.push(k.clone()); v.put_null(&k); } }
+    for k in op.get_object("in").keys() { if !cons.iter().any(|c| c.2 == i as i64 && c.3 == k) { g.push(k.clone()); v.put_null(&k); } }
     got.push(g); vals.push(v);
   }
   Shadow { wf: vec![false; cons.len()], sf: vec![false; syncs.len()], done: vec![false; n], res: vec![None; n], cmds, cons, syncs, got, vals, has_next: case.has("nextcase") }
@@ -172,14 +173,21 @@ fn child_path(parent: &str, op: i64, iter: Data) -> String {
 }
 fn is_null(d: &Data) -> bool { matches!(d, Data::DNull) }
 // a closed frame's result as the enclosing op sees it: fail = (empty, false); local = (out, true, fin);
-// a flow command maps the callee's output keys onto the op's outputs BY POSITION (I-7)
+// a flow command's outputs take the callee's outputs of the same name; when each side has
+// exactly one they map by position, whatever the names (flowlang 0.3.47)
 fn closing_of(op: &DataObject, keys: &Vec<String>, child: &(String, DataObject, bool)) -> Option<(DataObject, bool, bool)> {
   if child.0 == "fail" { return Some((DataObject::new(), false, false)); }
   if op.get_string("type") == "local" { return Some((child.1.clone(), true, child.2)); }
   let mut o = DataObject::new();
-  for (i, k) in op.get_object("out").keys().iter().enumerate() {
-    if i >= keys.len() || !child.1.has(&keys[i]) { return None; }
-    o.set_property(k, child.1.get_property(&keys[i]));
+  let outs: Vec<String> = op.get_object("out").keys();
+  if outs.len() == 1 && keys.len() == 1 {
+    if !child.1.has(&keys[0]) { return None; }
+    o.set_property(&outs[0], child.1.get_property(&keys[0]));
+    return Some((o, true, false));
+  }
+  for k in &outs {
+    if !keys.contains(k) || !child.1.has(k) { return None; }
+    o.set_property(k, child.1.get_property(k));
   }
   Some((o, true, false))
 }
@@ -388,7 +396,7 @@ for (idx, e) in evs.iter().enumerate() {
             match &run.child {
               None => note(&mut viol, seq, &t, format!("closing eval of op {} with no left frame", i)),
               Some(ch) => match closing_of(&op, &run.keys, ch) {
-                None => note(&mut viol, seq, &t, format!("op {}: the callee's out lacks a positional output (that is error absent-output)", i)),
+                None => note(&mut viol, seq, &t, format!("op {}: the callee's out lacks an output the op maps (that is error absent-output)", i)),
                 Some((xo, xb, _)) => {
                   if xb != b { note(&mut viol, seq, &t, format!("op {} closing b={} but the frame's outcome {} means b={}", i, b, ch.0, xb)); }
                   match ocmp(&e.get_property("out"), &xo) { 0 => {}, 1 => { alias.push_string(&format!("seq {}: op {} frame out changed in place", seq, i)); }, _ => note(&mut viol, seq, &t, format!("op {} closing out is not the frame's result", i)) }
@@ -425,7 +433,7 @@ for (idx, e) in evs.iter().enumerate() {
             match &run.child {
               None => note(&mut viol, seq, &t, format!("closing eval of op {} with no left frame", i)),
               Some(ch) => match closing_of(&op, &run.keys, ch) {
-                None => note(&mut viol, seq, &t, format!("op {}: the callee's out lacks a positional output (that is error absent-output)", i)),
+                None => note(&mut viol, seq, &t, format!("op {}: the callee's out lacks an output the op maps (that is error absent-output)", i)),
                 Some((xo, xb, xf)) => { if xb != b { note(&mut viol, seq, &t, format!("op {} iteration b={} but the frame's outcome {} means b={}", i, b, ch.0, xb)); } ires = xo; fin = xf; }
               },
             }
