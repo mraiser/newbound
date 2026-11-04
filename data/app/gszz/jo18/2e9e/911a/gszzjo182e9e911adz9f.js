@@ -157,16 +157,18 @@ function refreshSettings() {
   var choice = bindChoice();
   SS.querySelector('.ss-custom-ip').classList.toggle('ss-show', choice == 'custom');
   var addr = me.httpAddress();
-  var port = dget('portnum').value.trim();
-  var p = port === '' ? '…' : (+port === 0 ? '<port chosen at start>' : port);
+  var st = me.settingsState();
+  // An invalid port or address is never shown as a URL: the line reads — until both are valid.
+  var ok = st.v.port && st.v.ip;
+  var p = +st.cur.http_port === 0 ? '<port chosen at start>' : st.cur.http_port;
   var local = SS.querySelector('.ss-addr-local');
   var lan = SS.querySelector('.ss-addr-lan');
-  local.textContent = (choice == 'custom' ? 'http://' + (addr || '…') + ':' : 'http://localhost:') + p;
-  var other = null;
+  local.textContent = !ok ? '—' : (choice == 'custom' ? 'http://' + addr + ':' : 'http://localhost:') + p;
+  var other = null;  // null: only this computer can open it
   if (choice == '0.0.0.0') other = me.lanIP || '<this computer\'s IP>';
-  else if (choice == 'custom') other = addr || '…';
-  lan.textContent = other ? 'http://' + other + ':' + p : 'Not reachable';
-  lan.classList.toggle('ss-dim', !other);
+  else if (choice == 'custom') other = addr;
+  lan.textContent = other === null ? 'Not reachable' : (ok ? 'http://' + other + ':' + p : '—');
+  lan.classList.toggle('ss-dim', other === null);
   ssUpdate();
 }
 SS.querySelectorAll('input[name=ss-bind]').forEach(function(r) {
@@ -207,6 +209,7 @@ function fillStartPage(dbval, apps) {
 // --- Settings dialog: change tracking, validation, footer, saving ---
 me.saved = null;    // the four values as loaded on open; null until the read answers
 me.ssBusy = false;  // a save is in flight
+me.restartPending = false;  // saved, but the restart that should follow failed (P2)
 
 me.isIPv4 = function(s) {
   return /^\d{1,3}(\.\d{1,3}){3}$/.test(s) && s.split('.').every(function(n) { return +n <= 255; });
@@ -240,9 +243,11 @@ me.settingsState = function() {
     port: c.http_port !== s.http_port
   };
   var n = (d.name ? 1 : 0) + (d.app ? 1 : 0) + (d.bind ? 1 : 0) + (d.port ? 1 : 0);
-  var restart = d.bind || d.port;
+  // A saved address/port whose restart failed still needs one (P2).
+  var restart = d.bind || d.port || me.restartPending;
   return {
     cur: c, custom: custom, v: v, valid: v.name && v.port && v.ip, dirty: d, n: n, restart: restart,
+    pending: me.restartPending && n == 0,
     warnRemote: c.http_address == '127.0.0.1' && !me.isLocalHost(me.pageHost()),
     warnPort0: v.port && +c.http_port === 0 && restart
   };
@@ -267,12 +272,14 @@ function ssUpdate() {
   q('.ss-warn-remote').classList.toggle('ss-show', loaded && st.warnRemote);
   q('.ss-warn-port0').classList.toggle('ss-show', loaded && st.warnPort0);
   var status = q('.ss-foot-status');
-  status.textContent = st.n == 0 ? 'No changes' : (st.n == 1 ? '1 change' : st.n + ' changes') + (st.restart ? ' · restart needed' : '');
+  status.textContent = st.pending ? 'Saved · restart still needed' :
+    st.n == 0 ? 'No changes' : (st.n == 1 ? '1 change' : st.n + ' changes') + (st.restart ? ' · restart needed' : '');
   status.classList.toggle('ss-restart', st.restart);
+  status.classList.toggle('ss-pending', st.pending);
   var save = q('.ss-save'), only = q('.ss-save-only');
-  save.textContent = st.restart ? 'Save and restart' : 'Save';
-  save.disabled = me.ssBusy || !loaded || st.n == 0 || !st.valid;
-  only.hidden = !st.restart;
+  save.textContent = st.pending ? 'Restart now' : st.restart ? 'Save and restart' : 'Save';
+  save.disabled = me.ssBusy || !loaded || (!st.pending && (st.n == 0 || !st.valid));
+  only.hidden = st.pending || !st.restart;
   only.disabled = me.ssBusy || !loaded || !st.valid;
   return st;
 }
@@ -301,24 +308,45 @@ function ssSave(restart) {
       ssFootErr((result && result.msg) || "Couldn't save the settings.");
       return;
     }
+    // The config is on disk now: these are the saved values.
+    me.saved = o;
     if (!restart) {
       ssSetBusy(false);
       ssClose();
       ssToast(st.restart ? 'Saved. Network changes apply on the next restart.' : 'Saved');
       return;
     }
-    json('../dev/restart_instance', null, function(r) {
-      var msg = r && r.msg ? String(r.msg) : '';
-      if (!r || r.status != 'ok' || msg.indexOf('OK') != 0) {
-        ssSetBusy(false);
-        ssFootErr('Saved, but the restart failed: ' + (msg || 'no reply'));
-        return;
-      }
-      me.restartFlow(o.http_address, o.http_port);
+    me.restartNow(function(msg) {
+      me.restartPending = true;
+      ssFootErr('Saved, but the restart failed: ' + msg);
     });
   });
 }
-SS.querySelector('.ss-save').addEventListener('click', function() { ssSave(me.settingsState().restart); });
+
+// Restart now: the one restart path (a restart still pending after a save, and
+// a finished engine run). Only restart_instance, then the restart flow onto the
+// saved address and port - where the device will answer after it starts.
+// onErr(msg) gets an ERROR: reply; nothing else changes then.
+me.restartNow = function(onErr) {
+  if (!me.saved) return;
+  ssFootErr('');
+  ssSetBusy(true);
+  json('../dev/restart_instance', null, function(r) {
+    var msg = r && r.msg ? String(r.msg) : '';
+    if (!r || r.status != 'ok' || msg.indexOf('OK') != 0) {
+      onErr(msg || 'no reply');
+      ssSetBusy(false);
+      return;
+    }
+    me.restartPending = false;
+    me.restartFlow(me.saved.http_address, me.saved.http_port);
+  });
+};
+SS.querySelector('.ss-save').addEventListener('click', function() {
+  var st = me.settingsState();
+  if (st.pending) me.restartNow(function(msg) { ssFootErr('The restart failed: ' + msg); });
+  else ssSave(st.restart);
+});
 SS.querySelector('.ss-save-only').addEventListener('click', function() { ssSave(false); });
 dget('devicename').addEventListener('input', refreshSettings);
 dget('defaultbot').addEventListener('change', refreshSettings);
@@ -417,59 +445,256 @@ ME.querySelector('.open-system-settings').addEventListener('click', function() {
   });
 });
 
-// --- Platform crate versions ---
-function pollCrateUpdate() {
-  var d = ME.querySelector('.crate-update-status');
-  d.style.display = 'block';
-  if (me.cratePoll) clearInterval(me.cratePoll);
-  me.cratePoll = setInterval(function() {
+// --- Advanced: engine versions and reinstall ---
+// update_crates and hard_reset start detached runners that both report through
+// update_crates_status. One renderer turns that status into a checklist: a
+// missing kind is an update, a missing steps count is the kind's own (4 or 6).
+me.ENGINE_STEPS = {
+  update: ['Build Newbound with the new versions', 'Regenerate app code', 'Recompile add-on libraries', 'Final build'],
+  hardreset: ['Download Newbound from GitHub', 'Replace platform code and core data', 'Build the new copy',
+              'Regenerate app code', 'Recompile add-on libraries', 'Final build']
+};
+me.engine = null;      // {fl, nd} as crate_versions reported them
+me.runActive = false;  // a run is starting or running: one at a time
+me.runSeen = null;     // time of the last status record seen: an old record is not a new run
+me.isVersion = function(v) { return /^\d[0-9A-Za-z.-]*$/.test(v); };
+function eq(sel) { return SS.querySelector(sel); }
+function engineErr(sel, msg) {
+  var el = eq(sel);
+  el.textContent = msg || '';
+  el.classList.toggle('ss-show', !!msg);
+}
+
+// Enables what may run now: Update only for a real, allowed version change,
+// Reinstall now only on the saved device name, nothing while a run is going.
+function engineUpdate() {
+  var fl = dget('flowlangver').value.trim(), nd = dget('ndataver').value.trim();
+  var e = me.engine || { fl: fl, nd: nd };
+  var changed = fl !== e.fl || nd !== e.nd;
+  var err = '';
+  if (!me.isVersion(fl) || !me.isVersion(nd)) err = 'Versions look like 0.3.41: digits and dots.';
+  else if (nd !== e.nd && fl === e.fl) err = "ndata can't change on its own. New ndata versions ship with a flowlang release, so change flowlang too.";
+  engineErr('.ss-ver-err', changed ? err : '');
+  eq('.ss-ver-help').style.display = changed ? 'none' : '';
+  dget('flowlangver').disabled = dget('ndataver').disabled = me.runActive;
+  eq('.ss-upd').disabled = me.runActive || !me.engine || !changed || !!err;
+  eq('.ss-hr').disabled = me.runActive;
+  eq('.ss-hr-go').disabled = me.runActive || !me.saved || eq('.ss-hr-name').value !== me.saved.machineid;
+  if (me.runActive) {
+    eq('.ss-upd-confirm').classList.remove('ss-show');
+    eq('.ss-hr-confirm').classList.remove('ss-show');
+  }
+}
+
+function setLog(prog, open) {
+  prog.querySelector('.ss-log').classList.toggle('ss-show', open);
+  prog.querySelector('.ss-loglink').textContent = open ? 'Hide build log' : 'Show build log';
+}
+SS.querySelectorAll('.ss-prog').forEach(function(prog) {
+  prog.querySelector('.ss-loglink').addEventListener('click', function() {
+    setLog(prog, !prog.querySelector('.ss-log').classList.contains('ss-show'));
+  });
+});
+
+// The checklist for one status record. Steps before `step` are done, `step`
+// runs (or failed, with the server's label under it), later ones wait.
+// Every server string goes in as text.
+me.renderRun = function(r) {
+  var kind = r.kind == 'hardreset' ? 'hardreset' : 'update';
+  var prog = eq('.ss-prog-' + kind);
+  eq('.ss-prog-' + (kind == 'update' ? 'hardreset' : 'update')).classList.remove('ss-show');
+  var state = r.state;
+  var failed = state == 'failed' || state == 'stalled';
+  if (state != 'running' && state != 'done' && !failed) {
+    prog.classList.remove('ss-show');
+    me.runActive = false;
+    engineUpdate();
+    return;
+  }
+  var labels = me.ENGINE_STEPS[kind].slice();
+  var total = +r.steps > 0 ? +r.steps : labels.length;
+  while (labels.length < total) labels.push('Step ' + (labels.length + 1));
+  labels = labels.slice(0, total);
+  var step = +r.step || 0;
+  var ul = prog.querySelector('.ss-steps');
+  ul.textContent = '';
+  var labelShown = false;
+  labels.forEach(function(text, i) {
+    var n = i + 1;
+    var li = document.createElement('li');
+    li.className = state == 'done' || n < step ? 'ss-done' : n == step ? (failed ? 'ss-fail' : 'ss-run') : '';
+    var dot = document.createElement('span');
+    dot.className = 'ss-st';
+    var tx = document.createElement('span');
+    tx.textContent = text;
+    li.appendChild(dot);
+    li.appendChild(tx);
+    if (failed && n == step && r.label) {
+      var lb = document.createElement('div');
+      lb.className = 'ss-step-label';
+      lb.textContent = r.label;
+      li.appendChild(lb);
+      labelShown = true;
+    }
+    ul.appendChild(li);
+  });
+
+  var msg = prog.querySelector('.ss-prog-msg');
+  msg.textContent = '';
+  msg.className = 'ss-prog-msg';
+  if (state == 'running') {
+    msg.textContent = (step < 1 ? 'Starting. ' : '') + 'This takes several minutes. You can close Settings; progress continues.';
+  } else if (failed) {
+    msg.classList.add('ss-bad');
+    msg.textContent = (state == 'stalled' ? 'The run stopped without reporting' : 'Stopped') +
+      (step ? ' at step ' + step + ' of ' + total : '') + '.' + (!labelShown && r.label ? ' ' + r.label : '');
+  } else if (r.verdict == 'no-restart') {
+    msg.classList.add('ss-ok');
+    msg.textContent = "Done. The program didn't change, so no restart is needed.";
+  } else {
+    msg.classList.add('ss-ok');
+    msg.appendChild(document.createTextNode(r.verdict != 'restart' ? 'Done. Restart to be sure the new code runs.' :
+      kind == 'hardreset' ? 'Reinstalled. Restart to finish.' : 'Built. Restart to switch to the new versions.'));
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'coloredbutton ss-restart-now';
+    b.textContent = 'Restart now';
+    var berr = document.createElement('div');
+    berr.className = 'ss-prog-err';
+    b.addEventListener('click', function() {
+      if (me.ssBusy) return;
+      b.disabled = true;
+      berr.textContent = '';
+      me.restartNow(function(m) { b.disabled = false; berr.textContent = 'The restart failed: ' + m; });
+    });
+    msg.appendChild(b);
+    msg.appendChild(berr);
+  }
+
+  var lines = String(r.log_tail || '').replace(/\s+$/, '').split('\n').slice(-12).join('\n');
+  prog.querySelector('.ss-log').textContent = lines;
+  prog.querySelector('.ss-loglink').hidden = !lines;
+  if (!lines) setLog(prog, false);
+  else if (failed) setLog(prog, true);
+
+  prog.classList.add('ss-show');
+  me.runActive = state == 'running';
+  if (state == 'done') loadEngine();
+  engineUpdate();
+};
+
+// Follows the run every 3 s while it runs. Right after a start the runner may
+// not have written yet: a finished record with the time seen before the start
+// is the previous run, so it is skipped (up to 10 polls).
+function pollRun(fresh) {
+  clearInterval(me.runPoll);
+  var skips = 0;
+  me.runPoll = setInterval(function() {
     json('../dev/update_crates_status', null, function(r) {
-      var s = 'state: ' + r.state + '   step ' + (r.step || 0) + '/' + (r.steps || 4) + '   ' + (r.label || '');
-      if (r.state == 'done') s += '\nverdict: ' + r.verdict + (r.verdict == 'restart' ? ' — press Save and Restart to apply' : '');
-      if (r.log_tail) s += '\n---\n' + r.log_tail.split('\n').slice(-12).join('\n');
-      d.textContent = s;
-      if (r.state != 'running') clearInterval(me.cratePoll);
+      if (!r || !r.state) return;
+      if (fresh && r.state != 'running' && r.time == me.runSeen && skips++ < 10) return;
+      fresh = false;
+      me.runSeen = r.time;
+      me.renderRun(r);
+      if (r.state != 'running') { clearInterval(me.runPoll); me.runPoll = null; }
     });
   }, 3000);
 }
 
-ME.querySelector('.open-system-settings').addEventListener('click', function() {
+function startRun(kind, url, args, errSel) {
+  if (me.runActive) return;
+  me.runActive = true;
+  engineErr(errSel, '');
+  engineUpdate();
+  json(url, args, function(r) {
+    if (!r || r.status != 'ok') {
+      me.runActive = false;
+      engineErr(errSel, (r && r.msg) || 'No reply from the server.');
+      engineUpdate();
+      return;
+    }
+    setLog(eq('.ss-prog-' + kind), false);
+    me.renderRun({ state: 'running', step: 0, kind: kind });
+    pollRun(true);
+  });
+}
+
+function loadEngine() {
   json('../dev/crate_versions', null, function(r) {
-    var section = ME.querySelector('.crate-section');
-    if (r.status == 'ok') {
+    var section = eq('.crate-section');
+    if (r && r.status == 'ok') {
       section.style.display = '';
-      dget('flowlangver').value = r.flowlang;
-      dget('ndataver').value = r.ndata;
-      section.querySelector('.ss-sum-meta').textContent = 'flowlang ' + r.flowlang + ' · ndata ' + r.ndata;
+      me.engine = { fl: String(r.flowlang), nd: String(r.ndata) };
+      if (!me.runActive) {
+        dget('flowlangver').value = me.engine.fl;
+        dget('ndataver').value = me.engine.nd;
+      }
+      section.querySelector('.ss-sum-meta').textContent = 'flowlang ' + me.engine.fl + ' · ndata ' + me.engine.nd;
     } else {
       section.style.display = 'none';
+      me.engine = null;
     }
+    engineUpdate();
   });
+}
+
+['flowlangver', 'ndataver'].forEach(function(id) {
+  dget(id).addEventListener('input', function() {
+    eq('.ss-upd-confirm').classList.remove('ss-show');
+    engineErr('.ss-upd-err', '');
+    engineUpdate();
+  });
+});
+eq('.ss-upd').addEventListener('click', function() {
+  engineErr('.ss-upd-err', '');
+  eq('.ss-upd-what').textContent = 'flowlang ' + dget('flowlangver').value.trim() + ' · ndata ' + dget('ndataver').value.trim();
+  eq('.ss-upd-confirm').classList.add('ss-show');
+});
+eq('.ss-upd-cancel').addEventListener('click', function() { eq('.ss-upd-confirm').classList.remove('ss-show'); });
+eq('.ss-upd-go').addEventListener('click', function() {
+  eq('.ss-upd-confirm').classList.remove('ss-show');
+  var fl = dget('flowlangver').value.trim(), nd = dget('ndataver').value.trim();
+  startRun('update', '../dev/update_crates', 'flowlang=' + encodeURIComponent(fl) + '&ndata=' + encodeURIComponent(nd), '.ss-upd-err');
+});
+
+function hrReset() {
+  eq('.ss-hr-confirm').classList.remove('ss-show');
+  eq('.ss-hr-name').value = '';
+}
+eq('.ss-hr').addEventListener('click', function() {
+  engineErr('.ss-hr-err', '');
+  eq('.ss-hr-want').textContent = me.saved ? me.saved.machineid : '';
+  eq('.ss-hr-name').value = '';
+  eq('.ss-hr-confirm').classList.add('ss-show');
+  engineUpdate();
+  eq('.ss-hr-name').focus();
+});
+eq('.ss-hr-name').addEventListener('input', engineUpdate);
+eq('.ss-hr-cancel').addEventListener('click', function() { hrReset(); engineUpdate(); });
+eq('.ss-hr-go').addEventListener('click', function() {
+  if (!me.saved || eq('.ss-hr-name').value !== me.saved.machineid) return;
+  hrReset();
+  startRun('hardreset', '../dev/hard_reset', 'url=', '.ss-hr-err');
+});
+
+ME.querySelector('.open-system-settings').addEventListener('click', function() {
+  eq('.ss-upd-confirm').classList.remove('ss-show');
+  hrReset();
+  engineErr('.ss-upd-err', '');
+  engineErr('.ss-hr-err', '');
+  loadEngine();
+  if (me.runPoll) return;  // a run started from this page is still being followed
+  // On open, only a run that is going right now shows its checklist; an old
+  // done or failed record stays hidden until the user starts a run.
   json('../dev/update_crates_status', null, function(r) {
-    if (r.state == 'running') pollCrateUpdate();
-  });
-});
-
-ME.querySelector('.update-crates').addEventListener('click', function() {
-  var fl = dget('flowlangver').value.trim();
-  var nd = dget('ndataver').value.trim();
-  if (!fl || !nd) { alert('Enter both crate versions.'); return; }
-  if (!confirm('Pin flowlang ' + fl + ' / ndata ' + nd + ' and rebuild the whole platform? This takes several minutes.')) return;
-  json('../dev/update_crates', 'flowlang=' + encodeURIComponent(fl) + '&ndata=' + encodeURIComponent(nd), function(r) {
-    var d = ME.querySelector('.crate-update-status');
-    d.style.display = 'block';
-    d.textContent = r.msg || r.state || 'launched';
-    if (r.status == 'ok') pollCrateUpdate();
-  });
-});
-
-ME.querySelector('.hard-reset').addEventListener('click', function() {
-  if (!confirm('HARD RESET: re-clone canon newbound from GitHub over this instance (platform sources and core store), rebuild everything, and restart when done. Local libraries are untouched. This takes several minutes. Continue?')) return;
-  json('../dev/hard_reset', 'url=', function(r) {
-    var d = ME.querySelector('.crate-update-status');
-    d.style.display = 'block';
-    d.textContent = r.msg || 'launched';
-    if (r.status == 'ok') pollCrateUpdate();
+    me.runSeen = r ? r.time : null;
+    if (r && r.state == 'running') { me.renderRun(r); pollRun(false); }
+    else {
+      eq('.ss-prog-update').classList.remove('ss-show');
+      eq('.ss-prog-hardreset').classList.remove('ss-show');
+      me.runActive = false;
+      engineUpdate();
+    }
   });
 });
 

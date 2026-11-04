@@ -146,17 +146,46 @@
                 <input type='text' class='textinput ss-mono' id='ndataver' placeholder='e.g. 0.3.18' autocomplete='off'>
               </div>
             </div>
+            <div class='ss-err ss-ver-err' role='alert'></div>
             <div class='ss-help ss-hint ss-ver-help'>Edit a version above to enable the update. Versions aren't saved by the Save button.</div>
             <div class='ss-btn-row'>
-              <button type='button' class='regularbutton update-crates'>Update Crates</button>
+              <button type='button' class='regularbutton ss-upd' disabled>Update and rebuild</button>
             </div>
-            <div class='crate-update-status' style='display:none;'></div>
+            <div class='ss-err ss-upd-err' role='alert'></div>
+            <div class='ss-confirm ss-upd-confirm'>
+              Rebuild the platform with <b class='ss-upd-what'></b>? Newbound keeps running while it builds.
+              <div class='ss-btn-row'>
+                <button type='button' class='coloredbutton ss-upd-go'>Start rebuild</button>
+                <button type='button' class='clearbutton ss-upd-cancel'>Not now</button>
+              </div>
+            </div>
+            <div class='ss-prog ss-prog-update' aria-live='polite'>
+              <ul class='ss-steps'></ul>
+              <div class='ss-prog-msg'></div>
+              <button type='button' class='ss-loglink'>Show build log</button>
+              <div class='ss-log'></div>
+            </div>
           </div>
           <div class='ss-danger'>
             <p class='ss-sub-title'>Reinstall Newbound (hard reset)</p>
             <div class='ss-help ss-help-top'>Downloads a fresh copy of Newbound from GitHub and replaces the platform code and core data with it. Your own libraries are kept. Any changes you made to the built-in apps are lost. Rebuilds everything, then asks you to restart.</div>
             <div class='ss-btn-row'>
-              <button type='button' class='regularbutton ss-btn-danger hard-reset'>Hard Reset</button>
+              <button type='button' class='regularbutton ss-btn-danger ss-hr'>Reinstall…</button>
+            </div>
+            <div class='ss-err ss-hr-err' role='alert'></div>
+            <div class='ss-confirm ss-confirm-danger ss-hr-confirm'>
+              Type <b class='ss-hr-want ss-mono'></b> to confirm.
+              <input type='text' class='textinput ss-mono ss-hr-name' placeholder='Device name' autocomplete='off' aria-label='Type the device name to confirm'>
+              <div class='ss-btn-row'>
+                <button type='button' class='regularbutton ss-btn-danger-solid ss-hr-go' disabled>Reinstall now</button>
+                <button type='button' class='clearbutton ss-hr-cancel'>Cancel</button>
+              </div>
+            </div>
+            <div class='ss-prog ss-prog-hardreset' aria-live='polite'>
+              <ul class='ss-steps'></ul>
+              <div class='ss-prog-msg'></div>
+              <button type='button' class='ss-loglink'>Show build log</button>
+              <div class='ss-log'></div>
             </div>
           </div>
         </details>
