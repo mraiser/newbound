@@ -61,12 +61,13 @@
             <span class='ss-tag ss-hint'>Applies on save</span>
           </div>
           <div class='ss-field ss-f-name'>
-            <label class='textinputlabel ss-label' for='devicename'>Device name</label>
-            <input type='text' class='textinput' id='devicename' autocomplete='off'>
+            <label class='textinputlabel ss-label' for='devicename'>Device name <span class='ss-dot' aria-hidden='true'></span></label>
+            <input type='text' class='textinput' id='devicename' autocomplete='off' aria-describedby='ss-name-err'>
+            <div class='ss-err' id='ss-name-err'>Give the device a name.</div>
             <div class='ss-help ss-hint'>How this device shows up to your other Newbound devices, for example in Peers.</div>
           </div>
           <div class='ss-field ss-f-app'>
-            <label class='textinputlabel ss-label' for='defaultbot'>Start page</label>
+            <label class='textinputlabel ss-label' for='defaultbot'>Start page <span class='ss-dot' aria-hidden='true'></span></label>
             <select name='defaultbot' class='textinput' id='defaultbot'></select>
             <div class='ss-help ss-hint'>The app that opens when you go to this device's address without naming an app.</div>
           </div>
@@ -78,7 +79,7 @@
             <span class='ss-tag ss-net-tag ss-hint'>Needs restart</span>
           </div>
           <div class='ss-field ss-f-bind'>
-            <div class='textinputlabel ss-label' id='ss-bind-label'>Who can open this device</div>
+            <div class='textinputlabel ss-label' id='ss-bind-label'>Who can open this device <span class='ss-dot' aria-hidden='true'></span></div>
             <div class='ss-choices' role='radiogroup' aria-labelledby='ss-bind-label'>
               <label class='ss-choice'>
                 <input type='radio' name='ss-bind' value='127.0.0.1'>
@@ -106,18 +107,22 @@
               </label>
             </div>
             <div class='ss-custom-ip'>
-              <input type='text' class='textinput ss-mono' id='ipaddr' placeholder='e.g. 192.168.1.42' autocomplete='off' aria-label='Specific IP address'>
+              <input type='text' class='textinput ss-mono' id='ipaddr' placeholder='e.g. 192.168.1.42' autocomplete='off' aria-label='Specific IP address' aria-describedby='ss-ip-err'>
+              <div class='ss-err' id='ss-ip-err'>That doesn't look like an IP address.</div>
             </div>
           </div>
           <div class='ss-field ss-f-port'>
-            <label class='textinputlabel ss-label' for='portnum'>Port</label>
-            <input type='number' class='textinput ss-mono' id='portnum' min='0' max='65535' inputmode='numeric'>
+            <label class='textinputlabel ss-label' for='portnum'>Port <span class='ss-dot' aria-hidden='true'></span></label>
+            <input type='number' class='textinput ss-mono' id='portnum' min='0' max='65535' inputmode='numeric' aria-describedby='ss-port-err'>
+            <div class='ss-err' id='ss-port-err'>Use a number from 0 to 65535.</div>
             <div class='ss-help ss-hint'>Enter 0 to let Newbound pick a free port when it starts. Changing it breaks bookmarks and peer links that use the old port.</div>
           </div>
           <div class='ss-addr' aria-live='polite'>
             <div class='ss-addr-row'><span>On this computer</span><code class='ss-addr-local'></code></div>
             <div class='ss-addr-row'><span>From other devices</span><code class='ss-addr-lan'></code></div>
           </div>
+          <div class='ss-warn ss-warn-remote'>You're using this page from another device. After the restart you won't be able to open it from here.</div>
+          <div class='ss-warn ss-warn-port0'>Newbound will pick a new port at start. You'll find it in config.properties (http_port).</div>
         </section>
 
         <details class='ss-adv crate-section' style='display:none;'>
@@ -157,10 +162,21 @@
         </details>
       </div>
 
-      <div class='ss-foot card-button-wrap'>
-        <a class="regularbutton close-system-settings">Cancel</a>
-        <a class="clearbutton save-system-settings close-system-settings">Save</a>
-        <a class="coloredbutton save-and-restart">Save and Restart</a>
+      <div class='ss-foot'>
+        <div class='ss-foot-err' role='alert'></div>
+        <div class='ss-foot-status' aria-live='polite'>No changes</div>
+        <div class='ss-foot-btns'>
+          <button type='button' class='regularbutton close-system-settings ss-cancel'>Cancel</button>
+          <button type='button' class='clearbutton ss-save-only' hidden>Save only</button>
+          <button type='button' class='coloredbutton ss-save' disabled>Save</button>
+        </div>
+      </div>
+
+      <div class='ss-overlay' role='status' aria-live='polite'>
+        <div class='ss-spinner'></div>
+        <div class='ss-ov-msg'>Restarting Newbound…</div>
+        <div class='ss-ov-msg2'></div>
+        <div class='ss-ov-msg3'></div>
       </div>
     </div>
   </div>

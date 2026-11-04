@@ -176,6 +176,8 @@
 
 /* Help off: only titles, labels and fields. */
 .system-settings:not(.ss-showhelp) .ss-hint { display: none; }
+/* ...but a lit "Needs restart" tag is a state, not an explanation: always shown. */
+.system-settings:not(.ss-showhelp) .ss-tag.ss-on { display: inline-block; }
 
 .system-settings .ss-body {
   flex: 1 1 auto;
@@ -186,7 +188,46 @@
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
-.system-settings .ss-foot { flex: none; flex-wrap: wrap; padding: 12px 20px; }
+.system-settings .ss-frame { position: relative; }
+
+/* Footer: status on the left, buttons on the right; errors take a full row. */
+.system-settings .ss-foot {
+  flex: none; border-top: 1px solid var(--line-soft); padding: 12px 20px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap;
+}
+.system-settings .ss-foot-status { font-size: 13px; color: var(--text-dim); min-height: 20px; display: flex; align-items: center; }
+.system-settings .ss-foot-status.ss-restart { color: var(--accent); }
+.system-settings .ss-foot-btns { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+.system-settings .ss-foot-btns button { font-family: inherit; line-height: 1.2; padding: 10px 14px; white-space: nowrap; }
+.system-settings .ss-foot-btns button[hidden] { display: none; }
+.system-settings .ss-foot-btns button:disabled { opacity: 0.45; cursor: default; pointer-events: none; }
+.system-settings .ss-foot-err { flex: 1 0 100%; font-size: 13px; color: #e08585; display: none; overflow-wrap: anywhere; }
+.system-settings .ss-foot-err.ss-show { display: block; }
+
+/* Change tracking, validation, warnings. */
+.system-settings .ss-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); display: none; flex: none; }
+.system-settings .ss-field.ss-dirty .ss-dot { display: inline-block; }
+.system-settings .ss-err { font-size: 13px; color: #e08585; margin-top: 6px; display: none; }
+.system-settings .ss-err.ss-show { display: block; }
+.system-settings .textinput.ss-bad, .system-settings .textinput.ss-bad:focus { border-color: var(--danger); }
+.system-settings .ss-warn { font-size: 13px; color: var(--accent); margin-top: 12px; display: none; }
+.system-settings .ss-warn.ss-show { display: block; }
+
+/* Restart overlay, inside the frame. */
+.system-settings .ss-overlay {
+  position: absolute; inset: 0; z-index: 3; background: rgba(23, 26, 30, 0.94);
+  display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  text-align: center; padding: 24px;
+}
+.system-settings .ss-overlay.ss-show { display: flex; }
+.system-settings .ss-spinner { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--accent); border-top-color: transparent; animation: ss-spin .9s linear infinite; }
+.system-settings .ss-overlay.ss-stopped .ss-spinner { display: none; }
+@keyframes ss-spin { to { transform: rotate(360deg); } }
+.system-settings .ss-ov-msg { font-size: 15px; color: var(--text); }
+.system-settings .ss-ov-msg2 { font-size: 13px; color: var(--text-dim); max-width: 360px; overflow-wrap: anywhere; }
+.system-settings .ss-ov-msg2 a { color: var(--accent); font-family: var(--mono); }
+.system-settings .ss-ov-msg3 { font-size: 13px; color: #e08585; max-width: 360px; }
+.system-settings .ss-ov-msg3:empty { display: none; }
 
 .system-settings .ss-section { padding-top: 18px; }
 .system-settings .ss-section + .ss-section { border-top: 1px solid var(--line-soft); margin-top: 18px; }
@@ -287,6 +328,8 @@
   .system-settings .ss-addr { margin-top: 12px; padding: 8px 10px; }
   .system-settings .ss-foot { padding-top: 8px; padding-bottom: 8px; }
   .system-settings .regularbutton, .system-settings .clearbutton, .system-settings .coloredbutton { padding: 8px 14px; }
+  .system-settings .ss-foot-btns button { padding: 8px 12px; }
+  .system-settings .ss-foot-status { display: none; }
 }
 
 @media (max-width: 480px) {
@@ -294,6 +337,7 @@
   .system-settings .ss-body { padding: 4px 16px 16px; }
   .system-settings .ss-foot { padding-left: 16px; padding-right: 16px; }
   .system-settings .ss-pair { grid-template-columns: 1fr; }
-  .system-settings .ss-foot > a { flex: 1 1 auto; text-align: center; }
-  .system-settings .ss-foot > .coloredbutton { flex-basis: 100%; }
+  .system-settings .ss-foot-btns { width: 100%; }
+  .system-settings .ss-foot-btns button { flex: 1 1 auto; text-align: center; }
+  .system-settings .ss-foot-btns .coloredbutton { flex-basis: 100%; }
 }
