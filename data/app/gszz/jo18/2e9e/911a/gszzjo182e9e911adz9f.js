@@ -305,6 +305,21 @@ function ssToast(msg) { if (me.ui && me.ui.snackbarMsg) me.ui.snackbarMsg(msg); 
 // The header's ✕ is app.ui's close: it runs the close animation and removes the backdrop.
 function ssClose() { SS.querySelector('.ss-head .close-system-settings').click(); }
 
+// Escape closes Settings like the ✕ (edits discarded). Not while the restart
+// overlay shows, and not from a <select>: there Escape belongs to its list
+// (a page can't tell an open list from a closed one, so a focused select keeps it).
+me.ssIsOpen = function() {
+  return SS.getClientRects().length > 0 && getComputedStyle(SS).visibility != 'hidden';
+};
+document.addEventListener('keydown', function(e) {
+  if (e.key != 'Escape' || e.defaultPrevented || e.isComposing) return;
+  if (!me.ssIsOpen()) return;
+  if (SS.querySelector('.ss-overlay').classList.contains('ss-show')) return;
+  if (e.target && e.target.tagName == 'SELECT') return;
+  e.preventDefault();
+  ssClose();
+});
+
 // Save sends only the four keys. With restart, a saved config is followed by
 // restart_instance; an ERROR: reply stays inline and the dialog stays open.
 function ssSave(restart) {
