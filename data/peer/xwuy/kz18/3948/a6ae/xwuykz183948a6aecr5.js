@@ -692,8 +692,15 @@ ME.querySelector('.control-settings-popup').addEventListener("mouseleave", funct
 
 ME.querySelector('.refreshhud').addEventListener("click", me.refresh);
 
-ME.querySelector('.closeonclick').addEventListener("click", function(){
-  ME.querySelector('.control-settings-popup').style.display = 'none';
+// Phase 4 review: every .closeonclick row closes the ⋮ card — the old
+// querySelector (singular) bound only the first row (Refresh), so picking
+// Add Control left the menu open on top of the modal, and still open after
+// the modal closed. app.ui's non-modal close only fires for clicks OUTSIDE
+// the card, so the rows must close it themselves.
+ME.querySelectorAll('.closeonclick').forEach(function(row){
+  row.addEventListener("click", function(){
+    ME.querySelector('.control-settings-popup').style.display = 'none';
+  });
 });
 
 // --- Platform crate versions on the remote peer (crate-update feature) ---
