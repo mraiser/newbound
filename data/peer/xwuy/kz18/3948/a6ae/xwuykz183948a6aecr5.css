@@ -230,7 +230,6 @@
   flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--hud-tile-gap);
-  container-type: inline-size;   /* cqw = the dashboard's inner width */
 }
 
 .hudpanel .hudapps > .hudapps-empty {
@@ -263,7 +262,7 @@
    navbar), so an auto-height slot would collapse it to nothing. 16:9 is
    the camera's default resolution, so its image fills the row's width;
    in-flow content taller than that grows the slot (height:auto above a
-   min-height — not aspect-ratio, whose grow-with-content minimum is
+   floated 16:9 strut — not aspect-ratio, whose grow-with-content minimum is
    lost on a scroll container). overflow-y:auto keeps what a tile paints
    OUTSIDE its own boxes inside its slot: at a 360px panel the camera's
    DVR tab fits its controls into the slot by shrinking its image to 0
@@ -272,8 +271,22 @@
 .hudpanel .hudtilewrap > .hudtile.big {
   width: 100%;
   height: auto;
-  min-height: calc(100cqw * 9 / 16);
   overflow-y: auto;
+}
+
+/* P04 (QA 1): the 16:9 minimum is this floated strut, not a container
+   query. container-type on .hudapps made it the containing block AND
+   stacking context for position:fixed descendants, so a tile's own
+   modal (the camera settings popup, z15) painted UNDER the kit's
+   .greyedout backdrop (z5 on body) and took no clicks. The strut's
+   padding-top resolves against the tile's width (its full row), and
+   the tile's overflow:auto BFC contains the float, so height still
+   follows content above the same 16:9 minimum. */
+.hudpanel .hudtilewrap > .hudtile.big::before {
+  content: '';
+  float: left;
+  width: 0;
+  padding-top: calc(100% * 9 / 16);
 }
 
 /* D4: an icon tile is a fixed square (peer:reboot draws its canvas from
