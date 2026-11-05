@@ -14,7 +14,7 @@
     <div class='card popupcard mini control-settings-popup'>
       <table class="tablelist">
         <tr><td class="refreshhud closeonclick">Refresh</td></tr>
-        <tr><td class="adminonly popupmenu closeonclick" data-popup='{"selector":".add-control-popup","closeselector":".add-control-popup-close","modal":true}'>Add Control</td></tr>
+        <tr><td class="hudaddcontrol adminonly popupmenu closeonclick" data-popup='{"selector":".add-control-popup","closeselector":".add-control-popup-close","modal":true}'>Add Control</td></tr>
         <tr><td class="adminonly closeonclick">Control Settings</td></tr>
         <tr><td class="hudrestart adminonly closeonclick">Restart Services</td></tr>
       </table>
@@ -76,9 +76,9 @@
     <div class='hudapps'></div>
   </div>
   <div class='add-control-popup card popup-card modal hideme'>
-    <div class='dialog-header padme'>
-      Add Control
-      <img src='../app/asset/app/icons/ui/dark/close.svg' class='upper-right add-control-popup-close roundbutton-small out10'>
+    <div class='dialog-header hud-dlg-head'>
+      <span class='hud-dlg-title'>Add Control</span>
+      <img src='../app/asset/app/icons/ui/dark/close.svg' class='add-control-popup-close roundbutton-small-white' alt='Close' title='Close'>
     </div>
     <div class='card-text'>
       <div class = 'add-control-available'></div>

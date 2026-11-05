@@ -185,15 +185,37 @@ me.ready = function(){
           var td = document.createElement('td');
           td.className = 'add-ctl-item';
           td.dataset.id = i;
-          td.textContent = rdi.title;
+          td.dataset.type = rdi.type;
+          // D6: the title on the left, the "Added" mark on the right (shown
+          // by markAdded when the type is already on the dashboard). The ✓
+          // is the kit's check icon — text glyphs render as boxes in some
+          // fonts (the edit bar's arrows did).
+          var row = document.createElement('div');
+          row.className = 'add-ctl-row';
+          var name = document.createElement('span');
+          name.className = 'add-ctl-title';
+          name.textContent = rdi.title;
+          var added = document.createElement('span');
+          added.className = 'add-ctl-added';
+          added.textContent = 'Added';
+          var ok = document.createElement('img');
+          ok.src = '../app/asset/app/icons/ui/dark/check.svg';
+          ok.alt = '';
+          added.appendChild(ok);
+          row.appendChild(name);
+          row.appendChild(added);
+          td.appendChild(row);
           tr.appendChild(td);
           tbl.appendChild(tr);
         }
       }
       if (tbl.rows.length == 0) el.innerHTML = '<i>there are no available controls to install on this device</i>';
       else { el.innerHTML = ''; el.appendChild(tbl); }
+      markAdded(me.data && me.data.list);
       el.querySelectorAll('.add-ctl-item').forEach(function(item){
         item.addEventListener('click', function(){
+          // D6: a control already on the dashboard can't be picked
+          if (this.classList.contains('added')) return;
           var d = me.available[this.dataset.id];
           // F11: never write over a list we haven't just seen — a stale or
           // empty me.data would replace the peer's real dashboard. Re-read
@@ -207,6 +229,16 @@ me.ready = function(){
             if (rr.status == 'ok') fresh = rr.data && rr.data.list ? rr.data : { "list": [] };
             else if (rr.msg == 'NOT FOUND') fresh = { "list": [] };
             else { errEl.textContent = errText(rr); return; }
+            // D6: the fresh list decides — if the type is already there
+            // (added meanwhile, or the marks were stale), write nothing,
+            // say so, and show the peer's real dashboard. Lists that
+            // already hold duplicates are left alone; D5's ✕ removes them.
+            if (fresh.list.some(function(c){ return c && c.type == d.type; })) {
+              me.data = fresh;
+              buildControls();
+              errEl.textContent = (d.title || d.type) + ' is already on the dashboard.';
+              return;
+            }
             fresh.list.push(d);
             json('../peer/remote/'+ME.DATA.id+'/app/write', "lib=runtime&id=controls_shared&readers=[]&writers=[]&data="+encodeURIComponent(JSON.stringify(fresh)), function(result){
               if (result.status != 'ok') { errEl.textContent = errText(result); return; }
@@ -243,6 +275,7 @@ function buildControls(){
   // use the menu, so it carries .adminonly and F7's .isadmin rule decides
   // whether it shows.
   var list = data && data.list ? data.list : [];
+  markAdded(list);
   if (list.length == 0){
     var note = document.createElement('div');
     note.className = 'hudapps-empty';
@@ -286,6 +319,35 @@ function buildControls(){
   }
   decorateTiles();
 }
+
+// D6: a control already on the dashboard is greyed in Add Control, marked
+// "Added", not clickable (the click handler checks .added) and
+// aria-disabled. Matched by type; a list with duplicates just marks once.
+function markAdded(list){
+  var on = {};
+  (list || []).forEach(function(c){ if (c && c.type) on[c.type] = true; });
+  ME.querySelectorAll('.add-control-available .add-ctl-item').forEach(function(td){
+    var added = on[td.dataset.type] === true;
+    td.classList.toggle('added', added);
+    td.setAttribute('aria-disabled', added ? 'true' : 'false');
+    if (added) td.title = 'Already on the dashboard';
+    else td.removeAttribute('title');
+  });
+}
+
+// D6: the list re-checks each time it opens — the dashboard may have
+// changed since the panel loaded (another viewer, another tab). Mark from
+// what we have at once, then from a fresh read; a failed read keeps the
+// marks we had (the write path re-reads and refuses anyway).
+ME.querySelector('.hudaddcontrol').addEventListener('click', function(){
+  if (!this.hasAttribute('data-popup')) return;   // F11: disabled
+  ME.querySelector('.add-control-error').textContent = '';
+  markAdded(me.data && me.data.list);
+  json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_shared", function(rr){
+    if (rr.status == 'ok') markAdded(rr.data && rr.data.list);
+    else if (rr.msg == 'NOT FOUND') markAdded([]);
+  });
+});
 
 // D5: edit mode. Each tile gets an overlay (it swallows clicks, so a tile's
 // own buttons — Reboot — can't be pressed while editing) with a bar of

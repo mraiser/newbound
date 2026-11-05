@@ -419,6 +419,80 @@
   cursor: default;
 }
 
+/* D7: the Add Control header is one row — the title, and the ✕ at the
+   right, centred on it. The old ✕ was .upper-right (absolute, top:50%)
+   inside an unpositioned header, so it centred on the whole card and sat
+   over the first list row. Title style copied from the app's Settings
+   dialog (app.app .ss-head / .ss-title): 18px, weight 500, --text, on a
+   14px 12px 14px 20px header. The kit's .dialog-header already supplies
+   the flex row, --panel-2 and the bottom rule. */
+.add-control-popup .hud-dlg-head {
+  padding: 14px 12px 14px 20px;
+  gap: 12px;
+}
+
+.add-control-popup .hud-dlg-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.add-control-popup .add-control-popup-close {
+  flex: none;
+}
+
+/* D6: an Add Control row is the title, and on the right an "Added ✓"
+   mark that shows only when the type is already on the dashboard; such a
+   row is greyed, has no hover tint and no pointer (the click handler
+   ignores it too). */
+.add-control-popup .add-ctl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.add-control-popup .add-ctl-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.add-control-popup .add-ctl-added {
+  display: none;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.add-control-popup .add-ctl-added > img {
+  width: 16px;
+  height: 16px;
+}
+
+.add-control-popup .add-ctl-item.added .add-ctl-added {
+  display: inline-flex;
+}
+
+.add-control-popup .tablelist td.add-ctl-item.added {
+  cursor: default;
+  color: var(--text-dim);
+}
+
+.add-control-popup .tablelist tr:hover td.add-ctl-item.added {
+  background-color: transparent;
+}
+
+.add-control-popup .add-ctl-item.added .add-ctl-title {
+  opacity: 0.6;
+}
+
 /* F11: write-path errors in the Add Control popup */
 .add-control-error {
   color: #d06060;
