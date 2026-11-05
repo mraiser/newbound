@@ -8,10 +8,19 @@ if check_auth(&lib, &id, &nn_sessionid, false) {
   let mut args = args.clone();
   args.put_string("nn_sessionid", &nn_sessionid);
   let command = Command::new(&lib, &id);
-  command.cast_params(args.clone());
+  // Arguments that do not fit the declared types are the caller's error, not a panic.
+  if let Err(m) = command.try_cast_params(args.clone()) {
+    let mut o = DataObject::new();
+    o.put_string("status", "err");
+    o.put_string("msg", &m);
+    return o;
+  }
   let result = panic::catch_unwind(|| {
-    let o = command.execute(args).unwrap();
-    return format_result(command, o);
+    match command.execute(args) {
+      Ok(o) => format_result(command, o),
+      // A failed flow: {status: "err", msg: what failed and where, flow_error: the details}.
+      Err(e) => e.to_envelope(),
+    }
   });
 
   match result {

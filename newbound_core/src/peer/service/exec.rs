@@ -63,12 +63,9 @@ pub fn exec(uuid: String, app: String, cmd: String, params: DataObject) -> DataO
 if uuid == "local" {
   let cmd = Command::lookup(&app.clone(), &app.clone(), &cmd.clone());
   let o = cmd.execute(params);
-  if o.is_err(){
-    let mut res = DataObject::new();
-    res.put_string("status", "err");
-    let msg = format!("{:?}", o.err().unwrap());
-    res.put_string("msg", &msg);
-    return res;
+  if let Err(e) = &o {
+    // A failed flow: {status: "err", msg: what failed and where, flow_error: the details}.
+    return e.to_envelope();
   }
   else {
     let mut o = o.unwrap();

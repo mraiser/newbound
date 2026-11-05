@@ -1046,19 +1046,33 @@ pub fn handle_command(d: DataObject, sid: String) -> DataObject {
     if b_cmd_found {
       let command = Command::new(&ctldb, &id);
       if check_security(&command, &sid) {
-        command.cast_params(params.clone());
-
         let response_container = DataObject::new(); // Renamed response to response_container
         let dataref = response_container.data_ref;
         let r_return_type = command.return_type.to_owned(); // Renamed r to r_return_type
 
         let result = panic::catch_unwind(|| {
           let mut p_response_target = DataObject::get(dataref); // Renamed p to p_response_target
-          let cmd_output = command.execute(params).unwrap(); // Renamed o to cmd_output
-          p_response_target.put_object("a", cmd_output);
+          // Arguments that do not fit the declared types, and a failed flow, are error
+          // results ({status: "err", msg, ...}), not panics.
+          if let Err(m) = command.try_cast_params(params.clone()) {
+            let mut e = DataObject::new();
+            e.put_string("status", "err");
+            e.put_string("msg", &m);
+            p_response_target.put_object("err", e);
+            return;
+          }
+          match command.execute(params) {
+            Ok(cmd_output) => p_response_target.put_object("a", cmd_output), // Renamed o to cmd_output
+            // A failed flow: what failed and where, with the details under flow_error.
+            Err(e) => p_response_target.put_object("err", e.to_envelope()),
+          }
         });
 
         match result {
+          Ok(_x) if response_container.has("err") => {
+            o_result = response_container.get_object("err");
+            o_result.put_string("nn_return_type", "500");
+          },
           Ok(_x) => {
             let oo_inner_result = response_container.get_object("a"); // Renamed oo to oo_inner_result
             o_result = format_result(command, oo_inner_result);

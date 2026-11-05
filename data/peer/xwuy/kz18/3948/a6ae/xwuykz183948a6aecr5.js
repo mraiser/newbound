@@ -42,44 +42,67 @@ me.ready = function(){
   json('../peer/remote/'+uuid+'/app/libs', null, function(result){
     if (result.data && document.body.locallibraries) {
       var el = ME.querySelector('.upgradelist');
+      // U2: a chip's final form depends on whether THIS machine holds a
+      // package for the lib — collect the version-gap pairs, resolve each
+      // against peer.peer's shared reader (document.body.peerPackage), then
+      // render. When the reader isn't published (the panel mounted outside
+      // the peer page) every lib stays "unknown, allow": the panel is
+      // usable on its own, exactly as before.
+      var pairs = [];
       for (var i in result.data) {
         var theirlib = result.data[i];
         var mylib = getByProperty(document.body.locallibraries, 'id', theirlib.id);
         if (mylib) {
           // F12: the old author gate (if (true) //...) stays off on purpose —
           // a mismatch marks the chip below instead of hiding it.
-          {
-            if (mylib.version > theirlib.version) {
-              // F3: library ids and versions come from the remote peer —
-              // build the chip with DOM calls and textContent, never innerHTML.
-              var chip = document.createElement('span');
-              chip.className = 'chip ispos';
-              chip.id = 'U_' + mylib.id;
-              var click = document.createElement('span');
-              click.className = 'clickupdate';
-              click.dataset.lib = mylib.id;
-              click.dataset.version = mylib.version;
-              click.textContent = mylib.id + ' v' + theirlib.version + ' ➤ ' + mylib.version;
-              chip.appendChild(click);
-              var x = document.createElement('img');
-              x.src = '../app/asset/app/icons/ui/dark/close.svg';
-              x.className = 'roundbutton-small removeupdate mdl-chip__action chipbutton';
-              chip.appendChild(x);
-              // F12: published by peer.peer, like peerstatus — mark (and
-              // deselect) a different-author chip instead of hiding it.
-              if (document.body.peerAuthorWarn) document.body.peerAuthorWarn(chip, mylib, theirlib);
-
-              ME.querySelector('.availableupgrades').style.display = 'block';
-              el.appendChild(chip);
-              el.appendChild(document.createTextNode(' '));
-            }
-          }
+          if (mylib.version > theirlib.version) pairs.push({ mylib: mylib, theirlib: theirlib });
         }
       }
-      el.querySelectorAll('.removeupdate').forEach(function(x){
-        x.addEventListener('click', function(){
-          this.closest('.chip').remove();
+      function buildChip(pr){
+        // F3: library ids and versions come from the remote peer —
+        // build the chip with DOM calls and textContent, never innerHTML.
+        var chip = document.createElement('span');
+        chip.className = 'chip ispos';
+        chip.id = 'U_' + pr.mylib.id;
+        var click = document.createElement('span');
+        click.className = 'clickupdate';
+        click.dataset.lib = pr.mylib.id;
+        click.dataset.version = pr.mylib.version;
+        click.textContent = pr.mylib.id + ' v' + pr.theirlib.version + ' ➤ ' + pr.mylib.version;
+        chip.appendChild(click);
+        var x = document.createElement('img');
+        x.src = '../app/asset/app/icons/ui/dark/close.svg';
+        x.className = 'roundbutton-small removeupdate mdl-chip__action chipbutton';
+        chip.appendChild(x);
+        // F12: published by peer.peer, like peerstatus — mark (and
+        // deselect) a different-author chip instead of hiding it.
+        if (document.body.peerAuthorWarn) document.body.peerAuthorWarn(chip, pr.mylib, pr.theirlib);
+        return chip;
+      }
+      var chips = new Array(pairs.length);
+      var waitPkg = pairs.length;
+      function render(){
+        ME.querySelector('.availableupgrades').style.display = 'block';
+        chips.forEach(function(chip){
+          el.appendChild(chip);
+          el.appendChild(document.createTextNode(' '));
         });
+        el.querySelectorAll('.removeupdate').forEach(function(x){
+          x.addEventListener('click', function(){
+            this.closest('.chip').remove();
+          });
+        });
+      }
+      if (waitPkg > 0) pairs.forEach(function(pr, idx){
+        function built(pkg, checked){
+          var chip = buildChip(pr);
+          if (checked && document.body.peerPkgGate)
+            document.body.peerPkgGate(chip, pkg, pr.mylib.id, pr.mylib.version, pr.theirlib.version, ME.DATA.name || 'this peer');
+          chips[idx] = chip;
+          if (--waitPkg == 0) render();
+        }
+        if (document.body.peerPackage) document.body.peerPackage(pr.mylib.id, function(pkg){ built(pkg, true); });
+        else built(null, false);
       });
     }
   });
@@ -419,15 +442,20 @@ ME.querySelector('.updateall').addEventListener('click', function(){
   if (!up || up.running(ME.DATA.id)) return;
   var items = [];
   var skipped = 0;   // 3b: deselected different-author chips, named in the summary
+  var nopkg = 0;     // U2: chips this machine has no package for — never sent
   ME.querySelectorAll('.upgradelist .chip').forEach(function(chip){
     var el = chip.querySelector('.clickupdate');
     if (!el || chip.dataset.done == '1') return;
+    // U2: no package behind the chip — nothing to send, count it instead
+    if (chip.classList.contains('nopkg')) { nopkg++; return; }
     // F12: a different-author chip rides only when the user clicked it in
     if (chip.classList.contains('authwarn') && chip.dataset.included != '1') { skipped++; return; }
     items.push({ lib: el.dataset.lib, version: el.dataset.version, chipEl: chip });
   });
   if (items.length == 0) {
-    upgradeSummary('Nothing to update' + (skipped > 0 ? ' — ' + skipped + ' skipped (different author)' : ''));
+    upgradeSummary('Nothing to update'
+      + (skipped > 0 ? ' — ' + skipped + ' skipped (different author)' : '')
+      + (nopkg > 0 ? ' — ' + nopkg + ' not packaged on this machine' : ''));
     return;
   }
   var buttons = ME.querySelector('.updatebuttons');
@@ -440,7 +468,7 @@ ME.querySelector('.updateall').addEventListener('click', function(){
       upgradeSummary(summary.text);
       buttons.style.display = '';
     }
-  }, skipped);
+  }, skipped, nopkg);
 });
 
 ME.querySelector('.control-settings-popup').addEventListener("mouseleave", function(){

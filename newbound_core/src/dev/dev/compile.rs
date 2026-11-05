@@ -58,7 +58,72 @@ let key = format!("{}:{}:{}", &lib, &ctl, &cmd);
 let store = DataStore::new();
 let root = store.get_lib_root(&lib);
 
+// A JavaScript command has nothing to build either: flowlang runs its body
+// straight from the store. Building the crate for it anyway answered
+// "cargo exited 0 but no artifact advanced" wherever no artifact existed
+// yet (a bundle, a fresh checkout), so upsert_command reported a stored,
+// runnable JavaScript command as a compile error.
+//
+// Its compile result is a quick check instead - a V8 syntax check, no tsc -
+// so syntax errors are reported like compile errors; dev.code.check_js adds
+// the tsc type check. build() writes its editor files (<cmd>.js with JSDoc
+// types, flowlang.d.ts).
+let cmd_type = store.get_data(&lib, &store.lookup_cmd_id(&lib, &ctl, &cmd)).get_object("data").get_string("type");
+// TypeScript is the same case: flowlang runs it from an esbuild bundle,
+// which build() makes and check_quick reports on.
+if cmd_type == "javascript" || cmd_type == "js" || cmd_type == "typescript" || cmd_type == "ts" {
+    let _ = std::panic::catch_unwind(|| build(&lib, &ctl, &cmd, &root));
+    #[cfg(feature = "javascript_runtime")]
+    let outcome = {
+        let r = flowlang::jscmd::check_quick(&lib, &store.lookup_cmd_id(&lib, &ctl, &cmd));
+        if r.get_string("status") != "ok" {
+            format!("error: {}", r.get_string("msg"))
+        } else if r.get_boolean("clean") {
+            "OK".to_string()
+        } else {
+            let mut lines = Vec::new();
+            for p in r.get_array("problems").objects() {
+                let p = p.object();
+                lines.push(format!("error: {} ({}, {})", p.get_string("message"), r.get_string("command"), p.get_string("where")));
+            }
+            lines.join("\n")
+        }
+    };
+    #[cfg(not(feature = "javascript_runtime"))]
+    let outcome = "OK".to_string();
+    let mut c = result_cache();
+    c.put_string(&key, &outcome);
+    return package(&outcome);
+}
+
 let changed = build(&lib, &ctl, &cmd, &root);
+
+// A Python command has no cargo artifact: build() above generated its
+// source, and that is all there is to build. Its compile result is a quick
+// check instead - compile + import in a separate Python process, no mypy -
+// so syntax and import errors are reported like compile errors.
+// dev.code.check_python adds the mypy type check.
+let cmd_id = store.lookup_cmd_id(&lib, &ctl, &cmd);
+if store.get_data(&lib, &cmd_id).get_object("data").get_string("type") == "python" {
+    let r = flowlang::pycmd::check_quick(&lib, &cmd_id);
+    let outcome = if r.get_string("status") != "ok" {
+        format!("error: {}", r.get_string("msg"))
+    } else if r.get_boolean("clean") {
+        "OK".to_string()
+    } else {
+        let mut lines = Vec::new();
+        for p in r.get_array("problems").objects() {
+            let p = p.object();
+            if p.get_string("severity") == "error" {
+                lines.push(format!("error: {} ({}, {})", p.get_string("message"), r.get_string("command"), p.get_string("where")));
+            }
+        }
+        lines.join("\n")
+    };
+    let mut c = result_cache();
+    c.put_string(&key, &outcome);
+    return package(&outcome);
+}
 
 if !changed {
     // PRONG 3: unchanged code returns the last REAL result, not assumed success.

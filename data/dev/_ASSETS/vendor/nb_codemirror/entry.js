@@ -1,0 +1,11 @@
+export { Compartment, EditorState, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
+export { Decoration, EditorView, highlightActiveLine, keymap, lineNumbers } from "@codemirror/view";
+export { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+export { tags } from "@lezer/highlight";
+export { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+export { css } from "@codemirror/lang-css";
+export { html } from "@codemirror/lang-html";
+export { javascript } from "@codemirror/lang-javascript";
+export { json } from "@codemirror/lang-json";
+export { highlightSelectionMatches, openSearchPanel, search, searchKeymap } from "@codemirror/search";
+export { python } from "@codemirror/lang-python";

@@ -14,14 +14,16 @@ var readyP = (async () => {
     Compartment, Decoration, EditorState, EditorView, HighlightStyle,
     RangeSetBuilder, StateEffect, StateField, css, defaultKeymap, history,
     historyKeymap, highlightSelectionMatches, html, indentWithTab, javascript,
-    json, keymap, lineNumbers, searchKeymap, syntaxHighlighting, tags,
+    json, keymap, lineNumbers, python, searchKeymap, syntaxHighlighting, tags,
   } = await import("../app/asset/dev/vendor/nb_codemirror/cm6.js");
 
 const LANGUAGES = {
   html: () => html(),
   css: () => css(),
   js: () => javascript(),
+  ts: () => javascript({ typescript: true }),
   json: () => json(),
+  python: () => python(),
 };
 
 // facet-hue syntax tinting (DESIGN §4.2.4)
@@ -66,6 +68,8 @@ function readOnlyExt(value) {
 
 function init(host, { language = "html", readOnly = true, onChange, onSave } = {}) {
   const readOnlyConf = new Compartment();
+  const langConf = new Compartment();
+  let currentLanguage = language;
   let suppressChange = false;
 
   const view = new EditorView({
@@ -89,7 +93,7 @@ function init(host, { language = "html", readOnly = true, onChange, onSave } = {
           ...searchKeymap,
           indentWithTab,
         ]),
-        (LANGUAGES[language] ?? LANGUAGES.html)(),
+        langConf.of((LANGUAGES[currentLanguage] ?? LANGUAGES.html)()),
         syntaxHighlighting(nbHighlight),
         highlightSelectionMatches(),
         highlightField,
@@ -122,6 +126,12 @@ function init(host, { language = "html", readOnly = true, onChange, onSave } = {
     },
     setReadOnly(value) {
       view.dispatch({ effects: readOnlyConf.reconfigure(readOnlyExt(value)) });
+    },
+    // A reused editor switches grammar in place (undo history kept); later
+    // setSource calls keep the new language.
+    setLanguage(name) {
+      currentLanguage = name;
+      view.dispatch({ effects: langConf.reconfigure((LANGUAGES[name] ?? LANGUAGES.html)()) });
     },
   };
 }

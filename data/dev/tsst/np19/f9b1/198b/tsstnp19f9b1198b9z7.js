@@ -170,7 +170,7 @@ function validateCase(c, path, hasNextInChain, diags) {
       if (feeders.length !== 1) {
         diags.push({ code: DIAG.I1_UNWIRED, severity: "warn", path, opIndex: i, terminal: term,
           message: feeders.length === 0
-            ? `input “${term}” of op ${i} (${op.name}) is unwired`
+            ? `input “${term}” of op ${i} (${op.name}) is unwired (it gets null)`
             : `input “${term}” of op ${i} (${op.name}) has ${feeders.length} incoming wires (fan-in must be 1)` });
       }
     }
@@ -228,8 +228,9 @@ function validateCase(c, path, hasNextInChain, diags) {
     }
     // I-6: persistent op
     if (op.type === "persistent" && inCount > 1) diags.push({ code: DIAG.I6_PERSIST, severity: "warn", path, opIndex: i, message: `persistent op ${i} has ${inCount} inputs (write order is nondeterministic; keep to ≤1)` });
-    // I-7: multi-output command call (positional mapping over unordered keys)
-    if (op.type === "command" && outCount > 1) diags.push({ code: DIAG.I7_MULTIOUT, severity: "info", path, opIndex: i, message: `command op ${i} maps ${outCount} outputs positionally over unordered callee keys — order-fragile` });
+    // I-7 is retired: since flowlang 0.3.47 a command op's outputs map onto the
+    // callee's by name (by position only one-to-one), so several outputs are
+    // not order-fragile. DIAG.I7_MULTIOUT stays defined for older readers.
     // I-8: loop pairing
     for (const [term, node] of Object.entries(op.out)) {
       if (node.mode === "loop") {
@@ -762,13 +763,12 @@ function wireLabel(c, w) {
 function propagationRounds(c, opts = {}) {
   const N = c.cmds.length;
   const stopAt = typeof opts.stopAt === "number" ? opts.stopAt : null;
-  // §1.5 step 3, exactly: a terminal is pre-marked done iff its NAME appears
-  // as no connection's dest name — the match is GLOBAL and name-only (the
-  // I-1 sharp edge: an unwired input whose name is wired elsewhere waits
-  // forever). So an op needs a delivery for each input whose name is a dest
-  // name anywhere in the case.
-  const globalDest = new Set(c.cons.map((w) => w.dest[1]));
-  const need = c.cmds.map((op) => Object.keys(op.in).filter((n) => globalDest.has(n)).length);
+  // §1.5 step 3 (flowlang 0.3.47): an input is awaited only when a wire
+  // targets THAT input; every other input is pre-marked done (null). So an op
+  // needs a delivery for each of its inputs some wire targets. (Before 0.3.47
+  // the match was global and by name: an unwired input whose name was wired
+  // elsewhere waited forever.)
+  const need = c.cmds.map((op, i) => Object.keys(op.in).filter((n) => c.cons.some((w) => w.dest[0] === i && w.dest[1] === n)).length);
   // synchros: S-1-broken ones are diagnosed, never scheduled
   const syncs = c.syncs || [];
   const live = syncs.map((s) => isOpIdx(s.src, N) && isOpIdx(s.dest, N) && s.src !== s.dest);
