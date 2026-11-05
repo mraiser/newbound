@@ -41,6 +41,9 @@
   min-width: 0;
 }
 
+/* D2: a long peer name ellipsizes on its one 32px line (it used to wrap
+   and push the UUID down) — the same rule as the UUID. */
+.hudtitle .rp-name,
 .hudtitle .rp-uuid {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -56,20 +59,87 @@
   height: 32px;   /* the name row's height — centres the dots and the ⋮ on it */
 }
 
-.hudconn {
-  text-align: right;
+/* D2: the dots' box IS the three dots (a flex row, no line box around
+   them), so .hudheadright's align-items centres the dots themselves on
+   the name row — the latency used to ride in that box and lift the dots
+   6px above the line. The latency hangs under the dots, out of flow,
+   centred on them. */
+.hudheader .hudconn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .hudheader .connectionindicator {
-  margin-top: 0;
+  margin: 0;
+}
+
+.hudheader .connectionlatency {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 3px;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* D2: the ✕ and ⋮ glyphs sit flush with the tab bar's edges. Both are
+   32px buttons (6px padding, 24-unit icon drawn in 20px); the glyphs'
+   own insets differ: the ✕ strokes start 5.125 units in (round caps),
+   the ⋮ dots end 10.125 units short of the right. Pull each box out by
+   padding + its glyph inset, so the hover circle may overhang the
+   gutter but the glyph lands on it. */
+.hudheader .closehud {
+  margin-left: calc(-6px - 20px * 5.125 / 24);
+}
+
+.hudheader .morebutton {
+  margin-right: calc(-6px - 20px * 10.125 / 24);
 }
 
 /* 7.3: the tab bar sits on the same gutter as the header and the tab
    bodies (the kit's .navbar-dark is width:100%). Child combinator: the
    dashboard mounts whole controls with their own navbars — untouched. */
-.hudpanel > .navbar-dark {
+.hudpanel > .hudtop > .navbar-dark {
   width: auto;
   margin: 0 var(--hud-gutter);
+}
+
+/* D1: the header and the tab bar are ONE pinned block. The kit's navbar
+   rule (app.ui) is sticky at top:61px — the height of an app title bar
+   this panel doesn't have — so inside the panel (#headsupdisplay, the
+   scroll container) the tab bar floated 61px down with content showing
+   through the gap. .hudtop sticks at the top instead, on the panel's own
+   solid ground (D3), and the tab bar inside it is static. z-index 4:
+   above tile content (whose navbars are static below), and UNDER the
+   kit's modal backdrop (.greyedout, 5) and popup cards (15+) — so the
+   Add Control and camera modals open on top and the backdrop covers the
+   header too (no header click leaks past an open modal). The ⋮ menu
+   card lives inside this block and paints at its level. */
+.hudpanel > .hudtop {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background-color: var(--panel);
+}
+
+.hudpanel > .hudtop > .navbar-dark {
+  position: static;
+  background-color: transparent;
+}
+
+/* D1: tab bars that dashboard controls bring (the camera tile's
+   LIVE/DVR/EVENTS) scroll with their tile while they're in the panel.
+   Scoped to .hudapps, so those controls' own pages keep the kit's
+   sticky bar. */
+.hudpanel .hudapps .navbar,
+.hudpanel .hudapps .navbar-dark,
+.hudpanel .hudapps .navbar-light,
+.hudpanel .hudapps .navbar-accent {
+  position: static;
 }
 
 .connectionindicator {
