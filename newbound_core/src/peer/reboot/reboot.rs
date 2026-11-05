@@ -85,6 +85,13 @@ pub fn is_executable_file(p: &std::path::Path) -> bool {
   true
 }
 
+fn join_stderr(h: Option<std::thread::JoinHandle<String>>) -> String {
+  match h {
+    Some(h) => h.join().unwrap_or_default().trim().to_string(),
+    None => String::new(),
+  }
+}
+
 pub fn run_attempt(argv: &[String], timeout_secs: u64) -> (i64, String) {
   if argv.is_empty() { return (-1, "empty command".to_string()); }
   let exe = match find_on_path(&argv[0]) {
@@ -93,8 +100,7 @@ pub fn run_attempt(argv: &[String], timeout_secs: u64) -> (i64, String) {
   };
   let mut cmd = std::process::Command::new(&exe);
   cmd.args(&argv[1..]);
-  // stdin is closed so no tool can sit on a prompt; stdout is discarded so a
-  // chatty tool can't fill a pipe nobody drains while the loop polls try_wait.
+  // stdin is closed so no tool can sit on a prompt; stdout is discarded.
   cmd.stdin(std::process::Stdio::null());
   cmd.stdout(std::process::Stdio::null());
   cmd.stderr(std::process::Stdio::piped());
@@ -102,28 +108,42 @@ pub fn run_attempt(argv: &[String], timeout_secs: u64) -> (i64, String) {
     Ok(c) => c,
     Err(e) => return (-1, format!("failed to start: {}", e)),
   };
+  // Drain stderr on its own thread: a tool that writes more than the pipe
+  // buffer would otherwise block until the timeout. Joined after the process
+  // ends, so nothing is read half-written.
+  let stderr_handle = child.stderr.take().map(|mut se| {
+    std::thread::spawn(move || {
+      use std::io::Read;
+      let mut buf = String::new();
+      let _ = se.read_to_string(&mut buf);
+      buf
+    })
+  });
   let started = std::time::Instant::now();
   loop {
     match child.try_wait() {
       Ok(Some(status)) => {
-        let mut err = String::new();
-        if let Some(mut se) = child.stderr.take() {
-          use std::io::Read;
-          let _ = se.read_to_string(&mut err);
-        }
-        return (status.code().unwrap_or(-1) as i64, err.trim().to_string());
+        let err = join_stderr(stderr_handle);
+        return (status.code().unwrap_or(-1) as i64, err);
       }
       Ok(None) => {
         if started.elapsed() >= std::time::Duration::from_secs(timeout_secs) {
           let _ = child.kill();
           let _ = child.wait();
-          return (-1, format!("timed out after {} seconds", timeout_secs));
+          let err = join_stderr(stderr_handle);
+          let msg = if err.is_empty() {
+            format!("timed out after {} seconds", timeout_secs)
+          } else {
+            format!("timed out after {} seconds: {}", timeout_secs, err)
+          };
+          return (-1, msg);
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
       }
       Err(e) => {
         let _ = child.kill();
         let _ = child.wait();
+        let _ = join_stderr(stderr_handle);
         return (-1, format!("wait failed: {}", e));
       }
     }
@@ -131,6 +151,15 @@ pub fn run_attempt(argv: &[String], timeout_secs: u64) -> (i64, String) {
 }
 
 pub fn machine_name() -> String {
+  // The name the Peers app shows, read the way peer.info reads it.
+  let system = DataStore::globals().get_object("system");
+  if system.has("config") {
+    let config = system.get_object("config");
+    if config.has("machineid") {
+      let v = config.get_string("machineid").trim().to_string();
+      if !v.is_empty() { return v; }
+    }
+  }
   for key in ["COMPUTERNAME", "HOSTNAME"] {
     if let Ok(v) = std::env::var(key) {
       let v = v.trim().to_string();
