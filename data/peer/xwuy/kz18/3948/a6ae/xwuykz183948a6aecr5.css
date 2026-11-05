@@ -338,6 +338,33 @@
   border-color: #d06060;
 }
 
+/* Phase 3 review: ← → ✕ are the kit's icons, drawn like the header's ✕
+   (.roundbutton-small-white: a 32px round button, transparent, hover
+   tint) with the 20px glyph on its 6px inset. → is arrow-left mirrored. */
+.hudpanel .hudtile-btn.hudtile-icon {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 6px;
+  border: none;
+  border-radius: 50%;
+  background-color: transparent;
+}
+
+.hudpanel .hudtile-btn.hudtile-icon:not(:disabled):hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.hudpanel .hudtile-icon > img {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+.hudpanel .hudtile-mirror > img {
+  transform: scaleX(-1);
+}
+
 /* D5: the Edit/Done row at the top-right of the DASHBOARD tab, admin-only
    (F7). display:flex must beat F7's later .isadmin .adminonly revert, so
    this selector carries one class more. The message (failures, "the

@@ -291,11 +291,21 @@ function buildControls(){
 // own buttons — Reboot — can't be pressed while editing) with a bar of
 // real buttons: ← → ✕. ✕ asks first, inline in the same bar. Titles and
 // the peer name are peer-reported: textContent and setAttribute only (F3).
-function tileButton(text, label, cls, fn){
+// Phase 3 review: ← → ✕ as text glyphs rendered as empty boxes in some
+// fonts, so the move bar uses the kit's icons (an icon name instead of
+// text), drawn like the panel header's ✕ — a 32px round button, 20px glyph.
+function tileButton(text, label, cls, fn, icon){
   var b = document.createElement('button');
   b.type = 'button';
   b.className = 'hudtile-btn' + (cls ? ' ' + cls : '');
-  b.textContent = text;
+  if (icon) {
+    b.classList.add('roundbutton-small-white', 'hudtile-icon');
+    var img = document.createElement('img');
+    img.src = '../app/asset/app/icons/ui/dark/' + icon + '.svg';
+    img.alt = '';
+    b.appendChild(img);
+  }
+  else b.textContent = text;
   b.title = label;
   b.setAttribute('aria-label', label);
   b.addEventListener('click', function(e){ e.stopPropagation(); fn(); });
@@ -310,17 +320,17 @@ function tileTitle(idx, type){
 function showMoveBar(bar, idx, type, n){
   var title = tileTitle(idx, type);
   bar.textContent = '';
-  var left = tileButton('←', 'Move ' + title + ' earlier', '', function(){
+  var left = tileButton('', 'Move ' + title + ' earlier', '', function(){
     editWrite(idx, type, function(l){ l.splice(idx - 1, 0, l.splice(idx, 1)[0]); });
-  });
+  }, 'arrow-left');
   left.disabled = idx == 0;
-  var right = tileButton('→', 'Move ' + title + ' later', '', function(){
+  var right = tileButton('', 'Move ' + title + ' later', 'hudtile-mirror', function(){
     editWrite(idx, type, function(l){ l.splice(idx + 1, 0, l.splice(idx, 1)[0]); });
-  });
+  }, 'arrow-left');
   right.disabled = idx == n - 1;
   var gap = document.createElement('span');
   gap.className = 'hudtile-gap';
-  var x = tileButton('✕', 'Remove ' + title, 'hudtile-remove', function(){ showConfirm(bar, idx, type, n); });
+  var x = tileButton('', 'Remove ' + title, 'hudtile-x', function(){ showConfirm(bar, idx, type, n); }, 'close');
   bar.appendChild(left);
   bar.appendChild(right);
   bar.appendChild(gap);
