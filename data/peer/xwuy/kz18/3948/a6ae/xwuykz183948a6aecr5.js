@@ -160,6 +160,10 @@ me.ready = function(){
       // F11: a failed read makes adding unsafe (a write would replace a
       // list we never saw), so the menu item goes dark with the reason.
       disableAddControl(errText(result));
+      // D5: same reason — no edit can be checked against a list we can't read
+      var eb = ME.querySelector('.hudeditbutton');
+      eb.disabled = true;
+      eb.title = 'Editing is unavailable: ' + errText(result);
     }
   });
   json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_available", function(result){
@@ -262,15 +266,140 @@ function buildControls(){
     db = j == -1 ? db : db.substring(0,j);
     var claz = !ctl.big ? 'iconmode' : 'big';
 
+    // D5: the tile's slot (el) sits in a wrapper that is the flex item and
+    // the positioned box for the edit overlay — installControl replaces
+    // el's children, so the overlay can't live inside el. The wrapper
+    // records the tile's index and type, which edit writes check against
+    // the fresh list.
+    var tw = document.createElement('div');
+    tw.className = 'hudtilewrap ' + claz;
+    tw.dataset.index = i;
+    tw.dataset.type = ctl.type;
     var el = document.createElement('div');
     // D4: .hudtile carries the dashboard layout (css); big/iconmode stay
     // for any control that reads its slot's mode.
     el.className = 'inline hudtile ' + claz;
-    wrap.appendChild(el);
+    tw.appendChild(el);
+    wrap.appendChild(tw);
     d.peer = ME.DATA.id;
     installControl(el, db, id, function(api){}, d);
   }
+  decorateTiles();
 }
+
+// D5: edit mode. Each tile gets an overlay (it swallows clicks, so a tile's
+// own buttons — Reboot — can't be pressed while editing) with a bar of
+// real buttons: ← → ✕. ✕ asks first, inline in the same bar. Titles and
+// the peer name are peer-reported: textContent and setAttribute only (F3).
+function tileButton(text, label, cls, fn){
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'hudtile-btn' + (cls ? ' ' + cls : '');
+  b.textContent = text;
+  b.title = label;
+  b.setAttribute('aria-label', label);
+  b.addEventListener('click', function(e){ e.stopPropagation(); fn(); });
+  return b;
+}
+
+function tileTitle(idx, type){
+  var it = me.data && me.data.list ? me.data.list[idx] : null;
+  return it && it.title ? String(it.title) : String(type);
+}
+
+function showMoveBar(bar, idx, type, n){
+  var title = tileTitle(idx, type);
+  bar.textContent = '';
+  var left = tileButton('←', 'Move ' + title + ' earlier', '', function(){
+    editWrite(idx, type, function(l){ l.splice(idx - 1, 0, l.splice(idx, 1)[0]); });
+  });
+  left.disabled = idx == 0;
+  var right = tileButton('→', 'Move ' + title + ' later', '', function(){
+    editWrite(idx, type, function(l){ l.splice(idx + 1, 0, l.splice(idx, 1)[0]); });
+  });
+  right.disabled = idx == n - 1;
+  var gap = document.createElement('span');
+  gap.className = 'hudtile-gap';
+  var x = tileButton('✕', 'Remove ' + title, 'hudtile-remove', function(){ showConfirm(bar, idx, type, n); });
+  bar.appendChild(left);
+  bar.appendChild(right);
+  bar.appendChild(gap);
+  bar.appendChild(x);
+}
+
+function showConfirm(bar, idx, type, n){
+  var title = tileTitle(idx, type);
+  bar.textContent = '';
+  var q = document.createElement('span');
+  q.className = 'hudtile-q';
+  q.textContent = 'Remove ' + title + ' from ' + (ME.DATA.name || 'this peer') + "'s dashboard?";
+  bar.appendChild(q);
+  bar.appendChild(tileButton('Remove', 'Remove ' + title, 'hudtile-remove', function(){
+    editWrite(idx, type, function(l){ l.splice(idx, 1); });
+  }));
+  var cancel = tileButton('Cancel', 'Keep ' + title, '', function(){ showMoveBar(bar, idx, type, n); });
+  bar.appendChild(cancel);
+  cancel.focus();
+}
+
+function decorateTiles(){
+  ME.querySelectorAll('.hudapps .hudtile-edit').forEach(function(o){ o.remove(); });
+  if (!me.editing) return;
+  var tiles = ME.querySelectorAll('.hudapps > .hudtilewrap');
+  tiles.forEach(function(tw){
+    var ov = document.createElement('div');
+    ov.className = 'hudtile-edit';
+    var bar = document.createElement('div');
+    bar.className = 'hudtile-bar';
+    ov.appendChild(bar);
+    tw.appendChild(ov);
+    showMoveBar(bar, Number(tw.dataset.index), tw.dataset.type, tiles.length);
+  });
+}
+
+// D5 (the F11 rule): never write a list we haven't just seen. Re-read
+// controls_shared, check the tile is still the one the user pointed at
+// (index AND type), apply the change to the FRESH list, write it back.
+// A moved-under-us list writes nothing and rebuilds; a failed read or
+// write says why beside Edit and leaves the dashboard as it was.
+function editWrite(idx, type, mutate){
+  var msg = ME.querySelector('.hudedit-msg');
+  msg.textContent = '';
+  ME.querySelectorAll('.hudapps .hudtile-edit button, .hudeditbutton').forEach(function(b){ b.disabled = true; });
+  function settle(){
+    ME.querySelector('.hudeditbutton').disabled = false;
+    decorateTiles();
+  }
+  json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_shared", function(rr){
+    var fresh;
+    if (rr.status == 'ok') fresh = rr.data && rr.data.list ? rr.data : { "list": [] };
+    else if (rr.msg == 'NOT FOUND') fresh = { "list": [] };
+    else { msg.textContent = errText(rr); settle(); return; }
+    var it = fresh.list[idx];
+    if (!it || it.type != type) {
+      me.data = fresh;
+      ME.querySelector('.hudeditbutton').disabled = false;
+      buildControls();
+      msg.textContent = 'The dashboard changed. Refreshed it; try again.';
+      return;
+    }
+    mutate(fresh.list);
+    json('../peer/remote/'+ME.DATA.id+'/app/write', "lib=runtime&id=controls_shared&readers=[]&writers=[]&data="+encodeURIComponent(JSON.stringify(fresh)), function(result){
+      if (result.status != 'ok') { msg.textContent = errText(result); settle(); return; }
+      me.data = fresh;
+      ME.querySelector('.hudeditbutton').disabled = false;
+      buildControls();
+    });
+  });
+}
+
+ME.querySelector('.hudeditbutton').addEventListener('click', function(){
+  me.editing = !me.editing;
+  this.textContent = me.editing ? 'Done' : 'Edit';
+  this.setAttribute('aria-pressed', me.editing ? 'true' : 'false');
+  ME.querySelector('.hudedit-msg').textContent = '';
+  decorateTiles();
+});
 
 // F10: me.install/updateNext are gone — the panel's updates run through the
 // shared document.body.peerupdater (see the .updateall handler below).

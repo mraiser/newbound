@@ -237,6 +237,26 @@
   flex: 1 0 100%;
 }
 
+/* D5: the flex item is the tile's wrapper (.hudtilewrap); the slot the
+   control mounts in (.hudtile) fills it. The wrapper is the positioned
+   box the edit overlay covers. */
+.hudpanel .hudapps > .hudtilewrap {
+  position: relative;
+  min-width: 0;
+}
+
+.hudpanel .hudapps > .hudtilewrap.big {
+  flex: 0 0 100%;
+}
+
+.hudpanel .hudapps > .hudtilewrap.iconmode {
+  flex: none;
+}
+
+.hudpanel .hudtilewrap > .hudtile {
+  display: block;
+}
+
 /* D4: a big tile's height follows its content, from a 16:9 minimum of
    its width. The minimum is needed: camera:dvr sizes itself FROM its
    slot (adjustSizes fits the image into the slot's height minus its own
@@ -249,9 +269,8 @@
    DVR tab fits its controls into the slot by shrinking its image to 0
    and spilling the rest (391px into 176) over the next tile. That is
    the camera's own layout (session 3); here it scrolls in its slot. */
-.hudpanel .hudapps > .hudtile.big {
-  flex: 0 0 100%;
-  min-width: 0;
+.hudpanel .hudtilewrap > .hudtile.big {
+  width: 100%;
   height: auto;
   min-height: calc(100cqw * 9 / 16);
   overflow-y: auto;
@@ -259,10 +278,84 @@
 
 /* D4: an icon tile is a fixed square (peer:reboot draws its canvas from
    the slot's size once, at ready). */
-.hudpanel .hudapps > .hudtile.iconmode {
-  flex: none;
+.hudpanel .hudtilewrap > .hudtile.iconmode {
   width: 150px;
   height: 150px;
+}
+
+/* D5: edit mode. The overlay covers the whole tile and takes every click
+   (so Reboot can't be pressed by mistake); it sits under the pinned
+   header block (z-index 4). The bar rides the tile's top edge. */
+.hudpanel .hudtile-edit {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: rgba(0, 0, 0, 0.45);
+  outline: 1px dashed var(--text-dim);
+  outline-offset: -1px;
+}
+
+.hudpanel .hudtile-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  background: var(--panel-2);
+}
+
+.hudpanel .hudtile-gap {
+  flex: 1;
+}
+
+.hudpanel .hudtile-q {
+  flex: 1 0 100%;
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.hudpanel .hudtile-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  background: var(--panel);
+  border: 1px solid var(--text-dim);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.hudpanel .hudtile-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.hudpanel .hudtile-btn.hudtile-remove {
+  color: #d06060;
+  border-color: #d06060;
+}
+
+/* D5: the Edit/Done row at the top-right of the DASHBOARD tab, admin-only
+   (F7). display:flex must beat F7's later .isadmin .adminonly revert, so
+   this selector carries one class more. The message (failures, "the
+   dashboard changed") sits to the button's left. */
+.hudpanel.isadmin .hudeditbar.adminonly {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--hud-tile-gap);
+}
+
+.hudpanel .hudedit-msg {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  color: #d06060;
+  font-size: 12px;
 }
 
 /* F7: everything admin-only hides until the panel root (.hudpanel, set in
