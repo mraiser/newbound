@@ -289,11 +289,13 @@
   padding-top: calc(100% * 9 / 16);
 }
 
-/* D4: an icon tile is a fixed square (peer:reboot draws its canvas from
-   the slot's size once, at ready). */
+/* D4: an icon tile is a 150px column (peer:reboot draws its canvas from
+   the slot's width). R2.7: the square is a minimum, not a fixed height —
+   a tile's in-flow extras (peer:reboot's status line) grow the slot, so
+   the rows below move down instead of being painted over. */
 .hudpanel .hudtilewrap > .hudtile.iconmode {
   width: 150px;
-  height: 150px;
+  min-height: 150px;
 }
 
 /* D5: edit mode. The overlay covers the whole tile and takes every click

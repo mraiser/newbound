@@ -13,9 +13,6 @@ me.ready = function(){
     // R2.5: one request at a time — while one runs (or the Rebooting…
     // watch waits on the peer) clicks do nothing, not even a dialog.
     if (me.busy) return;
-    var el = document.createElement('div');
-    el.className = 'popup999 wrap';
-    document.body.appendChild(el);
     var data = {
       title:'Reboot Device',
       text:'Are you sure you want to reboot the device?',
@@ -31,7 +28,7 @@ me.ready = function(){
 
 // R2.6: every string here is peer-reported (msg, err, the peer name) —
 // textContent only, one div per line so the err text and the update
-// sentence read apart. The status paints under the tile's fixed box.
+// sentence read apart.
 function setStatus(lines){
   var el = ME.querySelector('.rebootstatus');
   if (!el) return;
@@ -128,8 +125,10 @@ function rebootNow(){
 }
 
 me.redraw = function(){
+  // R2.7: the square comes from the width alone — the status is in flow
+  // below the canvas now, so ME.clientHeight includes it.
   var w = ME.clientWidth;
-  var h = ME.clientHeight;
+  var h = w;
 
   var L = Math.min(w,h);
   var offx = (w-L)/2;
