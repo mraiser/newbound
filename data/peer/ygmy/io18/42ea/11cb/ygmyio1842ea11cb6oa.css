@@ -1,3 +1,21 @@
 .popup999{
   position:absolute;
 }
+
+/* R2: the status line under the tile — the slot (.hudtile) is a fixed
+   square with visible overflow, so this paints below it. Peer-reported
+   text wraps; hidden when empty so the tile's layout is untouched. */
+.rebootstatus {
+  position: relative;
+  z-index: 2;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+  color: var(--text, #ddd);
+  background-color: var(--panel, rgba(20,20,24,0.9));
+}
+
+.rebootstatus:empty {
+  display: none;
+}
