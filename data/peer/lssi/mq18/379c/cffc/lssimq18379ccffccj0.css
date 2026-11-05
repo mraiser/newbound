@@ -107,7 +107,12 @@
 #headsupdisplay{
   max-width: 90%;
   width:0px;
-  background-color:#202020D0;
+  /* D3: solid — the old #202020D0 (82%) let the 3D view's labels, orbs
+     and grid show through. --panel is the kit's raised-surface ground
+     (cards, popups); the panel is a surface floating over the scene, not
+     the page itself (--ground). The panel's pinned header (peer.headsup
+     .hudtop, D1) uses the same token. */
+  background-color:var(--panel);
   /* absolute, not fixed: position:fixed creates a stacking context in
      Blink, so any modal opened from a control hosted in the HUD (e.g.
      the camera tile's settings) gets its z-index trapped below the
