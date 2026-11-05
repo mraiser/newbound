@@ -126,9 +126,10 @@
   background-color: var(--panel);
 }
 
+/* Phase 1 review: static only — the bar keeps the kit's own strip
+   (.navbar-dark's --panel-2), like every other tab bar in the app. */
 .hudpanel > .hudtop > .navbar-dark {
   position: static;
-  background-color: transparent;
 }
 
 /* D1: tab bars that dashboard controls bring (the camera tile's
@@ -190,10 +191,18 @@
   margin-top:-10px;
 }
 
+/* Phase 1 review: app.ui opens this card position:fixed with an inline
+   left/top at the click point (clamped to innerWidth - offsetWidth - 10),
+   so right/top here never applied — the kit's .popupcard margin:20px did,
+   pushing the card 20px past that clamp (10px out of the window). No
+   margin; the ⋮ click handler in the js lines the card's right edge up
+   with the tab bar's. */
+.hudpanel .control-settings-popup {
+  margin: 0;
+}
+
 .control-settings-popup {
   position:absolute;
-  right:-20px;
-  top:6px;
   width:300px;
   color:black;
   z-index:10;

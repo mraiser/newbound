@@ -24,6 +24,18 @@ me.ready = function(){
   me.update();
   document.body.api.ui.initNavbar(ME);
   document.body.api.ui.initPopups(ME);
+  // Phase 1 review: app.ui puts the ⋮ card at the click point, clamped
+  // 10px inside the window, which lands it off the panel's grid. This
+  // listener runs after initPopups' (same element, added later), so the
+  // card is open and measurable: its right edge goes on the tab bar's
+  // right edge, its top just under the ⋮.
+  ME.querySelector('.morebutton').addEventListener('click', function(){
+    var card = ME.querySelector('.control-settings-popup');
+    if (card.style.display == 'none') return;
+    var bar = ME.querySelector('.hudtop > .navbar-dark').getBoundingClientRect();
+    card.style.left = (bar.right - card.offsetWidth) + 'px';
+    card.style.top = (this.getBoundingClientRect().bottom + 4) + 'px';
+  });
   initCrates();
 
   // 1b: remember which tab the user picks, per peer, ON THE HOST element —
