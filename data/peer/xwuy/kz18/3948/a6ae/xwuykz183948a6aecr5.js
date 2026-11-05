@@ -22,7 +22,11 @@ me.refresh = function(){
 me.ready = function(){
   me.check = ME.querySelector('.rp-uuid');
   me.update();
-  document.body.api.ui.initNavbar(ME);
+  // D9: initNavbar(ME) is gone — the kit's handler selects tab content BY
+  // CLASS over the WHOLE subtree (removes 'selected' from every
+  // .tab-content in el, adds it to every .<data-id>), so with the panel
+  // it reached the tiles' own tab contents. The panel binds its own two
+  // tabs below and never touches anything under .hudapps.
   document.body.api.ui.initPopups(ME);
   // Phase 1 review: app.ui puts the ⋮ card at the click point, clamped
   // 10px inside the window, which lands it off the panel's grid. This
@@ -38,14 +42,22 @@ me.ready = function(){
   });
   initCrates();
 
-  // 1b: remember which tab the user picks, per peer, ON THE HOST element —
-  // every refresh swaps the mount's innerHTML but the host div stays, so
-  // buildControls can put the user back on the tab they chose. Only the
-  // panel's own navbar is bound (the first .navbar-dark in the subtree;
-  // dashboard controls mount later, under .hudapps).
-  ME.querySelector('.navbar-dark').querySelectorAll('.navbar-tab').forEach(function(t){
+  // D9 + 1b: the panel's own tab switcher and tab memory. The tabs carry
+  // ids no tile would use (hudtab-info/hudtab-dash), the switcher toggles
+  // only the panel's two DIRECT tab contents (:scope >), and the pick is
+  // remembered per peer ON THE HOST element — every refresh swaps the
+  // mount's innerHTML but the host div stays, so buildControls can put
+  // the user back on the tab they chose.
+  var hudtabs = ME.querySelector('.hudtop .navbar-dark').querySelectorAll('.navbar-tab');
+  hudtabs.forEach(function(t){
     t.addEventListener('click', function(){
-      ME.lastTab = this.dataset.id;
+      var which = this.dataset.id;
+      hudtabs.forEach(function(x){ x.classList.remove('selected'); });
+      this.classList.add('selected');
+      ME.querySelectorAll(':scope > .tab-content').forEach(function(c){
+        c.classList.toggle('selected', c.classList.contains(which));
+      });
+      ME.lastTab = which;
       ME.lastTabPeer = ME.DATA.id;
     });
   });
@@ -261,8 +273,12 @@ function buildControls(){
   // the F7 note at the top), so the pick recorded on it by the navbar
   // listener in me.ready outlives a refresh — Refresh no longer yanks an
   // Info reader back to Dashboard.
-  var want = (ME.lastTabPeer == ME.DATA.id && ME.lastTab) ? ME.lastTab : 'tab2';
-  var tab = ME.querySelector('.navbar-dark .navbar-tab[data-id="' + want + '"]');
+  var want = (ME.lastTabPeer == ME.DATA.id && ME.lastTab) ? ME.lastTab : 'hudtab-dash';
+  // D9: a host element from before the rename may still carry tab1/tab2 —
+  // map the old stored ids onto the new ones.
+  if (want == 'tab1') want = 'hudtab-info';
+  if (want == 'tab2') want = 'hudtab-dash';
+  var tab = ME.querySelector('.hudtop .navbar-dark .navbar-tab[data-id="' + want + '"]');
   if (tab) tab.click();
 
   var data = me.data;

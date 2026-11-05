@@ -22,11 +22,14 @@
   </div>
 </div>
 <div class="navbar-dark">
-  <div class="navbar-tab navbar-tab1 selected" data-id='tab1'>Info</div>
-  <div class="navbar-tab navbar-tab2" data-id='tab2'>Dashboard</div>
+  <!-- D9: tab ids no tile would use — the generic tab1/tab2 collided with
+       the camera tile's own LIVE/DVR/EVENTS tabs (its DVR content is
+       .tab-content.tab2) -->
+  <div class="navbar-tab navbar-hudtab-info selected" data-id='hudtab-info'>Info</div>
+  <div class="navbar-tab navbar-hudtab-dash" data-id='hudtab-dash'>Dashboard</div>
 </div>
 </div>
-  <div class='padme tab-content tab1 selected'>
+  <div class='padme tab-content hudtab-info selected'>
     <div class='hudinfogrid'>
       <div class='hudinfolabel'>IP Address</div>
       <div class='hudinfovalue'><span class='hud_ipaddr'></span><span class='hud_addr_count hideme'></span><img src='../app/asset/app/icons/ui/accent/more.svg' class='roundbutton-small addressexpandbutton'><img src='../app/asset/app/icons/ui/accent/close.svg' class='roundbutton-small closeaddressbutton hideme'></div>
@@ -68,7 +71,7 @@
       </div>
     </div>
   </div>
-  <div class='padme tab-content tab2'>
+  <div class='padme tab-content hudtab-dash'>
     <div class='hudeditbar adminonly'>
       <span class='hudedit-msg' role='status'></span>
       <button type='button' class='regularbutton hudeditbutton' aria-pressed='false'>Edit</button>
