@@ -212,17 +212,57 @@
   display:inline-block;
 }
 
-.inline.big{
-  width:600px;
-  height:450px;
-  /* 7b: the panel is resizable down to 360px — a big dashboard tile
-     caps at the panel's inner width instead of holding 600px. */
-  max-width:100%;
+/* D4: the dashboard is one wrapping row of tiles, in the list's order,
+   with ONE gap (--hud-tile-gap) between tiles and between rows; the tab
+   body's .padme already puts it on the gutter. A big tile takes a whole
+   row at the panel's inner width, so it breaks the row before and after
+   it; consecutive icon tiles share rows, left-aligned. The old inline
+   flow put small tiles wherever it could, and a big tile held a fixed
+   600x450 box whatever its content. */
+/* 12px: the header's own gap, and two 150px icon tiles + one gap fill
+   the 312px inner width of a panel at its 360px minimum exactly. */
+.hudpanel {
+  --hud-tile-gap: 12px;
 }
 
-.inline.iconmode{
-  width:150px;
-  height:150px;
+.hudpanel .hudapps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--hud-tile-gap);
+  container-type: inline-size;   /* cqw = the dashboard's inner width */
+}
+
+.hudpanel .hudapps > .hudapps-empty {
+  flex: 1 0 100%;
+}
+
+/* D4: a big tile's height follows its content, from a 16:9 minimum of
+   its width. The minimum is needed: camera:dvr sizes itself FROM its
+   slot (adjustSizes fits the image into the slot's height minus its own
+   navbar), so an auto-height slot would collapse it to nothing. 16:9 is
+   the camera's default resolution, so its image fills the row's width;
+   in-flow content taller than that grows the slot (height:auto above a
+   min-height — not aspect-ratio, whose grow-with-content minimum is
+   lost on a scroll container). overflow-y:auto keeps what a tile paints
+   OUTSIDE its own boxes inside its slot: at a 360px panel the camera's
+   DVR tab fits its controls into the slot by shrinking its image to 0
+   and spilling the rest (391px into 176) over the next tile. That is
+   the camera's own layout (session 3); here it scrolls in its slot. */
+.hudpanel .hudapps > .hudtile.big {
+  flex: 0 0 100%;
+  min-width: 0;
+  height: auto;
+  min-height: calc(100cqw * 9 / 16);
+  overflow-y: auto;
+}
+
+/* D4: an icon tile is a fixed square (peer:reboot draws its canvas from
+   the slot's size once, at ready). */
+.hudpanel .hudapps > .hudtile.iconmode {
+  flex: none;
+  width: 150px;
+  height: 150px;
 }
 
 /* F7: everything admin-only hides until the panel root (.hudpanel, set in

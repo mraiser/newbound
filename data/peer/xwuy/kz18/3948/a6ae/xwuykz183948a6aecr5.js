@@ -263,7 +263,9 @@ function buildControls(){
     var claz = !ctl.big ? 'iconmode' : 'big';
 
     var el = document.createElement('div');
-    el.className = 'inline ' + claz;
+    // D4: .hudtile carries the dashboard layout (css); big/iconmode stay
+    // for any control that reads its slot's mode.
+    el.className = 'inline hudtile ' + claz;
     wrap.appendChild(el);
     d.peer = ME.DATA.id;
     installControl(el, db, id, function(api){}, d);
