@@ -13,10 +13,63 @@
   font-size:x-small;
 }
 
-.top-right{
-  position:absolute;
-  top:20px;
-  right:20px;
+/* 7.3: ONE inner gutter for the whole panel — the header, the tab bar
+   and both tab bodies start at the same x (the tab bodies' .padme is
+   24px, so the gutter is 24). */
+.hudpanel {
+  --hud-gutter: 24px;
+}
+
+/* 7.3: one header row: ✕ and the name share a vertical centre (both on
+   the 32px name line), the UUID sits under the name at the name's own
+   left edge, and the dots/latency and the ⋮ centre on the name row with
+   the ⋮ at the right gutter (the old .top-right floated them at the
+   panel corner, off the header's grid). */
+.hudheader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px var(--hud-gutter) 12px var(--hud-gutter);
+}
+
+.hudheader .closehud {
+  flex: none;
+}
+
+.hudtitle {
+  flex: 1;
+  min-width: 0;
+}
+
+.hudtitle .rp-uuid {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hudheadright {
+  position: relative;   /* the ⋮ menu card anchors here */
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;   /* the name row's height — centres the dots and the ⋮ on it */
+}
+
+.hudconn {
+  text-align: right;
+}
+
+.hudheader .connectionindicator {
+  margin-top: 0;
+}
+
+/* 7.3: the tab bar sits on the same gutter as the header and the tab
+   bodies (the kit's .navbar-dark is width:100%). Child combinator: the
+   dashboard mounts whole controls with their own navbars — untouched. */
+.hudpanel > .navbar-dark {
+  width: auto;
+  margin: 0 var(--hud-gutter);
 }
 
 .connectionindicator {
@@ -40,14 +93,19 @@
   margin-left: 6px
 }
 
+/* 1b: the chips clipped — .ispos forced the chip back to inline-block
+   (overriding the shared .chip's inline-flex, since this sheet loads
+   after app's) and .clickupdate claimed calc(100% - 20px) of it, so the
+   ✓ appended on done overlapped the version text and the ⚠ author
+   warning stretched the chip around a gap. Let the shared flex chip
+   size to its content: no display override, no width claim.
+   position:relative stays for the chips' positioned children. */
 .ispos {
   position:relative;
-  display:inline-block;
 }
 
 .clickupdate{
   display:inline-block;
-  width:calc(100% - 20px);
 }
 
 .removeupdate {
@@ -78,9 +136,149 @@
 .inline.big{
   width:600px;
   height:450px;
+  /* 7b: the panel is resizable down to 360px — a big dashboard tile
+     caps at the panel's inner width instead of holding 600px. */
+  max-width:100%;
 }
 
 .inline.iconmode{
   width:150px;
   height:150px;
+}
+
+/* F7: everything admin-only hides until the panel root (.hudpanel, set in
+   the js) earns .isadmin from the remote current_user check. Scoped to the
+   panel so dashboard-mounted controls' own classes are untouched. */
+.hudpanel .adminonly {
+  display: none;
+}
+
+.hudpanel.isadmin .adminonly {
+  display: revert;
+}
+
+/* 6b: the empty-dashboard note (Marc: 'NOT FOUND' is the default state,
+   not an error). Dim; the admin hint inside it inherits the dimming and
+   F7's .adminonly/.isadmin rule decides whether it shows at all. */
+.hudpanel .hudapps-empty {
+  opacity: 0.55;
+  font-size: 14px;
+  padding: 12px 0;
+}
+
+/* F8: the save-failure words next to Stay connected */
+.hudpanel .keepalive-status {
+  color: #d06060;
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+/* F11: a menu item whose action is unavailable (Add Control after a failed
+   first read) keeps its row but loses its popup and its affordance. */
+.hudpanel .menuitem-disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* F11: write-path errors in the Add Control popup */
+.add-control-error {
+  color: #d06060;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+/* F13: these two were absolutely positioned (.abspos) and sat on top of the
+   P2P Port line; they stay in flow on the IP Address line now. */
+.hudpanel .addressexpandbutton,
+.hudpanel .closeaddressbutton {
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+/* F13 follow-up (5b): the shared app css declares .roundbutton-small
+   { display:inline-flex } AFTER .hideme { display:none } at equal
+   specificity, so hideme never actually hid this button — it only sat
+   unseen under the ⋯ while both were .abspos at the same spot. Start it
+   hidden here; the expand/close click handlers set inline style.display,
+   which still overrides this rule. */
+.hudpanel .closeaddressbutton.hideme {
+  display: none;
+}
+
+/* 7.4: Info rows as two aligned columns. Full-width rows (the address
+   list, the crate form/status, Stay connected) span both columns; the
+   key/lock icons live in the label column, their 6px glyph inset pulled
+   back so the glyphs align with the text labels above. */
+.hudpanel .hudinfogrid {
+  display: grid;
+  grid-template-columns: minmax(96px, max-content) 1fr;
+  column-gap: 16px;
+  row-gap: 10px;
+  align-items: center;
+}
+
+.hudpanel .hudinfolabel {
+  color: var(--text-dim);
+}
+
+/* 7b fix-up: one rhythm for every Info row. The kit's .icon-small-white
+   is a 32px box (20px glyph + 6px inset), which made the key/lock rows
+   42px apart against the text rows' 29. A 20px box with no inset draws
+   the SAME 20px glyph at the text rows' height, glyph left edge on the
+   label column (so the old -6px inset pull-back goes too). */
+.hudpanel .hudinfolabel .icon-small-white {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  margin-left: 0;
+}
+
+.hudpanel .hudinfovalue {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.hudpanel .hudinfofull {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+/* 7c: the Platform rows are DIRECT grid children now, each tagged
+   .hudcrates.adminonly — the display:contents wrapper they sat in left
+   Gecko with stale grid track heights when the panel was dragged
+   narrower with Info visible, drawing the crate form over the Platform
+   value and the key row. The form is a wrapping flex row, so at narrow
+   widths the inputs and buttons stack with a real gap instead of
+   lines touching. The display rule must follow the .isadmin .adminonly
+   revert — same specificity, later wins. */
+.hudpanel .hudcrateform {
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.hudpanel.isadmin .hudcrateform {
+  display: flex;
+}
+
+/* 7c: .adminonly's isadmin revert out-ranks .hideme's display:none (the
+   closeaddressbutton precedent) — keep the crate status hidden until a
+   run shows it via inline style. */
+.hudpanel .hudcratestatus.hideme {
+  display: none;
+}
+
+.hudpanel .hud_address_list {
+  padding: 2px 0 6px;
+}
+
+/* 7.5: the dim +N beside the IP when the peer reported more addresses */
+.hudpanel .hud_addr_count {
+  color: var(--text-dim);
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+.hudpanel .availableupgrades {
+  margin-top: 16px;
 }

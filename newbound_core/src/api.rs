@@ -1151,6 +1151,22 @@ pub mod dev {
             ::flowlang::rustcmd::RustCmd::new("msuuqu1a165e00598r1161").execute(d).expect("Rust command execution failed").get_object("a")
         }
 
+        pub fn check_python(lib: String, ctl: String, cmd: String) -> DataObject {
+            let mut d = DataObject::new();
+            d.put_string("lib", &lib);
+            d.put_string("ctl", &ctl);
+            d.put_string("cmd", &cmd);
+            ::flowlang::rustcmd::RustCmd::new("tgzgxv1a19e04dfe3g1").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
+        pub fn check_js(lib: String, ctl: String, cmd: String) -> DataObject {
+            let mut d = DataObject::new();
+            d.put_string("lib", &lib);
+            d.put_string("ctl", &ctl);
+            d.put_string("cmd", &cmd);
+            ::flowlang::rustcmd::RustCmd::new("uuowqh1a1a0efa6baj1").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
     }
     pub mod viewctx {
         use ::ndata::dataobject::DataObject;
@@ -1340,6 +1356,119 @@ pub mod dev {
         use ::ndata::data::Data;
 
     }
+    pub mod flowstep {
+        use ::ndata::dataobject::DataObject;
+        use ::ndata::dataarray::DataArray;
+        use ::ndata::databytes::DataBytes;
+        use ::ndata::data::Data;
+
+        pub fn step(state: DataObject, pick: DataObject) -> DataObject {
+            let mut d = DataObject::new();
+            d.put_object("state", state);
+            d.put_object("pick", pick);
+            ::flowlang::rustcmd::RustCmd::new("kwjhgp1a16a026788s1c8").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
+        pub fn run(body: DataObject, args: DataObject, policy: String, budget: i64) -> DataObject {
+            let mut d = DataObject::new();
+            d.put_object("body", body);
+            d.put_object("args", args);
+            d.put_string("policy", &policy);
+            d.put_int("budget", budget);
+            ::flowlang::rustcmd::RustCmd::new("qktspz1a16a0b52e9u214").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
+        pub fn validate(body: DataObject, args: DataObject, events: DataArray) -> DataObject {
+            let mut d = DataObject::new();
+            d.put_object("body", body);
+            d.put_object("args", args);
+            d.put_array("events", events);
+            ::flowlang::rustcmd::RustCmd::new("phmyms1a16a0b6cbfw216").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
+        pub fn parity(lib: String, ctl: String, cmd: String, args: DataObject, presets: DataObject, policy: String) -> DataObject {
+            let mut d = DataObject::new();
+            d.put_string("lib", &lib);
+            d.put_string("ctl", &ctl);
+            d.put_string("cmd", &cmd);
+            d.put_object("args", args);
+            d.put_object("presets", presets);
+            d.put_string("policy", &policy);
+            ::flowlang::rustcmd::RustCmd::new("uzuhpw1a16a0b877fz218").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
+        pub fn drive(state: DataObject, mode: String, pick: DataObject, target: DataObject, budget: i64) -> DataObject {
+            let mut d = DataObject::new();
+            d.put_object("state", state);
+            d.put_string("mode", &mode);
+            d.put_object("pick", pick);
+            d.put_object("target", target);
+            d.put_int("budget", budget);
+            ::flowlang::rustcmd::RustCmd::new("iijpnu1a16a2cc451mc1").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
+        pub fn debug_reap() -> DataObject {
+            let d = DataObject::new();
+            ::flowlang::rustcmd::RustCmd::new("xuyiro1a16a466259h99").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
+        pub fn debug_stop(session: String) -> DataObject {
+            let mut d = DataObject::new();
+            d.put_string("session", &session);
+            ::flowlang::rustcmd::RustCmd::new("lojxro1a16a467d30i9b").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
+        pub fn debug_set_breakpoints(session: String, list: DataArray) -> DataObject {
+            let mut d = DataObject::new();
+            d.put_string("session", &session);
+            d.put_array("list", list);
+            ::flowlang::rustcmd::RustCmd::new("lyxgmp1a16a4698d4x9d").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
+        pub fn debug_step(session: String, mode: String, pick: DataObject) -> DataObject {
+            let mut d = DataObject::new();
+            d.put_string("session", &session);
+            d.put_string("mode", &mode);
+            d.put_object("pick", pick);
+            ::flowlang::rustcmd::RustCmd::new("wojtzq1a16a46b4bcy9f").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
+        pub fn debug_state(session: String) -> DataObject {
+            let mut d = DataObject::new();
+            d.put_string("session", &session);
+            ::flowlang::rustcmd::RustCmd::new("tgoxzr1a16a46d1d9ja2").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
+        pub fn debug_start(lib: String, ctl: String, cmd: String, body: DataObject, args: DataObject) -> DataObject {
+            let mut d = DataObject::new();
+            d.put_string("lib", &lib);
+            d.put_string("ctl", &ctl);
+            d.put_string("cmd", &cmd);
+            d.put_object("body", body);
+            d.put_object("args", args);
+            ::flowlang::rustcmd::RustCmd::new("nmmhrq1a16a46ef33ra4").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
+        pub fn run_flow(lib: String, ctl: String, cmd: String, args: DataObject, events: i64, budget: i64, nn_sessionid: String) -> DataObject {
+            let mut d = DataObject::new();
+            d.put_string("lib", &lib);
+            d.put_string("ctl", &ctl);
+            d.put_string("cmd", &cmd);
+            d.put_object("args", args);
+            d.put_int("events", events);
+            d.put_int("budget", budget);
+            d.put_string("nn_sessionid", &nn_sessionid);
+            ::flowlang::rustcmd::RustCmd::new("zixhvt1a1921dffe4of5").execute(d).expect("Rust command execution failed").get_object("a")
+        }
+
+    }
+    pub mod flowdebug {
+        use ::ndata::dataobject::DataObject;
+        use ::ndata::dataarray::DataArray;
+        use ::ndata::databytes::DataBytes;
+        use ::ndata::data::Data;
+
+    }
 }
 
 pub mod peer {
@@ -1519,19 +1648,6 @@ pub mod peer {
     }
 }
 
-pub mod runtime {
-}
-
-pub mod scratch {
-    pub mod scratch {
-        use ::ndata::dataobject::DataObject;
-        use ::ndata::dataarray::DataArray;
-        use ::ndata::databytes::DataBytes;
-        use ::ndata::data::Data;
-
-    }
-}
-
 pub mod security {
     pub mod security {
         use ::ndata::dataobject::DataObject;
@@ -1634,13 +1750,14 @@ pub struct old_dev_flowspike {}
 pub struct old_dev_flowview3d {}
 pub struct old_dev_flowedit3d {}
 pub struct old_dev_flowtoken {}
+pub struct old_dev_flowstep {}
+pub struct old_dev_flowdebug {}
 pub struct old_peer_headsup {}
 pub struct old_peer_peer {}
 pub struct old_peer_peer_model {}
 pub struct old_peer_reboot {}
 pub struct old_peer_service {}
 pub struct old_peer_peer_select {}
-pub struct old_scratch_scratch {}
 pub struct old_security_security {}
 pub struct old_app {
     pub api: old_app_api,
@@ -1698,6 +1815,8 @@ pub struct old_dev {
     pub flowview3d: old_dev_flowview3d,
     pub flowedit3d: old_dev_flowedit3d,
     pub flowtoken: old_dev_flowtoken,
+    pub flowstep: old_dev_flowstep,
+    pub flowdebug: old_dev_flowdebug,
 }
 pub struct old_peer {
     pub headsup: old_peer_headsup,
@@ -1707,11 +1826,6 @@ pub struct old_peer {
     pub service: old_peer_service,
     pub peer_select: old_peer_peer_select,
 }
-pub struct old_runtime {
-}
-pub struct old_scratch {
-    pub scratch: old_scratch_scratch,
-}
 pub struct old_security {
     pub security: old_security_security,
 }
@@ -1719,8 +1833,6 @@ pub struct api {
     pub app: old_app,
     pub dev: old_dev,
     pub peer: old_peer,
-    pub runtime: old_runtime,
-    pub scratch: old_scratch,
     pub security: old_security,
 }
 
@@ -1782,6 +1894,8 @@ pub const fn new() -> api {
             flowview3d: old_dev_flowview3d {},
             flowedit3d: old_dev_flowedit3d {},
             flowtoken: old_dev_flowtoken {},
+            flowstep: old_dev_flowstep {},
+            flowdebug: old_dev_flowdebug {},
         },
         peer: old_peer {
             headsup: old_peer_headsup {},
@@ -1790,11 +1904,6 @@ pub const fn new() -> api {
             reboot: old_peer_reboot {},
             service: old_peer_service {},
             peer_select: old_peer_peer_select {},
-        },
-        runtime: old_runtime {
-        },
-        scratch: old_scratch {
-            scratch: old_scratch_scratch {},
         },
         security: old_security {
             security: old_security_security {},
@@ -2237,6 +2346,14 @@ impl old_dev_code {
     pub fn trace_flow(&self, lib: String, ctl: String, cmd: String, args: DataObject, nn_sessionid: String) -> DataObject {
         self::dev::code::trace_flow(lib, ctl, cmd, args, nn_sessionid)
     }
+    #[deprecated(note = "use api::dev::code::check_python instead")]
+    pub fn check_python(&self, lib: String, ctl: String, cmd: String) -> DataObject {
+        self::dev::code::check_python(lib, ctl, cmd)
+    }
+    #[deprecated(note = "use api::dev::code::check_js instead")]
+    pub fn check_js(&self, lib: String, ctl: String, cmd: String) -> DataObject {
+        self::dev::code::check_js(lib, ctl, cmd)
+    }
 }
 impl old_dev_git {
     #[deprecated(note = "use api::dev::git::gitrun instead")]
@@ -2310,6 +2427,56 @@ impl old_dev_git {
     #[deprecated(note = "use api::dev::git::untrack_generated instead")]
     pub fn untrack_generated(&self, repo: String, message: String) -> DataObject {
         self::dev::git::untrack_generated(repo, message)
+    }
+}
+impl old_dev_flowstep {
+    #[deprecated(note = "use api::dev::flowstep::step instead")]
+    pub fn step(&self, state: DataObject, pick: DataObject) -> DataObject {
+        self::dev::flowstep::step(state, pick)
+    }
+    #[deprecated(note = "use api::dev::flowstep::run instead")]
+    pub fn run(&self, body: DataObject, args: DataObject, policy: String, budget: i64) -> DataObject {
+        self::dev::flowstep::run(body, args, policy, budget)
+    }
+    #[deprecated(note = "use api::dev::flowstep::validate instead")]
+    pub fn validate(&self, body: DataObject, args: DataObject, events: DataArray) -> DataObject {
+        self::dev::flowstep::validate(body, args, events)
+    }
+    #[deprecated(note = "use api::dev::flowstep::parity instead")]
+    pub fn parity(&self, lib: String, ctl: String, cmd: String, args: DataObject, presets: DataObject, policy: String) -> DataObject {
+        self::dev::flowstep::parity(lib, ctl, cmd, args, presets, policy)
+    }
+    #[deprecated(note = "use api::dev::flowstep::drive instead")]
+    pub fn drive(&self, state: DataObject, mode: String, pick: DataObject, target: DataObject, budget: i64) -> DataObject {
+        self::dev::flowstep::drive(state, mode, pick, target, budget)
+    }
+    #[deprecated(note = "use api::dev::flowstep::debug_reap instead")]
+    pub fn debug_reap(&self) -> DataObject {
+        self::dev::flowstep::debug_reap()
+    }
+    #[deprecated(note = "use api::dev::flowstep::debug_stop instead")]
+    pub fn debug_stop(&self, session: String) -> DataObject {
+        self::dev::flowstep::debug_stop(session)
+    }
+    #[deprecated(note = "use api::dev::flowstep::debug_set_breakpoints instead")]
+    pub fn debug_set_breakpoints(&self, session: String, list: DataArray) -> DataObject {
+        self::dev::flowstep::debug_set_breakpoints(session, list)
+    }
+    #[deprecated(note = "use api::dev::flowstep::debug_step instead")]
+    pub fn debug_step(&self, session: String, mode: String, pick: DataObject) -> DataObject {
+        self::dev::flowstep::debug_step(session, mode, pick)
+    }
+    #[deprecated(note = "use api::dev::flowstep::debug_state instead")]
+    pub fn debug_state(&self, session: String) -> DataObject {
+        self::dev::flowstep::debug_state(session)
+    }
+    #[deprecated(note = "use api::dev::flowstep::debug_start instead")]
+    pub fn debug_start(&self, lib: String, ctl: String, cmd: String, body: DataObject, args: DataObject) -> DataObject {
+        self::dev::flowstep::debug_start(lib, ctl, cmd, body, args)
+    }
+    #[deprecated(note = "use api::dev::flowstep::run_flow instead")]
+    pub fn run_flow(&self, lib: String, ctl: String, cmd: String, args: DataObject, events: i64, budget: i64, nn_sessionid: String) -> DataObject {
+        self::dev::flowstep::run_flow(lib, ctl, cmd, args, events, budget, nn_sessionid)
     }
 }
 impl old_peer_peer {

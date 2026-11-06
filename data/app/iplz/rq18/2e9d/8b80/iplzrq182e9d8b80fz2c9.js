@@ -184,6 +184,11 @@ me.initPopups = function(el) {
 me.closePopup = function(data, cb) {
   var el2 = resolveEl(data.selector);
   if (data && data.modal) {
+    // Mark closed first, so an open still animating won't attach re-centring after this
+    data.closed = true;
+    // Stop re-centring before the close animation starts, so they don't fight it
+    if (data.resizeObserver) { data.resizeObserver.disconnect(); data.resizeObserver = null; }
+    if (data.reflow) { window.removeEventListener('resize', data.reflow); data.reflow = null; }
     animateTo(el2, {
       left: data.clientX + 'px',
       top: data.clientY + 'px',
@@ -216,6 +221,7 @@ me.popup = function(data, cb) {
   }
 
   if (data.modal) {
+    data.closed = false;
     var bg = data.bg = document.createElement('div');
     bg.className = 'greyedout';
     bg.style.display = 'none';
@@ -240,8 +246,8 @@ me.popup = function(data, cb) {
       opacity: '0'
     });
 
-    var x = (window.innerWidth - w) / 2;
-    var y = (window.innerHeight - h) / 2;
+    var x = Math.max(16, (window.innerWidth - w) / 2);
+    var y = Math.max(16, (window.innerHeight - h) / 2);
 
     // Animate to final state, including height
     animateTo(el2, {
@@ -253,6 +259,18 @@ me.popup = function(data, cb) {
     }, 400, function() {
       // After animation, remove fixed width/height so it can be responsive
       setStyles(el2, { width: '', height: '' });
+      // Keep the card on screen and centred as it grows or the window resizes.
+      // Skip when it was closed again before this open finished.
+      if (!data.closed) {
+        data.reflow = function() {
+          el2.style.left = Math.max(16, (window.innerWidth - el2.offsetWidth) / 2) + 'px';
+          el2.style.top = Math.max(16, (window.innerHeight - el2.offsetHeight) / 2) + 'px';
+        };
+        data.resizeObserver = new ResizeObserver(data.reflow);
+        data.resizeObserver.observe(el2);
+        window.addEventListener('resize', data.reflow);
+        data.reflow();
+      }
       if (cb) cb();
     });
 
@@ -261,7 +279,7 @@ me.popup = function(data, cb) {
     // Position and display the popup off-screen to guarantee correct measurement
     setStyles(el2, {
       position: 'fixed',
-      zIndex: '6',
+      zIndex: '20',
       left: '-9999px',
       top: '-9999px',
       display: 'block',

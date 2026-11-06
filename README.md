@@ -5,7 +5,7 @@ Welcome to the official GitHub repository for Newbound!
 
 [API](https://www.newbound.io/documentation/reference.html) | [DISCORD](https://discord.gg/p2YvGGm2RR) | [DOC](https://www.newbound.io/documentation/index.html) | [WEB](https://www.newbound.io) | [CORP](https://www.newbound.com/site/index.html)
 
-NOTE: The reload, java_runtime, and javascript_runtime features are known to be buggy at this time.
+NOTE: The reload and java_runtime features are known to be buggy at this time. The javascript_runtime feature needs Rust 1.91 or newer (`cargo build --release --features=serde_support,javascript_runtime`; release bundles and the Docker image come in a `-js` variant with it); JavaScript and TypeScript commands are documented in `data/dev/_ASSETS/docs/js-commands.md`.
 
 ### Installation
 
@@ -34,6 +34,20 @@ If you are deploying an app (rather than developing one), you probably want to t
 (*MUCH faster*):
 ```
 cargo run --release
+```
+
+### Prebuilt bundles and Docker (Python included)
+
+`packaging/bundle.sh <target>` builds a self-contained bundle - the server
+built with the embedded Python runtime, a relocatable CPython 3.13 next to
+it, and the core libraries - that runs without a Rust toolchain or system
+Python (see `packaging/BUNDLE.md`). Release tags (`v*`) attach bundles for
+Linux x86_64/arm64 and macOS arm64 to the GitHub release. The Docker image
+is the same bundle on Debian:
+
+```
+docker build -t newbound .
+docker run -p 8080:8080 -v newbound-data:/newbound/data newbound
 ```
 
 ## What is Newbound?    
@@ -154,10 +168,18 @@ The following is a pretty good system prompt for working with Newbound using an 
     Writing Commands in Rust
     Follow all the principles outlined above, especially regarding ndata handle ownership, cloning, and the "no-wrap" rule.
     Writing Commands in Python
-    Python is a first-class language in Flowlang, making it ideal for LLM tooling and data scripting.
-    Argument Passing: ndata types are passed from Rust to Python by handle, not by value. Your Python function will receive arguments as instances of special wrapper classes: NDataObject, NDataArray, and NDataBytes.
-    Best Practice: Manipulate these NDataObject / NDataArray instances directly. This is highly efficient as it avoids costly serialization and allows your Python code to operate on the same underlying memory as Rust.
-    Return Values: You can return NDataObject and NDataArray instances. If you return a native Python type like a str, int, or dict, Flowlang will automatically convert it into the appropriate ndata structure.
+    Python is a first-class language in Flowlang (build with the python_runtime feature). Write the function BODY only, with imports in the separate imports field; declared params are in scope with type hints (String→str, Integer→int, Float→float, Boolean→bool, JSONObject→NDataObject, JSONArray→NDataArray, InputStream→NDataBytes).
+    Argument Passing: JSONObject/JSONArray/InputStream arguments arrive as NDataObject / NDataArray / NDataBytes - handles on the shared ndata data, not copies. They behave like dict / list / bytes (o["k"], o.get, o.items(), a.append, slicing, ==, len, in), so write ordinary Python against them; to_dict() / to_list() / ndata_py.to_py(x) give native copies when a library needs a real dict.
+    Return Values: Return the value itself - str, int, float, bool, None, dict, list, tuple, bytes, or an ndata object; the platform wraps it exactly as for a Rust command. A FLAT command returns a dict (the whole response). Conversion is exact or an error: ints must fit in 64 bits; set, Decimal and datetime must be converted explicitly (sorted(x), str(x), x.isoformat()).
+    Errors and Output: raise exceptions for failures - the caller gets the message, your body line and the traceback. print() and logging go to the server log, labelled with the command.
+    Calling Other Commands: import flowlang; flowlang.api.<lib>.<ctl>.<cmd>(args...) or flowlang.call(lib, ctl, cmd, *args, **kwargs) runs any command in any language and returns its value; a failure raises flowlang.CommandError. Another Python command's module imports as: from <lib>.<ctl> import <cmd>.
+    After writing or editing a Python command, run dev.code.check_python(lib, ctl, cmd): it compiles, imports and type-checks the command and reports problems at your body lines. Full reference: the dev library's docs/python-commands.md.
+    Writing Commands in JavaScript or TypeScript
+    JavaScript commands (lang "javascript") and TypeScript commands (lang "typescript") need a build with the javascript_runtime feature. Write the function BODY only, with ES import statements in the separate imports field; declared params are in scope (String→string, Integer/Float→number, Boolean→boolean, JSONObject→object, JSONArray→array; typed in TypeScript). A body that uses await is an async function. Packages come from node_modules next to data/ (npm install there; CommonJS and ESM both work), bundled by esbuild, which must be installed (npm install esbuild); TypeScript commands always need it. There is no Node: no require, process, Buffer, fs or http. The web APIs are there: fetch, Headers, Response, URL, URLSearchParams, TextEncoder/TextDecoder, atob/btoa, crypto.randomUUID/getRandomValues, structuredClone, AbortController, plus console, setTimeout/setInterval and flowlang. For files or processes, call a Rust or Python command.
+    Argument Passing and Return Values: JSONObject/JSONArray arguments arrive as handles on the caller's ndata - not copies; changes are seen by the caller. They behave like plain objects and arrays (o.k, in, delete, Object.keys, spread, JSON.stringify, Array.isArray, push, map, ...). InputStream arguments arrive as a Uint8Array. Return the value itself (or a Promise of it); the platform wraps it exactly as for a Rust command. A plain object or array written or returned becomes new ndata; a handle is stored or returned as itself. A FLAT command returns an object (the whole response). A function, symbol, BigInt, Map, Set or cyclic structure cannot be stored - convert it (Object.fromEntries(map), [...set], String(big)).
+    Errors and Output: throw for failures - the caller gets the message, your body line and the stack. console.log goes to the server log, labelled with the command. Every call has a time limit (30 s by default).
+    Calling Other Commands: flowlang.api.<lib>.<ctl>.<cmd>(args...) or flowlang.call(lib, ctl, cmd, {name: value}) runs any command in any language and returns its value (await it if the callee is an async JavaScript command); a failure throws flowlang.CommandError. To share code, import another JavaScript or TypeScript command as a module in the imports field: import fmt, { helper } from "flowlang:<lib>/<ctl>/<cmd>"; - the default export is its function, and whatever its own imports field exports (export const helper = ...) comes along.
+    After writing or editing a JavaScript or TypeScript command, run dev.code.check_js(lib, ctl, cmd): it compiles (or bundles) the command and, when TypeScript's tsc is installed, type-checks it, reporting problems at your body and imports lines. Full reference: the dev library's docs/js-commands.md.
     Front-End Control Development (JS/HTML/CSS)
     Controls are the user interface components, composed of three discrete code sections.
     Structure: Keep HTML, CSS, and JavaScript code in their separate, respective sections.

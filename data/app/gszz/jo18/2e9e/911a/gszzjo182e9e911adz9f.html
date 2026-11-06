@@ -5,7 +5,7 @@
     <span class='nb-title'>Applications</span>
     <div class='upper-right'>
       <button class='roundbutton-small-white open-system-settings popupmenu' data-popup='{"selector":".system-settings", "closeselector":".close-system-settings", "modal":true}'>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.69-1.62-0.92L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.44,0.17-0.48,0.41L9.2,5.77C8.61,5.99,8.08,6.3,7.58,6.68L5.19,5.72C4.97,5.64,4.72,5.71,4.6,5.92L2.68,9.24 c-0.11,0.2-0.06,0.47,0.12,0.61l2.03,1.58C4.78,11.66,4.76,11.97,4.76,12.3c0,0.32,0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.69,1.62,0.92l0.44,2.96 c0.04,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.48-0.41l0.44-2.96c0.59-0.23,1.12-0.54,1.62-0.92l2.39,0.96 c0.22,0.08,0.47,0.01,0.59-0.22l1.92-3.32c0.11-0.2,0.06-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"></path></svg>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-1 3-3 1-2 4 2 2v4l4 2 3-1 3 1 4-2v-4l2-2-2-4-3-1-1-3Z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
     </div>
   </div>
@@ -37,44 +37,176 @@
     <br><br>
   </div>
   <!-- System Settings Modal - Moved out of the transformed parent -->
-  <div class='card modal system-settings'>
-    <div class='appinfo-header pad16'>
-      <span>Settings</span>
-       <button class="popupcard-close close-system-settings">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-       </button>
-    </div>
-    <div class='pad16'>
-      <label class='textinputlabel' for='devicename'>Device Name</label>
-      <input type='text' class='textinput' placeholder='Name of this device' id='devicename'>
-      <br><br>
-      <label class='textinputlabel' for='ipaddr'>IP Address</label>
-      <input type='text' class='textinput' placeholder='IP Address for HTTP' id='ipaddr'>
-      <br><br>
-      <label class='textinputlabel' for='portnum'>Port Number</label>
-      <input type='number' class='textinput' placeholder='Port for HTTP' id='portnum'>
-      <br><br>
-      <label class='textinputlabel' for='defaultbot'>Default App</label>
-      <select name='defaultbot' class='textinput' id='defaultbot'></select>
-      <br><br>
-      <div class='crate-section' style='display:none;'>
-        <label class='textinputlabel' for='flowlangver'>flowlang Crate Version</label>
-        <input type='text' class='textinput' placeholder='e.g. 0.3.35' id='flowlangver'>
-        <br><br>
-        <label class='textinputlabel' for='ndataver'>ndata Crate Version</label>
-        <input type='text' class='textinput' placeholder='e.g. 0.3.18' id='ndataver'>
-        <br><br>
-        <a class='regularbutton update-crates'>Update Crates</a>
-        <a class='regularbutton hard-reset'>Hard Reset</a>
-        <div class='crate-update-status' style='display:none; white-space:pre-wrap; font-family:monospace; font-size:12px; margin-top:8px; max-height:160px; overflow:auto;'></div>
-        <br>
+  <div class='card modal system-settings' role='dialog' aria-labelledby='ss-title'>
+    <div class='ss-frame'>
+      <div class='ss-head'>
+        <div class='ss-head-left'>
+          <div class='ss-title' id='ss-title'>Settings</div>
+          <div class='ss-sub'>This Newbound device</div>
+        </div>
+        <div class='ss-head-right'>
+          <label class='ss-helpsw' title='Show a short explanation under each setting'>Show help
+            <span class='tg'><input type='checkbox' class='ss-showhelp-input' aria-label='Show help'><span></span></span>
+          </label>
+          <button class='popupcard-close close-system-settings' aria-label='Close'>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
       </div>
-      <i style='color:var(--text-color-light);'>Changes require restart</i>
-    </div>
-    <div class="card-button-wrap">
-      <a class="regularbutton close-system-settings">Cancel</a>
-      <a class="clearbutton save-system-settings close-system-settings">Save</a>
-      <a class="coloredbutton save-and-restart">Save and Restart</a>
+
+      <div class='ss-body'>
+        <section class='ss-section'>
+          <div class='ss-sec-head'>
+            <span class='ss-sec-title'>This device</span>
+            <span class='ss-tag ss-hint'>Applies on save</span>
+          </div>
+          <div class='ss-field ss-f-name'>
+            <label class='textinputlabel ss-label' for='devicename'>Device name <span class='ss-dot' aria-hidden='true'></span></label>
+            <input type='text' class='textinput' id='devicename' autocomplete='off' aria-describedby='ss-name-err'>
+            <div class='ss-err' id='ss-name-err'>Give the device a name.</div>
+            <div class='ss-help ss-hint'>How this device shows up to your other Newbound devices, for example in Peers.</div>
+          </div>
+          <div class='ss-field ss-f-app'>
+            <label class='textinputlabel ss-label' for='defaultbot'>Start page <span class='ss-dot' aria-hidden='true'></span></label>
+            <select name='defaultbot' class='textinput' id='defaultbot'></select>
+            <div class='ss-help ss-hint'>The app that opens when you go to this device's address without naming an app.</div>
+          </div>
+        </section>
+
+        <section class='ss-section'>
+          <div class='ss-sec-head'>
+            <span class='ss-sec-title'>Network</span>
+            <span class='ss-tag ss-net-tag ss-hint'>Needs restart</span>
+          </div>
+          <div class='ss-field ss-f-bind'>
+            <div class='textinputlabel ss-label' id='ss-bind-label'>Who can open this device <span class='ss-dot' aria-hidden='true'></span></div>
+            <div class='ss-choices' role='radiogroup' aria-labelledby='ss-bind-label'>
+              <label class='ss-choice'>
+                <input type='radio' name='ss-bind' value='127.0.0.1'>
+                <span class='ss-choice-box'>
+                  <span class='ss-radio'></span>
+                  <span><span class='ss-choice-title'>Only this computer</span><span class='ss-choice-desc ss-hint'>Other devices can't reach the web interface.</span></span>
+                  <span class='ss-choice-code'>127.0.0.1</span>
+                </span>
+              </label>
+              <label class='ss-choice'>
+                <input type='radio' name='ss-bind' value='0.0.0.0'>
+                <span class='ss-choice-box'>
+                  <span class='ss-radio'></span>
+                  <span><span class='ss-choice-title'>Any device on the network</span><span class='ss-choice-desc ss-hint'>Phones and other computers can open it too. Login still applies.</span></span>
+                  <span class='ss-choice-code'>0.0.0.0</span>
+                </span>
+              </label>
+              <label class='ss-choice'>
+                <input type='radio' name='ss-bind' value='custom'>
+                <span class='ss-choice-box'>
+                  <span class='ss-radio'></span>
+                  <span><span class='ss-choice-title'>One specific address</span><span class='ss-choice-desc ss-hint'>For computers with more than one network connection.</span></span>
+                  <span class='ss-choice-code'>custom</span>
+                </span>
+              </label>
+            </div>
+            <div class='ss-custom-ip'>
+              <input type='text' class='textinput ss-mono' id='ipaddr' placeholder='e.g. 192.168.1.42' autocomplete='off' aria-label='Specific IP address' aria-describedby='ss-ip-err'>
+              <div class='ss-err' id='ss-ip-err'>That doesn't look like an IP address.</div>
+            </div>
+          </div>
+          <div class='ss-field ss-f-port'>
+            <label class='textinputlabel ss-label' for='portnum'>Port <span class='ss-dot' aria-hidden='true'></span></label>
+            <input type='number' class='textinput ss-mono' id='portnum' min='0' max='65535' inputmode='numeric' aria-describedby='ss-port-err'>
+            <div class='ss-err' id='ss-port-err'>Use a number from 0 to 65535.</div>
+            <div class='ss-help ss-hint'>Enter 0 to let Newbound pick a free port when it starts. Changing it breaks bookmarks and peer links that use the old port.</div>
+          </div>
+          <div class='ss-addr' aria-live='polite'>
+            <div class='ss-addr-row'><span>On this computer</span><code class='ss-addr-local'></code></div>
+            <div class='ss-addr-row'><span>From other devices</span><code class='ss-addr-lan'></code></div>
+          </div>
+          <div class='ss-warn ss-warn-remote'>You're using this page from another device. After the restart you won't be able to open it from here.</div>
+          <div class='ss-warn ss-warn-port0'>Newbound will pick a new port at start. You'll find it in config.properties (http_port).</div>
+        </section>
+
+        <details class='ss-adv crate-section' style='display:none;'>
+          <summary>
+            <span class='ss-sum-left'>
+              <span class='ss-sec-title'>Advanced · Platform engine</span>
+              <span class='ss-sum-meta'></span>
+            </span>
+            <svg class='ss-chev' width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </summary>
+          <div class='ss-sub-block'>
+            <p class='ss-sub-title'>Engine versions</p>
+            <div class='ss-help ss-hint ss-help-top'>flowlang runs Newbound's code and ndata stores its data. Changing either one rebuilds the whole platform. That takes several minutes, then a restart.</div>
+            <div class='ss-pair'>
+              <div>
+                <label class='textinputlabel ss-label' for='flowlangver'>flowlang</label>
+                <input type='text' class='textinput ss-mono' id='flowlangver' placeholder='e.g. 0.3.35' autocomplete='off'>
+              </div>
+              <div>
+                <label class='textinputlabel ss-label' for='ndataver'>ndata</label>
+                <input type='text' class='textinput ss-mono' id='ndataver' placeholder='e.g. 0.3.18' autocomplete='off'>
+              </div>
+            </div>
+            <div class='ss-err ss-ver-err' role='alert'></div>
+            <div class='ss-help ss-hint ss-ver-help'>Edit a version above to enable the update. Versions aren't saved by the Save button.</div>
+            <div class='ss-btn-row'>
+              <button type='button' class='regularbutton ss-upd' disabled>Update and rebuild</button>
+            </div>
+            <div class='ss-err ss-upd-err' role='alert'></div>
+            <div class='ss-confirm ss-upd-confirm'>
+              Rebuild the platform with <b class='ss-upd-what'></b>? Newbound keeps running while it builds.
+              <div class='ss-btn-row'>
+                <button type='button' class='coloredbutton ss-upd-go'>Start rebuild</button>
+                <button type='button' class='clearbutton ss-upd-cancel'>Not now</button>
+              </div>
+            </div>
+            <div class='ss-prog ss-prog-update' aria-live='polite'>
+              <ul class='ss-steps'></ul>
+              <div class='ss-prog-msg'></div>
+              <button type='button' class='ss-loglink'>Show build log</button>
+              <div class='ss-log'></div>
+            </div>
+          </div>
+          <div class='ss-danger'>
+            <p class='ss-sub-title'>Reinstall Newbound (hard reset)</p>
+            <div class='ss-help ss-help-top'>Downloads a fresh copy of Newbound from GitHub and replaces the platform code and core data with it. Your own libraries are kept. Any changes you made to the built-in apps are lost. Rebuilds everything, then asks you to restart.</div>
+            <div class='ss-btn-row'>
+              <button type='button' class='regularbutton ss-btn-danger ss-hr'>Reinstall…</button>
+            </div>
+            <div class='ss-err ss-hr-err' role='alert'></div>
+            <div class='ss-confirm ss-confirm-danger ss-hr-confirm'>
+              Type <b class='ss-hr-want ss-mono'></b> to confirm.
+              <input type='text' class='textinput ss-mono ss-hr-name' placeholder='Device name' autocomplete='off' aria-label='Type the device name to confirm'>
+              <div class='ss-btn-row'>
+                <button type='button' class='regularbutton ss-btn-danger-solid ss-hr-go' disabled>Reinstall now</button>
+                <button type='button' class='clearbutton ss-hr-cancel'>Cancel</button>
+              </div>
+            </div>
+            <div class='ss-prog ss-prog-hardreset' aria-live='polite'>
+              <ul class='ss-steps'></ul>
+              <div class='ss-prog-msg'></div>
+              <button type='button' class='ss-loglink'>Show build log</button>
+              <div class='ss-log'></div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class='ss-foot'>
+        <div class='ss-foot-err' role='alert'></div>
+        <div class='ss-foot-status' aria-live='polite'>No changes</div>
+        <div class='ss-foot-btns'>
+          <button type='button' class='regularbutton close-system-settings ss-cancel'>Cancel</button>
+          <button type='button' class='clearbutton ss-save-only' hidden>Save only</button>
+          <button type='button' class='coloredbutton ss-save' disabled>Save</button>
+        </div>
+      </div>
+
+      <div class='ss-overlay' role='status' aria-live='polite'>
+        <div class='ss-spinner'></div>
+        <div class='ss-ov-msg'>Restarting Newbound…</div>
+        <div class='ss-ov-msg2'></div>
+        <div class='ss-ov-msg3'></div>
+      </div>
     </div>
   </div>
   <div class='card hideme app-settings dialog-wide' id='app-settings'>

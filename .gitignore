@@ -20,6 +20,14 @@
 !newbound.sh
 !default.nix
 !config.properties_example
+!Dockerfile
+!.dockerignore
+
+# Packaging and CI
+!packaging/
+!packaging/**
+!.github/
+!.github/**
 
 # Core store libraries (the data/ tree is the product)
 !data/
@@ -54,6 +62,12 @@
 # --- Re-exclusions inside allowed trees ---
 # Generated typed API, one per crate src/ (builder-written, overlay-aware)
 **/src/api.rs
+# Generated JavaScript declarations for the whole store (builder-written, overlay-aware)
+**/src/flowlang.d.ts
+# esbuild bundles of JavaScript/TypeScript commands that import packages (built
+# from the store and node_modules; never source)
+**/*.bundle.js
+**/*.bundle.tsconfig.json
 # Per-instance local state inside tracked runtime/dev
 runtime/dev/libraries/
 runtime/dev/repos.json

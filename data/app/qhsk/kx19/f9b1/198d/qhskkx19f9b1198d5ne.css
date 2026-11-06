@@ -6,6 +6,24 @@
    Values may tune; names only ever get added. The [hidden] rule and the
    reduced-motion block are part of the contract too. */
 
+/* Newbound Mono: our own monospace, letters and symbols drawn together, so
+   the Dev screen looks the same on every OS. "Newbound Mono Symbols" is the
+   same file limited to the UI's symbols, for symbols inside sans-serif text. */
+@font-face {
+  font-family: "Newbound Mono";
+  src: url("/app/asset/app/fonts/newbound-mono.woff2?v=0.5.0") format("woff2");
+  font-display: block;
+}
+@font-face {
+  font-family: "Newbound Mono Symbols";
+  src: url("/app/asset/app/fonts/newbound-mono.woff2?v=0.5.0") format("woff2");
+  unicode-range: U+2190-21FF, U+2205, U+2212, U+2260, U+2264-2265, U+2295,
+                 U+2301, U+2315, U+2318, U+2387, U+23EF, U+2500, U+25A0-25FF,
+                 U+2691, U+2699, U+26A0, U+26C3, U+26E8, U+26F6, U+2713, U+2715,
+                 U+2717, U+2733, U+275A, U+27F2-27F3;
+  font-display: block;
+}
+
 :root {
   /* graphite — the tool */
   --ground: #171a1e;
@@ -41,8 +59,9 @@
   --danger: #c15a5a;
 
   /* type roles */
-  --sans: system-ui, "Segoe UI", Roboto, sans-serif;
-  --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --sans: "Newbound Mono Symbols", system-ui, "Segoe UI", Roboto, sans-serif;
+  --mono: "Newbound Mono", ui-monospace, monospace;
+  font-variant-emoji: text; /* keep ⚙ ⚠ ⏯ ✳ as text, never colour emoji */
   --disp: "Futura", "Avenir Next", "URW Gothic", "Century Gothic", "Trebuchet MS", sans-serif;
 }
 

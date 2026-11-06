@@ -1,55 +1,61 @@
-<div class='top-right'>
-  <div class='rp-info'>
-    <div class="connectionindicator"></div><div class="connectionindicator"></div><div class="connectionindicator"></div>
-    <div class='connectionlatency'></div>
-  </div>
-  <div class='card popupcard mini control-settings-popup'>
-    <table class="tablelist">
-      <tr><td class="refreshhud closeonclick">Refresh</td></tr>
-      <tr><td class="adminonly popupmenu closeonclick" data-popup='{"selector":".add-control-popup","closeselector":".add-control-popup-close","modal":true}'>Add Control</td></tr>
-      <tr><td class="adminonly closeonclick">Control Settings</td></tr>
-      <tr><td class="hudrestart adminonly closeonclick">Restart Services</td></tr>
-    </table>
-  </div>
-  <img src='../app/asset/app/more_icon-vert-white.png' class='roundbutton-small-white popupmenu morebutton' data-popup='{"selector":".control-settings-popup","closeselector":".control-settings-popup-close","popup":true}'>
-</div>
-<div class='padme'>
-  <img src='../app/asset/app/close-white.png' class='closehud roundbutton-small-white marginme'>
-  <div class='rp-info'>
+<div class='hudheader'>
+  <img src='../app/asset/app/icons/ui/dark/close.svg' class='closehud roundbutton-small-white'>
+  <div class='rp-info hudtitle'>
     <div class='headline rp-name'></div>
     <div class='rp-uuid'></div>
   </div>
-  <div class = "navbar-dark">
-    <div class = "navbar-tab navbar-tab1 selected" data-id='tab1'>Info</div>
-    <div class = "navbar-tab navbar-tab2" data-id='tab2'>Dashboard</div>
+  <div class='hudheadright'>
+    <div class='rp-info hudconn'>
+      <div class="connectionindicator"></div><div class="connectionindicator"></div><div class="connectionindicator"></div>
+      <div class='connectionlatency'></div>
+    </div>
+    <img src='../app/asset/app/icons/ui/dark/more-vertical.svg' class='roundbutton-small-white popupmenu morebutton' data-popup='{"selector":".control-settings-popup","closeselector":".control-settings-popup-close","popup":true}'>
+    <div class='card popupcard mini control-settings-popup'>
+      <table class="tablelist">
+        <tr><td class="refreshhud closeonclick">Refresh</td></tr>
+        <tr><td class="adminonly popupmenu closeonclick" data-popup='{"selector":".add-control-popup","closeselector":".add-control-popup-close","modal":true}'>Add Control</td></tr>
+        <tr><td class="adminonly closeonclick">Control Settings</td></tr>
+        <tr><td class="hudrestart adminonly closeonclick">Restart Services</td></tr>
+      </table>
+    </div>
   </div>
+</div>
+<div class="navbar-dark">
+  <div class="navbar-tab navbar-tab1 selected" data-id='tab1'>Info</div>
+  <div class="navbar-tab navbar-tab2" data-id='tab2'>Dashboard</div>
+</div>
   <div class='padme tab-content tab1 selected'>
-    IP Address: <span class='hud_ipaddr'></span>
-    <img src='../app/asset/app/more_icon-green.png' class='roundbutton-small addressexpandbutton abspos'><img src='../app/asset/app/close-green.png' class='roundbutton-small closeaddressbutton hideme abspos'><br>
-    <div class='hud_address_list padme addressexpand hideme'></div>
-    P2P Port: <span class='hud_port'></span><br>
-    HTTP Port: <span class='hud_http_port'></span><br>
-    <div class='hudcrates adminonly' style='display:none;'>
-      Platform: <span class='hud_crates'><i>checking...</i></span><br>
-      <div class='hudcrateform'>
-        <input type='text' class='textinput hud_flowlang' placeholder='flowlang' style='width:90px; display:inline-block;'>
-        <input type='text' class='textinput hud_ndata' placeholder='ndata' style='width:90px; display:inline-block;'>
+    <div class='hudinfogrid'>
+      <div class='hudinfolabel'>IP Address</div>
+      <div class='hudinfovalue'><span class='hud_ipaddr'></span><span class='hud_addr_count hideme'></span><img src='../app/asset/app/icons/ui/accent/more.svg' class='roundbutton-small addressexpandbutton'><img src='../app/asset/app/icons/ui/accent/close.svg' class='roundbutton-small closeaddressbutton hideme'></div>
+      <div class='hud_address_list addressexpand hudinfofull hideme'></div>
+      <div class='hudinfolabel'>P2P Port</div>
+      <div class='hudinfovalue hud_port'></div>
+      <div class='hudinfolabel'>HTTP Port</div>
+      <div class='hudinfovalue hud_http_port'></div>
+      <div class='hudinfolabel hudcrates adminonly'>Platform</div>
+      <div class='hudinfovalue hud_crates hudcrates adminonly'><i>checking...</i></div>
+      <div class='hudcrateform hudinfofull hudcrates adminonly'>
+        <input type='text' class='textinput hud_flowlang' placeholder='flowlang' style='width:90px;'>
+        <input type='text' class='textinput hud_ndata' placeholder='ndata' style='width:90px;'>
         <button class='coloredbutton hudcrateupdate'>Update Crates</button>
         <button class='regularbutton hudcratehardreset'>Hard Reset</button>
         <button class='accentbutton hudcraterestart hideme'>Restart Instance</button>
       </div>
-      <div class='hudcratestatus hideme' style='white-space:pre-wrap; font-family:monospace; font-size:11px; max-height:120px; overflow:auto;'></div>
+      <div class='hudcratestatus hudinfofull hudcrates adminonly hideme' style='white-space:pre-wrap; font-family:monospace; font-size:11px; max-height:120px; overflow:auto;'></div>
+      <div class='hudinfolabel'><img src="../app/asset/app/icons/ui/dark/key.svg" class="icon-small-white" title="Groups this peer grants you"></div>
+      <div class='hudinfovalue rp-key'><i>checking...</i></div>
+      <div class='hudinfolabel'><img src="../app/asset/app/icons/ui/dark/lock.svg" class="icon-small-white" title="Groups you grant this peer"></div>
+      <div class='hudinfovalue rp-lock'><i>checking...</i></div>
+      <div class='hudinfofull'>
+        <label class="plaincheckbox">
+          <input type='checkbox' id='keepalive'>
+          <span>Stay connected</span>
+        </label>
+        <span class='keepalive-status'></span>
+      </div>
     </div>
-    
-    <img src="../app/asset/app/key_icon-white.png" class="icon-small-white">&nbsp;<span class='rp-key'><i>checking...</i></span>
-    <img src="../app/asset/app/lock_icon-white.png" class="icon-small-white">&nbsp;<span class='rp-lock'><i>checking...</i></span>
-    <br>
-    <label class="plaincheckbox">
-      <input type='checkbox' id='keepalive'>
-      <span>Stay connected</span>
-    </label>
-    <br><br>
-    <div class='availableupgrades hideme padme'>
+    <div class='availableupgrades hideme'>
       The following libraries on <span class='rp-name'></span> can be updated:
       <br><br>
       <div class='upgradelist'></div>
@@ -66,10 +72,10 @@
   <div class='add-control-popup card popup-card modal hideme'>
     <div class='dialog-header padme'>
       Add Control
-      <img src='../app/asset/app/close-white.png' class='upper-right add-control-popup-close roundbutton-small out10'>
+      <img src='../app/asset/app/icons/ui/dark/close.svg' class='upper-right add-control-popup-close roundbutton-small out10'>
     </div>
     <div class='card-text'>
       <div class = 'add-control-available'></div>
+      <div class='add-control-error'></div>
     </div>
   </div>
-</div>

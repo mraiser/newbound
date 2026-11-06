@@ -181,6 +181,9 @@ pub fn http_listen() {
 
         let mut querystring = "".to_string();
         let mut params = DataObject::new();
+        let mut raw_body = DataBytes::from_bytes(&Vec::new());
+        let mut request_error = "".to_string();
+        let mut request_error_code = 400i64;
 
         if method == "POST" {
           // extractPOSTParams
@@ -339,6 +342,40 @@ pub fn http_listen() {
           }
         }
 
+        else if method != "GET" && method != "HEAD" {
+          // Preserve arbitrary non-POST request bodies (WebDAV PUT/PROPFIND,
+          // JSON PATCH, etc.) without decoding or newline transformation.
+          // Consume or reject the body on every path so keep-alive stays framed.
+          if headers.has("TRANSFER-ENCODING") {
+            let transfer_encoding = headers.get_string("TRANSFER-ENCODING");
+            if !transfer_encoding.eq_ignore_ascii_case("identity") {
+              request_error_code = 501;
+              request_error = format!("Transfer-Encoding {} is not supported", transfer_encoding);
+            }
+          }
+
+          let content_length = headers.try_get_string("CONTENT-LENGTH").unwrap_or_else(|_| "0".to_string());
+          let body_len = match content_length.parse::<usize>() {
+            Ok(n) => n,
+            Err(_) => {
+              request_error = "Invalid Content-Length".to_string();
+              0
+            }
+          };
+          const MAX_RAW_BODY: usize = 64 * 1024 * 1024;
+          if request_error.is_empty() && body_len > MAX_RAW_BODY {
+            request_error_code = 413;
+            request_error = "Request body exceeds the 64 MiB limit".to_string();
+          }
+          if request_error.is_empty() && body_len > 0 {
+            let mut body_buf = vec![0; body_len];
+            match stream.read_exact(&mut body_buf) {
+              Ok(_) => raw_body = DataBytes::from_bytes(&body_buf),
+              Err(e) => request_error = format!("Error reading request body: {}", e)
+            }
+          }
+        }
+
         let cmd_path:String; // Renamed cmd to cmd_path
         if path.contains("?"){
           let i = path.find("?").unwrap();
@@ -399,6 +436,11 @@ pub fn http_listen() {
         request.put_string("querystring", &querystring);
         request.put_object("headers", headers.clone()); // Clone headers before moving to request
         request.put_object("params", params);
+        request.put_bytes("body", raw_body);
+        if !request_error.is_empty() {
+          request.put_string("request_error", &request_error);
+          request.put_int("request_error_code", request_error_code);
+        }
 
         let now = time();
         request.put_int("timestamp", now);
@@ -421,8 +463,18 @@ pub fn http_listen() {
 
         let result = panic::catch_unwind(|| {
           let mut p = DataObject::get(dataref);
-          let o = handle_request(request.clone(), stream.try_clone().unwrap());
-          p.put_object("a", o);
+          if !request_error.is_empty() {
+            let mut o = DataObject::new();
+            o.put_int("code", request_error_code);
+            o.put_string("msg", "BAD REQUEST");
+            o.put_string("mimetype", "text/plain; charset=utf-8");
+            o.put_string("body", &request_error);
+            p.put_object("a", o);
+          }
+          else {
+            let o = handle_request(request.clone(), stream.try_clone().unwrap());
+            p.put_object("a", o);
+          }
         });
 
         match result {
@@ -945,7 +997,19 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
               let r_type = d_result.get_string("nn_return_type"); // Renamed r to r_type
               if r_type != "404" {
                 b_found = true;
-                if r_type == "File" {
+                // Explicit opt-in for protocol adapters (WebDAV, webhooks,
+                // etc.). Ordinary command responses retain their JSON shape.
+                if r_type == "FLAT" && d_result.has("nn_http") && d_result.get_boolean("nn_http") {
+                  res = d_result;
+                }
+                else if cmd == "dav" && d_result.has("status") && d_result.get_string("status") == "err" && d_result.has("msg") && d_result.get_string("msg").starts_with("UNAUTHORIZED:") {
+                  // Protocol clients need an HTTP denial, not a JSON error in a 200.
+                  res.put_int("code", 403);
+                  res.put_string("msg", "FORBIDDEN");
+                  res.put_string("mimetype", "text/plain; charset=utf-8");
+                  res.put_string("body", "Forbidden");
+                }
+                else if r_type == "File" {
                   res.put_string("file", &d_result.get_string("data"));
                   res.put_string("mimetype", &mime_type(p_app_src.clone())); // Or appropriate path
                 }
@@ -1046,19 +1110,33 @@ pub fn handle_command(d: DataObject, sid: String) -> DataObject {
     if b_cmd_found {
       let command = Command::new(&ctldb, &id);
       if check_security(&command, &sid) {
-        command.cast_params(params.clone());
-
         let response_container = DataObject::new(); // Renamed response to response_container
         let dataref = response_container.data_ref;
         let r_return_type = command.return_type.to_owned(); // Renamed r to r_return_type
 
         let result = panic::catch_unwind(|| {
           let mut p_response_target = DataObject::get(dataref); // Renamed p to p_response_target
-          let cmd_output = command.execute(params).unwrap(); // Renamed o to cmd_output
-          p_response_target.put_object("a", cmd_output);
+          // Arguments that do not fit the declared types, and a failed flow, are error
+          // results ({status: "err", msg, ...}), not panics.
+          if let Err(m) = command.try_cast_params(params.clone()) {
+            let mut e = DataObject::new();
+            e.put_string("status", "err");
+            e.put_string("msg", &m);
+            p_response_target.put_object("err", e);
+            return;
+          }
+          match command.execute(params) {
+            Ok(cmd_output) => p_response_target.put_object("a", cmd_output), // Renamed o to cmd_output
+            // A failed flow: what failed and where, with the details under flow_error.
+            Err(e) => p_response_target.put_object("err", e.to_envelope()),
+          }
         });
 
         match result {
+          Ok(_x) if response_container.has("err") => {
+            o_result = response_container.get_object("err");
+            o_result.put_string("nn_return_type", "500");
+          },
           Ok(_x) => {
             let oo_inner_result = response_container.get_object("a"); // Renamed oo to oo_inner_result
             o_result = format_result(command, oo_inner_result);
@@ -1163,7 +1241,8 @@ pub fn format_result(command:Command, o:DataObject) -> DataObject {
     else {
       if o.has("a") { d_formatted_result = o.get_object("a"); }
       else if o.has("data") { d_formatted_result = o.get_object("data"); }
-      else { d_formatted_result = o.objects()[0].1.object(); } // This could panic if objects() is empty or not an object
+      else if o.clone().keys().is_empty() { d_formatted_result = o; } // nothing delivered (e.g. a flow that terminated before any output): {status:ok}, not an index panic
+      else { d_formatted_result = o.objects()[0].1.object(); } // panics if the only value is not an object
     }
   }
   else {
@@ -1172,7 +1251,9 @@ pub fn format_result(command:Command, o:DataObject) -> DataObject {
     if o.has("a") { oo_data_prop = o.get_property("a"); }
     else if o.has("data") { oo_data_prop = o.get_property("data"); }
     else if o.has("msg") { oo_data_prop = o.get_property("msg"); }
-    else { oo_data_prop = o.objects()[0].1.clone(); } // This could panic if objects() is empty
+    else if o.clone().keys().is_empty() { oo_data_prop = Data::DNull; } // nothing delivered (e.g. a flow that terminated before any output): data null, not an index panic
+    else if command.lang == "flow" && o.clone().keys().len() > 1 { oo_data_prop = Data::DObject(o.data_ref); } // a multi-output flow: the whole result, never one key picked in HashMap order
+    else { oo_data_prop = o.objects()[0].1.clone(); }
 
     if command.return_type == "String" {
       d_formatted_result.set_property("msg", oo_data_prop.clone());
