@@ -340,6 +340,7 @@ pub fn http_listen() {
         let mut request_error = "".to_string();
         let mut request_error_code = 400i64;
         let mut ka_force_close = false;
+        let mut chunked_body = false;
 
         if headers.has("TRANSFER-ENCODING") {
           // HTTP/1.1 chunk framing is decoded before the existing content-type
@@ -353,6 +354,7 @@ pub fn http_listen() {
                 raw_body = DataBytes::from_bytes(&body_buf);
                 headers.put_string("CONTENT-LENGTH", &body_buf.len().to_string());
                 headers.remove_property("TRANSFER-ENCODING");
+                chunked_body = true;
               },
               Err(e) => {
                 request_error_code = e.code;
@@ -372,33 +374,47 @@ pub fn http_listen() {
           }
         }
 
-        if method == "POST" && request_error.is_empty() {
-          // extractPOSTParams
-          let clstr = headers.get_string("CONTENT-LENGTH");
+        if method == "POST" && !chunked_body && request_error.is_empty() {
+          // A chunked body has already been consumed above and is passed to
+          // the command as raw_body. Never read its payload a second time.
+          // The legacy Content-Length POST parsers retain their socket path.
+          let clstr = headers.try_get_string("CONTENT-LENGTH").unwrap_or_else(|_| "0".to_string());
           let ctstr = match headers.has("CONTENT-TYPE") {
             true => headers.get_string("CONTENT-TYPE"),
             false => "text/plain".to_string()
           };
-          let max = clstr.parse::<usize>().unwrap_or(0); 
+          let max = match clstr.parse::<usize>() {
+            Ok(n) => n,
+            Err(_) => {
+              request_error = "Invalid Content-Length".to_string();
+              ka_force_close = true;
+              0
+            }
+          };
+          if max > MAX_RAW_BODY {
+            request_error_code = 413;
+            request_error = "Request body exceeds the 64 MiB limit".to_string();
+            ka_force_close = true;
+          }
 
           let s = ctstr.to_lowercase();
-          if s.contains("application/json") {
+          if request_error.is_empty() && s.contains("application/json") {
             if max > 0 {
                 let mut body_buf = vec![0; max];
                 match stream.read_exact(&mut body_buf) {
                     Ok(_) => {
                         let body_str = String::from_utf8_lossy(&body_buf).to_string();
-                        let json_params = DataObject::from_string(&body_str); 
+                        let json_params = DataObject::from_string(&body_str);
                         params = json_params;
                     },
                     Err(e) => {
-                        println!("Error reading JSON body: {}", e);
-                        // Keep params as new DataObject
+                        request_error = format!("Error reading JSON body: {}", e);
+                        ka_force_close = true;
                     }
                 }
             }
           }
-          else if s.starts_with("multipart/form-data") {
+          else if request_error.is_empty() && s.starts_with("multipart/form-data") {
             // MULTIPART
             let boundary = ctstr.split("boundary=").nth(1).map(|s| s.trim_matches('"'));
             if let Some(boundary_str) = boundary {
@@ -495,7 +511,7 @@ pub fn http_listen() {
                 println!("Multipart request without boundary!");
             }
           }
-          else {
+          else if request_error.is_empty() {
             // DEFAULT: Handle application/x-www-form-urlencoded
             let mut max_i64 = max as i64; // Use i64 for compatibility with old logic
             while max_i64 > 0 {
