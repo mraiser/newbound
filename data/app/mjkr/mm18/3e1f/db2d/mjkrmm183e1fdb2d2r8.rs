@@ -181,6 +181,9 @@ pub fn http_listen() {
 
         let mut querystring = "".to_string();
         let mut params = DataObject::new();
+        let mut raw_body = DataBytes::from_bytes(&Vec::new());
+        let mut request_error = "".to_string();
+        let mut request_error_code = 400i64;
 
         if method == "POST" {
           // extractPOSTParams
@@ -339,6 +342,40 @@ pub fn http_listen() {
           }
         }
 
+        else if method != "GET" && method != "HEAD" {
+          // Preserve arbitrary non-POST request bodies (WebDAV PUT/PROPFIND,
+          // JSON PATCH, etc.) without decoding or newline transformation.
+          // Consume or reject the body on every path so keep-alive stays framed.
+          if headers.has("TRANSFER-ENCODING") {
+            let transfer_encoding = headers.get_string("TRANSFER-ENCODING");
+            if !transfer_encoding.eq_ignore_ascii_case("identity") {
+              request_error_code = 501;
+              request_error = format!("Transfer-Encoding {} is not supported", transfer_encoding);
+            }
+          }
+
+          let content_length = headers.try_get_string("CONTENT-LENGTH").unwrap_or_else(|_| "0".to_string());
+          let body_len = match content_length.parse::<usize>() {
+            Ok(n) => n,
+            Err(_) => {
+              request_error = "Invalid Content-Length".to_string();
+              0
+            }
+          };
+          const MAX_RAW_BODY: usize = 64 * 1024 * 1024;
+          if request_error.is_empty() && body_len > MAX_RAW_BODY {
+            request_error_code = 413;
+            request_error = "Request body exceeds the 64 MiB limit".to_string();
+          }
+          if request_error.is_empty() && body_len > 0 {
+            let mut body_buf = vec![0; body_len];
+            match stream.read_exact(&mut body_buf) {
+              Ok(_) => raw_body = DataBytes::from_bytes(&body_buf),
+              Err(e) => request_error = format!("Error reading request body: {}", e)
+            }
+          }
+        }
+
         let cmd_path:String; // Renamed cmd to cmd_path
         if path.contains("?"){
           let i = path.find("?").unwrap();
@@ -399,6 +436,11 @@ pub fn http_listen() {
         request.put_string("querystring", &querystring);
         request.put_object("headers", headers.clone()); // Clone headers before moving to request
         request.put_object("params", params);
+        request.put_bytes("body", raw_body);
+        if !request_error.is_empty() {
+          request.put_string("request_error", &request_error);
+          request.put_int("request_error_code", request_error_code);
+        }
 
         let now = time();
         request.put_int("timestamp", now);
@@ -421,8 +463,18 @@ pub fn http_listen() {
 
         let result = panic::catch_unwind(|| {
           let mut p = DataObject::get(dataref);
-          let o = handle_request(request.clone(), stream.try_clone().unwrap());
-          p.put_object("a", o);
+          if !request_error.is_empty() {
+            let mut o = DataObject::new();
+            o.put_int("code", request_error_code);
+            o.put_string("msg", "BAD REQUEST");
+            o.put_string("mimetype", "text/plain; charset=utf-8");
+            o.put_string("body", &request_error);
+            p.put_object("a", o);
+          }
+          else {
+            let o = handle_request(request.clone(), stream.try_clone().unwrap());
+            p.put_object("a", o);
+          }
         });
 
         match result {
@@ -945,7 +997,19 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
               let r_type = d_result.get_string("nn_return_type"); // Renamed r to r_type
               if r_type != "404" {
                 b_found = true;
-                if r_type == "File" {
+                // Explicit opt-in for protocol adapters (WebDAV, webhooks,
+                // etc.). Ordinary command responses retain their JSON shape.
+                if r_type == "FLAT" && d_result.has("nn_http") && d_result.get_boolean("nn_http") {
+                  res = d_result;
+                }
+                else if cmd == "dav" && d_result.has("status") && d_result.get_string("status") == "err" && d_result.has("msg") && d_result.get_string("msg").starts_with("UNAUTHORIZED:") {
+                  // Protocol clients need an HTTP denial, not a JSON error in a 200.
+                  res.put_int("code", 403);
+                  res.put_string("msg", "FORBIDDEN");
+                  res.put_string("mimetype", "text/plain; charset=utf-8");
+                  res.put_string("body", "Forbidden");
+                }
+                else if r_type == "File" {
                   res.put_string("file", &d_result.get_string("data"));
                   res.put_string("mimetype", &mime_type(p_app_src.clone())); // Or appropriate path
                 }
