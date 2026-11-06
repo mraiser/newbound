@@ -181,6 +181,8 @@ pub fn http_listen() {
 
         let mut querystring = "".to_string();
         let mut params = DataObject::new();
+        let mut raw_body = DataBytes::from_bytes(&Vec::new());
+        let mut request_error = "".to_string();
 
         if method == "POST" {
           // extractPOSTParams
