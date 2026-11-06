@@ -108,10 +108,12 @@ fn valid_chunk_extensions(line: &[u8]) -> bool {
   let size = parts.next().unwrap_or(&[]);
   if size.is_empty() || !size.iter().all(|b| b.is_ascii_hexdigit()) { return false; }
   let extensions = match parts.next() { Some(v) => v, None => return true };
+  // splitn removed the semicolon separating size from the first extension.
+  // Enter the parser positioned immediately AFTER that delimiter; subsequent
+  // delimiters remain in `extensions` and are consumed at the loop bottom.
   let mut i = 0usize;
   while i < extensions.len() {
-    if extensions[i] != b';' { return false; }
-    i += 1;
+    let start = i;
     let start = i;
     while i < extensions.len() && extensions[i] != b';' && extensions[i] != b'=' { i += 1; }
     if !valid_token(&extensions[start..i]) { return false; }
@@ -139,6 +141,10 @@ fn valid_chunk_extensions(line: &[u8]) -> bool {
         while i < extensions.len() && extensions[i] != b';' { i += 1; }
         if !valid_token(&extensions[start..i]) { return false; }
       }
+    }
+    if i < extensions.len() {
+      if extensions[i] != b';' { return false; }
+      i += 1;
     }
   }
   true
@@ -545,7 +551,8 @@ pub fn http_listen() {
           }
         }
 
-        else if method != "GET" && method != "HEAD" {
+        else if method != "GET" && method != "HEAD" && !chunked_body {
+          // Chunked bodies of every method were already consumed above.
           // Preserve arbitrary non-POST request bodies (WebDAV PUT/PROPFIND,
           // JSON PATCH, etc.) without decoding or newline transformation.
           // Consume or reject the body on every path so keep-alive stays framed.
