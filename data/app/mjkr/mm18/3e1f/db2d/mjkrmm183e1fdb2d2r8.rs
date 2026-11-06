@@ -1002,6 +1002,13 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
                 if r_type == "FLAT" && d_result.has("nn_http") && d_result.get_boolean("nn_http") {
                   res = d_result;
                 }
+                else if cmd == "dav" && d_result.has("status") && d_result.get_string("status") == "err" && d_result.has("msg") && d_result.get_string("msg").starts_with("UNAUTHORIZED:") {
+                  // Protocol clients need an HTTP denial, not a JSON error in a 200.
+                  res.put_int("code", 403);
+                  res.put_string("msg", "FORBIDDEN");
+                  res.put_string("mimetype", "text/plain; charset=utf-8");
+                  res.put_string("body", "Forbidden");
+                }
                 else if r_type == "File" {
                   res.put_string("file", &d_result.get_string("data"));
                   res.put_string("mimetype", &mime_type(p_app_src.clone())); // Or appropriate path
