@@ -185,7 +185,28 @@ pub fn http_listen() {
         let mut request_error = "".to_string();
         let mut request_error_code = 400i64;
 
-        if method == "POST" {
+        if method != "GET" && method != "HEAD" && headers.has("TRANSFER-ENCODING") {
+          // HTTP/1.1 chunk framing is decoded before the existing content-type
+          // handlers, so JSON POST, form POST, and DAV PUT all receive exactly
+          // one decoded body. A declared Content-Length is ignored for chunked
+          // messages; chunk bytes, never that stale length, delimit the request.
+          match read_chunked_body(&mut stream, MAX_RAW_BODY) {
+            Ok(body_buf) => {
+              raw_body = DataBytes::from_bytes(&body_buf);
+              headers.put_string("CONTENT-LENGTH", &body_buf.len().to_string());
+              headers.remove_property("TRANSFER-ENCODING");
+            },
+            Err(e) => {
+              request_error_code = e.code;
+              request_error = e.message;
+              // Consume this response only. Never interpret an invalid chunk
+              // line, body suffix, or trailer as another HTTP request.
+              ka_force_close = true;
+            }
+          }
+        }
+
+        if method == "POST" && request_error.is_empty() {
           // extractPOSTParams
           let clstr = headers.get_string("CONTENT-LENGTH");
           let ctstr = match headers.has("CONTENT-TYPE") {
