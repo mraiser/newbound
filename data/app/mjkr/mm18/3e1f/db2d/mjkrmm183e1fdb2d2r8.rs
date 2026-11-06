@@ -787,10 +787,19 @@ pub fn http_listen() {
           // representation below: regular files, byte streams, and strings.
           response_headers.put_string("Connection", &ka);
 
-          let session_id_cookie = request.get_object("session").get_string("id"); // Renamed session_id to session_id_cookie
-          let later = now + 31536000000;
-          let cookie = "sessionid=".to_string() + &session_id_cookie + "; Path=/; Expires=" + &RFC2822Date::new(later).to_string();
-          response_headers.put_string("Set-Cookie", &cookie);
+          // Request-framing errors are answered before handle_request creates
+          // or refreshes a session. Do not panic trying to emit a session
+          // cookie on that early-error path: the promised 400/413 response
+          // must still reach the client and the connection must then close.
+          if request.has("session") && request.get_property("session").is_object() {
+            let session = request.get_object("session");
+            if session.has("id") && session.get_property("id").is_string() {
+              let session_id_cookie = session.get_string("id");
+              let later = now + 31536000000;
+              let cookie = "sessionid=".to_string() + &session_id_cookie + "; Path=/; Expires=" + &RFC2822Date::new(later).to_string();
+              response_headers.put_string("Set-Cookie", &cookie);
+            }
+          }
 
           let cors = "*";
           response_headers.put_string("Access-Control-Allow-Origin", cors);
