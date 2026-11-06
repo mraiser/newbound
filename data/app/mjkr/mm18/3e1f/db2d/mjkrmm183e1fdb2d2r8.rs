@@ -997,7 +997,12 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
               let r_type = d_result.get_string("nn_return_type"); // Renamed r to r_type
               if r_type != "404" {
                 b_found = true;
-                if r_type == "File" {
+                // Explicit opt-in for protocol adapters (WebDAV, webhooks,
+                // etc.). Ordinary command responses retain their JSON shape.
+                if r_type == "FLAT" && d_result.has("nn_http") && d_result.get_boolean("nn_http") {
+                  res = d_result;
+                }
+                else if r_type == "File" {
                   res.put_string("file", &d_result.get_string("data"));
                   res.put_string("mimetype", &mime_type(p_app_src.clone())); // Or appropriate path
                 }
