@@ -41,6 +41,9 @@
   min-width: 0;
 }
 
+/* D2: a long peer name ellipsizes on its one 32px line (it used to wrap
+   and push the UUID down) — the same rule as the UUID. */
+.hudtitle .rp-name,
 .hudtitle .rp-uuid {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -56,20 +59,88 @@
   height: 32px;   /* the name row's height — centres the dots and the ⋮ on it */
 }
 
-.hudconn {
-  text-align: right;
+/* D2: the dots' box IS the three dots (a flex row, no line box around
+   them), so .hudheadright's align-items centres the dots themselves on
+   the name row — the latency used to ride in that box and lift the dots
+   6px above the line. The latency hangs under the dots, out of flow,
+   centred on them. */
+.hudheader .hudconn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .hudheader .connectionindicator {
-  margin-top: 0;
+  margin: 0;
+}
+
+.hudheader .connectionlatency {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 3px;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* D2: the ✕ and ⋮ glyphs sit flush with the tab bar's edges. Both are
+   32px buttons (6px padding, 24-unit icon drawn in 20px); the glyphs'
+   own insets differ: the ✕ strokes start 5.125 units in (round caps),
+   the ⋮ dots end 10.125 units short of the right. Pull each box out by
+   padding + its glyph inset, so the hover circle may overhang the
+   gutter but the glyph lands on it. */
+.hudheader .closehud {
+  margin-left: calc(-6px - 20px * 5.125 / 24);
+}
+
+.hudheader .morebutton {
+  margin-right: calc(-6px - 20px * 10.125 / 24);
 }
 
 /* 7.3: the tab bar sits on the same gutter as the header and the tab
    bodies (the kit's .navbar-dark is width:100%). Child combinator: the
    dashboard mounts whole controls with their own navbars — untouched. */
-.hudpanel > .navbar-dark {
+.hudpanel > .hudtop > .navbar-dark {
   width: auto;
   margin: 0 var(--hud-gutter);
+}
+
+/* D1: the header and the tab bar are ONE pinned block. The kit's navbar
+   rule (app.ui) is sticky at top:61px — the height of an app title bar
+   this panel doesn't have — so inside the panel (#headsupdisplay, the
+   scroll container) the tab bar floated 61px down with content showing
+   through the gap. .hudtop sticks at the top instead, on the panel's own
+   solid ground (D3), and the tab bar inside it is static. z-index 4:
+   above tile content (whose navbars are static below), and UNDER the
+   kit's modal backdrop (.greyedout, 5) and popup cards (15+) — so the
+   Add Control and camera modals open on top and the backdrop covers the
+   header too (no header click leaks past an open modal). The ⋮ menu
+   card lives inside this block and paints at its level. */
+.hudpanel > .hudtop {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background-color: var(--panel);
+}
+
+/* Phase 1 review: static only — the bar keeps the kit's own strip
+   (.navbar-dark's --panel-2), like every other tab bar in the app. */
+.hudpanel > .hudtop > .navbar-dark {
+  position: static;
+}
+
+/* D1: tab bars that dashboard controls bring (the camera tile's
+   LIVE/DVR/EVENTS) scroll with their tile while they're in the panel.
+   Scoped to .hudapps, so those controls' own pages keep the kit's
+   sticky bar. */
+.hudpanel .hudapps .navbar,
+.hudpanel .hudapps .navbar-dark,
+.hudpanel .hudapps .navbar-light,
+.hudpanel .hudapps .navbar-accent {
+  position: static;
 }
 
 .connectionindicator {
@@ -120,10 +191,18 @@
   margin-top:-10px;
 }
 
+/* Phase 1 review: app.ui opens this card position:fixed with an inline
+   left/top at the click point (clamped to innerWidth - offsetWidth - 10),
+   so right/top here never applied — the kit's .popupcard margin:20px did,
+   pushing the card 20px past that clamp (10px out of the window). No
+   margin; the ⋮ click handler in the js lines the card's right edge up
+   with the tab bar's. */
+.hudpanel .control-settings-popup {
+  margin: 0;
+}
+
 .control-settings-popup {
   position:absolute;
-  right:-20px;
-  top:6px;
   width:300px;
   color:black;
   z-index:10;
@@ -133,17 +212,192 @@
   display:inline-block;
 }
 
-.inline.big{
-  width:600px;
-  height:450px;
-  /* 7b: the panel is resizable down to 360px — a big dashboard tile
-     caps at the panel's inner width instead of holding 600px. */
-  max-width:100%;
+/* D4: the dashboard is one wrapping row of tiles, in the list's order,
+   with ONE gap (--hud-tile-gap) between tiles and between rows; the tab
+   body's .padme already puts it on the gutter. A big tile takes a whole
+   row at the panel's inner width, so it breaks the row before and after
+   it; consecutive icon tiles share rows, left-aligned. The old inline
+   flow put small tiles wherever it could, and a big tile held a fixed
+   600x450 box whatever its content. */
+/* 12px: the header's own gap, and two 150px icon tiles + one gap fill
+   the 312px inner width of a panel at its 360px minimum exactly. */
+.hudpanel {
+  --hud-tile-gap: 12px;
 }
 
-.inline.iconmode{
-  width:150px;
-  height:150px;
+.hudpanel .hudapps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--hud-tile-gap);
+}
+
+.hudpanel .hudapps > .hudapps-empty {
+  flex: 1 0 100%;
+}
+
+/* D5: the flex item is the tile's wrapper (.hudtilewrap); the slot the
+   control mounts in (.hudtile) fills it. The wrapper is the positioned
+   box the edit overlay covers. */
+.hudpanel .hudapps > .hudtilewrap {
+  position: relative;
+  min-width: 0;
+}
+
+.hudpanel .hudapps > .hudtilewrap.big {
+  flex: 0 0 100%;
+}
+
+.hudpanel .hudapps > .hudtilewrap.iconmode {
+  flex: none;
+}
+
+.hudpanel .hudtilewrap > .hudtile {
+  display: block;
+}
+
+/* D4: a big tile's height follows its content, from a 16:9 minimum of
+   its width. The minimum is needed: camera:dvr sizes itself FROM its
+   slot (adjustSizes fits the image into the slot's height minus its own
+   navbar), so an auto-height slot would collapse it to nothing. 16:9 is
+   the camera's default resolution, so its image fills the row's width;
+   in-flow content taller than that grows the slot (height:auto above a
+   floated 16:9 strut — not aspect-ratio, whose grow-with-content minimum is
+   lost on a scroll container). overflow-y:auto keeps what a tile paints
+   OUTSIDE its own boxes inside its slot: at a 360px panel the camera's
+   DVR tab fits its controls into the slot by shrinking its image to 0
+   and spilling the rest (391px into 176) over the next tile. That is
+   the camera's own layout (session 3); here it scrolls in its slot. */
+.hudpanel .hudtilewrap > .hudtile.big {
+  width: 100%;
+  height: auto;
+  overflow-y: auto;
+}
+
+/* P04 (QA 1): the 16:9 minimum is this floated strut, not a container
+   query. container-type on .hudapps made it the containing block AND
+   stacking context for position:fixed descendants, so a tile's own
+   modal (the camera settings popup, z15) painted UNDER the kit's
+   .greyedout backdrop (z5 on body) and took no clicks. The strut's
+   padding-top resolves against the tile's width (its full row), and
+   the tile's overflow:auto BFC contains the float, so height still
+   follows content above the same 16:9 minimum. */
+.hudpanel .hudtilewrap > .hudtile.big::before {
+  content: '';
+  float: left;
+  width: 0;
+  padding-top: calc(100% * 9 / 16);
+}
+
+/* D4: an icon tile is a 150px column (peer:reboot draws its canvas from
+   the slot's width). R2.7: the square is a minimum, not a fixed height —
+   a tile's in-flow extras (peer:reboot's status line) grow the slot, so
+   the rows below move down instead of being painted over. */
+.hudpanel .hudtilewrap > .hudtile.iconmode {
+  width: 150px;
+  min-height: 150px;
+}
+
+/* D5: edit mode. The overlay covers the whole tile and takes every click
+   (so Reboot can't be pressed by mistake); it sits under the pinned
+   header block (z-index 4). The bar rides the tile's top edge. */
+.hudpanel .hudtile-edit {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: rgba(0, 0, 0, 0.45);
+  outline: 1px dashed var(--text-dim);
+  outline-offset: -1px;
+}
+
+.hudpanel .hudtile-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  background: var(--panel-2);
+}
+
+.hudpanel .hudtile-gap {
+  flex: 1;
+}
+
+.hudpanel .hudtile-q {
+  flex: 1 0 100%;
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.hudpanel .hudtile-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  background: var(--panel);
+  border: 1px solid var(--text-dim);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.hudpanel .hudtile-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.hudpanel .hudtile-btn.hudtile-remove {
+  color: #d06060;
+  border-color: #d06060;
+}
+
+/* Phase 3 review: ← → ✕ are the kit's icons, drawn like the header's ✕
+   (.roundbutton-small-white: a 32px round button, transparent, hover
+   tint) with the 20px glyph on its 6px inset. → is arrow-left mirrored. */
+.hudpanel .hudtile-btn.hudtile-icon {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 6px;
+  border: none;
+  border-radius: 50%;
+  background-color: transparent;
+}
+
+.hudpanel .hudtile-btn.hudtile-icon:not(:disabled):hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.hudpanel .hudtile-icon > img {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+.hudpanel .hudtile-mirror > img {
+  transform: scaleX(-1);
+}
+
+/* D5: the Edit/Done row at the top-right of the DASHBOARD tab, admin-only
+   (F7). display:flex must beat F7's later .isadmin .adminonly revert, so
+   this selector carries one class more. The message (failures, "the
+   dashboard changed") sits to the button's left. */
+.hudpanel.isadmin .hudeditbar.adminonly {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--hud-tile-gap);
+}
+
+.hudpanel .hudedit-msg {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  color: #d06060;
+  font-size: 12px;
 }
 
 /* F7: everything admin-only hides until the panel root (.hudpanel, set in
@@ -178,6 +432,80 @@
 .hudpanel .menuitem-disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* D7: the Add Control header is one row — the title, and the ✕ at the
+   right, centred on it. The old ✕ was .upper-right (absolute, top:50%)
+   inside an unpositioned header, so it centred on the whole card and sat
+   over the first list row. Title style copied from the app's Settings
+   dialog (app.app .ss-head / .ss-title): 18px, weight 500, --text, on a
+   14px 12px 14px 20px header. The kit's .dialog-header already supplies
+   the flex row, --panel-2 and the bottom rule. */
+.add-control-popup .hud-dlg-head {
+  padding: 14px 12px 14px 20px;
+  gap: 12px;
+}
+
+.add-control-popup .hud-dlg-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.add-control-popup .add-control-popup-close {
+  flex: none;
+}
+
+/* D6: an Add Control row is the title, and on the right an "Added ✓"
+   mark that shows only when the type is already on the dashboard; such a
+   row is greyed, has no hover tint and no pointer (the click handler
+   ignores it too). */
+.add-control-popup .add-ctl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.add-control-popup .add-ctl-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.add-control-popup .add-ctl-added {
+  display: none;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.add-control-popup .add-ctl-added > img {
+  width: 16px;
+  height: 16px;
+}
+
+.add-control-popup .add-ctl-item.added .add-ctl-added {
+  display: inline-flex;
+}
+
+.add-control-popup .tablelist td.add-ctl-item.added {
+  cursor: default;
+  color: var(--text-dim);
+}
+
+.add-control-popup .tablelist tr:hover td.add-ctl-item.added {
+  background-color: transparent;
+}
+
+.add-control-popup .add-ctl-item.added .add-ctl-title {
+  opacity: 0.6;
 }
 
 /* F11: write-path errors in the Add Control popup */

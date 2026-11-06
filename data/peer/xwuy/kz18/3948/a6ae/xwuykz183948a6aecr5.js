@@ -22,18 +22,42 @@ me.refresh = function(){
 me.ready = function(){
   me.check = ME.querySelector('.rp-uuid');
   me.update();
-  document.body.api.ui.initNavbar(ME);
+  // D9: initNavbar(ME) is gone — the kit's handler selects tab content BY
+  // CLASS over the WHOLE subtree (removes 'selected' from every
+  // .tab-content in el, adds it to every .<data-id>), so with the panel
+  // it reached the tiles' own tab contents. The panel binds its own two
+  // tabs below and never touches anything under .hudapps.
   document.body.api.ui.initPopups(ME);
+  // Phase 1 review: app.ui puts the ⋮ card at the click point, clamped
+  // 10px inside the window, which lands it off the panel's grid. This
+  // listener runs after initPopups' (same element, added later), so the
+  // card is open and measurable: its right edge goes on the tab bar's
+  // right edge, its top just under the ⋮.
+  ME.querySelector('.morebutton').addEventListener('click', function(){
+    var card = ME.querySelector('.control-settings-popup');
+    if (card.style.display == 'none') return;
+    var bar = ME.querySelector('.hudtop > .navbar-dark').getBoundingClientRect();
+    card.style.left = (bar.right - card.offsetWidth) + 'px';
+    card.style.top = (this.getBoundingClientRect().bottom + 4) + 'px';
+  });
   initCrates();
 
-  // 1b: remember which tab the user picks, per peer, ON THE HOST element —
-  // every refresh swaps the mount's innerHTML but the host div stays, so
-  // buildControls can put the user back on the tab they chose. Only the
-  // panel's own navbar is bound (the first .navbar-dark in the subtree;
-  // dashboard controls mount later, under .hudapps).
-  ME.querySelector('.navbar-dark').querySelectorAll('.navbar-tab').forEach(function(t){
+  // D9 + 1b: the panel's own tab switcher and tab memory. The tabs carry
+  // ids no tile would use (hudtab-info/hudtab-dash), the switcher toggles
+  // only the panel's two DIRECT tab contents (:scope >), and the pick is
+  // remembered per peer ON THE HOST element — every refresh swaps the
+  // mount's innerHTML but the host div stays, so buildControls can put
+  // the user back on the tab they chose.
+  var hudtabs = ME.querySelector('.hudtop .navbar-dark').querySelectorAll('.navbar-tab');
+  hudtabs.forEach(function(t){
     t.addEventListener('click', function(){
-      ME.lastTab = this.dataset.id;
+      var which = this.dataset.id;
+      hudtabs.forEach(function(x){ x.classList.remove('selected'); });
+      this.classList.add('selected');
+      ME.querySelectorAll(':scope > .tab-content').forEach(function(c){
+        c.classList.toggle('selected', c.classList.contains(which));
+      });
+      ME.lastTab = which;
       ME.lastTabPeer = ME.DATA.id;
     });
   });
@@ -148,6 +172,10 @@ me.ready = function(){
       // F11: a failed read makes adding unsafe (a write would replace a
       // list we never saw), so the menu item goes dark with the reason.
       disableAddControl(errText(result));
+      // D5: same reason — no edit can be checked against a list we can't read
+      var eb = ME.querySelector('.hudeditbutton');
+      eb.disabled = true;
+      eb.title = 'Editing is unavailable: ' + errText(result);
     }
   });
   json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_available", function(result){
@@ -169,15 +197,37 @@ me.ready = function(){
           var td = document.createElement('td');
           td.className = 'add-ctl-item';
           td.dataset.id = i;
-          td.textContent = rdi.title;
+          td.dataset.type = rdi.type;
+          // D6: the title on the left, the "Added" mark on the right (shown
+          // by markAdded when the type is already on the dashboard). The ✓
+          // is the kit's check icon — text glyphs render as boxes in some
+          // fonts (the edit bar's arrows did).
+          var row = document.createElement('div');
+          row.className = 'add-ctl-row';
+          var name = document.createElement('span');
+          name.className = 'add-ctl-title';
+          name.textContent = rdi.title;
+          var added = document.createElement('span');
+          added.className = 'add-ctl-added';
+          added.textContent = 'Added';
+          var ok = document.createElement('img');
+          ok.src = '../app/asset/app/icons/ui/dark/check.svg';
+          ok.alt = '';
+          added.appendChild(ok);
+          row.appendChild(name);
+          row.appendChild(added);
+          td.appendChild(row);
           tr.appendChild(td);
           tbl.appendChild(tr);
         }
       }
       if (tbl.rows.length == 0) el.innerHTML = '<i>there are no available controls to install on this device</i>';
       else { el.innerHTML = ''; el.appendChild(tbl); }
+      markAdded(me.data && me.data.list);
       el.querySelectorAll('.add-ctl-item').forEach(function(item){
         item.addEventListener('click', function(){
+          // D6: a control already on the dashboard can't be picked
+          if (this.classList.contains('added')) return;
           var d = me.available[this.dataset.id];
           // F11: never write over a list we haven't just seen — a stale or
           // empty me.data would replace the peer's real dashboard. Re-read
@@ -191,6 +241,16 @@ me.ready = function(){
             if (rr.status == 'ok') fresh = rr.data && rr.data.list ? rr.data : { "list": [] };
             else if (rr.msg == 'NOT FOUND') fresh = { "list": [] };
             else { errEl.textContent = errText(rr); return; }
+            // D6: the fresh list decides — if the type is already there
+            // (added meanwhile, or the marks were stale), write nothing,
+            // say so, and show the peer's real dashboard. Lists that
+            // already hold duplicates are left alone; D5's ✕ removes them.
+            if (fresh.list.some(function(c){ return c && c.type == d.type; })) {
+              me.data = fresh;
+              buildControls();
+              errEl.textContent = (d.title || d.type) + ' is already on the dashboard.';
+              return;
+            }
             fresh.list.push(d);
             json('../peer/remote/'+ME.DATA.id+'/app/write', "lib=runtime&id=controls_shared&readers=[]&writers=[]&data="+encodeURIComponent(JSON.stringify(fresh)), function(result){
               if (result.status != 'ok') { errEl.textContent = errText(result); return; }
@@ -213,8 +273,12 @@ function buildControls(){
   // the F7 note at the top), so the pick recorded on it by the navbar
   // listener in me.ready outlives a refresh — Refresh no longer yanks an
   // Info reader back to Dashboard.
-  var want = (ME.lastTabPeer == ME.DATA.id && ME.lastTab) ? ME.lastTab : 'tab2';
-  var tab = ME.querySelector('.navbar-dark .navbar-tab[data-id="' + want + '"]');
+  var want = (ME.lastTabPeer == ME.DATA.id && ME.lastTab) ? ME.lastTab : 'hudtab-dash';
+  // D9: a host element from before the rename may still carry tab1/tab2 —
+  // map the old stored ids onto the new ones.
+  if (want == 'tab1') want = 'hudtab-info';
+  if (want == 'tab2') want = 'hudtab-dash';
+  var tab = ME.querySelector('.hudtop .navbar-dark .navbar-tab[data-id="' + want + '"]');
   if (tab) tab.click();
 
   var data = me.data;
@@ -227,6 +291,7 @@ function buildControls(){
   // use the menu, so it carries .adminonly and F7's .isadmin rule decides
   // whether it shows.
   var list = data && data.list ? data.list : [];
+  markAdded(list);
   if (list.length == 0){
     var note = document.createElement('div');
     note.className = 'hudapps-empty';
@@ -250,13 +315,179 @@ function buildControls(){
     db = j == -1 ? db : db.substring(0,j);
     var claz = !ctl.big ? 'iconmode' : 'big';
 
+    // D5: the tile's slot (el) sits in a wrapper that is the flex item and
+    // the positioned box for the edit overlay — installControl replaces
+    // el's children, so the overlay can't live inside el. The wrapper
+    // records the tile's index and type, which edit writes check against
+    // the fresh list.
+    var tw = document.createElement('div');
+    tw.className = 'hudtilewrap ' + claz;
+    tw.dataset.index = i;
+    tw.dataset.type = ctl.type;
     var el = document.createElement('div');
-    el.className = 'inline ' + claz;
-    wrap.appendChild(el);
+    // D4: .hudtile carries the dashboard layout (css); big/iconmode stay
+    // for any control that reads its slot's mode.
+    el.className = 'inline hudtile ' + claz;
+    tw.appendChild(el);
+    wrap.appendChild(tw);
     d.peer = ME.DATA.id;
     installControl(el, db, id, function(api){}, d);
   }
+  decorateTiles();
 }
+
+// D6: a control already on the dashboard is greyed in Add Control, marked
+// "Added", not clickable (the click handler checks .added) and
+// aria-disabled. Matched by type; a list with duplicates just marks once.
+function markAdded(list){
+  var on = {};
+  (list || []).forEach(function(c){ if (c && c.type) on[c.type] = true; });
+  ME.querySelectorAll('.add-control-available .add-ctl-item').forEach(function(td){
+    var added = on[td.dataset.type] === true;
+    td.classList.toggle('added', added);
+    td.setAttribute('aria-disabled', added ? 'true' : 'false');
+    if (added) td.title = 'Already on the dashboard';
+    else td.removeAttribute('title');
+  });
+}
+
+// D6: the list re-checks each time it opens — the dashboard may have
+// changed since the panel loaded (another viewer, another tab). Mark from
+// what we have at once, then from a fresh read; a failed read keeps the
+// marks we had (the write path re-reads and refuses anyway).
+ME.querySelector('.hudaddcontrol').addEventListener('click', function(){
+  if (!this.hasAttribute('data-popup')) return;   // F11: disabled
+  ME.querySelector('.add-control-error').textContent = '';
+  markAdded(me.data && me.data.list);
+  json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_shared", function(rr){
+    if (rr.status == 'ok') markAdded(rr.data && rr.data.list);
+    else if (rr.msg == 'NOT FOUND') markAdded([]);
+  });
+});
+
+// D5: edit mode. Each tile gets an overlay (it swallows clicks, so a tile's
+// own buttons — Reboot — can't be pressed while editing) with a bar of
+// real buttons: ← → ✕. ✕ asks first, inline in the same bar. Titles and
+// the peer name are peer-reported: textContent and setAttribute only (F3).
+// Phase 3 review: ← → ✕ as text glyphs rendered as empty boxes in some
+// fonts, so the move bar uses the kit's icons (an icon name instead of
+// text), drawn like the panel header's ✕ — a 32px round button, 20px glyph.
+function tileButton(text, label, cls, fn, icon){
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'hudtile-btn' + (cls ? ' ' + cls : '');
+  if (icon) {
+    b.classList.add('roundbutton-small-white', 'hudtile-icon');
+    var img = document.createElement('img');
+    img.src = '../app/asset/app/icons/ui/dark/' + icon + '.svg';
+    img.alt = '';
+    b.appendChild(img);
+  }
+  else b.textContent = text;
+  b.title = label;
+  b.setAttribute('aria-label', label);
+  b.addEventListener('click', function(e){ e.stopPropagation(); fn(); });
+  return b;
+}
+
+function tileTitle(idx, type){
+  var it = me.data && me.data.list ? me.data.list[idx] : null;
+  return it && it.title ? String(it.title) : String(type);
+}
+
+function showMoveBar(bar, idx, type, n){
+  var title = tileTitle(idx, type);
+  bar.textContent = '';
+  var left = tileButton('', 'Move ' + title + ' earlier', '', function(){
+    editWrite(idx, type, function(l){ l.splice(idx - 1, 0, l.splice(idx, 1)[0]); });
+  }, 'arrow-left');
+  left.disabled = idx == 0;
+  var right = tileButton('', 'Move ' + title + ' later', 'hudtile-mirror', function(){
+    editWrite(idx, type, function(l){ l.splice(idx + 1, 0, l.splice(idx, 1)[0]); });
+  }, 'arrow-left');
+  right.disabled = idx == n - 1;
+  var gap = document.createElement('span');
+  gap.className = 'hudtile-gap';
+  var x = tileButton('', 'Remove ' + title, 'hudtile-x', function(){ showConfirm(bar, idx, type, n); }, 'close');
+  bar.appendChild(left);
+  bar.appendChild(right);
+  bar.appendChild(gap);
+  bar.appendChild(x);
+}
+
+function showConfirm(bar, idx, type, n){
+  var title = tileTitle(idx, type);
+  bar.textContent = '';
+  var q = document.createElement('span');
+  q.className = 'hudtile-q';
+  q.textContent = 'Remove ' + title + ' from ' + (ME.DATA.name || 'this peer') + "'s dashboard?";
+  bar.appendChild(q);
+  bar.appendChild(tileButton('Remove', 'Remove ' + title, 'hudtile-remove', function(){
+    editWrite(idx, type, function(l){ l.splice(idx, 1); });
+  }));
+  var cancel = tileButton('Cancel', 'Keep ' + title, '', function(){ showMoveBar(bar, idx, type, n); });
+  bar.appendChild(cancel);
+  cancel.focus();
+}
+
+function decorateTiles(){
+  ME.querySelectorAll('.hudapps .hudtile-edit').forEach(function(o){ o.remove(); });
+  if (!me.editing) return;
+  var tiles = ME.querySelectorAll('.hudapps > .hudtilewrap');
+  tiles.forEach(function(tw){
+    var ov = document.createElement('div');
+    ov.className = 'hudtile-edit';
+    var bar = document.createElement('div');
+    bar.className = 'hudtile-bar';
+    ov.appendChild(bar);
+    tw.appendChild(ov);
+    showMoveBar(bar, Number(tw.dataset.index), tw.dataset.type, tiles.length);
+  });
+}
+
+// D5 (the F11 rule): never write a list we haven't just seen. Re-read
+// controls_shared, check the tile is still the one the user pointed at
+// (index AND type), apply the change to the FRESH list, write it back.
+// A moved-under-us list writes nothing and rebuilds; a failed read or
+// write says why beside Edit and leaves the dashboard as it was.
+function editWrite(idx, type, mutate){
+  var msg = ME.querySelector('.hudedit-msg');
+  msg.textContent = '';
+  ME.querySelectorAll('.hudapps .hudtile-edit button, .hudeditbutton').forEach(function(b){ b.disabled = true; });
+  function settle(){
+    ME.querySelector('.hudeditbutton').disabled = false;
+    decorateTiles();
+  }
+  json('../peer/remote/'+ME.DATA.id+'/app/read', "lib=runtime&id=controls_shared", function(rr){
+    var fresh;
+    if (rr.status == 'ok') fresh = rr.data && rr.data.list ? rr.data : { "list": [] };
+    else if (rr.msg == 'NOT FOUND') fresh = { "list": [] };
+    else { msg.textContent = errText(rr); settle(); return; }
+    var it = fresh.list[idx];
+    if (!it || it.type != type) {
+      me.data = fresh;
+      ME.querySelector('.hudeditbutton').disabled = false;
+      buildControls();
+      msg.textContent = 'The dashboard changed. Refreshed it; try again.';
+      return;
+    }
+    mutate(fresh.list);
+    json('../peer/remote/'+ME.DATA.id+'/app/write', "lib=runtime&id=controls_shared&readers=[]&writers=[]&data="+encodeURIComponent(JSON.stringify(fresh)), function(result){
+      if (result.status != 'ok') { msg.textContent = errText(result); settle(); return; }
+      me.data = fresh;
+      ME.querySelector('.hudeditbutton').disabled = false;
+      buildControls();
+    });
+  });
+}
+
+ME.querySelector('.hudeditbutton').addEventListener('click', function(){
+  me.editing = !me.editing;
+  this.textContent = me.editing ? 'Done' : 'Edit';
+  this.setAttribute('aria-pressed', me.editing ? 'true' : 'false');
+  ME.querySelector('.hudedit-msg').textContent = '';
+  decorateTiles();
+});
 
 // F10: me.install/updateNext are gone — the panel's updates run through the
 // shared document.body.peerupdater (see the .updateall handler below).
@@ -477,8 +708,15 @@ ME.querySelector('.control-settings-popup').addEventListener("mouseleave", funct
 
 ME.querySelector('.refreshhud').addEventListener("click", me.refresh);
 
-ME.querySelector('.closeonclick').addEventListener("click", function(){
-  ME.querySelector('.control-settings-popup').style.display = 'none';
+// Phase 4 review: every .closeonclick row closes the ⋮ card — the old
+// querySelector (singular) bound only the first row (Refresh), so picking
+// Add Control left the menu open on top of the modal, and still open after
+// the modal closed. app.ui's non-modal close only fires for clicks OUTSIDE
+// the card, so the rows must close it themselves.
+ME.querySelectorAll('.closeonclick').forEach(function(row){
+  row.addEventListener("click", function(){
+    ME.querySelector('.control-settings-popup').style.display = 'none';
+  });
 });
 
 // --- Platform crate versions on the remote peer (crate-update feature) ---
