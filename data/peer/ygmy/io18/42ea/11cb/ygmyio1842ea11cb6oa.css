@@ -1,3 +1,21 @@
-.popup999{
-  position:absolute;
+/* R2.7: the canvas is the tile's square; a block, so the status below
+   measures from its box edge, not a text baseline. */
+.rebootcanvas {
+  display: block;
+}
+
+/* R2.7: the status is normal flow under the canvas — it grows the
+   tile's slot (the dashboard's icon slot is min-height, not fixed), so
+   the rows below move down instead of being painted over. Peer-reported
+   text wraps; hidden when empty. */
+.rebootstatus {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+  color: var(--text, #ddd);
+}
+
+.rebootstatus:empty {
+  display: none;
 }

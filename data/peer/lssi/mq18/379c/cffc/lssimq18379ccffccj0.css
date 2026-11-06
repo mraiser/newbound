@@ -107,7 +107,12 @@
 #headsupdisplay{
   max-width: 90%;
   width:0px;
-  background-color:#202020D0;
+  /* D3: solid — the old #202020D0 (82%) let the 3D view's labels, orbs
+     and grid show through. --panel is the kit's raised-surface ground
+     (cards, popups); the panel is a surface floating over the scene, not
+     the page itself (--ground). The panel's pinned header (peer.headsup
+     .hudtop, D1) uses the same token. */
+  background-color:var(--panel);
   /* absolute, not fixed: position:fixed creates a stacking context in
      Blink, so any modal opened from a control hosted in the HUD (e.g.
      the camera tile's settings) gets its z-index trapped below the
@@ -142,6 +147,73 @@
 .addusercard .tab-content {
   overflow: auto;
   max-height: calc(50vh + 40px);
+}
+
+/* D8: the CONNECT tab is a two-column grid — Device Name | IP Address,
+   Device UUID | Port Number, Select Group | Keep Connection Alive — with
+   uniform cells (label over field), so each row's fields share a top
+   edge. The old <table> spaced its two columns with different <br>
+   patterns, so nothing lined up. */
+.addusercard .adduserform {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 20px;
+  align-items: start;
+}
+
+/* width:100% + the kit's 12px padding must not spill into the next column */
+.addusercard .adduserform .textinput {
+  box-sizing: border-box;
+}
+
+/* The checkbox has no label line above it: give its row the select box's
+   own height (the kit's 10px padding + 1px border around 1rem text) and
+   bottom-align the cell, so the checkbox centres on the Select Group box
+   beside it and its left edge sits on the column's field edge, under the
+   IP and Port boxes. */
+.addusercard .aufield-check {
+  align-self: end;
+}
+
+.addusercard .aufield-check .plaincheckbox {
+  padding: 11px 0;
+}
+
+/* D8: the select's arrow sat against the box's right edge — draw the
+   kit's chevron inside instead, its GLYPH inset 12px like the text's
+   left inset. The chevron's stroke spans x 5..19 of its 24-unit box, so
+   the 16px icon carries a ~3px built-in right inset — the background
+   sits at 9px so the visible glyph edge lands on 12 (the D2 rule:
+   measure glyph pixels, not element boxes). */
+.addusercard select.addusergroup {
+  appearance: none;
+  background-image: url(../app/asset/app/icons/ui/dark/chevron-down.svg);
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  background-size: 16px 16px;
+  padding-right: 40px;
+}
+
+/* D8: one title style for every dialog the Peers page opens, copied from
+   the app's Settings dialog (app.app .ss-title: 18px, 500, --text). The
+   panel's Add Control title (peer.headsup .hud-dlg-title) carries the
+   same numbers. */
+.addusercard .peer-dlg-title,
+.updateallpeerscard .peer-dlg-title {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+/* F2/D8: under 640px the grid is one column; nothing sits beside the
+   checkbox to centre on, so its row sits in flow like the rest. */
+@media (max-width: 640px) {
+  .addusercard .adduserform {
+    grid-template-columns: 1fr;
+  }
+  .addusercard .aufield-check {
+    align-self: start;
+  }
 }
 
 .bottomhugger{

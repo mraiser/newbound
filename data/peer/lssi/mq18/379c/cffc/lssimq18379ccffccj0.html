@@ -30,7 +30,7 @@
   <div class='card hideme updateallpeerscard'>
     <div class='dialog-header'>
       <div class='padme'>
-        Update Peers
+        <span class='peer-dlg-title'>Update Peers</span>
         <img src='../app/asset/app/icons/ui/dark/close.svg' class='upper-right close-update-peers roundbutton-small out10'>
       </div>
     </div>
@@ -43,7 +43,7 @@
   <div class='card hideme addusercard'>
     <div class='dialog-header'>
       <div class='padme'>
-        Add Connection
+        <span class='peer-dlg-title'>Add Connection</span>
         <img src='../app/asset/app/icons/ui/dark/close.svg' class='upper-right close-add-user roundbutton-small out10'>
       </div>
       <div class = "navbar navbar-dark addusernavbar">
@@ -56,33 +56,40 @@
     </div>
     <div class='tab-content autab2' id='autab2'>
       <div class='padme'>
-        <table border="0" cellpadding="0" cellspacing="0" width="100%">
-          <tr>
-            <td style='vertical-align:top;'>
-              <div class='textinputlabel'>Device Name</div>
-              <div><input type='text' class='textinput addusername'></div>
-              <br>
-              <div class='textinputlabel'>Device UUID</div>
-              <div><input type='text' class='textinput adduseruuid'></div>
-              <br>
-              <div class='textinputlabel'>Select Group</div>
-              <select class='textinput groupselect addusergroup'></select>
-            </td>
-            <td width="20"></td>
-            <td style='vertical-align:top;'>
-              <div class='textinputlabel'>IP Address (if you have it)</div>
-              <input type='text' class='textinput adduseripaddr'>
-              <br><br>
-              <div class='textinputlabel'>Port Number (if you have it)</div>
-              <input type='number' class='textinput adduserport'>
-              <br><br>
-              <label class="plaincheckbox">
-                <input type='checkbox' id='useraddkeepalive' checked>
-                <span>Keep Connection Alive</span>
-              </label>
-            </td>
-          </tr>
-        </table>
+        <!-- D8: a two-column grid (css .adduserform) in place of the old
+             <table>, whose columns were spaced with different <br>
+             patterns so no row shared a top edge. Row order: Name | IP,
+             UUID | Port, Group | Keep Alive. The UUID input keeps its
+             plain wrapper div: the js paints the validation border on
+             the input's parentElement. -->
+        <div class='adduserform'>
+          <div class='aufield'>
+            <div class='textinputlabel'>Device Name</div>
+            <input type='text' class='textinput addusername'>
+          </div>
+          <div class='aufield'>
+            <div class='textinputlabel'>IP Address (if you have it)</div>
+            <input type='text' class='textinput adduseripaddr'>
+          </div>
+          <div class='aufield'>
+            <div class='textinputlabel'>Device UUID</div>
+            <div><input type='text' class='textinput adduseruuid'></div>
+          </div>
+          <div class='aufield'>
+            <div class='textinputlabel'>Port Number (if you have it)</div>
+            <input type='number' class='textinput adduserport'>
+          </div>
+          <div class='aufield'>
+            <div class='textinputlabel'>Select Group</div>
+            <select class='textinput groupselect addusergroup'></select>
+          </div>
+          <div class='aufield aufield-check'>
+            <label class="plaincheckbox">
+              <input type='checkbox' id='useraddkeepalive' checked>
+              <span>Keep Connection Alive</span>
+            </label>
+          </div>
+        </div>
       </div>
       <div class="card-button-wrap">
         <button id="addconnection"  class="clearbutton">Add Connection</button>
