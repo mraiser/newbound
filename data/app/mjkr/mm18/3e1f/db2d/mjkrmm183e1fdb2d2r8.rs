@@ -354,7 +354,7 @@ pub fn http_listen() {
             }
           }
 
-          let content_length = headers.try_get_string("CONTENT-LENGTH").unwrap_or_else(|| "0".to_string());
+          let content_length = headers.try_get_string("CONTENT-LENGTH").unwrap_or_else(|_| "0".to_string());
           let body_len = match content_length.parse::<usize>() {
             Ok(n) => n,
             Err(_) => {
@@ -436,6 +436,11 @@ pub fn http_listen() {
         request.put_string("querystring", &querystring);
         request.put_object("headers", headers.clone()); // Clone headers before moving to request
         request.put_object("params", params);
+        request.put_bytes("body", raw_body);
+        if !request_error.is_empty() {
+          request.put_string("request_error", &request_error);
+          request.put_int("request_error_code", request_error_code);
+        }
 
         let now = time();
         request.put_int("timestamp", now);
@@ -458,8 +463,18 @@ pub fn http_listen() {
 
         let result = panic::catch_unwind(|| {
           let mut p = DataObject::get(dataref);
-          let o = handle_request(request.clone(), stream.try_clone().unwrap());
-          p.put_object("a", o);
+          if !request_error.is_empty() {
+            let mut o = DataObject::new();
+            o.put_int("code", request_error_code);
+            o.put_string("msg", "BAD REQUEST");
+            o.put_string("mimetype", "text/plain; charset=utf-8");
+            o.put_string("body", &request_error);
+            p.put_object("a", o);
+          }
+          else {
+            let o = handle_request(request.clone(), stream.try_clone().unwrap());
+            p.put_object("a", o);
+          }
         });
 
         match result {
