@@ -901,8 +901,14 @@ pub fn prep_request(mut request: DataObject) -> String {
 }
 
 pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_id:String) -> bool {
+  // An ordinary HTTP request must retain the session prepared above for its
+  // response cookie. Do not move a headers handle out of the request record.
+  let is_websocket = {
+    let headers = request.get_object("headers");
+    headers.has("SEC-WEBSOCKET-KEY")
+  };
+  if !is_websocket { return false; }
   let headers = request.get_object("headers");
-  if ! headers.has("SEC-WEBSOCKET-KEY") { return false; }
 
   stream.set_read_timeout(None).expect("set_read_timeout call failed");
 
@@ -1176,7 +1182,11 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
               d_cmd.put_object("params", params_clone.clone());
 
               for (k,v) in request.objects() {
-                params_clone.set_property(&("nn_".to_string()+&k), v);
+                // set_property stores the Data value. Clone it so the
+                // temporary iterator value cannot make a later GC collect
+                // the request's session/headers while this same connection
+                // is still serializing its response.
+                params_clone.set_property(&("nn_".to_string()+&k), v.clone());
               }
 
               let d_result = handle_command(d_cmd, session_id.to_owned()); // Renamed d to d_result
