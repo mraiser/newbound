@@ -584,6 +584,33 @@ pub fn http_listen() {
           }
         }
 
+        // Chunked JSON POST was decoded above, before the legacy POST branch.
+        // Populate command params here, exactly as the Content-Length JSON
+        // branch does, rather than delivering only raw_body and losing fields.
+        // Invalid UTF-8/JSON becomes a framed 400, not a listener-thread panic.
+        if method == "POST" && chunked_body && request_error.is_empty() {
+          let content_type = headers.try_get_string("CONTENT-TYPE").unwrap_or_else(|_| "text/plain".to_string());
+          if content_type.to_lowercase().contains("application/json") {
+            match String::from_utf8(raw_body.get_data()) {
+              Ok(body_text) => {
+                match DataObject::try_from_string(&format!("{{\"body\":{}}}", body_text)) {
+                  Ok(wrapper) => {
+                    let body_data = wrapper.get_property("body");
+                    if body_data.is_object() { params = body_data.object(); }
+                    else { request_error = "JSON request body must be an object".to_string(); }
+                  },
+                  Err(_) => { request_error = "Invalid JSON request body".to_string(); }
+                }
+              },
+              Err(_) => { request_error = "JSON request body is not UTF-8".to_string(); }
+            }
+            if !request_error.is_empty() {
+              request_error_code = 400;
+              ka_force_close = true;
+            }
+          }
+        }
+
         let cmd_path:String; // Renamed cmd to cmd_path
         if path.contains("?"){
           let i = path.find("?").unwrap();
