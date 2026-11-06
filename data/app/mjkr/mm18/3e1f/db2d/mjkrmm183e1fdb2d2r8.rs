@@ -632,13 +632,6 @@ pub fn http_listen() {
 
         fire_event("app", "HTTP_BEGIN", request.clone());
 
-        if false && headers.has("TRANSFER-ENCODING"){
-          let trenc = headers.get_string("TRANSFER-ENCODING");
-          if trenc.to_uppercase() == "CHUNKED" {
-            // CHUNKED
-          }
-        }
-
         let mut ka;
         if headers.has("CONNECTION") { ka = headers.get_string("CONNECTION"); }
         else { ka = "close".to_string(); }
