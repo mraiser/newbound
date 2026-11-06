@@ -183,6 +183,7 @@ pub fn http_listen() {
         let mut params = DataObject::new();
         let mut raw_body = DataBytes::from_bytes(&Vec::new());
         let mut request_error = "".to_string();
+        let mut request_error_code = 400i64;
 
         if method == "POST" {
           // extractPOSTParams
@@ -337,6 +338,40 @@ pub fn http_listen() {
               params.put_string(&key, &value);
 
               if b_post { break; }
+            }
+          }
+        }
+
+        else if method != "GET" && method != "HEAD" {
+          // Preserve arbitrary non-POST request bodies (WebDAV PUT/PROPFIND,
+          // JSON PATCH, etc.) without decoding or newline transformation.
+          // Consume or reject the body on every path so keep-alive stays framed.
+          if headers.has("TRANSFER-ENCODING") {
+            let transfer_encoding = headers.get_string("TRANSFER-ENCODING");
+            if !transfer_encoding.eq_ignore_ascii_case("identity") {
+              request_error_code = 501;
+              request_error = format!("Transfer-Encoding {} is not supported", transfer_encoding);
+            }
+          }
+
+          let content_length = headers.try_get_string("CONTENT-LENGTH").unwrap_or_else(|| "0".to_string());
+          let body_len = match content_length.parse::<usize>() {
+            Ok(n) => n,
+            Err(_) => {
+              request_error = "Invalid Content-Length".to_string();
+              0
+            }
+          };
+          const MAX_RAW_BODY: usize = 64 * 1024 * 1024;
+          if request_error.is_empty() && body_len > MAX_RAW_BODY {
+            request_error_code = 413;
+            request_error = "Request body exceeds the 64 MiB limit".to_string();
+          }
+          if request_error.is_empty() && body_len > 0 {
+            let mut body_buf = vec![0; body_len];
+            match stream.read_exact(&mut body_buf) {
+              Ok(_) => raw_body = DataBytes::from_bytes(&body_buf),
+              Err(e) => request_error = format!("Error reading request body: {}", e)
             }
           }
         }
