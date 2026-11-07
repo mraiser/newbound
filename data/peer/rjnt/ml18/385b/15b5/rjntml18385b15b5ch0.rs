@@ -55,7 +55,7 @@ let adr = ask.data_ref;
 for (uuid, user) in users.objects(){
   if uuid.len() == 36 {
     let mut user = user.object();
-    if get_tcp(user.clone()).is_some() || user.get_array("connections").len() > 0 {
+    if crate::peer::service::listen::get_best(user.clone()).is_some() {
       user.put_boolean("connected", true);
       let salt = salt.to_owned();
       ask.incr();

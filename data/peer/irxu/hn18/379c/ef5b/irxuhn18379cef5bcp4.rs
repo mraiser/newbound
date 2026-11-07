@@ -1672,7 +1672,7 @@ mod tests {
         fresh.last_read.store(time(),AtomicOrdering::SeqCst);
         P2PCONS.get().lock().insert(stale_id,stale.duplicate());
         P2PCONS.get().lock().insert(fresh_id,fresh.duplicate());
-        let mut user=DataObject::new();let ids=DataArray::new();ids.push_int(stale_id);ids.push_int(fresh_id);user.put_array("connections",ids);
+        let mut user=DataObject::new();let mut ids=DataArray::new();ids.push_int(stale_id);ids.push_int(fresh_id);user.put_array("connections",ids);
         let selected=get_best(user.clone()).unwrap();
         assert_eq!(selected.sessionid,fresh.sessionid);
         assert_eq!(get_tcp(user.clone()).unwrap().sessionid,fresh.sessionid);
