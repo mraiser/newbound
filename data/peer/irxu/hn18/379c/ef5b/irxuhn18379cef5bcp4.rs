@@ -123,11 +123,12 @@ fn send_chunked(stream: &mut P2PStream, cipher: &Aes256, payload: &[u8], sid: St
     for i in 0..total {
         let start = i as usize * CHUNK_WIRE;
         let end = (start + CHUNK_WIRE).min(payload.len());
-        let mut p = Vec::with_capacity(28 + end - start);
+        let mut p = Vec::with_capacity(32 + end - start);
         p.extend_from_slice(b"xfr ");
         p.extend_from_slice(&id.to_be_bytes());
         p.extend_from_slice(&i.to_be_bytes());
         p.extend_from_slice(&total.to_be_bytes());
+        p.extend_from_slice(&((end - start) as u32).to_be_bytes());
         p.extend_from_slice(&payload[start..end]);
         send_legacy_frame(stream, cipher, &p, sid.clone())?;
     }
@@ -276,7 +277,20 @@ impl P2PStream {
         match self {
             P2PStream::Tcp(stream, _) => {
                 let mut ref_stream = &**stream;
-                ref_stream.read_exact(buf)
+                let mut offset = 0;
+                while offset < buf.len() {
+                    match ref_stream.read(&mut buf[offset..]) {
+                        Ok(0) => return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "P2P TCP closed")),
+                        Ok(n) => { offset += n; },
+                        Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                        Err(e) if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut => {
+                            if offset > 0 { continue; }
+                            return Err(e);
+                        },
+                        Err(e) => return Err(e),
+                    }
+                }
+                Ok(())
             }
             P2PStream::Relay(stream, _) => {
                 let len_to_read = buf.len();
@@ -310,6 +324,16 @@ impl P2PStream {
             P2PStream::Udp(stream) => {
                 stream.read_exact(buf)
             }
+        }
+    }
+
+    pub fn read_some(&self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            P2PStream::Tcp(stream, _) => {
+                let mut stream = &**stream;
+                stream.read(buf)
+            },
+            _ => Err(io::Error::new(io::ErrorKind::Unsupported, "read_some is TCP-only")),
         }
     }
 
@@ -372,8 +396,11 @@ pub struct P2PConnection {
     pub pending: DataArray,
     pub last_read: Arc<AtomicI64>,
     pub alive: Arc<AtomicBool>,
-    pub chunks: Arc<Mutex<HashMap<i64, (i64, HashMap<i64, Vec<u8>>)>>>,
+    pub chunks: Arc<Mutex<HashMap<i64, (i64, i64, HashMap<i64, Vec<u8>>)>>>,
     pub capabilities: Arc<Mutex<DataObject>>,
+    // Partial TCP reads survive an idle timeout; a new frame header is never
+    // parsed from the middle of the previous frame.
+    pub inbox: Arc<Mutex<VecDeque<u8>>>,
 }
 
 impl P2PConnection {
@@ -396,21 +423,6 @@ impl P2PConnection {
         p2pcons_guard.keys().cloned().collect()
     }
 
-    pub fn begin_for_test(uuid: String, stream: P2PStream) -> P2PConnection {
-        P2PConnection {
-            stream,
-            sessionid: unique_session_id(),
-            cipher: Aes256::new(&[7u8;32]),
-            uuid,
-            res: DataObject::new(),
-            pending: DataArray::new(),
-            last_read: Arc::new(AtomicI64::new(time())),
-            alive: Arc::new(AtomicBool::new(true)),
-            chunks: Arc::new(Mutex::new(HashMap::new())),
-            capabilities: Arc::new(Mutex::new(DataObject::new())),
-        }
-    }
-
     pub fn duplicate(&self) -> P2PConnection {
         P2PConnection {
             stream: self.stream.clone(),
@@ -423,6 +435,7 @@ impl P2PConnection {
             alive: self.alive.clone(),
             chunks: self.chunks.clone(),
             capabilities: self.capabilities.clone(),
+            inbox: self.inbox.clone(),
         }
     }
 
@@ -457,6 +470,7 @@ impl P2PConnection {
             alive: Arc::new(AtomicBool::new(true)),
             chunks: Arc::new(Mutex::new(HashMap::new())),
             capabilities: Arc::new(Mutex::new(DataObject::new())),
+            inbox: Arc::new(Mutex::new(VecDeque::new())),
         };
 
         let sessiontimeoutmillis = system.get_object("config").get_int("sessiontimeoutmillis");
@@ -727,6 +741,9 @@ impl P2PConnection {
             let mut streamreaders_map_guard = STREAMREADERS.get().lock();
             streamreaders_map_guard.remove(&downstream_id);
         }
+        if let Some(control) = STREAMCONTROL.get().lock().remove(&downstream_id) {
+            control.1.notify_all();
+        }
     }
 }
 
@@ -743,6 +760,9 @@ pub fn get_best(user: DataObject) -> Option<P2PConnection> {
                     if best_conn.as_ref().map(|c| !c.stream.is_tcp() || c.last_contact() < current_conn.last_contact()).unwrap_or(true) {
                         best_conn = Some(current_conn.duplicate());
                     }
+                }
+                if !current_conn.alive.load(AtomicOrdering::SeqCst) || current_conn.last_contact() < time() - 120000 {
+                    continue;
                 }
                 if best_conn.is_none() {
                     best_conn = Some(current_conn.duplicate());
@@ -772,7 +792,7 @@ pub fn get_tcp(user: DataObject) -> Option<P2PConnection> {
             }
         }
     }
-    None
+    best_conn
 }
 
 pub fn get_udp(user: DataObject) -> Option<P2PConnection> {
@@ -1047,23 +1067,11 @@ pub fn handle_next_message(conn: &mut P2PConnection) -> bool {
     let sessions_map = system_globals.get_object("sessions");
     let mut current_session = sessions_map.get_object(&conn.sessionid);
 
-    let mut len_bytes = vec![0u8; 2];
-    match read_frame_part(conn, &mut len_bytes) {
-        Ok(true) => {}, Ok(false) => return true, Err(_) => return false,
-    }
-
-    let msg_len_arr: [u8; 2] = match len_bytes.try_into() {
-        Ok(arr) => arr,
+    let encrypted_payload_bytes = match read_frame(conn) {
+        Ok(Some(frame)) => frame,
+        Ok(None) => return true,
         Err(_) => return false,
     };
-    let msg_len = u16::from_be_bytes(msg_len_arr) as usize;
-
-    if msg_len == 0 || msg_len > MAX_LEGACY_FRAME { return false; }
-
-    let mut encrypted_payload_bytes = vec![0u8; msg_len];
-    match read_frame_part(conn, &mut encrypted_payload_bytes) {
-        Ok(true) => {}, Ok(false) => return true, Err(_) => return false,
-    }
 
     let decrypted_payload = decrypt(&conn.cipher, &encrypted_payload_bytes);
     if decrypted_payload.is_empty() && !encrypted_payload_bytes.is_empty() { return false; }
@@ -1091,19 +1099,28 @@ pub fn handle_next_message(conn: &mut P2PConnection) -> bool {
     }
 
     if method_str == "xfr " {
-        if decrypted_payload.len() < 28 { return false; }
+        if decrypted_payload.len() < 32 { return false; }
         let id = i64::from_be_bytes(decrypted_payload[4..12].try_into().unwrap());
         let index = i64::from_be_bytes(decrypted_payload[12..20].try_into().unwrap());
         let total = i64::from_be_bytes(decrypted_payload[20..28].try_into().unwrap());
+        let part_len = u32::from_be_bytes(decrypted_payload[28..32].try_into().unwrap()) as usize;
         if total <= 0 || total > (MAX_CHUNK_MESSAGE / CHUNK_WIRE + 1) as i64 || index < 0 || index >= total { return false; }
-        let part = decrypted_payload[28..].to_vec();
+        if part_len > CHUNK_WIRE || decrypted_payload.len() < 32 + part_len { return false; }
+        let part = decrypted_payload[32..32 + part_len].to_vec();
         let complete = {
             let mut all = conn.chunks.lock().unwrap();
-            let entry = all.entry(id).or_insert_with(|| (total, HashMap::new()));
+            let now = time();
+            // Abandoned or hostile fragmented messages cannot retain memory
+            // indefinitely. Each transfer also has a hard 16 MiB bound.
+            all.retain(|_, (_, updated, _)| now - *updated < 120000);
+            let buffered: usize = all.values().map(|(_, _, parts)| parts.values().map(|p| p.len()).sum::<usize>()).sum();
+            if buffered + part.len() > MAX_CHUNK_MESSAGE { return false; }
+            let entry = all.entry(id).or_insert_with(|| (total, now, HashMap::new()));
             if entry.0 != total { all.remove(&id); return false; }
-            entry.1.insert(index, part);
-            if entry.1.len() as i64 == total {
-                let (_, parts) = all.remove(&id).unwrap();
+            entry.1 = now;
+            entry.2.insert(index, part);
+            if entry.2.len() as i64 == total {
+                let (_, _, parts) = all.remove(&id).unwrap();
                 let mut bytes = Vec::new();
                 for i in 0..total { if let Some(p) = parts.get(&i) { bytes.extend_from_slice(p); } else { return false; } }
                 if bytes.len() > MAX_CHUNK_MESSAGE { return false; }
@@ -1121,6 +1138,9 @@ pub fn handle_next_message(conn: &mut P2PConnection) -> bool {
 
         let mut streamwriters_map_guard = STREAMWRITERS.get().lock();
         streamwriters_map_guard.insert(writer_stream_id, reader_downstream_id);
+        if conn.supports("flow") {
+            STREAMCONTROL.get().lock().entry(writer_stream_id).or_insert_with(|| Arc::new((Mutex::new(false), Condvar::new())));
+        }
 
     } else if method_str == "s_2 " {
         if decrypted_payload.len() < 14 { return false; }
@@ -1150,12 +1170,14 @@ pub fn handle_next_message(conn: &mut P2PConnection) -> bool {
             if let Some(control) = STREAMCONTROL.get().read().get(&reader_downstream_id).cloned() {
                 let should_pause = backlog > 4 * 1024 * 1024;
                 let mut paused = control.0.lock().unwrap();
-                if *paused != should_pause {
-                    *paused = should_pause;
-                    let mut message = if should_pause { b"s_5 ".to_vec() } else { b"s_6 ".to_vec() };
+                if should_pause && !*paused {
+                    *paused = true;
+                    let mut message = b"s_5 ".to_vec();
                     message.extend_from_slice(&reader_downstream_id.to_be_bytes());
                     let _ = send_legacy_frame(&mut conn.stream, &conn.cipher, &message, conn.sessionid.clone());
                 }
+                // Resume is emitted by join_stream's drain monitor only after
+                // the consumer has actually reduced the queue below low water.
             }
         }
         if dead_reader {
@@ -1385,16 +1407,60 @@ pub fn handle_next_message(conn: &mut P2PConnection) -> bool {
     true
 }
 
-fn read_frame_part(conn: &mut P2PConnection, buf: &mut [u8]) -> io::Result<bool> {
-    match conn.stream.read_exact(buf) {
-        Ok(_) => { conn.last_read.store(time(), AtomicOrdering::SeqCst); Ok(true) },
-        Err(e) if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut => {
-            if conn.last_contact() < time() - 120000 {
+fn read_frame(conn: &mut P2PConnection) -> io::Result<Option<Vec<u8>>> {
+    if !conn.stream.is_tcp() {
+        // UDP and Relay already provide exact legacy message reads; they do
+        // not implement TCP peek and need no partial-frame compatibility path.
+        let mut header = [0u8;2];
+        conn.stream.read_exact(&mut header)?;
+        let len = u16::from_be_bytes(header) as usize;
+        if len == 0 || len > MAX_LEGACY_FRAME { return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid P2P frame length")); }
+        let mut frame = vec![0u8;len];
+        conn.stream.read_exact(&mut frame)?;
+        return Ok(Some(frame));
+    }
+    let mut header: Option<usize> = None;
+    loop {
+        {
+            let mut inbox = conn.inbox.lock().unwrap();
+            if header.is_none() && inbox.len() >= 2 {
+                let len = u16::from_be_bytes([inbox[0], inbox[1]]) as usize;
+                if len == 0 || len > MAX_LEGACY_FRAME {
+                    return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid P2P frame length"));
+                }
+                header = Some(len);
+            }
+            if let Some(len) = header {
+                if inbox.len() >= len + 2 {
+                    inbox.drain(..2);
+                    let frame: Vec<u8> = inbox.drain(..len).collect();
+                    return Ok(Some(frame));
+                }
+            }
+        }
+        if !conn.alive.load(AtomicOrdering::SeqCst) { return Err(io::Error::new(io::ErrorKind::NotConnected, "P2P connection closed")); }
+        let mut buf = [0u8; 16384];
+        match conn.stream.read_some(&mut buf) {
+            Ok(0) => {
                 conn.alive.store(false, AtomicOrdering::SeqCst);
-                Err(io::Error::new(io::ErrorKind::TimedOut, "P2P receive liveness timeout"))
-            } else { Ok(false) }
-        },
-        Err(e) => { conn.alive.store(false, AtomicOrdering::SeqCst); Err(e) },
+                return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "P2P socket closed"));
+            },
+            Ok(n) => {
+                conn.last_read.store(time(), AtomicOrdering::SeqCst);
+                conn.inbox.lock().unwrap().extend(buf[..n].iter().copied());
+            },
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut => {
+                if conn.last_contact() < time() - 120000 {
+                    conn.alive.store(false, AtomicOrdering::SeqCst);
+                    return Err(io::Error::new(io::ErrorKind::TimedOut, "P2P receive liveness timeout"));
+                }
+                return Ok(None);
+            },
+            Err(e) => {
+                conn.alive.store(false, AtomicOrdering::SeqCst);
+                return Err(e);
+            }
+        }
     }
 }
 
@@ -1464,3 +1530,147 @@ pub fn decode_hex(hex_str: &str) -> Result<Vec<u8>, ParseIntError> {
             u8::from_str_radix(&hex_str[i..end], 16)
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cipher() -> Aes256 { Aes256::new(&[7u8;32]) }
+
+    fn fixture() -> (P2PConnection, TcpStream) {
+        static INIT_TEST_DATA: Once = Once::new();
+        INIT_TEST_DATA.call_once(|| { DataObject::init(); DataArray::init(); DataBytes::init(); });
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let join = thread::spawn(move || listener.accept().unwrap().0);
+        let client = TcpStream::connect(addr).unwrap();
+        let server = join.join().unwrap();
+        client.set_read_timeout(Some(Duration::from_millis(50))).unwrap();
+        client.set_write_timeout(Some(Duration::from_secs(2))).unwrap();
+        server.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        server.set_write_timeout(Some(Duration::from_secs(2))).unwrap();
+        let stream = P2PStream::Tcp(Arc::new(client), Arc::new(Mutex::new(())));
+        let con = P2PConnection {
+            stream,
+            sessionid: "test".to_string(),
+            cipher: cipher(),
+            uuid: "test".to_string(),
+            res: DataObject::new(),
+            pending: DataArray::new(),
+            last_read: Arc::new(AtomicI64::new(time())),
+            alive: Arc::new(AtomicBool::new(true)),
+            chunks: Arc::new(Mutex::new(HashMap::new())),
+            capabilities: Arc::new(Mutex::new(DataObject::new())),
+            inbox: Arc::new(Mutex::new(VecDeque::new())),
+        };
+        (con, server)
+    }
+
+    #[test]
+    fn legacy_frame_bytes_and_bounds() {
+        let c = cipher();
+        let plain = b"res {\"status\":\"ok\",\"pid\":1}";
+        let actual = legacy_frame(&c, plain).unwrap();
+        let encrypted = encrypt(&c, plain);
+        let mut expected = (encrypted.len() as i16).to_be_bytes().to_vec();
+        expected.extend_from_slice(&encrypted);
+        assert_eq!(actual, expected, "small legacy frames must remain byte-identical");
+        let len = u16::from_be_bytes([actual[0], actual[1]]) as usize;
+        assert_eq!(len, encrypted.len());
+        assert!(legacy_frame(&c, &vec![b'x';MAX_LEGACY_FRAME+1]).is_err());
+    }
+
+    #[test]
+    fn fragmented_frames_reassemble_without_desync() {
+        let (mut con, mut server) = fixture();
+        let first = legacy_frame(&con.cipher, b"cap {}").unwrap();
+        let second = legacy_frame(&con.cipher, b"res {}").unwrap();
+        let writer = thread::spawn(move || {
+            server.write_all(&first[..1]).unwrap();
+            thread::sleep(Duration::from_millis(100));
+            server.write_all(&first[1..]).unwrap();
+            server.write_all(&second).unwrap();
+        });
+        assert_eq!(read_frame(&mut con).unwrap(), None);
+        let one = read_frame(&mut con).unwrap().unwrap();
+        assert_eq!(decrypt(&con.cipher,&one)[..6], b"cap {}"[..]);
+        let two = read_frame(&mut con).unwrap().unwrap();
+        assert_eq!(decrypt(&con.cipher,&two)[..6], b"res {}"[..]);
+        writer.join().unwrap();
+    }
+
+    #[test]
+    fn no_capability_means_legacy_fallback() {
+        let (con, _server) = fixture();
+        let mut c = con.duplicate();
+        assert!(!c.supports("xfrm"));
+        assert!(c.send_command("res ", &vec![b'x';MAX_LEGACY_FRAME+1]).is_err());
+        c.capabilities.lock().unwrap().put_boolean("xfrm",true);
+        assert!(c.supports("xfrm"));
+    }
+
+    #[test]
+    fn chunk_roundtrip_stays_within_legacy_frames() {
+        let (mut con, mut server) = fixture();
+        con.capabilities.lock().unwrap().put_boolean("xfrm",true);
+        let payload = vec![b'a';64000];
+        con.send_command("res ",&payload).unwrap();
+        let mut received = Vec::new();
+        for _ in 0..5 {
+            let mut h = [0u8;2]; server.read_exact(&mut h).unwrap();
+            let n = u16::from_be_bytes(h) as usize;
+            assert!(n <= MAX_LEGACY_FRAME);
+            let mut frame = vec![0u8;n];server.read_exact(&mut frame).unwrap();
+            let msg = decrypt(&con.cipher,&frame);
+            assert_eq!(&msg[..4],b"xfr ");
+            let id = i64::from_be_bytes(msg[4..12].try_into().unwrap());
+            let idx = i64::from_be_bytes(msg[12..20].try_into().unwrap());
+            let total = i64::from_be_bytes(msg[20..28].try_into().unwrap());
+            let mut chunks = con.chunks.lock().unwrap();
+            let entry = chunks.entry(id).or_insert_with(||(total,time(),HashMap::new()));
+            let part_len = u32::from_be_bytes(msg[28..32].try_into().unwrap()) as usize;
+            entry.2.insert(idx,msg[32..32+part_len].to_vec());
+            if entry.2.len() as i64 == total {
+                let (_,_,parts)=chunks.remove(&id).unwrap();
+                for i in 0..total { received.extend_from_slice(parts.get(&i).unwrap()); }
+                break;
+            }
+        }
+        assert_eq!(&received[..4],b"res ");
+        assert_eq!(&received[4..],&payload[..]);
+    }
+
+    #[test]
+    fn flow_control_wakes_on_drain_and_shutdown() {
+        do_init();
+        let id = rand_i64();
+        let control = Arc::new((Mutex::new(false), Condvar::new()));
+        STREAMCONTROL.get().lock().insert(id,control.clone());
+        *control.0.lock().unwrap() = true;
+        let waiting = control.clone();
+        let worker = thread::spawn(move || {
+            let (lock,cvar)=&*waiting;
+            let mut paused=lock.lock().unwrap();
+            let started=std::time::Instant::now();
+            while *paused && started.elapsed()<Duration::from_secs(2) {
+                let (next,_)=cvar.wait_timeout(paused,Duration::from_millis(100)).unwrap();paused=next;
+            }
+            !*paused
+        });
+        thread::sleep(Duration::from_millis(50));
+        *control.0.lock().unwrap()=false;control.1.notify_all();
+        assert!(worker.join().unwrap());
+        *control.0.lock().unwrap()=true;control.1.notify_all();
+        STREAMCONTROL.get().lock().remove(&id);
+    }
+
+    #[test]
+    fn newest_live_connection_is_selected() {
+        let (a, _sa) = fixture();
+        let (b, _sb) = fixture();
+        assert!(a.alive.load(AtomicOrdering::SeqCst));
+        a.last_read.store(time()-5000,AtomicOrdering::SeqCst);
+        b.last_read.store(time(),AtomicOrdering::SeqCst);
+        assert!(b.last_contact() > a.last_contact());
+    }
