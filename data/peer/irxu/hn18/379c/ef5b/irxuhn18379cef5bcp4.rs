@@ -752,23 +752,20 @@ pub fn get_best(user: DataObject) -> Option<P2PConnection> {
     let mut best_conn: Option<P2PConnection> = None;
     let p2pcons_guard = P2PCONS.get().read();
     let user_connections = user.get_array("connections");
-
+    let cutoff = time() - 120000;
     for con_id_data in user_connections.objects() {
         if let Data::DInt(conid) = con_id_data {
-            if let Some(current_conn) = p2pcons_guard.get(&conid) {
-                if current_conn.stream.is_tcp() && current_conn.alive.load(AtomicOrdering::SeqCst) {
-                    if best_conn.as_ref().map(|c| !c.stream.is_tcp() || c.last_contact() < current_conn.last_contact()).unwrap_or(true) {
-                        best_conn = Some(current_conn.duplicate());
+            if let Some(current) = p2pcons_guard.get(&conid) {
+                if !current.alive.load(AtomicOrdering::SeqCst) || current.last_contact() < cutoff { continue; }
+                let replace = match &best_conn {
+                    None => true,
+                    Some(best) => {
+                        let current_rank = if current.stream.is_tcp() { 3 } else if current.stream.is_udp() { 2 } else { 1 };
+                        let best_rank = if best.stream.is_tcp() { 3 } else if best.stream.is_udp() { 2 } else { 1 };
+                        current_rank > best_rank || (current_rank == best_rank && current.last_contact() > best.last_contact())
                     }
-                }
-                if !current_conn.alive.load(AtomicOrdering::SeqCst) || current_conn.last_contact() < time() - 120000 {
-                    continue;
-                }
-                if best_conn.is_none() {
-                    best_conn = Some(current_conn.duplicate());
-                } else if best_conn.as_ref().unwrap().stream.is_relay() && current_conn.stream.is_udp() {
-                    best_conn = Some(current_conn.duplicate());
-                }
+                };
+                if replace { best_conn = Some(current.duplicate()); }
             }
         }
     }
@@ -780,11 +777,11 @@ pub fn get_tcp(user: DataObject) -> Option<P2PConnection> {
     let mut best_conn: Option<P2PConnection> = None;
     let p2pcons_guard = P2PCONS.get().read();
     let user_connections = user.get_array("connections");
-
+    let cutoff = time() - 120000;
     for con_id_data in user_connections.objects() {
         if let Data::DInt(conid) = con_id_data {
             if let Some(conn) = p2pcons_guard.get(&conid) {
-                if conn.stream.is_tcp() && conn.alive.load(AtomicOrdering::SeqCst) {
+                if conn.stream.is_tcp() && conn.alive.load(AtomicOrdering::SeqCst) && conn.last_contact() >= cutoff {
                     if best_conn.as_ref().map(|c: &P2PConnection| c.last_contact() < conn.last_contact()).unwrap_or(true) {
                         best_conn = Some(conn.duplicate());
                     }
@@ -1663,6 +1660,26 @@ mod tests {
         assert!(worker.join().unwrap());
         *control.0.lock().unwrap()=true;control.1.notify_all();
         STREAMCONTROL.get().lock().remove(&id);
+    }
+
+    #[test]
+    fn stale_and_dead_connections_are_not_selected() {
+        do_init();
+        let (stale, _a) = fixture();
+        let (fresh, _b) = fixture();
+        let stale_id=rand_i64();let fresh_id=rand_i64();
+        stale.last_read.store(time()-121000,AtomicOrdering::SeqCst);
+        fresh.last_read.store(time(),AtomicOrdering::SeqCst);
+        P2PCONS.get().lock().insert(stale_id,stale.duplicate());
+        P2PCONS.get().lock().insert(fresh_id,fresh.duplicate());
+        let mut user=DataObject::new();let ids=DataArray::new();ids.push_int(stale_id);ids.push_int(fresh_id);user.put_array("connections",ids);
+        let selected=get_best(user.clone()).unwrap();
+        assert_eq!(selected.sessionid,fresh.sessionid);
+        assert_eq!(get_tcp(user.clone()).unwrap().sessionid,fresh.sessionid);
+        fresh.alive.store(false,AtomicOrdering::SeqCst);
+        assert!(get_best(user.clone()).is_none());
+        assert!(get_tcp(user).is_none());
+        P2PCONS.get().lock().remove(&stale_id);P2PCONS.get().lock().remove(&fresh_id);
     }
 
     #[test]
