@@ -40,7 +40,7 @@ pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
   let relayc = get_relay(o.clone());
   let now = flowlang::flowlang::system::time::time();
   let tcp = tcpc.as_ref().map(|c| c.alive.load(std::sync::atomic::Ordering::SeqCst) && now - c.last_contact() < 120000).unwrap_or(false);
-  let udp = udpc.is_some();
+  let udp = udpc.as_ref().map(|c| c.alive.load(std::sync::atomic::Ordering::SeqCst) && now - c.last_contact() < 120000).unwrap_or(false);
   let relay = relayc.is_some();
   let connected = tcp || udp || relay;
 
