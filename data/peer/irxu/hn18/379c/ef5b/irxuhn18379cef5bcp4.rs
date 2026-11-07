@@ -1422,9 +1422,12 @@ fn read_frame(conn: &mut P2PConnection) -> io::Result<Option<Vec<u8>>> {
             let mut inbox = conn.inbox.lock().unwrap();
             if header.is_none() && inbox.len() >= 2 {
                 let len = u16::from_be_bytes([inbox[0], inbox[1]]) as usize;
-                if len == 0 || len > MAX_LEGACY_FRAME {
-                    return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid P2P frame length"));
-                }
+                // Old senders cast lengths to signed i16. Values above 16400
+                // were rejected by old receivers, but on TCP their two-byte
+                // wrapped representation is unambiguous once the entire frame
+                // has arrived. Do not decrypt until then: this is not stream
+                // resynchronization and cannot mistake ciphertext for JSON.
+                if len == 0 { return Err(io::Error::new(io::ErrorKind::InvalidData, "Zero-length P2P frame")); }
                 header = Some(len);
             }
             if let Some(len) = header {
@@ -1595,6 +1598,24 @@ mod tests {
         let two = read_frame(&mut con).unwrap().unwrap();
         assert_eq!(decrypt(&con.cipher,&two)[..6], b"res {}"[..]);
         writer.join().unwrap();
+    }
+
+    #[test]
+    fn old_wrapped_large_frame_is_recovered_without_resync() {
+        let (mut con, mut server) = fixture();
+        let payload = vec![b'a';36810];
+        let encrypted = encrypt(&con.cipher,&payload);
+        assert_eq!(encrypted.len(),36816);
+        let mut old = (encrypted.len() as i16).to_be_bytes().to_vec();
+        old.extend_from_slice(&encrypted);
+        let normal = legacy_frame(&con.cipher,b"res {}").unwrap();
+        old.extend_from_slice(&normal);
+        server.write_all(&old).unwrap();
+        let first = read_frame(&mut con).unwrap().unwrap();
+        assert_eq!(first.len(),36816);
+        assert_eq!(&first[..],&encrypted[..]);
+        let second = read_frame(&mut con).unwrap().unwrap();
+        assert_eq!(decrypt(&con.cipher,&second)[..6],b"res {}"[..]);
     }
 
     #[test]
