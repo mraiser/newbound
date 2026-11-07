@@ -1,97 +1,83 @@
 if uuid == "local" {
   let cmd = Command::lookup(&app.clone(), &app.clone(), &cmd.clone());
   let o = cmd.execute(params);
-  if let Err(e) = &o {
-    // A failed flow: {status: "err", msg: what failed and where, flow_error: the details}.
-    return e.to_envelope();
+  if let Err(e) = &o { return e.to_envelope(); }
+  let mut o = o.unwrap();
+  if !o.has("status") { o.put_string("status", "ok"); }
+  if o.has("a") {
+    let a = o.get_property("a");
+    if a.is_string() { o.set_property("msg", a); } else { o.set_property("data", a); }
   }
-  else {
-    let mut o = o.unwrap();
-    if !o.has("status") { o.put_string("status", "ok"); }
-    if o.has("a") {
-      let a = o.get_property("a");
-      if a.is_string() {
-        o.set_property("msg", a);
-      }
-      else {
-        o.set_property("data", a);
-      }
-      //o.remove_property("a");
-    }
-    return o;
-  }
+  return o;
 }
-
 
 let user = get_user(&uuid);
-if user.is_none(){
-  return DataObject::from_string("{\"status\":\"err\",\"msg\":\"No such peer\"}");
+if user.is_none() {
+  let mut o = DataObject::new(); o.put_string("status", "err"); o.put_string("msg", "No such peer"); return o;
 }
 let user = user.unwrap();
-let cons = user.get_array("connections");
-if cons.len() == 0 {
-  return DataObject::from_string("{\"status\":\"err\",\"msg\":\"No route to peer\"}");
+if user.get_array("connections").len() == 0 {
+  let mut o = DataObject::new(); o.put_string("status", "err"); o.put_string("msg", "No route to peer"); return o;
 }
 
 let pid;
 #[allow(static_mut_refs)]
-unsafe { pid = NEXT_CMD.fetch_add(1, Ordering::SeqCst) as i64;}
-
+unsafe { pid = NEXT_CMD.fetch_add(1, Ordering::SeqCst) as i64; }
 let mut d = DataObject::new();
 d.put_string("bot", &app);
 d.put_string("cmd", &cmd);
 d.put_int("pid", pid);
 d.put_object("params", params);
 
-let con = get_best(user.clone()).unwrap();
-let cipher = con.cipher;
-let mut stream = con.stream;
-let mut res = con.res;
-
-let mut pending = con.pending;
+let con = match get_best(user.clone()) {
+  Some(con) => con,
+  None => { let mut o = DataObject::new(); o.put_string("status", "err"); o.put_string("msg", "No live route to peer"); return o; },
+};
+let conid = P2PConnection::list().into_iter().find(|id| {
+  P2PConnection::try_get(*id).map(|other| other.sessionid == con.sessionid).unwrap_or(false)
+}).unwrap_or(-1);
+let mut res = con.res.clone();
+let mut pending = con.pending.clone();
 pending.push_int(pid);
 
-let s = "cmd ".to_string() + &d.to_string();
-let buf = encrypt(&cipher, s.as_bytes());
-let len = buf.len() as i16;
-let mut bytes = len.to_be_bytes().to_vec();
-bytes.extend_from_slice(&buf);
-let _x = stream.write(&bytes, con.sessionid).unwrap();
-
-// FIXME - should timeout
-let pidstr = &pid.to_string();
-let name = match user.has("displayname") {
-  true => user.get_string("displayname"),
-  _ => uuid.to_string()
-};
-let mut timeout = 0;
-let mut numtimes = 0; // FIXME - Major hack
-while ! res.has(pidstr) {
-  // TIGHTLOOP
-  timeout += 1;
-  let beat = Duration::from_millis(timeout);
-  thread::sleep(beat);
-  if timeout > 450 { 
-    println!("Unusually long wait in peer:service:exec [{}/{}/{}/{}]", &name, &app, &cmd, pid); 
-    if numtimes > 4 || time() - stream.last_contact() > 120000 { // WTF?!
-      return DataObject::from_string("{\"status\":\"err\",\"msg\":\"SERVICE EXEC TIMEOUT\"}"); 
-    }
-    timeout = 0;
-    numtimes += 1;
-  }
-  
-  wait();
+if con.send_command("cmd ", d.to_string().as_bytes()).is_err() {
+  pending.remove_data(Data::DInt(pid));
+  con.alive.store(false, Ordering::SeqCst);
+  if conid >= 0 { let _ = con.shutdown(&con.uuid, conid); }
+  let mut o = DataObject::new(); o.put_string("status", "err"); o.put_string("msg", "P2P request could not be sent within the legacy frame limit or its connection failed"); return o;
 }
 
-let o = res.get_object(pidstr);
-res.remove_property(pidstr);
-pending.remove_data(Data::DInt(pid));
+let pidstr = pid.to_string();
+let name = if user.has("displayname") { user.get_string("displayname") } else { uuid.to_string() };
+let started = time();
+let mut last_notice = started;
+while !res.has(&pidstr) {
+  if !con.alive.load(Ordering::SeqCst) {
+    pending.remove_data(Data::DInt(pid));
+    let mut o = DataObject::new(); o.put_string("status", "err"); o.put_string("msg", "P2P connection closed while awaiting response"); return o;
+  }
+  let now = time();
+  if now - last_notice > 30000 {
+    println!("P2P still awaiting response [{}/{}/{}/{}] after {} ms", &name, &app, &cmd, pid, now-started);
+    last_notice = now;
+  }
+  let limit = if app == "peer" && cmd == "info" { 15000 } else { 120000 };
+  if now - started > limit {
+    pending.remove_data(Data::DInt(pid));
+    con.alive.store(false, Ordering::SeqCst);
+    if conid >= 0 { let _ = con.shutdown(&con.uuid, conid); }
+    let mut o = DataObject::new(); o.put_string("status", "err"); o.put_string("msg", "SERVICE EXEC TIMEOUT; stale P2P connection closed for reconnect"); return o;
+  }
+  thread::sleep(Duration::from_millis(10));
+}
 
+let o = res.get_object(&pidstr);
+res.remove_property(&pidstr);
+pending.remove_data(Data::DInt(pid));
 o
 }
 
 static mut NEXT_CMD: AtomicUsize = AtomicUsize::new(1);
 
-fn wait(){
-//  spin_loop();
-//  yield_now();
+fn wait() {
+  thread::yield_now();
