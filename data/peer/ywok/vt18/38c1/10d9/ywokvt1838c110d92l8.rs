@@ -53,6 +53,8 @@ pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
     _ => 0,
   };
 
+  let live_connections = o.get_array("connections").deep_copy();
+  o.put_array("connections", live_connections);
   o.put_boolean("tcp", tcp);  
   o.put_boolean("udp", udp);  
   o.put_boolean("relay", relay);  
