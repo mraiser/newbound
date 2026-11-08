@@ -1,0 +1,1 @@
+{"data":{"attachmentkeynames":["rs"],"import":"use flowlang::datastore::DataStore;\nuse flowlang::command::Command;\nuse crate::app::service::init::handle_command_parity_host;","params":[],"returntype":"FLAT","type":"rust"},"id":"wjsgql1a1b9286f48h4e7","readers":[],"time":1794107797322,"username":"system","writers":[]}
