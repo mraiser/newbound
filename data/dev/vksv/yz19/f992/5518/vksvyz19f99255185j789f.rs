@@ -208,13 +208,40 @@ store.set_data(&lib, &impl_id, impl_rec);
 
 // Append to the control's shared journal (the same record the facet
 // patches use); revert = write_flow_body of the entry's `old`.
-let patch_id = match crate::dev::code::journal_storage::append(&store, &lib, &ctlid, "flow", current, new_s.clone(), format!("{}: {}", cmd, label), author) {
-    Ok(id) => id,
-    Err(e) => {
-        let mut o = DataObject::new(); o.put_string("status", "err");
-        o.put_string("kind", "journal_write_failed"); o.put_string("msg", &e); return o;
-    }
-};
+let jid = format!("{}_patches", ctlid);
+let mut jrec;
+let mut jdata;
+let mut jlist;
+if store.exists(&lib, &jid) {
+    jrec = store.get_data(&lib, &jid);
+    jdata = jrec.get_object("data");
+    jlist = if jdata.has("list") { jdata.get_array("list") } else { DataArray::new() };
+} else {
+    jrec = DataObject::new();
+    jrec.put_string("id", &jid);
+    jrec.put_string("username", "system");
+    jrec.put_array("readers", DataArray::new());
+    jrec.put_array("writers", DataArray::new());
+    jdata = DataObject::new();
+    jlist = DataArray::new();
+}
+
+let patch_id = format!("p{}", jlist.len() + 1);
+let mut entry = DataObject::new();
+entry.put_string("patch_id", &patch_id);
+entry.put_string("author", &author);
+entry.put_string("facet", "flow");
+entry.put_string("cmd", &cmd);
+entry.put_string("old", &current);
+entry.put_string("new", &new_s);
+entry.put_int("time", time());
+entry.put_string("label", &label);
+jlist.push_object(entry);
+
+jdata.put_array("list", jlist);
+jrec.put_object("data", jdata);
+jrec.put_int("time", time());
+store.set_data(&lib, &jid, jrec);
 
 let mut o = DataObject::new();
 o.put_string("status", "ok");

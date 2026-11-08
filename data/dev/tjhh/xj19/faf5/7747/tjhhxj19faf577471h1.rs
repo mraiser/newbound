@@ -108,11 +108,9 @@ if data.has("cmd") {
     }
 }
 
-// Both legacy and per-entry journal records die with the control.
+// the journal dies with the control (terminal - stated in the contract)
 let jid = format!("{}_patches", ctlid);
 zap(&store, &lib, &jid);
-let journal_ids = crate::dev::code::journal_storage::all_record_ids(&store, &lib, &ctlid);
-for id in journal_ids { zap(&store, &lib, &id); }
 
 // unlink from the library's controls index
 if store.exists(&lib, "controls") {
