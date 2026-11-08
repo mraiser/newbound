@@ -1338,6 +1338,10 @@ fn websock_message(mut stream: TcpStream, msg:String) -> bool {
   x.is_ok()
 }
 
+pub fn handle_command_parity_host(d: DataObject, sid: String) -> DataObject {
+  handle_command(d, sid)
+}
+
 pub fn handle_command(d: DataObject, sid: String) -> DataObject {
   let system = DataStore::globals().get_object("system");
   let sessions = system.get_object("sessions");
