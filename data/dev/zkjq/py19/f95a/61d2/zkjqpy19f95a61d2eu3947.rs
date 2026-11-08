@@ -9,23 +9,13 @@ if !store.exists(&lib, &ctlid) {
     return o;
 }
 
-let mut patches = DataArray::new();
-let jid = format!("{}_patches", ctlid);
-if store.exists(&lib, &jid) {
-    let jdata = store.get_data(&lib, &jid).get_object("data");
-    if jdata.has("list") {
-        let list = jdata.get_array("list");
-        let total = list.len();
-        let n = if limit <= 0 { total } else if (limit as usize) < total { limit as usize } else { total };
-        // Newest first: the journal appends; the timeline renders reverse-chronological.
-        let mut i = total;
-        while i > total - n {
-            i -= 1;
-            patches.push_object(list.get_object(i));
-        }
+let patches = match crate::dev::code::journal_storage::list(&store, &lib, &ctlid, limit) {
+    Ok(p) => p,
+    Err(e) => {
+        let mut o = DataObject::new(); o.put_string("status", "err");
+        o.put_string("msg", &format!("control journal unavailable: {}", e)); return o;
     }
-}
-
+};
 let mut o = DataObject::new();
 o.put_string("status", "ok");
 o.put_array("patches", patches);
