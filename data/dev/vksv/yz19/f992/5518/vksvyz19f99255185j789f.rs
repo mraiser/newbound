@@ -208,7 +208,7 @@ store.set_data(&lib, &impl_id, impl_rec);
 
 // Append to the control's shared journal (the same record the facet
 // patches use); revert = write_flow_body of the entry's `old`.
-let patch_id = match crate::dev::code::journal_storage::append(&store, &lib, &ctlid, "flow", current, new_s, format!("{}: {}", cmd, label), author) {
+let patch_id = match crate::dev::code::journal_storage::append(&store, &lib, &ctlid, "flow", current, new_s.clone(), format!("{}: {}", cmd, label), author) {
     Ok(id) => id,
     Err(e) => {
         let mut o = DataObject::new(); o.put_string("status", "err");
