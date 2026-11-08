@@ -191,37 +191,13 @@ if data.has("event") {
 // then records the move as its own entry.
 let jid = format!("{}_patches", ctlid);
 let _x = move_rec(&store, &lib, &to_lib, &jid);
-
-let mut jrec;
-let mut jdata;
-let mut jlist;
-if store.exists(&to_lib, &jid) {
-    jrec = store.get_data(&to_lib, &jid);
-    jdata = jrec.get_object("data");
-    jlist = if jdata.has("list") { jdata.get_array("list") } else { DataArray::new() };
-} else {
-    jrec = DataObject::new();
-    jrec.put_string("id", &jid);
-    jrec.put_string("username", "system");
-    jrec.put_array("readers", DataArray::new());
-    jrec.put_array("writers", DataArray::new());
-    jdata = DataObject::new();
-    jlist = DataArray::new();
+for id in crate::dev::code::journal_storage::all_record_ids(&store, &lib, &ctlid) {
+    let _x = move_rec(&store, &lib, &to_lib, &id);
 }
-let patch_id = format!("p{}", jlist.len() + 1);
-let mut entry = DataObject::new();
-entry.put_string("patch_id", &patch_id);
-entry.put_string("author", &author);
-entry.put_string("facet", "move");
-entry.put_string("old", &lib);
-entry.put_string("new", &to_lib);
-entry.put_int("time", time());
-entry.put_string("label", &format!("moved from {} to {}", lib, to_lib));
-jlist.push_object(entry);
-jdata.put_array("list", jlist);
-jrec.put_object("data", jdata);
-jrec.put_int("time", time());
-store.set_data(&to_lib, &jid, jrec);
+let patch_id = match crate::dev::code::journal_storage::append(&store, &to_lib, &ctlid, "move", lib.clone(), to_lib.clone(), format!("moved from {} to {}", lib, to_lib), author) {
+    Ok(id) => id,
+    Err(e) => { let mut o = DataObject::new(); o.put_string("status", "err"); o.put_string("msg", &e); return o; }
+};
 
 // The control record itself - facet attachments ride the same get->set.
 let _x = move_rec(&store, &lib, &to_lib, &ctlid);
