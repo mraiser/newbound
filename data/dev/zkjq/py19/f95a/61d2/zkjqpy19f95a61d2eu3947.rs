@@ -9,11 +9,16 @@ if !store.exists(&lib, &ctlid) {
     return o;
 }
 
-let patches = match crate::dev::code::journal_storage::list(&store, &lib, &ctlid, limit) {
-    Ok(p) => p,
-    Err(e) => {
+let patches = match std::panic::catch_unwind(|| crate::dev::code::journal_storage::list(&store, &lib, &ctlid, limit)) {
+    Ok(Ok(p)) => p,
+    Ok(Err(e)) => {
         let mut o = DataObject::new(); o.put_string("status", "err");
         o.put_string("msg", &format!("control journal unavailable: {}", e)); return o;
+    },
+    Err(_) => {
+        let mut o = DataObject::new(); o.put_string("status", "err");
+        o.put_string("kind", "corrupt_journal");
+        o.put_string("msg", "control journal is malformed; no panic escaped the read API"); return o;
     }
 };
 let mut o = DataObject::new();

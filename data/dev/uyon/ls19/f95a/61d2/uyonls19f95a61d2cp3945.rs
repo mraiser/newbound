@@ -42,6 +42,9 @@ let api = crate::api::new();
 let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
 
 let store = DataStore::new();
+// One process-wide journal transaction. Validate the current record and base
+// under the same lock used for the facet and journal writes.
+let _journal_guard = crate::dev::code::journal_storage::lock();
 if !store.exists(&lib, &ctlid) {
     let mut o = DataObject::new();
     o.put_string("status", "err");
@@ -59,7 +62,15 @@ fn content_hash(s: &str) -> String {
     format!("{:016x}", h)
 }
 
-let mut record = store.get_data(&lib, &ctlid);
+let mut record = match std::panic::catch_unwind(|| store.get_data(&lib, &ctlid)) {
+    Ok(r) => r,
+    Err(_) => {
+        let mut o = DataObject::new(); o.put_string("status", "err");
+        o.put_string("kind", "corrupt_record");
+        o.put_string("msg", &format!("control record {}:{} is unreadable; no facet or journal was written", lib, ctlid));
+        return o;
+    }
+};
 let mut data_obj = record.get_object("data");
 
 // Normalize line endings to avoid strict matching failures caused by \r\n vs \n
@@ -127,44 +138,21 @@ data_obj.put_array("attachmentkeynames", keys);
 data_obj.put_string(&facet, &new_code);
 record.put_object("data", data_obj);
 record.put_int("time", time());
-store.set_data(&lib, &ctlid, record);
-
-// Append to the control's journal: one DataStore record per control, read by
-// list_control_patches. Revert = apply the inverse as a new patch; the
-// journal itself is never rewritten.
-let jid = format!("{}_patches", ctlid);
-let mut jrec;
-let mut jdata;
-let mut list;
-if store.exists(&lib, &jid) {
-    jrec = store.get_data(&lib, &jid);
-    jdata = jrec.get_object("data");
-    list = if jdata.has("list") { jdata.get_array("list") } else { DataArray::new() };
-} else {
-    jrec = DataObject::new();
-    jrec.put_string("id", &jid);
-    jrec.put_string("username", "system");
-    jrec.put_array("readers", DataArray::new());
-    jrec.put_array("writers", DataArray::new());
-    jdata = DataObject::new();
-    list = DataArray::new();
+if let Err(e) = crate::dev::code::journal_storage::write_record(&store, &lib, &ctlid, &record) {
+    let mut o = DataObject::new(); o.put_string("status", "err"); o.put_string("kind", "write_failed");
+    o.put_string("msg", &format!("facet write failed before journal append: {}", e)); return o;
 }
 
-let patch_id = format!("p{}", list.len() + 1);
-let mut entry = DataObject::new();
-entry.put_string("patch_id", &patch_id);
-entry.put_string("author", &author);
-entry.put_string("facet", &facet);
-entry.put_string("old", &journal_old);
-entry.put_string("new", &new_n);
-entry.put_int("time", time());
-entry.put_string("label", &label);
-list.push_object(entry);
-
-jdata.put_array("list", list);
-jrec.put_object("data", jdata);
-jrec.put_int("time", time());
-store.set_data(&lib, &jid, jrec);
+// Plan patches are independent records: one board change never rewrites the
+// entire prior journal. Generic controls retain their legacy journal shape.
+let patch_id = match crate::dev::code::journal_storage::append(&store, &lib, &ctlid, &facet, journal_old, new_n, label, author) {
+    Ok(id) => id,
+    Err(e) => {
+        let mut o = DataObject::new(); o.put_string("status", "err"); o.put_string("kind", "journal_write_failed");
+        o.put_string("msg", &format!("facet was written but journal append failed: {}", e));
+        o.put_boolean("facet_written", true); return o;
+    }
+};
 
 let mut o = DataObject::new();
 o.put_string("status", "ok");
