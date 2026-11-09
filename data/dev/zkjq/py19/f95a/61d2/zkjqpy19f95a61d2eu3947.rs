@@ -12,6 +12,8 @@ if !store.exists(&lib, &ctlid) {
 // Runtime-backed journals are instance-local; an unconverted source
 // journal remains readable. Reads do not migrate or modify either copy.
 // The public response deliberately retains its historical FLAT shape.
+// Runtime journals live in data/runtime; legacy source journals are only
+// a fallback until the first write or an explicit conversion.
 let r = crate::dev::code::patch_journal::patch_journal(
     "read".to_string(), lib, ctl, String::new(), DataObject::new(), limit, false, String::new());
 if r.get_string("status") != "ok" { return r; }

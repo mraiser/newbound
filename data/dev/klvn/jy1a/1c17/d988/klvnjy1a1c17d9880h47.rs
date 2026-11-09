@@ -8,7 +8,6 @@ fn err(msg: &str) -> DataObject {
 fn ok() -> DataObject {
     let mut o = DataObject::new(); o.put_string("status", "ok"); o
 }
-fn empty_entry() -> DataObject { DataObject::new() }
 fn make_record(id: &str, data: DataObject, readers: DataArray, writers: DataArray) -> DataObject {
     let mut r = DataObject::new();
     r.put_string("id", id); r.put_string("username", "system");
