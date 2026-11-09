@@ -109,8 +109,8 @@ if data.has("cmd") {
 }
 
 // the journal dies with the control (terminal - stated in the contract)
-let jid = format!("{}_patches", ctlid);
-zap(&store, &lib, &jid);
+let jr = crate::dev::code::patch_journal::patch_journal("delete".to_string(), lib.clone(), ctlid.clone(), String::new(), DataObject::new(), 0, false, nn_sessionid);
+if jr.get_string("status") != "ok" { return jr; }
 
 // unlink from the library's controls index
 if store.exists(&lib, "controls") {

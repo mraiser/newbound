@@ -40,18 +40,10 @@ fn clear_pointer(store: &DataStore, lib: &str, ctlid: &str) {
 }
 fn delete_record(store: &DataStore, lib: &str, id: &str, session: &str) -> Result<(), String> {
     if !store.exists(lib, id) { return Ok(()); }
-    // This command has already been authorized by the command dispatcher.
-    // A record-level ACL can only narrow, not widen, that authority; an
-    // admin session (including this server's own MCP session) may delete
-    // every record. Keep the generic app.delete route in the live server;
-    // the headless exec harness has no security globals, so its equivalent
-    // record-only operation is used there after checking for an admin.
-    if !DataStore::globals().has("system") {
-        let f = store.get_data_file(lib, id);
-        let _ = std::fs::remove_file(f);
-        if store.exists(lib, id) { return Err(format!("could not delete {}:{}", lib, id)); }
-        return Ok(());
-    }
+    // Headless exec has not booted the HTTP service's global snapshot;
+    // initialize it normally, then use the same secured record command in
+    // both execution modes. Never bypass the store with a file shortcut.
+    if !DataStore::globals().has("system") { flowlang::appserver::init_globals(); }
     if !crate::security::security::init::check_auth(lib, id, session, true) {
         return Err(format!("not authorized to delete {}:{}", lib, id));
     }
