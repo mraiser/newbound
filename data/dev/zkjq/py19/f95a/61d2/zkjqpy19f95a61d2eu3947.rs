@@ -9,24 +9,13 @@ if !store.exists(&lib, &ctlid) {
     return o;
 }
 
-let mut patches = DataArray::new();
-let jid = format!("{}_patches", ctlid);
-if store.exists(&lib, &jid) {
-    let jdata = store.get_data(&lib, &jid).get_object("data");
-    if jdata.has("list") {
-        let list = jdata.get_array("list");
-        let total = list.len();
-        let n = if limit <= 0 { total } else if (limit as usize) < total { limit as usize } else { total };
-        // Newest first: the journal appends; the timeline renders reverse-chronological.
-        let mut i = total;
-        while i > total - n {
-            i -= 1;
-            patches.push_object(list.get_object(i));
-        }
-    }
-}
-
+// Runtime-backed journals are instance-local; an unconverted source
+// journal remains readable. Reads do not migrate or modify either copy.
+// The public response deliberately retains its historical FLAT shape.
+let r = crate::dev::code::patch_journal::patch_journal(
+    "read".to_string(), lib, ctl, String::new(), DataObject::new(), limit, false, String::new());
+if r.get_string("status") != "ok" { return r; }
 let mut o = DataObject::new();
 o.put_string("status", "ok");
-o.put_array("patches", patches);
+o.put_array("patches", r.get_array("patches"));
 o
