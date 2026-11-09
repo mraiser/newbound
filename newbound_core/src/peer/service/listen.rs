@@ -1187,7 +1187,7 @@ pub fn handle_next_message(conn: &mut P2PConnection) -> bool {
                             let path_clone_for_thread = file_path_str.clone();
                             thread::spawn(move || {
                                 if let Ok(mut file) = fs::File::open(&path_clone_for_thread) {
-                                    let chunk_size = 0x4000;
+                                    let chunk_size = 16000;
                                     let mut buffer = vec![0; chunk_size];
                                     loop {
                                         match file.read(&mut buffer) {

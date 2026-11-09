@@ -91,6 +91,7 @@ static STREAMREADERS: GlobalSharedMutex<HashMap<i64, DataBytes>> = GlobalSharedM
 static STREAMCONTROL: GlobalSharedMutex<HashMap<i64, Arc<(Mutex<bool>, Condvar)>>> = GlobalSharedMutex::new();
 
 pub const MAX_LEGACY_FRAME: usize = 16400;
+pub const MAX_STREAM_PAYLOAD: usize = 16000;
 const CHUNK_WIRE: usize = 15000;
 const MAX_CHUNK_MESSAGE: usize = 16 * 1024 * 1024;
 
@@ -658,7 +659,7 @@ impl P2PConnection {
     pub fn write_stream(&mut self, upstream_id: i64, data_to_write: &Vec<u8>) -> bool {
         do_init();
         if !self.alive.load(AtomicOrdering::SeqCst) { return false; }
-        if data_to_write.len() > 16000 { return false; }
+        if data_to_write.len() > MAX_STREAM_PAYLOAD { return false; }
         if let Some(control) = STREAMCONTROL.get().read().get(&upstream_id).cloned() {
             let (lock, cvar) = &*control;
             let mut paused = lock.lock().unwrap();
@@ -1363,7 +1364,7 @@ pub fn handle_next_message(conn: &mut P2PConnection) -> bool {
                             let path_clone_for_thread = file_path_str.clone();
                             thread::spawn(move || {
                                 if let Ok(mut file) = fs::File::open(&path_clone_for_thread) {
-                                    let chunk_size = 0x4000;
+                                    let chunk_size = MAX_STREAM_PAYLOAD;
                                     let mut buffer = vec![0; chunk_size];
                                     loop {
                                         match file.read(&mut buffer) {
@@ -1657,6 +1658,34 @@ mod tests {
         }
         assert_eq!(&received[..4],b"res ");
         assert_eq!(&received[4..],&payload[..]);
+    }
+
+    #[test]
+    fn stream_producers_use_legacy_compatible_chunks() {
+        do_init();
+        let (mut sender, mut wire) = fixture();
+        let upstream_id = rand_i64();
+        let downstream_id = rand_i64();
+        STREAMWRITERS.get().lock().insert(upstream_id, downstream_id);
+
+        // The old 0x4000 producer size was rejected before it reached the wire.
+        assert!(!sender.write_stream(upstream_id, &vec![0u8; 0x4000]));
+        let payload: Vec<u8> = (0..MAX_STREAM_PAYLOAD).map(|i| (i % 251) as u8).collect();
+        assert!(sender.write_stream(upstream_id, &payload));
+
+        let mut header = [0u8; 2];
+        wire.read_exact(&mut header).unwrap();
+        let len = i16::from_be_bytes(header) as usize;
+        assert!(len > 0 && len <= MAX_LEGACY_FRAME);
+        let mut frame = vec![0u8; len];
+        wire.read_exact(&mut frame).unwrap();
+        let message = decrypt(&sender.cipher, &frame);
+        assert_eq!(&message[..4], b"s_2 ");
+        assert_eq!(i64::from_be_bytes(message[4..12].try_into().unwrap()), downstream_id);
+        let n = i16::from_be_bytes(message[12..14].try_into().unwrap()) as usize;
+        assert_eq!(n, MAX_STREAM_PAYLOAD);
+        assert_eq!(&message[14..14+n], &payload);
+        STREAMWRITERS.get().lock().remove(&upstream_id);
     }
 
     #[test]
