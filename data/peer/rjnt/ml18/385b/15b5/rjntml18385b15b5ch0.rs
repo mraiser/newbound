@@ -7,7 +7,7 @@ let mut live = Vec::new();
   let pcons = P2PConnection::list();
   for id in pcons {
     let con = P2PConnection::get(id);
-    if con.last_contact() < now - pollx2 {
+    if !con.alive.load(std::sync::atomic::Ordering::SeqCst) || con.last_contact() < now - pollx2 {
       let _x = con.shutdown(&con.uuid, id as i64);
     }
     else { live.push(con.duplicate()); }
@@ -55,7 +55,7 @@ let adr = ask.data_ref;
 for (uuid, user) in users.objects(){
   if uuid.len() == 36 {
     let mut user = user.object();
-    if user.get_array("connections").len() > 0 {
+    if crate::peer::service::listen::get_best(user.clone()).is_some() {
       user.put_boolean("connected", true);
       let salt = salt.to_owned();
       ask.incr();
