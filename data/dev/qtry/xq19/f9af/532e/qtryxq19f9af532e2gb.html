@@ -1,132 +1,244 @@
 <section class="nb-shelf">
+<div class="sh-main">
   <header class="sh-head">
-    <h1>The shelf</h1>
-    <p>Every library is a stack of cards. No folders, no tree — a library holds
-    assets and controls, a control holds everything else. Open a stack to fan
-    out its controls.</p>
-  </header>
-  <div class="sh-groups"></div>
-  <form class="sh-newlib" hidden>
-    <button type="button" class="sh-newlib-open">+ new library</button>
-    <span class="sh-newlib-fields" hidden>
-      <input class="sh-newlib-name" placeholder="library name — lowercase, no spaces"
-             aria-label="New library name">
-      <button type="submit" class="sh-newlib-go">create</button>
-      <span class="sh-newlib-note"></span>
-    </span>
-  </form>
-  <form class="sh-plugins" hidden>
-    <button type="button" class="sh-plugins-open">◈ plugins</button>
-    <div class="sh-plugins-panel" hidden>
-      <p class="sh-plugins-cap lbl">plugin registrations — when TARGET is on a
-      page, PLUGIN mounts at SELECTOR (runtime/dev/plugins.json via
-      dev.plugins; changes apply on the next reload)</p>
-      <div class="sh-plugins-list"></div>
-      <div class="sh-plugins-fields">
-        <input class="sh-plug-name" placeholder="entry name" aria-label="Registration entry name">
-        <input class="sh-plug-tlib" placeholder="target lib — dev" aria-label="Target library">
-        <input class="sh-plug-tctl" placeholder="target ctl — dev · workbench · session…" aria-label="Target control">
-        <input class="sh-plug-plib" placeholder="plugin lib" aria-label="Plugin library">
-        <input class="sh-plug-pctl" placeholder="plugin ctl" aria-label="Plugin control">
-        <input class="sh-plug-sel" placeholder="selector — #devpluginholder" aria-label="Slot CSS selector">
-        <button type="submit" class="sh-plug-save">set</button>
-        <span class="sh-plugins-note"></span>
+    <div class="sh-title">
+      <h1>The shelf</h1>
+      <div class="sh-head-actions">
+        <button type="button" class="sh-btn sh-outline sh-plugins-open" aria-expanded="false" hidden>
+          Plugins <span class="sh-plugins-count"></span></button>
+        <button type="button" class="sh-btn sh-primary sh-newlib-open" aria-expanded="false" hidden>New library</button>
       </div>
     </div>
+    <p class="sh-intro">Your libraries, and the controls inside them.</p>
+  </header>
+
+  <form class="sh-create sh-newlib" hidden>
+    <label class="sh-field">Library name
+      <input class="sh-newlib-name" placeholder="library name — lowercase, no spaces"
+             aria-label="New library name" autocomplete="off"></label>
+    <button type="submit" class="sh-btn sh-primary sh-newlib-go">Create library</button>
+    <button type="button" class="sh-btn sh-newlib-cancel">Cancel</button>
+    <span class="sh-note sh-newlib-note"></span>
   </form>
-  <div class="sh-fan" hidden>
-    <div class="sh-fan-head">
-      <span class="fh-name"></span>
-      <span class="lbl">controls — dots show which facets each card carries</span>
+
+  <form class="sh-panel sh-plugins" hidden>
+    <div class="sh-panel-head">
+      <h2>Plugins</h2>
+      <div class="sh-panel-actions">
+        <button type="button" class="sh-btn sh-outline sh-plug-add">Add registration</button>
+        <button type="button" class="sh-btn sh-outline sh-icon-btn sh-plugins-close" aria-label="Close plugins">
+          <i class="sh-i sh-i-close" aria-hidden="true"></i></button>
+      </div>
     </div>
-    <p class="fh-desc"></p>
-    <div class="fh-tools" hidden>
-      <button class="fh-meta-btn" hidden>meta ▸</button>
-      <button class="fh-groups-btn" hidden
-        title="security groups — who can see and run this library's contents; the deliberate set_groups act, distinct from meta">groups ▸</button>
-      <button class="fh-assets-btn">assets ▸</button>
-      <button class="fh-settings-btn">rust settings ▸</button>
-      <button class="fh-rebuild-btn" hidden>rebuild ▸</button>
-      <button class="fh-archive-btn" hidden>archive ▸</button>
-      <button class="fh-del-btn" hidden
-        title="rmdir semantics — refuses while the library has any controls; delete them first, each on purpose">delete library</button>
+    <p class="sh-panel-copy">Plugin registrations — when TARGET is on a page, PLUGIN
+    mounts at SELECTOR (<code>runtime/dev/plugins.json</code> via <code>dev.plugins</code>;
+    changes apply on the next reload).</p>
+    <div class="sh-plugins-list"></div>
+    <div class="sh-plugins-fields" hidden>
+      <h3 class="sh-plug-form-title">New registration</h3>
+      <div class="sh-form-grid">
+        <label class="sh-field">Registration name
+          <input class="sh-plug-name" placeholder="entry name" aria-label="Registration entry name"></label>
+        <label class="sh-field">CSS selector
+          <input class="sh-plug-sel" placeholder="selector — #devpluginholder" aria-label="Slot CSS selector"></label>
+        <label class="sh-field">Target library
+          <input class="sh-plug-tlib" placeholder="target lib — dev" aria-label="Target library"></label>
+        <label class="sh-field">Target control
+          <input class="sh-plug-tctl" placeholder="target ctl — dev · workbench · session…" aria-label="Target control"></label>
+        <label class="sh-field">Plugin library
+          <input class="sh-plug-plib" placeholder="plugin lib" aria-label="Plugin library"></label>
+        <label class="sh-field">Plugin control
+          <input class="sh-plug-pctl" placeholder="plugin ctl" aria-label="Plugin control"></label>
+      </div>
+      <div class="sh-form-actions">
+        <button type="submit" class="sh-btn sh-primary sh-plug-save">Save registration</button>
+        <button type="button" class="sh-btn sh-plug-cancel">Cancel</button>
+      </div>
     </div>
-    <form class="fh-meta" hidden>
-      <input class="fm-desc" placeholder="describe this library — agents discover it through desc">
-      <input class="fm-tags" placeholder="tags (comma-delimited — categorization, never security)">
-      <button type="submit" class="fm-apply">set</button>
-      <span class="fm-note"></span>
-    </form>
-    <form class="fh-groups" hidden>
-      <p class="fg-cap">The library gate: comma-delimited security groups,
-      written to <code>meta.json</code> as both the <code>groups</code>
-      string and the enforced <code>readers</code> array
-      (<code>set_groups</code>). Empty = admin-only. The convention for a
-      library serving non-admin users is <code>anonymous</code> here, with
-      fine-grained groups on individual controls and commands. Takes effect
-      on restart.</p>
-      <input class="fg-input"
-        placeholder="groups (comma-delimited, e.g. anonymous) — empty = admin only">
-      <span class="fg-known lbl"></span>
-      <button type="submit" class="fg-apply">set groups</button>
-      <span class="fg-note"></span>
-    </form>
-    <div class="fh-assets" hidden>
-      <p class="fa-cap">The library's <code>_ASSETS</code> files, served at
-      <code>/app/asset/&lt;lib&gt;/&lt;name&gt;</code>. Writes go through the
-      write API (<code>write_asset</code>/<code>rename_asset</code>/
-      <code>delete_asset</code>), journal-free but admin-gated.</p>
-      <div class="fa-rows"></div>
-      <form class="fa-new" hidden>
-        <input class="fa-name" placeholder="name (relative path, e.g. styles/x.css)">
-        <textarea class="fa-content" rows="3"
-          placeholder="text content — OR leave empty and give a server-side file path below"></textarea>
-        <input class="fa-tempfile"
-          placeholder="server-side file path (for binary/large files; instance-local)">
-        <button type="submit" class="fa-write">write asset</button>
-        <span class="fa-note"></span>
-      </form>
-    </div>
-    <form class="fh-rebuild" hidden>
-      <p class="fr-cap">Regenerates and recompiles this library's commands
-      from the store (<code>dev.dev.rebuild_lib</code>) — the old dev UI's
-      build button. Store edits (upserts, moves) can leave compiled code
-      behind the records until a rebuild or restart; this is the deliberate
-      catch-up act. Slow for big libraries; the instance keeps serving.</p>
-      <button type="submit" class="fr-go">rebuild now</button>
-      <span class="fr-note"></span>
-      <pre class="fr-out" hidden></pre>
-    </form>
-    <div class="fh-archive" hidden>
-      <p class="fk-cap">The library's versioned archive — <b>the peer
-      app-update path</b>: publishing an app builds a signed zip of each of
-      its libraries under <code>runtime/dev/libraries</code>, and peers in
-      the <code>update</code>/<code>admin</code> groups install updates from
-      exactly these. Git is development-only and plays no part here.</p>
-      <div class="fk-rows"></div>
-      <span class="fk-note"></span>
-    </div>
-    <form class="fh-settings" hidden>
-      <p class="fs-cap">Rust settings — meta.json's <code>root</code>,
-      <code>cargo.crate_types</code>, <code>cargo.dependencies</code>. Inert
-      until this library contains Rust; editable so adding Rust later has a
-      defined home. Saved via <code>dev.libsettings.save_library_config</code>.</p>
-      <label class="lbl">root <input class="fs-root"></label>
-      <label class="lbl fs-ffi-row"><input type="checkbox" class="fs-ffi">
-        ffi — build this library's crate as a hot-loadable dylib (excluded
-        from the cargo workspace, so its commands hot-swap on save)</label>
-      <label class="lbl">crate types (comma) <input class="fs-types"></label>
-      <label class="lbl">dependencies (one <code>name = spec</code> per line)
-        <textarea class="fs-deps" rows="4"></textarea></label>
-      <button type="submit" class="fs-save" hidden>save settings</button>
-      <span class="fs-note"></span>
-    </form>
-    <div class="sh-cards"></div>
-    <form class="sh-newctl" hidden>
-      <input class="sh-newctl-name" placeholder="new control name — lowercase, no spaces"
-             aria-label="New control name">
-      <button type="submit" class="sh-newctl-go">+ new control</button>
-      <span class="sh-newctl-note"></span>
-    </form>
+    <span class="sh-note sh-plugins-note"></span>
+  </form>
+
+  <div class="sh-tools">
+    <input class="sh-search" type="search" placeholder="Find a library…"
+           aria-label="Find a library" autocomplete="off">
+    <select class="sh-root" aria-label="Filter by root">
+      <option value="">All roots</option>
+    </select>
   </div>
+
+  <div class="sh-grid"></div>
+  <p class="sh-empty sh-nomatch" hidden>No libraries match. Try another name or root.</p>
+
+  <div class="sh-lib" hidden>
+    <button type="button" class="sh-btn sh-outline sh-back">
+      <i class="sh-i sh-i-back" aria-hidden="true"></i> All libraries</button>
+    <section class="sh-fan">
+      <div class="sh-fan-head">
+        <h2><span class="fh-name"></span> <span class="fh-count"></span></h2>
+        <div class="fh-actions">
+          <button type="button" class="sh-btn sh-primary" data-open="newctl" aria-expanded="false" hidden>New control</button>
+          <button type="button" class="sh-btn sh-outline sh-icon-btn sh-close" aria-label="Close library">
+            <i class="sh-i sh-i-close" aria-hidden="true"></i></button>
+        </div>
+      </div>
+      <p class="fh-desc"></p>
+
+      <nav class="fh-tools" aria-label="Library actions">
+        <button type="button" data-open="meta" aria-expanded="false" hidden>meta</button>
+        <button type="button" data-open="groups" aria-expanded="false" hidden
+          title="security groups — who can see and run this library's contents; the deliberate set_groups act, distinct from meta">groups</button>
+        <button type="button" data-open="assets" aria-expanded="false">assets</button>
+        <button type="button" data-open="settings" aria-expanded="false">rust settings</button>
+        <button type="button" data-open="rebuild" aria-expanded="false" hidden>rebuild</button>
+        <button type="button" data-open="archive" aria-expanded="false" hidden>archive</button>
+        <button type="button" class="fh-del-btn" hidden
+          title="rmdir semantics — refuses while the library has any controls; delete them first, each on purpose">delete library</button>
+      </nav>
+
+      <form class="sh-panel fh-meta" data-panel="meta" hidden>
+        <div class="sh-panel-head">
+          <h3>Meta · <span class="sh-mono fh-lib"></span></h3>
+          <button type="button" class="sh-btn sh-outline sh-icon-btn" data-close aria-label="Close metadata">
+            <i class="sh-i sh-i-close" aria-hidden="true"></i></button>
+        </div>
+        <p class="sh-panel-copy">Describe this library and add tags so people and agents can discover it.</p>
+        <div class="sh-form-grid">
+          <label class="sh-field sh-field-wide">Description
+            <textarea class="fm-desc" rows="3" placeholder="describe this library — agents discover it through desc"></textarea></label>
+          <label class="sh-field sh-field-wide">Tags
+            <input class="fm-tags" placeholder="images, video, training">
+            <span class="sh-hint">Comma-delimited — categorization, never security. Tags describe content; groups control access.</span></label>
+        </div>
+        <div class="sh-form-actions">
+          <button type="submit" class="sh-btn sh-primary fm-apply">Save metadata</button>
+          <button type="button" class="sh-btn" data-close>Cancel</button>
+          <span class="sh-note fm-note"></span>
+        </div>
+      </form>
+
+      <form class="sh-panel fh-groups" data-panel="groups" hidden>
+        <div class="sh-panel-head">
+          <h3>Groups · <span class="sh-mono fh-lib"></span></h3>
+          <button type="button" class="sh-btn sh-outline sh-icon-btn" data-close aria-label="Close groups">
+            <i class="sh-i sh-i-close" aria-hidden="true"></i></button>
+        </div>
+        <p class="sh-panel-copy fg-cap">The library gate: comma-delimited security groups,
+        written to <code>meta.json</code> as both the <code>groups</code>
+        string and the enforced <code>readers</code> array
+        (<code>set_groups</code>). Empty = admin-only. The convention for a
+        library serving non-admin users is <code>anonymous</code> here, with
+        fine-grained groups on individual controls and commands. Takes effect
+        on restart.</p>
+        <label class="sh-field">Library groups
+          <input class="fg-input" placeholder="groups (comma-delimited, e.g. anonymous) — empty = admin only">
+          <span class="sh-hint fg-known"></span></label>
+        <div class="sh-form-actions">
+          <button type="submit" class="sh-btn sh-primary fg-apply">Set groups</button>
+          <button type="button" class="sh-btn" data-close>Cancel</button>
+          <span class="sh-note fg-note"></span>
+        </div>
+      </form>
+
+      <div class="sh-panel fh-assets" data-panel="assets" hidden>
+        <div class="sh-panel-head">
+          <h3>Assets · <span class="sh-mono fh-lib"></span></h3>
+          <button type="button" class="sh-btn sh-outline sh-icon-btn" data-close aria-label="Close assets">
+            <i class="sh-i sh-i-close" aria-hidden="true"></i></button>
+        </div>
+        <p class="sh-panel-copy">The library's <code>_ASSETS</code> files, served at
+        <code>/app/asset/&lt;lib&gt;/&lt;name&gt;</code>. Writes go through the
+        write API (<code>write_asset</code>/<code>rename_asset</code>/
+        <code>delete_asset</code>), journal-free but admin-gated.</p>
+        <div class="fa-rows"></div>
+        <form class="fa-new" hidden>
+          <h4>Write an asset</h4>
+          <label class="sh-field">Name
+            <input class="fa-name" placeholder="name (relative path, e.g. styles/x.css)"></label>
+          <label class="sh-field">Content
+            <textarea class="fa-content" rows="3"
+              placeholder="text content — OR leave empty and give a server-side file path below"></textarea></label>
+          <label class="sh-field">Server-side file path
+            <input class="fa-tempfile"
+              placeholder="server-side file path (for binary/large files; instance-local)"></label>
+          <div class="sh-form-actions">
+            <button type="submit" class="sh-btn sh-primary fa-write">Write asset</button>
+            <span class="sh-note fa-note"></span>
+          </div>
+        </form>
+      </div>
+
+      <form class="sh-panel fh-settings" data-panel="settings" hidden>
+        <div class="sh-panel-head">
+          <h3>Rust settings · <span class="sh-mono fh-lib"></span></h3>
+          <button type="button" class="sh-btn sh-outline sh-icon-btn" data-close aria-label="Close Rust settings">
+            <i class="sh-i sh-i-close" aria-hidden="true"></i></button>
+        </div>
+        <p class="sh-panel-copy">Rust settings — meta.json's <code>root</code>,
+        <code>cargo.crate_types</code>, <code>cargo.dependencies</code>. Inert
+        until this library contains Rust; editable so adding Rust later has a
+        defined home. Saved via <code>dev.libsettings.save_library_config</code>.</p>
+        <div class="sh-form-grid">
+          <label class="sh-field">Root <input class="fs-root"></label>
+          <label class="sh-field">Crate types (comma) <input class="fs-types"></label>
+          <label class="sh-check sh-field-wide"><input type="checkbox" class="fs-ffi">
+            <span>ffi — build this library's crate as a hot-loadable dylib (excluded
+            from the cargo workspace, so its commands hot-swap on save)</span></label>
+          <label class="sh-field sh-field-wide"><span>Dependencies (one <code>name = spec</code> per line)</span>
+            <textarea class="fs-deps" rows="4"></textarea></label>
+        </div>
+        <div class="sh-form-actions">
+          <button type="submit" class="sh-btn sh-primary fs-save" hidden>Save settings</button>
+          <button type="button" class="sh-btn" data-close>Cancel</button>
+          <span class="sh-note fs-note"></span>
+        </div>
+      </form>
+
+      <form class="sh-panel fh-rebuild" data-panel="rebuild" hidden>
+        <div class="sh-panel-head">
+          <h3>Rebuild · <span class="sh-mono fh-lib"></span></h3>
+          <button type="button" class="sh-btn sh-outline sh-icon-btn" data-close aria-label="Close rebuild">
+            <i class="sh-i sh-i-close" aria-hidden="true"></i></button>
+        </div>
+        <p class="sh-panel-copy">Regenerates and recompiles this library's commands
+        from the store (<code>dev.dev.rebuild_lib</code>) — the old dev UI's
+        build button. Store edits (upserts, moves) can leave compiled code
+        behind the records until a rebuild or restart; this is the deliberate
+        catch-up act. Slow for big libraries; the instance keeps serving.</p>
+        <div class="sh-form-actions">
+          <button type="submit" class="sh-btn sh-primary fr-go">Rebuild now</button>
+          <span class="sh-note fr-note"></span>
+        </div>
+        <pre class="fr-out" hidden></pre>
+      </form>
+
+      <div class="sh-panel fh-archive" data-panel="archive" hidden>
+        <div class="sh-panel-head">
+          <h3>Archive · <span class="sh-mono fh-lib"></span></h3>
+          <button type="button" class="sh-btn sh-outline sh-icon-btn" data-close aria-label="Close archive">
+            <i class="sh-i sh-i-close" aria-hidden="true"></i></button>
+        </div>
+        <p class="sh-panel-copy">The library's versioned archive — <b>the peer
+        app-update path</b>: publishing an app builds a signed zip of each of
+        its libraries under <code>runtime/dev/libraries</code>, and peers in
+        the <code>update</code>/<code>admin</code> groups install updates from
+        exactly these. Git is development-only and plays no part here.</p>
+        <div class="fk-rows"></div>
+        <span class="sh-note fk-note"></span>
+      </div>
+
+      <form class="sh-create sh-newctl" data-panel="newctl" hidden>
+        <label class="sh-field">Control name
+          <input class="sh-newctl-name" placeholder="new control name — lowercase, no spaces"
+                 aria-label="New control name" autocomplete="off"></label>
+        <button type="submit" class="sh-btn sh-primary sh-newctl-go">Create control</button>
+        <button type="button" class="sh-btn" data-close>Cancel</button>
+        <span class="sh-note sh-newctl-note"></span>
+      </form>
+
+      <div class="sh-cards"></div>
+      <p class="sh-empty sh-cards-empty" hidden>This library has no controls yet.</p>
+      <div class="sh-legend" aria-label="Facet colours" hidden></div>
+    </section>
+  </div>
+</div>
 </section>
