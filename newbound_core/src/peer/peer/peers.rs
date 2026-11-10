@@ -81,15 +81,14 @@ pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
   let tcpc = get_tcp(o.clone());
   let udpc = get_udp(o.clone());
   let relayc = get_relay(o.clone());
-  let tcp = tcpc.is_some();
-  let udp = udpc.is_some();
+  let now = flowlang::flowlang::system::time::time();
+  let tcp = tcpc.as_ref().map(|c| c.alive.load(std::sync::atomic::Ordering::SeqCst) && now - c.last_contact() < 120000).unwrap_or(false);
+  let udp = udpc.as_ref().map(|c| c.alive.load(std::sync::atomic::Ordering::SeqCst) && now - c.last_contact() < 120000).unwrap_or(false);
   let relay = relayc.is_some();
   let connected = tcp || udp || relay;
 
-  // last_contact: epoch ms of the most recent traffic on whichever transport
-  // is up, 0 when nothing is connected. NOTE a P2PStream::Tcp reports time()
-  // - TCP keeps no per-read stamp - so a live TCP peer always reads "now";
-  // only UDP and relay carry a real age. Clients must treat 0 as unknown.
+  // last_contact is a real receive timestamp on every transport. A quiet or
+  // half-open TCP connection therefore ages normally and can be recovered.
   let last_contact = match (&tcpc, &udpc, &relayc) {
     (Some(c), _, _) => c.last_contact(),
     (_, Some(c), _) => c.last_contact(),
@@ -97,6 +96,8 @@ pub fn user_to_peer(o:DataObject, id:String) -> DataObject {
     _ => 0,
   };
 
+  let live_connections = o.get_array("connections").deep_copy();
+  o.put_array("connections", live_connections);
   o.put_boolean("tcp", tcp);  
   o.put_boolean("udp", udp);  
   o.put_boolean("relay", relay);  

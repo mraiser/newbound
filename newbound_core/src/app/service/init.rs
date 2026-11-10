@@ -31,6 +31,7 @@ use crate::peer::service::exec::exec;
 use crate::security::security::init::check_security;
 use ndata::Data;
 use ndata::dataarray::DataArray;
+use ndata::databytes::DataBytes;
 
 #[cfg(not(feature = "webview"))]
 use flowlang::flowlang::system::system_call::system_call;
@@ -121,6 +122,167 @@ pub struct WebsockConnection {
 static START: Once = Once::new();
 // Modified: Replaced Storage<RwLock<Heap<WebsockConnection>>> with GlobalSharedMutex
 pub static WEBSOCKHEAP: GlobalSharedMutex<Heap<WebsockConnection>> = GlobalSharedMutex::new();
+
+// Maximum aggregate decoded bytes for one Content-Length or chunked body.
+pub const MAX_RAW_BODY: usize = 64 * 1024 * 1024;
+pub const MAX_CHUNK_LINE: usize = 4096;
+pub const MAX_TRAILER_LINE: usize = 8192;
+pub const MAX_TRAILER_BYTES: usize = 64 * 1024;
+
+#[derive(Debug)]
+pub struct ChunkedBodyError {
+  pub code: i64,
+  pub message: String,
+}
+
+impl ChunkedBodyError {
+  fn bad_request(message: &str) -> Self {
+    Self { code: 400, message: message.to_string() }
+  }
+  fn too_large() -> Self {
+    Self { code: 413, message: "Request body exceeds the 64 MiB limit".to_string() }
+  }
+}
+
+// Read a CRLF-terminated protocol line without accepting a bare LF, EOF, or
+// an unbounded line. The delimiter is removed; every other byte is checked
+// by the caller. This is deliberately separate from the legacy read_line,
+// which is permissive and remains in use by existing MIME handling.
+fn read_strict_crlf_line(stream: &mut TcpStream, limit: usize) -> Result<Vec<u8>, ChunkedBodyError> {
+  let mut line = Vec::new();
+  let mut one = [0u8; 1];
+  loop {
+    if stream.read_exact(&mut one).is_err() {
+      return Err(ChunkedBodyError::bad_request("Truncated chunked request line"));
+    }
+    if one[0] == b'\n' {
+      return Err(ChunkedBodyError::bad_request("Chunked request lines must end with CRLF"));
+    }
+    if one[0] == b'\r' {
+      if stream.read_exact(&mut one).is_err() || one[0] != b'\n' {
+        return Err(ChunkedBodyError::bad_request("Chunked request lines must end with CRLF"));
+      }
+      return Ok(line);
+    }
+    if line.len() >= limit {
+      return Err(ChunkedBodyError::bad_request("Chunked request line is too long"));
+    }
+    line.push(one[0]);
+  }
+}
+
+fn valid_token(token: &[u8]) -> bool {
+  !token.is_empty() && token.iter().all(|b| matches!(b,
+    b'!' | b'#' | b'$' | b'%' | b'&' | b'\'' | b'*' | b'+' | b'-' | b'.' |
+    b'^' | b'_' | b'`' | b'|' | b'~' | b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z'))
+}
+
+fn valid_chunk_extensions(line: &[u8]) -> bool {
+  // RFC 9112 chunk-ext: *( ";" token [ "=" ( token / quoted-string ) ] ).
+  // Whitespace around the size is intentionally not accepted; a quoted
+  // extension value may contain HTAB/SP and the normal qdtext/quoted-pair
+  // range, but never controls, CRLF, or an unterminated escape.
+  let mut parts = line.splitn(2, |b| *b == b';');
+  let size = parts.next().unwrap_or(&[]);
+  if size.is_empty() || !size.iter().all(|b| b.is_ascii_hexdigit()) { return false; }
+  let extensions = match parts.next() { Some(v) => v, None => return true };
+  // splitn removed the semicolon separating size from the first extension.
+  // Enter the parser positioned immediately AFTER that delimiter; subsequent
+  // delimiters remain in `extensions` and are consumed at the loop bottom.
+  let mut i = 0usize;
+  while i < extensions.len() {
+    let start = i;
+    let start = i;
+    while i < extensions.len() && extensions[i] != b';' && extensions[i] != b'=' { i += 1; }
+    if !valid_token(&extensions[start..i]) { return false; }
+    if i < extensions.len() && extensions[i] == b'=' {
+      i += 1;
+      if i < extensions.len() && extensions[i] == b'"' {
+        i += 1;
+        let mut closed = false;
+        while i < extensions.len() {
+          match extensions[i] {
+            b'"' => { i += 1; closed = true; break; },
+            b'\\' => {
+              i += 1;
+              if i >= extensions.len() || !matches!(extensions[i], b'\t' | b' '..=b'~' | 0x80..=0xff) { return false; }
+              i += 1;
+            },
+            b'\t' | b' '..=b'!' | b'#'..=b'[' | b']'..=b'~' | 0x80..=0xff => i += 1,
+            _ => return false,
+          }
+        }
+        if !closed || (i < extensions.len() && extensions[i] != b';') { return false; }
+      }
+      else {
+        let start = i;
+        while i < extensions.len() && extensions[i] != b';' { i += 1; }
+        if !valid_token(&extensions[start..i]) { return false; }
+      }
+    }
+    if i < extensions.len() {
+      if extensions[i] != b';' { return false; }
+      i += 1;
+    }
+  }
+  true
+}
+
+fn consume_trailers(stream: &mut TcpStream) -> Result<(), ChunkedBodyError> {
+  let mut total = 0usize;
+  loop {
+    let line = read_strict_crlf_line(stream, MAX_TRAILER_LINE)?;
+    if line.is_empty() { return Ok(()); }
+    total = total.checked_add(line.len() + 2)
+      .ok_or_else(|| ChunkedBodyError::bad_request("Trailer section is too large"))?;
+    if total > MAX_TRAILER_BYTES {
+      return Err(ChunkedBodyError::bad_request("Trailer section is too large"));
+    }
+    // No obs-fold or whitespace before the colon. Trailer field values are
+    // consumed for framing only and are never exposed as request headers.
+    let colon = line.iter().position(|b| *b == b':')
+      .ok_or_else(|| ChunkedBodyError::bad_request("Malformed chunk trailer"))?;
+    if !valid_token(&line[..colon]) { return Err(ChunkedBodyError::bad_request("Malformed chunk trailer name")); }
+    if line[colon + 1..].iter().any(|b| !matches!(b, b'\t' | b' '..=b'~' | 0x80..=0xff)) {
+      return Err(ChunkedBodyError::bad_request("Malformed chunk trailer value"));
+    }
+  }
+}
+
+// Decode exactly one chunked message. A successful return means the final
+// zero-size chunk, its CRLF, and the complete trailer section were consumed;
+// the next unread byte therefore belongs to the next request, if any.
+pub fn read_chunked_body(stream: &mut TcpStream, max_body: usize) -> Result<Vec<u8>, ChunkedBodyError> {
+  let mut decoded = Vec::new();
+  loop {
+    let size_line = read_strict_crlf_line(stream, MAX_CHUNK_LINE)?;
+    if !valid_chunk_extensions(&size_line) {
+      return Err(ChunkedBodyError::bad_request("Malformed chunk size or extension"));
+    }
+    let size_text = size_line.split(|b| *b == b';').next().unwrap_or(&[]);
+    let size_text = std::str::from_utf8(size_text).unwrap_or("");
+    let chunk_size = u64::from_str_radix(size_text, 16)
+      .map_err(|_| ChunkedBodyError::bad_request("Chunk size is invalid or overflows"))?;
+    if chunk_size > max_body as u64 || decoded.len() as u64 + chunk_size > max_body as u64 {
+      return Err(ChunkedBodyError::too_large());
+    }
+    if chunk_size == 0 {
+      // The trailer section starts immediately after this size line. When
+      // empty, its first blank line supplies the final CRLF.
+      consume_trailers(stream)?;
+      return Ok(decoded);
+    }
+    let start = decoded.len();
+    decoded.resize(start + chunk_size as usize, 0);
+    if stream.read_exact(&mut decoded[start..]).is_err() {
+      return Err(ChunkedBodyError::bad_request("Truncated chunk data"));
+    }
+    let mut crlf = [0u8; 2];
+    if stream.read_exact(&mut crlf).is_err() || crlf != *b"\r\n" {
+      return Err(ChunkedBodyError::bad_request("Chunk data must be followed by CRLF"));
+    }
+  }
+}
 
 pub fn http_listen() {
   let mut system = DataStore::globals().get_object("system");
@@ -258,34 +420,85 @@ pub fn http_listen() {
 
         let mut querystring = "".to_string();
         let mut params = DataObject::new();
+        let mut raw_body = DataBytes::from_bytes(&Vec::new());
+        let mut request_error = "".to_string();
+        let mut request_error_code = 400i64;
+        let mut ka_force_close = false;
+        let mut chunked_body = false;
 
-        if method == "POST" {
-          // extractPOSTParams
-          let clstr = headers.get_string("CONTENT-LENGTH");
+        if headers.has("TRANSFER-ENCODING") {
+          // HTTP/1.1 chunk framing is decoded before the existing content-type
+          // handlers, so JSON POST, form POST, and DAV PUT all receive exactly
+          // one decoded body. A declared Content-Length is ignored for chunked
+          // messages; chunk bytes, never that stale length, delimit the request.
+          let transfer_encoding = headers.get_string("TRANSFER-ENCODING");
+          if transfer_encoding.eq_ignore_ascii_case("chunked") {
+            match read_chunked_body(&mut stream, MAX_RAW_BODY) {
+              Ok(body_buf) => {
+                raw_body = DataBytes::from_bytes(&body_buf);
+                headers.put_string("CONTENT-LENGTH", &body_buf.len().to_string());
+                headers.remove_property("TRANSFER-ENCODING");
+                chunked_body = true;
+              },
+              Err(e) => {
+                request_error_code = e.code;
+                request_error = e.message;
+                // Consume this response only. Never interpret an invalid chunk
+                // line, body suffix, or trailer as another HTTP request.
+                ka_force_close = true;
+              }
+            }
+          }
+          else if !transfer_encoding.eq_ignore_ascii_case("identity") {
+            request_error_code = 501;
+            request_error = format!("Transfer-Encoding {} is not supported", transfer_encoding);
+            // An unsupported coding has no known request boundary. Do not
+            // reuse the connection and possibly parse its payload as HTTP.
+            ka_force_close = true;
+          }
+        }
+
+        if method == "POST" && !chunked_body && request_error.is_empty() {
+          // A chunked body has already been consumed above and is passed to
+          // the command as raw_body. Never read its payload a second time.
+          // The legacy Content-Length POST parsers retain their socket path.
+          let clstr = headers.try_get_string("CONTENT-LENGTH").unwrap_or_else(|_| "0".to_string());
           let ctstr = match headers.has("CONTENT-TYPE") {
             true => headers.get_string("CONTENT-TYPE"),
             false => "text/plain".to_string()
           };
-          let max = clstr.parse::<usize>().unwrap_or(0); 
+          let max = match clstr.parse::<usize>() {
+            Ok(n) => n,
+            Err(_) => {
+              request_error = "Invalid Content-Length".to_string();
+              ka_force_close = true;
+              0
+            }
+          };
+          if max > MAX_RAW_BODY {
+            request_error_code = 413;
+            request_error = "Request body exceeds the 64 MiB limit".to_string();
+            ka_force_close = true;
+          }
 
           let s = ctstr.to_lowercase();
-          if s.contains("application/json") {
+          if request_error.is_empty() && s.contains("application/json") {
             if max > 0 {
                 let mut body_buf = vec![0; max];
                 match stream.read_exact(&mut body_buf) {
                     Ok(_) => {
                         let body_str = String::from_utf8_lossy(&body_buf).to_string();
-                        let json_params = DataObject::from_string(&body_str); 
+                        let json_params = DataObject::from_string(&body_str);
                         params = json_params;
                     },
                     Err(e) => {
-                        println!("Error reading JSON body: {}", e);
-                        // Keep params as new DataObject
+                        request_error = format!("Error reading JSON body: {}", e);
+                        ka_force_close = true;
                     }
                 }
             }
           }
-          else if s.starts_with("multipart/form-data") {
+          else if request_error.is_empty() && s.starts_with("multipart/form-data") {
             // MULTIPART
             let boundary = ctstr.split("boundary=").nth(1).map(|s| s.trim_matches('"'));
             if let Some(boundary_str) = boundary {
@@ -382,7 +595,7 @@ pub fn http_listen() {
                 println!("Multipart request without boundary!");
             }
           }
-          else {
+          else if request_error.is_empty() {
             // DEFAULT: Handle application/x-www-form-urlencoded
             let mut max_i64 = max as i64; // Use i64 for compatibility with old logic
             while max_i64 > 0 {
@@ -412,6 +625,66 @@ pub fn http_listen() {
               params.put_string(&key, &value);
 
               if b_post { break; }
+            }
+          }
+        }
+
+        else if method != "GET" && method != "HEAD" && !chunked_body {
+          // Chunked bodies of every method were already consumed above.
+          // Preserve arbitrary non-POST request bodies (WebDAV PUT/PROPFIND,
+          // JSON PATCH, etc.) without decoding or newline transformation.
+          // Consume or reject the body on every path so keep-alive stays framed.
+          let content_length = headers.try_get_string("CONTENT-LENGTH").unwrap_or_else(|_| "0".to_string());
+          let body_len = match content_length.parse::<usize>() {
+            Ok(n) => n,
+            Err(_) => {
+              request_error = "Invalid Content-Length".to_string();
+              ka_force_close = true;
+              0
+            }
+          };
+          if request_error.is_empty() && body_len > MAX_RAW_BODY {
+            request_error_code = 413;
+            request_error = "Request body exceeds the 64 MiB limit".to_string();
+            // The oversized payload is still on the socket. Do not consume
+            // part of it and mistake its remainder for another request.
+            ka_force_close = true;
+          }
+          if request_error.is_empty() && body_len > 0 {
+            let mut body_buf = vec![0; body_len];
+            match stream.read_exact(&mut body_buf) {
+              Ok(_) => raw_body = DataBytes::from_bytes(&body_buf),
+              Err(e) => {
+                request_error = format!("Error reading request body: {}", e);
+                ka_force_close = true;
+              }
+            }
+          }
+        }
+
+        // Chunked JSON POST was decoded above, before the legacy POST branch.
+        // Populate command params here, exactly as the Content-Length JSON
+        // branch does, rather than delivering only raw_body and losing fields.
+        // Invalid UTF-8/JSON becomes a framed 400, not a listener-thread panic.
+        if method == "POST" && chunked_body && request_error.is_empty() {
+          let content_type = headers.try_get_string("CONTENT-TYPE").unwrap_or_else(|_| "text/plain".to_string());
+          if content_type.to_lowercase().contains("application/json") {
+            match String::from_utf8(raw_body.get_data()) {
+              Ok(body_text) => {
+                match DataObject::try_from_string(&format!("{{\"body\":{}}}", body_text)) {
+                  Ok(wrapper) => {
+                    let body_data = wrapper.get_property("body");
+                    if body_data.is_object() { params = body_data.object(); }
+                    else { request_error = "JSON request body must be an object".to_string(); }
+                  },
+                  Err(_) => { request_error = "Invalid JSON request body".to_string(); }
+                }
+              },
+              Err(_) => { request_error = "JSON request body is not UTF-8".to_string(); }
+            }
+            if !request_error.is_empty() {
+              request_error_code = 400;
+              ka_force_close = true;
             }
           }
         }
@@ -476,30 +749,39 @@ pub fn http_listen() {
         request.put_string("querystring", &querystring);
         request.put_object("headers", headers.clone()); // Clone headers before moving to request
         request.put_object("params", params);
+        request.put_bytes("body", raw_body);
+        if !request_error.is_empty() {
+          request.put_string("request_error", &request_error);
+          request.put_int("request_error_code", request_error_code);
+        }
 
         let now = time();
         request.put_int("timestamp", now);
 
         fire_event("app", "HTTP_BEGIN", request.clone());
 
-        if headers.has("TRANSFER-ENCODING"){
-          let trenc = headers.get_string("TRANSFER-ENCODING");
-          if trenc.to_uppercase() == "CHUNKED" {
-            // CHUNKED
-          }
-        }
-
         let mut ka;
         if headers.has("CONNECTION") { ka = headers.get_string("CONNECTION"); }
         else { ka = "close".to_string(); }
+        if ka_force_close { ka = "close".to_string(); }
 
         let mut response_obj = DataObject::new(); // Renamed response to response_obj to avoid conflict
         let dataref = response_obj.data_ref;
 
         let result = panic::catch_unwind(|| {
           let mut p = DataObject::get(dataref);
-          let o = handle_request(request.clone(), stream.try_clone().unwrap());
-          p.put_object("a", o);
+          if !request_error.is_empty() {
+            let mut o = DataObject::new();
+            o.put_int("code", request_error_code);
+            o.put_string("msg", "BAD REQUEST");
+            o.put_string("mimetype", "text/plain; charset=utf-8");
+            o.put_string("body", &request_error);
+            p.put_object("a", o);
+          }
+          else {
+            let o = handle_request(request.clone(), stream.try_clone().unwrap());
+            p.put_object("a", o);
+          }
         });
 
         match result {
@@ -605,11 +887,24 @@ pub fn http_listen() {
           response_headers.put_string("Content-Type", &mimetype);
           if len == -1 { ka = "close".to_string(); }
           else { response_headers.put_string("Content-Length", &len.to_string()); }
+          // Every response advertises whether its connection can be reused.
+          // HEAD retains the equivalent GET length but suppresses every body
+          // representation below: regular files, byte streams, and strings.
+          response_headers.put_string("Connection", &ka);
 
-          let session_id_cookie = request.get_object("session").get_string("id"); // Renamed session_id to session_id_cookie
-          let later = now + 31536000000;
-          let cookie = "sessionid=".to_string() + &session_id_cookie + "; Path=/; Expires=" + &RFC2822Date::new(later).to_string();
-          response_headers.put_string("Set-Cookie", &cookie);
+          // Request-framing errors are answered before handle_request creates
+          // or refreshes a session. Do not panic trying to emit a session
+          // cookie on that early-error path: the promised 400/413 response
+          // must still reach the client and the connection must then close.
+          if request.has("session") && request.get_property("session").is_object() {
+            let session = request.get_object("session");
+            if session.has("id") && session.get_property("id").is_string() {
+              let session_id_cookie = session.get_string("id");
+              let later = now + 31536000000;
+              let cookie = "sessionid=".to_string() + &session_id_cookie + "; Path=/; Expires=" + &RFC2822Date::new(later).to_string();
+              response_headers.put_string("Set-Cookie", &cookie);
+            }
+          }
 
           let cors = "*";
           response_headers.put_string("Access-Control-Allow-Origin", cors);
@@ -620,7 +915,10 @@ pub fn http_listen() {
           }
           reshead = reshead + "\r\n";
 
-          if isfile {
+          if method == "HEAD" {
+            let _x = stream.write(reshead.as_bytes());
+          }
+          else if isfile {
             let _x = stream.write(reshead.as_bytes());
             let mut file = fs::File::open(&body_content).unwrap();
             let chunk_size = core::cmp::min(file.metadata().unwrap().len(), 65024) as usize;
@@ -740,8 +1038,14 @@ pub fn prep_request(mut request: DataObject) -> String {
 }
 
 pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_id:String) -> bool {
+  // An ordinary HTTP request must retain the session prepared above for its
+  // response cookie. Do not move a headers handle out of the request record.
+  let is_websocket = {
+    let headers = request.get_object("headers");
+    headers.has("SEC-WEBSOCKET-KEY")
+  };
+  if !is_websocket { return false; }
   let headers = request.get_object("headers");
-  if ! headers.has("SEC-WEBSOCKET-KEY") { return false; }
 
   stream.set_read_timeout(None).expect("set_read_timeout call failed");
 
@@ -1015,14 +1319,30 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
               d_cmd.put_object("params", params_clone.clone());
 
               for (k,v) in request.objects() {
-                params_clone.set_property(&("nn_".to_string()+&k), v);
+                // set_property stores the Data value. Clone it so the
+                // temporary iterator value cannot make a later GC collect
+                // the request's session/headers while this same connection
+                // is still serializing its response.
+                params_clone.set_property(&("nn_".to_string()+&k), v.clone());
               }
 
               let d_result = handle_command(d_cmd, session_id.to_owned()); // Renamed d to d_result
               let r_type = d_result.get_string("nn_return_type"); // Renamed r to r_type
               if r_type != "404" {
                 b_found = true;
-                if r_type == "File" {
+                // Explicit opt-in for protocol adapters (WebDAV, webhooks,
+                // etc.). Ordinary command responses retain their JSON shape.
+                if r_type == "FLAT" && d_result.has("nn_http") && d_result.get_boolean("nn_http") {
+                  res = d_result;
+                }
+                else if cmd == "dav" && d_result.has("status") && d_result.get_string("status") == "err" && d_result.has("msg") && d_result.get_string("msg").starts_with("UNAUTHORIZED:") {
+                  // Protocol clients need an HTTP denial, not a JSON error in a 200.
+                  res.put_int("code", 403);
+                  res.put_string("msg", "FORBIDDEN");
+                  res.put_string("mimetype", "text/plain; charset=utf-8");
+                  res.put_string("body", "Forbidden");
+                }
+                else if r_type == "File" {
                   res.put_string("file", &d_result.get_string("data"));
                   res.put_string("mimetype", &mime_type(p_app_src.clone())); // Or appropriate path
                 }
