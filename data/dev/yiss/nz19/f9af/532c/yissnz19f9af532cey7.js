@@ -199,6 +199,8 @@ async function init(host) {
       if (lib) {
         setCrumb(lib, null);
         await shelfApi.showFan?.(lib);
+      } else {
+        shelfApi.showAll?.();
       }
     }
   }
