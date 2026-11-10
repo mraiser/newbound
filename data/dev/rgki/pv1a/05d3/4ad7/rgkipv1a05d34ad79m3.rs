@@ -119,6 +119,22 @@ if gensrc.exists() {
     relargs.push(r.clone());
     staged.push_string(&r);
 }
+// ...and whatever git itself reports under this unit (store_status): above
+// all DELETIONS - a removed facet, attachment or legacy _patches journal is a
+// file the closure walk above can no longer see - and the unit's generated
+// sources in a library repo's own crate
+let ss = crate::dev::git::store_status::store_status(repo.clone());
+if ss.get_string("status") == "ok" {
+    if let Ok(arr) = ss.get_object("groups").try_get_array(&format!("{}.{}", lib, ctlname)) {
+        for it in arr.objects() {
+            let p = it.object().get_string("path");
+            if !relargs.iter().any(|r| r == &p || p.starts_with(&format!("{}/", r))) {
+                relargs.push(p.clone());
+                staged.push_string(&p);
+            }
+        }
+    }
+}
 if relargs.is_empty() {
     return fail("no closure files resolve inside this repo - wrong repo for this unit?");
 }
