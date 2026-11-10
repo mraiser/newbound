@@ -133,6 +133,9 @@ fn build_map(lib: &str, labels: &mut DataObject, units: &mut DataObject) {
 let mut args = DataArray::new();
 args.push_string("--porcelain");
 args.push_string("-uall");
+// a rename reads as its delete + its add: each path is reported (and can be
+// committed) on its own, so no half of a rename is ever left behind
+args.push_string("--no-renames");
 let st = crate::dev::git::read::read(repo.clone(), "status".to_string(), args);
 if st.get_string("status") != "ok" { return st; }
 let out = st.get_string("out");
@@ -144,6 +147,7 @@ let mut groups = DataObject::new();
 let mut order: Vec<String> = Vec::new();
 let mut ocounts = DataObject::new();
 let mut oorder: Vec<String> = Vec::new();
+let mut other_paths = DataArray::new();
 
 for line in out.lines() {
     if line.len() < 4 { continue; }
@@ -163,6 +167,7 @@ for line in out.lines() {
             if !built.contains(&lib) { build_map(&lib, &mut labels, &mut units); built.push(lib.clone()); }
             if comps[2] == "meta.json" { (lib.clone(), "library metadata (meta.json)".to_string()) }
             else if comps[2] == "_ASSETS" { (lib.clone(), format!("asset {}", comps[3..].join("/"))) }
+            else if comps[2] == "_APPS" { (lib.clone(), format!("publish metadata {}", comps[3..].join("/"))) }
             else {
                 let fname = comps.last().unwrap().clone();
                 let (base, suffix) = if let Some(p) = fname.find("_patches") { (fname[..p].to_string(), "patches".to_string()) }
@@ -190,7 +195,12 @@ for line in out.lines() {
                 (unit, what)
             }
         }
-    } else if path.starts_with("newbound_core/src/") {
+    } else if {
+        // generated sources: <crate>/src/<lib>/[<ctl>/]file - newbound_core for
+        // the core libraries, the library's own crate in a repositories/* clone
+        let c: Vec<&str> = path.split('/').collect();
+        c.len() >= 4 && c[1] == "src" && (c[0] == "newbound_core" || DataStore::new().root.join(c[2]).is_dir())
+    } {
         let comps: Vec<&str> = path.split('/').collect();
         if comps.len() >= 5 { (format!("{}.{}", comps[2], comps[3]), format!("generated source {}", comps[4..].join("/"))) }
         else if comps.len() == 4 { (comps[2].to_string(), format!("generated source {}", comps[3])) }
@@ -204,6 +214,11 @@ for line in out.lines() {
         let n = if ocounts.has(&okey) { ocounts.get_int(&okey) } else { 0 };
         if n == 0 { oorder.push(okey.clone()); }
         ocounts.put_int(&okey, n + 1);
+        // ...but every path is still named, so a committer can commit it
+        let mut item = DataObject::new();
+        item.put_string("state", state);
+        item.put_string("path", &path);
+        other_paths.push_object(item);
         continue;
     }
     if !groups.has(&unit) { groups.put_array(&unit, DataArray::new()); order.push(unit.clone()); }
@@ -237,6 +252,7 @@ let mut res = DataObject::new();
 res.put_string("status", "ok");
 res.put_object("groups", groups);
 res.put_object("other", ocounts);
+res.put_array("other_paths", other_paths);
 res.put_string("text", &text);
 res
 }
