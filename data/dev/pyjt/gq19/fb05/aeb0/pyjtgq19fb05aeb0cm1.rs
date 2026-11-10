@@ -187,18 +187,6 @@ if data.has("event") {
     }
 }
 
-// The journal moves with the control (the point of this command existing),
-// then records the move as its own entry.
-let mut entry = DataObject::new();
-entry.put_string("author", &author);
-entry.put_string("facet", "move");
-entry.put_string("old", &lib);
-entry.put_string("new", &to_lib);
-entry.put_int("time", time());
-entry.put_string("label", &format!("moved from {} to {}", lib, to_lib));
-let jr = crate::dev::code::patch_journal::patch_journal("move".to_string(), lib.clone(), ctlid.clone(), to_lib.clone(), entry, 0, false, nn_sessionid);
-if jr.get_string("status") != "ok" { return jr; }
-
 // The control record itself - facet attachments ride the same get->set.
 let _x = move_rec(&store, &lib, &to_lib, &ctlid);
 
@@ -239,5 +227,18 @@ o.put_string("status", "ok");
 o.put_string("msg", &format!("Control '{}' moved from '{}' to '{}'", ctl, lib, to_lib));
 o.put_int("moved_commands", n_cmds);
 o.put_int("moved_components", n_comps);
-o.put_string("patch_id", &jr.get_string("patch_id"));
+
+// The journal follows the control (the point of this command existing) and
+// records the move as its own entry. It runs LAST: the control now lives in
+// to_lib, so a journal problem is reported, never a half-moved control.
+let mut entry = DataObject::new();
+entry.put_string("author", &author);
+entry.put_string("facet", "move");
+entry.put_string("old", &lib);
+entry.put_string("new", &to_lib);
+entry.put_int("time", time());
+entry.put_string("label", &format!("moved from {} to {}", lib, to_lib));
+let jr = crate::dev::code::patch_journal::patch_journal("move".to_string(), lib.clone(), ctlid.clone(), to_lib.clone(), entry, 0, false, nn_sessionid);
+if jr.get_string("status") == "ok" { o.put_string("patch_id", &jr.get_string("patch_id")); }
+else { o.put_string("journal_warning", &jr.try_get_string("msg").unwrap_or_default()); }
 o
