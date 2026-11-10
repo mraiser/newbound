@@ -109,8 +109,10 @@ if data.has("cmd") {
 }
 
 // the journal dies with the control (terminal - stated in the contract)
-let jid = format!("{}_patches", ctlid);
-zap(&store, &lib, &jid);
+let jr = crate::dev::code::patch_journal::patch_journal("delete".to_string(), lib.clone(), ctlid.clone(), String::new(), DataObject::new(), 0, false, nn_sessionid);
+// The control's commands and components are already gone: a journal that
+// cannot be removed is reported, never a reason to leave half a control.
+let journal_warning = if jr.get_string("status") != "ok" { jr.try_get_string("msg").unwrap_or_default() } else { String::new() };
 
 // unlink from the library's controls index
 if store.exists(&lib, "controls") {
@@ -135,4 +137,5 @@ o.put_string("status", "ok");
 o.put_string("msg", &format!("Control '{}' deleted from library '{}'", ctl, lib));
 o.put_int("deleted_commands", n_cmds);
 o.put_int("deleted_components", n_comps);
+if !journal_warning.is_empty() { o.put_string("journal_warning", &journal_warning); }
 o
