@@ -75,7 +75,7 @@ else if x.has("file") {
 
     thread::spawn(move || {
       let mut file = fs::File::open(&path).unwrap();
-      let chunk_size = 16000;
+      let chunk_size = crate::peer::service::listen::MAX_STREAM_PAYLOAD;
       loop {
         let mut chunk = Vec::with_capacity(chunk_size);
         let n = std::io::Read::by_ref(&mut file).take(chunk_size as u64).read_to_end(&mut chunk).unwrap();
@@ -114,7 +114,7 @@ else if x.has("body") && x.get_property("body").is_bytes() {
     let mut starved = 0;
     loop {
       if !bytes.is_read_open() { break; }
-      let chunk = bytes.read(16000);
+      let chunk = bytes.read(crate::peer::service::listen::MAX_STREAM_PAYLOAD);
       if chunk.len() == 0 {
         // no data yet - the source (e.g. a live remux) may just be
         // between frames; give up only after ~30s of starvation
