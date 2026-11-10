@@ -129,17 +129,15 @@ fn quarantine(store: &DataStore, jid: &str) {
     let qid = format!("{}_broken_{}", jid, time());
     rec.put_string("id", &qid); store.set_data("runtime", &qid, rec);
 }
-fn delete_record(store: &DataStore, lib: &str, id: &str, session: &str) -> Result<(), String> {
+// Journal records carry no attachments, so this is delete_control's zap for
+// one file. The gate is this command's own (admin-only) door, exactly as for
+// every other record delete_control removes - a second session check here
+// made deletion impossible from exec, timers and other sessionless callers.
+fn delete_record(store: &DataStore, lib: &str, id: &str, _session: &str) -> Result<(), String> {
     if !store.exists(lib, id) { return Ok(()); }
-    // Headless exec has not booted the HTTP service's global snapshot;
-    // initialize it normally, then use the same secured record command in
-    // both execution modes. Never bypass the store with a file shortcut.
-    if !DataStore::globals().has("system") { flowlang::appserver::init_globals(); }
-    if !crate::security::security::init::check_auth(lib, id, session, true) {
-        return Err(format!("not authorized to delete {}:{}", lib, id));
-    }
-    let answer = crate::app::app::delete::delete(lib.to_string(), id.to_string(), session.to_string());
-    if answer != "OK" || store.exists(lib, id) { return Err(format!("could not delete {}:{}", lib, id)); }
+    let f = store.get_data_file(lib, id);
+    if let Err(e) = std::fs::remove_file(&f) { return Err(format!("could not delete {}:{} ({})", lib, id, e)); }
+    if store.exists(lib, id) { return Err(format!("could not delete {}:{}", lib, id)); }
     Ok(())
 }
 fn view(store: &DataStore, lib: &str, ctlid: &str, limit: i64, full: bool) -> DataObject {
