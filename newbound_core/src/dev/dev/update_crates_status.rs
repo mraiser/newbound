@@ -38,6 +38,18 @@ pub fn execute(_: DataObject) -> DataObject {
 }
 
 pub fn update_crates_status() -> DataObject {
+// Is the runner still alive? /proc answers on Linux; elsewhere (macOS, the
+// BSDs) `kill -0` does - signal 0 only checks that the pid exists.
+fn pid_alive(pid: i64) -> bool {
+  use std::process::{Command, Stdio};
+  if std::path::Path::new("/proc/self").exists() {
+    return std::path::Path::new(&format!("/proc/{}", pid)).exists();
+  }
+  Command::new("kill").arg("-0").arg(pid.to_string())
+    .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null())
+    .status().map(|s| s.success()).unwrap_or(false)
+}
+
 let store = DataStore::new();
 let base = store.root.canonicalize().unwrap();
 let base = base.parent().unwrap().to_path_buf();
@@ -64,7 +76,7 @@ match fs::read_to_string(&status_path) {
         let pid = if o.has("pid") { o.get_int("pid") } else { 0 };
         // A runner that died without writing a failure (OOM, kill -9) must not
         // report "running" forever: the pid is the truth.
-        if state == "running" && pid > 0 && !std::path::Path::new(&format!("/proc/{}", pid)).exists() {
+        if state == "running" && pid > 0 && !pid_alive(pid) {
           state = "stalled".to_string();
         }
         out.put_int("step", if o.has("step") { o.get_int("step") } else { 0 });
