@@ -174,13 +174,15 @@ echo "== STEP 2: $BIN rebuild" >> "$LOG"
 "$BIN" rebuild >> "$LOG" 2>&1 || {{ st failed 2 'rebuild failed' ''; exit 1; }}
 st running 3 'newbound recompile' ''
 echo "== STEP 3: $BIN recompile" >> "$LOG"
-"$BIN" recompile >> "$LOG" 2>&1 || {{ st failed 3 'recompile failed' ''; exit 1; }}
+"$BIN" recompile >> "$LOG" 2>&1 || echo "== STEP 3: some libraries failed to compile (continuing; they keep their old build)" >> "$LOG"
+RC=$(grep -E '^[0-9]+ compiled, [0-9]+ failed' "$LOG" | tail -1 | tr -d '"\\')
 st running 4 'final host build' ''
 echo "== STEP 4: {cargo}" >> "$LOG"
 {cargo} >> "$LOG" 2>&1 || {{ st failed 4 'final host build failed' ''; exit 1; }}
 H1=$(h)
 if [ "$H0" = "$H1" ]; then V=no-restart; else V=restart; fi
-st done 4 'complete' "$V"
+L=complete; [ -n "$RC" ] && L="complete; recompile: $RC"
+st done 4 "$L" "$V"
 echo "== DONE: verdict=$V" >> "$LOG"
 "#, base = base.display(), bin = binpath, cargo = cargo_cmd);
 

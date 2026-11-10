@@ -145,14 +145,16 @@ echo "== STEP 4: $CB rebuild" >> "$LOG"
 "$CB" rebuild >> "$LOG" 2>&1 || {{ st failed 4 'rebuild failed' ''; exit 1; }}
 st running 5 'newbound recompile via canon binary' ''
 echo "== STEP 5: $CB recompile" >> "$LOG"
-"$CB" recompile >> "$LOG" 2>&1 || {{ st failed 5 'recompile failed' ''; exit 1; }}
+"$CB" recompile >> "$LOG" 2>&1 || echo "== STEP 5: some libraries failed to compile (continuing; they keep their old build)" >> "$LOG"
+RC=$(grep -E '^[0-9]+ compiled, [0-9]+ failed' "$LOG" | tail -1 | tr -d '"\\')
 rm -rf CHUCKTHIS
 st running 6 'final host build' ''
 echo "== STEP 6: {cargo}" >> "$LOG"
 {cargo} >> "$LOG" 2>&1 || {{ st failed 6 'final host build failed' ''; exit 1; }}
 H1=$(h)
 if [ "$H0" = "$H1" ]; then V=no-restart; else V=restart; fi
-st done 6 'complete' "$V"
+L=complete; [ -n "$RC" ] && L="complete; recompile: $RC"
+st done 6 "$L" "$V"
 echo "== DONE: verdict=$V" >> "$LOG"
 "#, base = base.display(), profile = profile, url = url, cargo = cargo_cmd);
 
