@@ -44,10 +44,8 @@ pub fn restart_instance() -> String {
 //   system systemd unit:  .../system.slice/<unit>.service
 //   user systemd unit:    .../user@<uid>.service/.../<unit>.service
 //   plain process:        a session/user scope with no non-manager .service
-let cg = match fs::read_to_string("/proc/self/cgroup") {
-  Ok(s) => s,
-  Err(e) => { return format!("ERROR: cannot read /proc/self/cgroup ({}); restart_instance is Linux-only", e); }
-};
+// No /proc (macOS, the BSDs) means no systemd either: a plain process.
+let cg = fs::read_to_string("/proc/self/cgroup").unwrap_or_default();
 let mut unit = String::new();
 let mut under_user_mgr = false;
 for line in cg.lines() {
@@ -89,17 +87,20 @@ if !unit.is_empty() {
 // watcher waits for our pid to vanish, then execs our exact cmdline in our cwd.
 fn q(s: &str) -> String { format!("'{}'", s.replace('\'', "'\\''")) }
 
-let exe = match fs::read_link("/proc/self/exe") {
-  Ok(p) => p, Err(e) => { return format!("ERROR: cannot resolve /proc/self/exe: {}", e); }
+// /proc/self answers on Linux; the std calls answer the same on macOS
+let exe = match fs::read_link("/proc/self/exe").or_else(|_| std::env::current_exe()) {
+  Ok(p) => p, Err(e) => { return format!("ERROR: cannot resolve this program's path: {}", e); }
 };
-let cwd = match fs::read_link("/proc/self/cwd") {
-  Ok(p) => p, Err(e) => { return format!("ERROR: cannot resolve /proc/self/cwd: {}", e); }
+let cwd = match fs::read_link("/proc/self/cwd").or_else(|_| std::env::current_dir()) {
+  Ok(p) => p, Err(e) => { return format!("ERROR: cannot resolve the working directory: {}", e); }
 };
-let cmdline = fs::read("/proc/self/cmdline").unwrap_or_default();
-let mut args: Vec<String> = cmdline.split(|b| *b == 0)
-  .filter(|s| !s.is_empty())
-  .map(|s| String::from_utf8_lossy(s).to_string())
-  .collect();
+let mut args: Vec<String> = match fs::read("/proc/self/cmdline") {
+  Ok(cmdline) => cmdline.split(|b| *b == 0)
+    .filter(|s| !s.is_empty())
+    .map(|s| String::from_utf8_lossy(s).to_string())
+    .collect(),
+  Err(_) => std::env::args().collect(),
+};
 if !args.is_empty() { args.remove(0); }
 let pid = std::process::id();
 let mut argstr = String::new();
@@ -113,14 +114,20 @@ let sp = dir.join("restart_respawn.sh");
 if let Err(e) = fs::write(&sp, &script) {
   return format!("ERROR: cannot write respawn script: {}", e);
 }
-let spawned = Command::new("setsid")
-  .arg("/bin/sh")
-  .arg(&sp)
+let mut watcher = Command::new("/bin/sh");
+watcher.arg(&sp)
   .current_dir(&cwd)
   .stdin(Stdio::null())
   .stdout(Stdio::null())
-  .stderr(Stdio::null())
-  .spawn();
+  .stderr(Stdio::null());
+// its own process group (was the Linux-only `setsid` binary): our exit
+// must not take the watcher down with us
+#[cfg(unix)]
+{
+  use std::os::unix::process::CommandExt;
+  watcher.process_group(0);
+}
+let spawned = watcher.spawn();
 if let Err(e) = spawned {
   return format!("ERROR: could not launch respawn watcher: {}", e);
 }
