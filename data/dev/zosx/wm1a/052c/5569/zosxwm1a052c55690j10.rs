@@ -41,9 +41,51 @@ if !unit.is_empty() {
   };
 }
 
-// Plain process (command line, nohup, session scope): self-respawn. A detached
-// watcher waits for our pid to vanish, then execs our exact cmdline in our cwd.
+// Plain process (command line, nohup, session scope): restart IN PLACE.
+// exec() swaps this process for a fresh copy of the same program with the
+// same arguments: same pid, same terminal, so an instance started in a
+// terminal tab stays in that tab (output keeps scrolling there, Ctrl-C still
+// stops it). Rust opens sockets close-on-exec, so the ports are free again
+// for the fresh copy. exec() returns only when it fails; then a detached
+// watcher waits for our pid to vanish and relaunches us in the background.
 fn q(s: &str) -> String { format!("'{}'", s.replace('\'', "'\\''")) }
+
+#[cfg(unix)]
+fn exec_self(exe: &std::path::Path, args: &[String], cwd: &std::path::Path) -> std::io::Error {
+  use std::os::unix::process::CommandExt;
+  Command::new(exe).args(args).current_dir(cwd).exec()
+}
+#[cfg(not(unix))]
+fn exec_self(_: &std::path::Path, _: &[String], _: &std::path::Path) -> std::io::Error {
+  std::io::Error::new(std::io::ErrorKind::Unsupported, "exec is unix-only")
+}
+
+// the fallback: a detached watcher that relaunches us once our pid is gone
+// (output then goes to runtime/restart.log, since no terminal owns it)
+fn respawn_watcher(pid: u32, exe: &std::path::Path, args: &[String], cwd: &std::path::Path) -> Result<(), String> {
+  let mut argstr = String::new();
+  for a in args { argstr.push(' '); argstr.push_str(&q(a)); }
+  let script = format!("#!/bin/sh\nwhile kill -0 {} 2>/dev/null; do sleep 0.2; done\ncd {}\nexec {}{} >> runtime/restart.log 2>&1\n",
+    pid, q(&cwd.display().to_string()), q(&exe.display().to_string()), argstr);
+  let dir = cwd.join("runtime");
+  let _ = fs::create_dir_all(&dir);
+  let sp = dir.join("restart_respawn.sh");
+  fs::write(&sp, &script).map_err(|e| format!("cannot write respawn script: {}", e))?;
+  let mut watcher = Command::new("/bin/sh");
+  watcher.arg(&sp)
+    .current_dir(cwd)
+    .stdin(Stdio::null())
+    .stdout(Stdio::null())
+    .stderr(Stdio::null());
+  // its own process group (was the Linux-only `setsid` binary): our exit
+  // must not take the watcher down with us
+  #[cfg(unix)]
+  {
+    use std::os::unix::process::CommandExt;
+    watcher.process_group(0);
+  }
+  watcher.spawn().map(|_| ()).map_err(|e| format!("could not launch respawn watcher: {}", e))
+}
 
 // /proc/self answers on Linux; the std calls answer the same on macOS
 let exe = match fs::read_link("/proc/self/exe").or_else(|_| std::env::current_exe()) {
@@ -61,37 +103,15 @@ let mut args: Vec<String> = match fs::read("/proc/self/cmdline") {
 };
 if !args.is_empty() { args.remove(0); }
 let pid = std::process::id();
-let mut argstr = String::new();
-for a in &args { argstr.push(' '); argstr.push_str(&q(a)); }
-let script = format!("#!/bin/sh\nwhile kill -0 {} 2>/dev/null; do sleep 0.2; done\ncd {}\nexec {}{} >> runtime/restart.log 2>&1\n",
-  pid, q(&cwd.display().to_string()), q(&exe.display().to_string()), argstr);
-
-let dir = cwd.join("runtime");
-let _ = fs::create_dir_all(&dir);
-let sp = dir.join("restart_respawn.sh");
-if let Err(e) = fs::write(&sp, &script) {
-  return format!("ERROR: cannot write respawn script: {}", e);
-}
-let mut watcher = Command::new("/bin/sh");
-watcher.arg(&sp)
-  .current_dir(&cwd)
-  .stdin(Stdio::null())
-  .stdout(Stdio::null())
-  .stderr(Stdio::null());
-// its own process group (was the Linux-only `setsid` binary): our exit
-// must not take the watcher down with us
-#[cfg(unix)]
-{
-  use std::os::unix::process::CommandExt;
-  watcher.process_group(0);
-}
-let spawned = watcher.spawn();
-if let Err(e) = spawned {
-  return format!("ERROR: could not launch respawn watcher: {}", e);
-}
-// answer first, then die: the watcher relaunches us the moment the pid clears
-std::thread::spawn(|| {
+// answer first (the reply must leave before the program is replaced), then
+// restart in place; if exec fails, fall back to the background watcher
+std::thread::spawn(move || {
   std::thread::sleep(std::time::Duration::from_millis(750));
-  std::process::exit(0);
+  let e = exec_self(&exe, &args, &cwd);
+  eprintln!("restart in place failed ({}); relaunching in the background (output: runtime/restart.log)", e);
+  match respawn_watcher(pid, &exe, &args, &cwd) {
+    Ok(_) => std::process::exit(0),
+    Err(m) => eprintln!("restart failed: {}; this instance keeps running", m),
+  }
 });
-format!("OK: restarting (self-respawn of pid {}); the instance will be back on the same port shortly", pid)
+format!("OK: restarting in place (pid {}); the instance will be back on the same port shortly", pid)
