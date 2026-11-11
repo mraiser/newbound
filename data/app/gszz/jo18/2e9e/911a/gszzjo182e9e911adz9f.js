@@ -53,7 +53,8 @@ function addRemoteApps(p) {
         me.list.sort((a, b) => (a.name > b.name) ? 1 : -1);
         var n = me.list.indexOf(papp);
         el = document.createElement('div');
-        el.className = 'appcard-wrap appcard_' + papp.id;
+        // appcard-wrap-remote lets the css swap the amber hover ring for the Available one
+        el.className = 'appcard-wrap appcard-wrap-remote appcard_' + papp.id;
         var div = ME.querySelector(".applist>div:nth-child(" + n + ")");
         if (div) div.after(el);
         else ME.querySelector(".applist").prepend(el);
