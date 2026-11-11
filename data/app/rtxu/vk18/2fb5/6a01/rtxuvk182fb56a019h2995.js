@@ -37,7 +37,8 @@ ME.querySelector('.app-run-button').addEventListener('click', function() {
 });
 
 ME.querySelector('.app-edit-button').addEventListener('click', function() {
-  window.location.href = "../dev/editcontrol.html?lib=" + ME.DATA.ctldb + "&id=" + ME.DATA.ctlid;
+  // The app's control in the Development workbench (editcontrol.html is gone).
+  window.location.href = "../dev/index.html#/bench/" + encodeURIComponent(ME.DATA.ctldb) + "/" + encodeURIComponent(ME.DATA.ctlid);
 });
 
 ME.querySelector('.app-install-button').addEventListener('click', function() {
