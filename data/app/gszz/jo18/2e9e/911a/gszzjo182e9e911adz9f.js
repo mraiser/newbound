@@ -89,6 +89,28 @@ ME.querySelectorAll('.close-app-settings').forEach(function(el) {
   });
 });
 
+// The gear toggles Settings. app.ui's popup() builds a new backdrop on every
+// call and the gear stays clickable above it, so repeated clicks stacked
+// backdrops that ✕ could no longer clear. One popup record lives here: a click
+// while it is open closes it, a click while it is closing does nothing, and
+// either way the open-time loaders below (registered after this) don't run.
+me.settingsPopup = null;
+ME.querySelector('.open-system-settings').addEventListener('click', function(e) {
+  var open = me.settingsPopup;
+  if (open) {
+    e.stopImmediatePropagation();
+    if (!open.closed) me.ui.closePopup(open);
+    return;
+  }
+  var d = me.settingsPopup = {
+    selector: '.system-settings', closeselector: '.close-system-settings', modal: true,
+    clientX: e.clientX, clientY: e.clientY
+  };
+  // app.ui calls close() once the close animation ends, whichever control closed it
+  d.close = function() { if (me.settingsPopup === d) me.settingsPopup = null; };
+  me.ui.popup(d);
+});
+
 // --- Settings dialog: read side ---
 var SS = ME.querySelector('.system-settings');
 
