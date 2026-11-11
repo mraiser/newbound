@@ -895,6 +895,84 @@ pub fn handle_request(request: DataObject, stream: TcpStream) -> DataObject {
   do_get(request, session_id)
 }
 
+pub fn basic_auth_enabled() -> bool {
+  let config = DataStore::globals().get_object("system").get_object("config");
+  config.has("basicauth") && Data::as_string(config.get_property("basicauth")) == "true"
+}
+
+// Parses "Basic <base64(user:pass)>" into (user, pass). None for any other
+// scheme or a malformed value; never panics on client input.
+pub fn basic_credentials(header: &str) -> Option<(String, String)> {
+  let b = header.trim().as_bytes();
+  if b.len() < 7 || !b[..6].eq_ignore_ascii_case(b"basic ") { return None; }
+  let mut out: Vec<u8> = Vec::new();
+  let mut acc: u32 = 0;
+  let mut bits = 0;
+  for &c in &b[6..] {
+    let v = match c {
+      b'A'..=b'Z' => c - b'A',
+      b'a'..=b'z' => c - b'a' + 26,
+      b'0'..=b'9' => c - b'0' + 52,
+      b'+' => 62,
+      b'/' => 63,
+      b'=' | b' ' => continue,
+      _ => return None,
+    };
+    acc = (acc << 6) | v as u32;
+    bits += 6;
+    if bits >= 8 {
+      bits -= 8;
+      out.push((acc >> bits) as u8);
+      acc &= (1u32 << bits) - 1;
+    }
+  }
+  let s = String::from_utf8(out).ok()?;
+  let i = s.find(':')?;
+  Some((s[..i].to_string(), s[i + 1..].to_string()))
+}
+
+// The session id valid Basic credentials stand for, or "" when they are wrong.
+// Keeps the current session when it already belongs to that user; otherwise
+// reuses the user's entry in system.basic_sessions, minting and logging in a
+// session only when that one has expired.
+fn basic_session(username: &str, password: &str, current: &str) -> String {
+  if username == "" || password == "" { return "".to_string(); }
+  let user = match get_user(username) { Some(u) => u, None => return "".to_string() };
+  if !user.has("password") || Data::as_string(user.get_property("password")) != password { return "".to_string(); }
+
+  let mut system = DataStore::globals().get_object("system");
+  let mut sessions = system.get_object("sessions");
+  let owned = |sid: &str| -> bool {
+    if sid == "" || !sessions.has(sid) { return false; }
+    let s = sessions.get_object(sid);
+    s.has("username") && Data::as_string(s.get_property("username")) == username
+  };
+  if owned(current) { return current.to_string(); }
+
+  if !system.has("basic_sessions") { system.put_object("basic_sessions", DataObject::new()); }
+  let mut map = system.get_object("basic_sessions");
+  if map.has(username) {
+    let sid = Data::as_string(map.get_property(username));
+    if owned(&sid) { return sid; }
+  }
+
+  let sid = unique_session_id();
+  let mut session = DataObject::new();
+  session.put_int("count", 0);
+  session.put_string("id", &sid);
+  let mut anon = DataObject::new();
+  anon.put_string("displayname", "Anonymous");
+  anon.put_array("groups", DataArray::new());
+  anon.put_string("username", "anonymous");
+  session.put_string("username", "anonymous");
+  session.put_object("user", anon);
+  session.put_int("expire", time() + system.get_object("config").get_int("sessiontimeoutmillis"));
+  sessions.put_object(&sid, session);
+  if !log_in(&sid, username, password) { return "".to_string(); }
+  map.put_string(username, &sid);
+  sid
+}
+
 pub fn prep_request(mut request: DataObject) -> String {
   let system = DataStore::globals().get_object("system");
 
@@ -914,6 +992,16 @@ pub fn prep_request(mut request: DataObject) -> String {
           break;
         }
       }
+    }
+  }
+  // HTTP Basic, opt-in (basicauth=true in config.properties). Mount clients
+  // (rclone, davfs2) keep no cookies, so valid credentials select one reused
+  // session per user. The password is checked on every request.
+  if basic_auth_enabled() && headers.has("AUTHORIZATION") {
+    if let Some((buser, bpass)) = basic_credentials(&Data::as_string(headers.get_property("AUTHORIZATION"))) {
+      let sid = basic_session(&buser, &bpass, &session_id);
+      if sid != "" { session_id = sid; }
+      else { request.put_boolean("basic_failed", true); }
     }
   }
   if session_id == "" { session_id = unique_session_id(); }
@@ -1257,12 +1345,27 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
                 if r_type == "FLAT" && d_result.has("nn_http") && d_result.get_boolean("nn_http") {
                   res = d_result;
                 }
-                else if cmd == "dav" && d_result.has("status") && d_result.get_string("status") == "err" && d_result.has("msg") && d_result.get_string("msg").starts_with("UNAUTHORIZED:") {
+                else if d_result.has("nn_http_denial") && d_result.has("status") && d_result.get_string("status") == "err" && d_result.has("msg") && d_result.get_string("msg").starts_with("UNAUTHORIZED:") {
                   // Protocol clients need an HTTP denial, not a JSON error in a 200.
-                  res.put_int("code", 403);
-                  res.put_string("msg", "FORBIDDEN");
-                  res.put_string("mimetype", "text/plain; charset=utf-8");
-                  res.put_string("body", "Forbidden");
+                  // Nobody logged in (or wrong Basic credentials) and Basic is
+                  // enabled: challenge, so mount clients send credentials.
+                  // Logged in but not in the command's groups: 403.
+                  let anon = !request.has("session") || Data::as_string(request.get_object("session").get_property("username")) == "anonymous";
+                  if basic_auth_enabled() && (anon || request.has("basic_failed")) {
+                    res.put_int("code", 401);
+                    res.put_string("msg", "UNAUTHORIZED");
+                    let mut h = DataObject::new();
+                    h.put_string("WWW-Authenticate", "Basic realm=\"Newbound\", charset=\"UTF-8\"");
+                    res.put_object("headers", h);
+                    res.put_string("mimetype", "text/plain; charset=utf-8");
+                    res.put_string("body", "Unauthorized");
+                  }
+                  else {
+                    res.put_int("code", 403);
+                    res.put_string("msg", "FORBIDDEN");
+                    res.put_string("mimetype", "text/plain; charset=utf-8");
+                    res.put_string("body", "Forbidden");
+                  }
                 }
                 else if r_type == "File" {
                   res.put_string("file", &d_result.get_string("data"));
@@ -1412,6 +1515,9 @@ pub fn handle_command(d: DataObject, sid: String) -> DataObject {
       else {
         o_result = DataObject::new();
         o_result.put_string("status", "err");
+        // A command that declares nn_method speaks HTTP itself (a protocol
+        // adapter): do_get answers its denial as 401/403, not JSON in a 200.
+        if command.params.iter().any(|p| p.0 == "nn_method") { o_result.put_boolean("nn_http_denial", true); }
         let err = format!("UNAUTHORIZED: {}", &cmd);
         o_result.put_string("msg", &err);
         o_result.put_string("nn_return_type", "String");

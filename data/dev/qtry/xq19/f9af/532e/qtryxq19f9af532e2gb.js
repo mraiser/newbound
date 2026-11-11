@@ -1,7 +1,11 @@
-// shelf — libraries as stacks of cards, grouped by their `root` value
-// verbatim (pure metadata — the platform has no category concept, so the
-// shelf invents none; G-2). The fan carries the library's desc/groups meta
-// (set_library_meta) and the "Rust settings" panel (dev.libsettings).
+// shelf — the IDE's home: a gallery of library cards. Each card shows its
+// `root` verbatim, and the root filter offers the distinct values (pure
+// metadata — the platform has no category concept, so the shelf invents
+// none; G-2). Opening a library (#/shelf/<lib>, via the frame) swaps the
+// gallery for that library: its control cards, its desc/groups meta
+// (set_library_meta / set_groups), and the Manage library panels — assets,
+// Rust settings (dev.libsettings), rebuild, archive, delete. Back to the
+// gallery is #/shelf, which the frame routes to showAll().
 
 
 var me = this;
@@ -67,23 +71,47 @@ var readyP = (async () => {
     });
   }
 
+  // the legend under a library's control cards — the card's six dots, named
+  const FACET_LEGEND = [["html", "HTML", "--f-html"], ["css", "CSS", "--f-css"],
+    ["js", "JS", "--f-js"], ["data", "Data", "--f-data"], ["scene", "3D", "--f-3d"],
+    ["cmd", "Commands", "--f-cmd"]];
+
 async function init(host, { openLib, openControl, toast }) {
-  const groupsEl = host.querySelector(".sh-groups");
-  const fanEl = host.querySelector(".sh-fan");
+  const scroller = host.querySelector(".nb-shelf");
+  const gridEl = host.querySelector(".sh-grid");
+  const noMatchEl = host.querySelector(".sh-nomatch");
+  const searchEl = host.querySelector(".sh-search");
+  const rootSel = host.querySelector(".sh-root");
+  const libEl = host.querySelector(".sh-lib");
   const cardsEl = host.querySelector(".sh-cards");
-  const stackEls = new Map();
+  const cardsEmptyEl = host.querySelector(".sh-cards-empty");
+  const legendEl = host.querySelector(".sh-legend");
+  const libCards = new Map();
+  const toShelf = () => { location.hash = "#/shelf"; };
+
+  // The platform's own default: flowlang's get_crate_info treats an absent
+  // OR empty `root` as "cmd", so libraries that never set one show "cmd"
+  // rather than a "?" of their own.
+  const rootOf = (lib) => (lib.root ?? "").trim() || "cmd";
 
   // The library gate, as boot-time meta reports it (readers refresh on
   // restart): anonymous = open (no badge), named groups shown, empty =
   // admin-only. The groups intent string prevails when present — it is what
   // set_groups writes, and the enforced readers are derived from it.
-  function renderGate(stack, lib) {
-    const el = stack.querySelector(".s-gate");
+  function renderGate(card, lib) {
+    const el = card.querySelector(".s-gate");
     if (!el) return;
     const g = (lib.groups ?? (Array.isArray(lib.readers) ? lib.readers.join(",") : "")).trim();
     const open = g.split(",").map((s) => s.trim()).includes("anonymous");
-    el.textContent = g ? (open ? "" : `⛨ ${g}`) : "⛨ admin";
+    el.textContent = g ? (open ? "" : g) : "admin";
     el.title = g ? `security groups: ${g}` : "admin only — no groups granted";
+  }
+
+  function countText(lib, n) {
+    const parts = [];
+    if (n !== null) parts.push(`${n} control${n === 1 ? "" : "s"}`);
+    if (lib.version) parts.push(`v${lib.version}`);
+    return parts.join(" · ");
   }
 
   const libs = await libsOf();
@@ -94,61 +122,103 @@ async function init(host, { openLib, openControl, toast }) {
   const writable = true;
   const patchApi = true;
 
-  const groups = new Map();
-  for (const lib of [...libs].sort((a, b) => a.id.localeCompare(b.id))) {
-    // The platform's own default: flowlang's get_crate_info treats an absent
-    // OR empty `root` as "cmd", so libraries that never set one belong in the
-    // cmd group rather than a "?" of their own.
-    const root = (lib.root ?? "").trim() || "cmd";
-    const label = `root · ${root}`;
-    if (!groups.has(label)) groups.set(label, []);
-    groups.get(label).push(lib);
+  // ── the gallery ───────────────────────────────────────────
+  // ordered root first, then name — the order the old root groups had
+  const byRootThenName = (a, b) => rootOf(a).localeCompare(rootOf(b)) || a.id.localeCompare(b.id);
+
+  function addLibCard(lib) {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "sh-libcard";
+    card.innerHTML =
+      `<span class="s-name"><span class="s-id"></span><i class="sh-i sh-i-next" aria-hidden="true"></i></span>` +
+      `<span class="s-meta"><span class="s-count"></span><span class="s-gate"></span><span class="s-root"></span></span>`;
+    card.querySelector(".s-id").textContent = lib.id;
+    card.querySelector(".s-root").textContent = rootOf(lib);
+    card.querySelector(".s-root").title = `root · ${rootOf(lib)}`;
+    card.querySelector(".s-count").textContent = countText(lib, null);
+    renderGate(card, lib);
+    if (lib.desc) card.title = lib.desc;
+    card.addEventListener("click", () => openLib(lib.id));
+    gridEl.appendChild(card);
+    libCards.set(lib.id, card);
+    controlsOf(lib.id).then((controls) => {
+      if (!(controls instanceof Error)) {
+        card.querySelector(".s-count").textContent = countText(lib, controls.length);
+      }
+    });
   }
 
-  for (const [label, members] of [...groups.entries()].sort()) {
-    const group = document.createElement("div");
-    group.className = "sh-group";
-    const lbl = document.createElement("span");
-    lbl.className = "lbl";
-    lbl.textContent = label;
-    const grid = document.createElement("div");
-    grid.className = "sh-stacks";
-    group.append(lbl, grid);
-    groupsEl.appendChild(group);
+  for (const lib of [...libs].sort(byRootThenName)) addLibCard(lib);
+  for (const r of [...new Set(libs.map(rootOf))].sort()) {
+    const opt = document.createElement("option");
+    opt.value = r;
+    opt.textContent = r;
+    rootSel.appendChild(opt);
+  }
 
-    for (const lib of members) {
-      const stack = document.createElement("button");
-      stack.className = "sh-stack";
-      stack.innerHTML =
-        `<span class="s-name"></span><span class="s-gate"></span><span class="s-meta">v${lib.version ?? "?"}</span>`;
-      stack.querySelector(".s-name").textContent = lib.id;
-      renderGate(stack, lib);
-      if (lib.desc) stack.title = lib.desc;
-      stack.addEventListener("click", () => openLib(lib.id));
-      grid.appendChild(stack);
-      stackEls.set(lib.id, stack);
-
-      controlsOf(lib.id).then((controls) => {
-        if (!(controls instanceof Error)) {
-          stack.querySelector(".s-meta").textContent =
-            `${controls.length} controls · v${lib.version ?? "?"}`;
-        }
-      });
+  function applyFilter() {
+    const q = searchEl.value.trim().toLowerCase();
+    const r = rootSel.value;
+    let shown = 0;
+    for (const lib of libs) {
+      const card = libCards.get(lib.id);
+      if (!card) continue;
+      const match = (!r || rootOf(lib) === r) && lib.id.toLowerCase().includes(q);
+      card.hidden = !match;
+      if (match) shown++;
     }
+    noMatchEl.hidden = !libEl.hidden || shown > 0;
   }
 
-  // ── library meta (set_library_meta) ───────────────────────
+  // filtering is a gallery act: from an open library it returns to the
+  // gallery (the frame routes #/shelf to showAll, which re-applies it)
+  function onFilter() {
+    if (!libEl.hidden) toShelf();
+    else applyFilter();
+  }
+  searchEl.addEventListener("input", onFilter);
+  rootSel.addEventListener("change", onFilter);
+
+  // ── one library: the action bar (meta ▸ … delete library) and its panels ─
+  // One panel open at a time; a bar item's ▸ turns ▾ while its panel is open.
+  let fanLib = null;
+  let openPanelName = null;
+  const onOpen = {};   // panel name -> fill-in on open, rewired per library
+
+  function showPanel(name) {
+    openPanelName = name;
+    for (const el of libEl.querySelectorAll("[data-panel]")) el.hidden = el.dataset.panel !== name;
+    for (const b of libEl.querySelectorAll("[data-open]")) {
+      b.setAttribute("aria-expanded", String(b.dataset.open === name));
+    }
+    if (name && onOpen[name]) onOpen[name]();
+  }
+
+  libEl.addEventListener("click", (ev) => {
+    const opener = ev.target.closest("[data-open]");
+    if (opener) {
+      showPanel(openPanelName === opener.dataset.open ? null : opener.dataset.open);
+      return;
+    }
+    if (ev.target.closest("[data-close]")) showPanel(null);
+  });
+  host.querySelector(".sh-back").addEventListener("click", toShelf);
+  host.querySelector(".sh-close").addEventListener("click", toShelf);
+
   function renderLibMeta(lib) {
+    for (const el of libEl.querySelectorAll(".fh-lib")) el.textContent = lib.id;
     const descEl = host.querySelector(".fh-desc");
     descEl.textContent = lib.desc
       || "no description — discovery reads desc";
     descEl.classList.toggle("empty", !lib.desc);
-    host.querySelector(".fh-tools").hidden = false;
-    host.querySelector(".fh-meta-btn").hidden = !(writable && patchApi);
-    host.querySelector(".fh-groups-btn").hidden = !(writable && patchApi);
-    host.querySelector(".fh-del-btn").hidden = !(writable && patchApi);
-    host.querySelector(".fh-rebuild-btn").hidden = !writable;
-    host.querySelector(".fh-archive-btn").hidden = false;
+    const show = (sel, on) => { for (const el of libEl.querySelectorAll(sel)) el.hidden = !on; };
+    show('[data-open="meta"]', writable && patchApi);
+    show('[data-open="groups"]', writable && patchApi);
+    show('[data-open="newctl"]', writable && patchApi);
+    show(".fh-del-btn", writable && patchApi);
+    show('[data-open="rebuild"]', writable);
+    show('[data-open="archive"]', true);
   }
 
   // ── library delete (delete_library) ───────────────────────
@@ -171,11 +241,11 @@ async function init(host, { openLib, openControl, toast }) {
         return;
       }
       toast.show(`delete_library → ${lib.id} removed`);
-      fanEl.hidden = true;
-      stackEls.get(lib.id)?.remove();
-      stackEls.delete(lib.id);
+      libCards.get(lib.id)?.remove();
+      libCards.delete(lib.id);
       const i = libs.findIndex((l) => l.id === lib.id);
       if (i >= 0) libs.splice(i, 1);
+      toShelf();
     };
   }
 
@@ -183,18 +253,16 @@ async function init(host, { openLib, openControl, toast }) {
     // desc + TAGS are editable (the 2026-07-31 groups correction); the
     // security-group string is never edited from a meta form.
     const form = host.querySelector(".fh-meta");
-    host.querySelector(".fh-meta-btn").onclick = () => {
-      form.hidden = !form.hidden;
-      if (!form.hidden) {
-        form.querySelector(".fm-desc").value = lib.desc ?? "";
-        form.querySelector(".fm-tags").value = lib.tags ?? "";
-        form.querySelector(".fm-note").textContent = "";
-        form.querySelector(".fm-desc").focus();
-      }
+    onOpen.meta = () => {
+      form.querySelector(".fm-desc").value = lib.desc ?? "";
+      form.querySelector(".fm-tags").value = lib.tags ?? "";
+      form.querySelector(".fm-note").textContent = "";
+      form.querySelector(".fm-desc").focus();
     };
     form.onsubmit = async (ev) => {
       ev.preventDefault();
       const note = form.querySelector(".fm-note");
+      note.textContent = "";
       const desc = form.querySelector(".fm-desc").value.trim();
       const tagsV = form.querySelector(".fm-tags").value.trim();
       const dArg = desc && desc !== (lib.desc ?? "") ? desc : "";
@@ -210,13 +278,15 @@ async function init(host, { openLib, openControl, toast }) {
         const r = await setLibraryMeta(lib.id, dArg, "");
         if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
         lib.desc = dArg;
+        const card = libCards.get(lib.id);
+        if (card) card.title = dArg;
       }
       if (tChanged) {
         const r = await setTags(lib.id, "", "", tagsV);
         if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
         lib.tags = tagsV;
       }
-      form.hidden = true;
+      showPanel(null);
       renderLibMeta(lib);
       toast.show("library meta → saved to meta.json (the instance re-reads it on restart)");
     };
@@ -228,21 +298,17 @@ async function init(host, { openLib, openControl, toast }) {
   // correction): permission is not edited casually alongside desc/tags.
   function wireLibGroups(lib) {
     const form = host.querySelector(".fh-groups");
-    const btn = host.querySelector(".fh-groups-btn");
     const input = form.querySelector(".fg-input");
     const note = form.querySelector(".fg-note");
     const apply = form.querySelector(".fg-apply");
-    btn.onclick = async () => {
-      form.hidden = !form.hidden;
-      if (!form.hidden) {
-        input.value = lib.groups ?? "";
-        note.textContent = "";
-        apply.textContent = "set groups";
-        input.focus();
-        const known = await securityGroups();
-        form.querySelector(".fg-known").textContent =
-          known.length ? `known groups: ${known.join(", ")}` : "";
-      }
+    onOpen.groups = async () => {
+      input.value = lib.groups ?? "";
+      note.textContent = "";
+      apply.textContent = "Set groups";
+      input.focus();
+      const known = await securityGroups();
+      form.querySelector(".fg-known").textContent =
+        known.length ? `known groups: ${known.join(", ")}` : "";
     };
     form.onsubmit = async (ev) => {
       ev.preventDefault();
@@ -250,17 +316,17 @@ async function init(host, { openLib, openControl, toast }) {
       if (v === (lib.groups ?? "").trim()) { note.textContent = "nothing changed"; return; }
       if (!v && apply.textContent !== "really clear? (admin-only)") {
         apply.textContent = "really clear? (admin-only)";
-        setTimeout(() => { apply.textContent = "set groups"; }, 2500);
+        setTimeout(() => { apply.textContent = "Set groups"; }, 2500);
         return;
       }
       const r = await setGroups(lib.id, "", "", v);
       if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
       lib.groups = v;
       lib.readers = r.readers ?? [];
-      const stack = stackEls.get(lib.id);
-      if (stack) renderGate(stack, lib);
-      form.hidden = true;
-      apply.textContent = "set groups";
+      const card = libCards.get(lib.id);
+      if (card) renderGate(card, lib);
+      apply.textContent = "Set groups";
+      showPanel(null);
       toast.show(`set_groups → readers [${(r.readers ?? []).join(", ") || "— admin only"}] — the library gate refreshes on restart`);
     };
   }
@@ -304,8 +370,9 @@ async function init(host, { openLib, openControl, toast }) {
         row.querySelector(".fa-size").textContent = fmtSize(a.size ?? 0);
         if (writable && patchApi) {
           const ren = document.createElement("button");
-          ren.className = "fa-act";
-          ren.textContent = "rename ▸";
+          ren.type = "button";
+          ren.className = "sh-btn fa-act";
+          ren.textContent = "Rename";
           ren.addEventListener("click", async () => {
             const to = prompt(`rename ${a.name} to (relative path):`, a.name);
             if (!to || to === a.name) return;
@@ -314,13 +381,14 @@ async function init(host, { openLib, openControl, toast }) {
             refresh();
           });
           const del = document.createElement("button");
-          del.className = "fa-act fa-danger";
-          del.textContent = "delete";
+          del.type = "button";
+          del.className = "sh-btn fa-act fa-danger";
+          del.textContent = "Delete";
           del.addEventListener("click", async () => {
             // two-click confirm, §5.6 spirit without a modal
             if (del.textContent !== "really delete?") {
               del.textContent = "really delete?";
-              setTimeout(() => { del.textContent = "delete"; }, 2500);
+              setTimeout(() => { del.textContent = "Delete"; }, 2500);
               return;
             }
             const rr = await deleteAsset(lib.id, a.name);
@@ -333,12 +401,10 @@ async function init(host, { openLib, openControl, toast }) {
       }));
     }
 
-    host.querySelector(".fh-assets-btn").onclick = () => {
-      panel.hidden = !panel.hidden;
-      if (!panel.hidden) {
-        form.hidden = !(writable && patchApi);
-        refresh();
-      }
+    onOpen.assets = () => {
+      form.hidden = !(writable && patchApi);
+      note.textContent = "";
+      refresh();
     };
 
     form.onsubmit = async (ev) => {
@@ -371,9 +437,8 @@ async function init(host, { openLib, openControl, toast }) {
   // form, so the form always round-trips get_library_config.
   function wireSettings(lib) {
     const panel = host.querySelector(".fh-settings");
-    host.querySelector(".fh-settings-btn").onclick = async () => {
-      panel.hidden = !panel.hidden;
-      if (panel.hidden) return;
+    onOpen.settings = async () => {
+      panel.querySelector(".fs-note").textContent = "";
       const got = await invoke("dev", "libsettings", "get_library_config", { id: lib.id });
       if (got instanceof Error || got.envelope.status !== "ok") {
         panel.querySelector(".fs-note").textContent =
@@ -387,7 +452,6 @@ async function init(host, { openLib, openControl, toast }) {
       panel.querySelector(".fs-types").value = (cfg.library_types ?? []).join(", ");
       panel.querySelector(".fs-deps").value = cfg.library_dependencies ?? "";
       panel.querySelector(".fs-save").hidden = !writable;
-      panel.querySelector(".fs-note").textContent = "";
     };
     panel.onsubmit = async (ev) => {
       ev.preventDefault();
@@ -419,8 +483,7 @@ async function init(host, { openLib, openControl, toast }) {
   // or restart.
   function wireRebuild(lib) {
     const panel = host.querySelector(".fh-rebuild");
-    host.querySelector(".fh-rebuild-btn").onclick = () => {
-      panel.hidden = !panel.hidden;
+    onOpen.rebuild = () => {
       panel.querySelector(".fr-note").textContent = "";
       panel.querySelector(".fr-out").hidden = true;
     };
@@ -457,9 +520,7 @@ async function init(host, { openLib, openControl, toast }) {
   // the zip through app/exec — the browser downloads, no fetch involved.
   function wireArchive(lib) {
     const panel = host.querySelector(".fh-archive");
-    host.querySelector(".fh-archive-btn").onclick = async () => {
-      panel.hidden = !panel.hidden;
-      if (panel.hidden) return;
+    onOpen.archive = async () => {
       const rows = panel.querySelector(".fk-rows");
       const note = panel.querySelector(".fk-note");
       rows.replaceChildren();
@@ -490,7 +551,7 @@ async function init(host, { openLib, openControl, toast }) {
     };
   }
 
-  // ── creating controls + libraries (the ghost card) ────────
+  // ── creating controls + libraries ─────────────────────────
   // No typed confirm — creating an empty record is additive.
   // add_control/add_library are pre-existing dev.code commands.
   const NAME_RE = /^[a-z][a-z0-9_]*$/;
@@ -506,7 +567,10 @@ async function init(host, { openLib, openControl, toast }) {
   const newCtlForm = host.querySelector(".sh-newctl");
   const newCtlName = host.querySelector(".sh-newctl-name");
   const newCtlNote = host.querySelector(".sh-newctl-note");
-  let fanLib = null;
+  onOpen.newctl = () => {
+    newCtlNote.textContent = "";
+    newCtlName.focus();
+  };
 
   newCtlForm.addEventListener("submit", async (ev) => {
     ev.preventDefault();
@@ -541,15 +605,18 @@ async function init(host, { openLib, openControl, toast }) {
   });
 
   const newLibForm = host.querySelector(".sh-newlib");
-  const newLibFields = host.querySelector(".sh-newlib-fields");
+  const newLibOpen = host.querySelector(".sh-newlib-open");
   const newLibName = host.querySelector(".sh-newlib-name");
   const newLibNote = host.querySelector(".sh-newlib-note");
-  newLibForm.hidden = !(writable && patchApi);
-  host.querySelector(".sh-newlib-open").addEventListener("click", () => {
-    newLibFields.hidden = !newLibFields.hidden;
+  newLibOpen.hidden = !(writable && patchApi);
+  function setNewLib(open) {
+    newLibForm.hidden = !open;
+    newLibOpen.setAttribute("aria-expanded", String(open));
     newLibNote.textContent = "";
-    if (!newLibFields.hidden) newLibName.focus();
-  });
+    if (open) newLibName.focus();
+  }
+  newLibOpen.addEventListener("click", () => setNewLib(newLibForm.hidden));
+  host.querySelector(".sh-newlib-cancel").addEventListener("click", () => setNewLib(false));
 
   newLibForm.addEventListener("submit", async (ev) => {
     ev.preventDefault();
@@ -569,11 +636,10 @@ async function init(host, { openLib, openControl, toast }) {
       newLibNote.textContent = `failed: ${r.msg}`;
       return;
     }
-    newLibNote.textContent = "";
     newLibName.value = "";
-    newLibFields.hidden = true;
+    setNewLib(false);
     toast.show(`add_library → ${name} — reload to see it on the shelf, or add a control now`);
-    await showFan(name);
+    openLib(name);
   });
 
 
@@ -581,12 +647,22 @@ async function init(host, { openLib, openControl, toast }) {
   // page, PLUGIN mounts at SELECTOR. Instance-level like git import, so
   // it lives on the shelf header; entries apply on the next reload.
   const plugForm = host.querySelector(".sh-plugins");
-  const plugPanel = host.querySelector(".sh-plugins-panel");
+  const plugOpen = host.querySelector(".sh-plugins-open");
+  const plugCount = host.querySelector(".sh-plugins-count");
   const plugList = host.querySelector(".sh-plugins-list");
   const plugNote = host.querySelector(".sh-plugins-note");
-  plugForm.hidden = !(writable && patchApi);
+  const plugEditor = host.querySelector(".sh-plugins-fields");
+  const plugTitle = host.querySelector(".sh-plug-form-title");
+  plugOpen.hidden = !(writable && patchApi);
   const plugFields = ["name", "tlib", "tctl", "plib", "pctl", "sel"].map(
     (k) => host.querySelector(".sh-plug-" + k));
+  function showPlugEditor(title, vals) {
+    plugTitle.textContent = title;
+    plugFields.forEach((f, i) => { f.value = vals[i] ?? ""; });
+    plugEditor.hidden = false;
+    plugNote.textContent = "";
+    plugFields[0].focus();
+  }
   async function renderPlugins() {
     const entries = await listPlugins();
     plugList.replaceChildren();
@@ -595,6 +671,7 @@ async function init(host, { openLib, openControl, toast }) {
       return;
     }
     const names = Object.keys(entries).sort();
+    plugCount.textContent = String(names.length);
     if (!names.length) {
       plugList.textContent = "no registrations on this instance";
       return;
@@ -603,27 +680,36 @@ async function init(host, { openLib, openControl, toast }) {
       const e = entries[n] ?? {};
       const row = document.createElement("div");
       row.className = "sh-plug-row";
-      const label = document.createElement("span");
-      label.textContent = n;
+      const label = document.createElement("div");
+      const nameEl = document.createElement("span");
+      nameEl.className = "sh-mono";
+      nameEl.textContent = n;
       const what = document.createElement("code");
+      what.className = "sh-plug-route";
       what.textContent =
         `${e.plugin_lib}.${e.plugin_ctl} → ${e.target_lib}.${e.target_ctl} at ${e.selector}`;
+      label.append(nameEl, what);
+      const actions = document.createElement("div");
+      actions.className = "sh-plug-actions";
       const edit = document.createElement("button");
       edit.type = "button";
-      edit.textContent = "edit";
+      edit.className = "sh-btn sh-outline";
+      edit.textContent = "Edit";
+      edit.setAttribute("aria-label", `Edit ${n}`);
       edit.addEventListener("click", () => {
-        const vals = [n, e.target_lib, e.target_ctl, e.plugin_lib, e.plugin_ctl, e.selector];
-        plugFields.forEach((f, i) => { f.value = vals[i] ?? ""; });
-        plugFields[0].focus();
+        showPlugEditor("Edit registration",
+          [n, e.target_lib, e.target_ctl, e.plugin_lib, e.plugin_ctl, e.selector]);
       });
       const rm = document.createElement("button");
       rm.type = "button";
-      rm.textContent = "✕";
+      rm.className = "sh-btn sh-outline sh-danger";
+      rm.textContent = "Remove";
+      rm.setAttribute("aria-label", `Remove ${n}`);
       rm.addEventListener("click", async () => {
         // two-click confirm, the fh-del idiom
         if (rm.textContent !== "really remove?") {
           rm.textContent = "really remove?";
-          setTimeout(() => { rm.textContent = "✕"; }, 2500);
+          setTimeout(() => { rm.textContent = "Remove"; }, 2500);
           return;
         }
         const r = await removePlugin(n);
@@ -634,14 +720,26 @@ async function init(host, { openLib, openControl, toast }) {
         toast.show(`remove_plugin → ${n} — applies on the next reload`);
         await renderPlugins();
       });
-      row.append(label, what, edit, rm);
+      actions.append(edit, rm);
+      row.append(label, actions);
       plugList.append(row);
     }
   }
-  host.querySelector(".sh-plugins-open").addEventListener("click", async () => {
-    plugPanel.hidden = !plugPanel.hidden;
+  function setPlugins(open) {
+    plugForm.hidden = !open;
+    plugOpen.setAttribute("aria-expanded", String(open));
     plugNote.textContent = "";
-    if (!plugPanel.hidden) await renderPlugins();
+    plugEditor.hidden = true;
+    if (open) renderPlugins();
+  }
+  plugOpen.addEventListener("click", () => setPlugins(plugForm.hidden));
+  host.querySelector(".sh-plugins-close").addEventListener("click", () => setPlugins(false));
+  host.querySelector(".sh-plug-add").addEventListener("click", () => {
+    showPlugEditor("New registration", []);
+  });
+  host.querySelector(".sh-plug-cancel").addEventListener("click", () => {
+    plugEditor.hidden = true;
+    plugNote.textContent = "";
   });
   plugForm.addEventListener("submit", async (ev) => {
     ev.preventDefault();
@@ -658,22 +756,51 @@ async function init(host, { openLib, openControl, toast }) {
       return;
     }
     plugNote.textContent = "";
+    plugEditor.hidden = true;
     toast.show(`set_plugin → ${name} ${r.created ? "registered" : "replaced"} — applies on the next reload`);
     await renderPlugins();
   });
+  // the header count, read once at load (the panel re-reads on open)
+  if (writable && patchApi) {
+    listPlugins().then((entries) => {
+      if (!(entries instanceof Error)) plugCount.textContent = String(Object.keys(entries).length);
+    });
+  }
+
+  // the legend: built once, shown under any library that has controls
+  for (const [, label, hue] of FACET_LEGEND) {
+    const item = document.createElement("span");
+    const dot = document.createElement("i");
+    dot.className = "sh-dot";
+    dot.style.setProperty("--dot", `var(${hue})`);
+    item.append(dot, document.createTextNode(label));
+    legendEl.append(item);
+  }
+
+  // ── gallery ⇄ library ─────────────────────────────────────
+  function setMode(lib) {
+    gridEl.hidden = Boolean(lib);
+    libEl.hidden = !lib;
+    applyFilter();
+  }
+
+  function showAll() {
+    fanLib = null;
+    showPanel(null);
+    cardsEl.replaceChildren();
+    setMode(null);
+  }
 
   async function showFan(libId) {
     fanLib = libId;
-    for (const [id, el] of stackEls) el.classList.toggle("on", id === libId);
-    fanEl.hidden = false;
+    setMode(libId);
     host.querySelector(".fh-name").textContent = libId;
-    host.querySelector(".fh-meta").hidden = true;
-    host.querySelector(".fh-groups").hidden = true;
-    host.querySelector(".fh-settings").hidden = true;
-    host.querySelector(".fh-assets").hidden = true;
-    host.querySelector(".fh-rebuild").hidden = true;
-    host.querySelector(".fh-archive").hidden = true;
+    host.querySelector(".fh-count").textContent = "";
+    showPanel(null);
     cardsEl.replaceChildren();
+    cardsEmptyEl.hidden = true;
+    legendEl.hidden = true;
+    scroller.scrollTop = 0;
 
     const lib = libs.find((l) => l.id === libId) ?? { id: libId };
     renderLibMeta(lib);
@@ -684,37 +811,40 @@ async function init(host, { openLib, openControl, toast }) {
     wireAssets(lib);
     wireRebuild(lib);
     wireArchive(lib);
-
-    newCtlForm.hidden = !(writable && patchApi);
+    newCtlName.value = "";
     newCtlNote.textContent = "";
 
     const controls = await controlsOf(libId);
+    if (fanLib !== libId) return;   // navigated on while the index loaded
     if (controls instanceof Error) {
       toast.show(`could not read ${libId}: ${controls.message}`);
       return;
     }
-    const stack = stackEls.get(libId);
-    if (stack) {
-      stack.querySelector(".s-meta").textContent =
-        `${controls.length} controls · v${lib.version ?? "?"}`;
-    }
+    host.querySelector(".fh-count").textContent = `/ ${countText({}, controls.length)}`;
+    const card = libCards.get(libId);
+    if (card) card.querySelector(".s-count").textContent = countText(lib, controls.length);
+    cardsEmptyEl.hidden = controls.length > 0;
+    legendEl.hidden = controls.length === 0;
     // alphabetical: the controls index is in creation order, which tells a
     // reader nothing once a library has more than a handful
     for (const ctl of [...controls].sort((a, b) => a.name.localeCompare(b.name))) {
+      if (fanLib !== libId) return;
       const slot = document.createElement("div");
       slot.className = "sh-slot";
       cardsEl.appendChild(slot);
-      const card = await mount("card", slot, {
+      const ctlCard = await mount("card", slot, {
         name: ctl.name,
         onOpen: () => openControl(libId, ctl.id),
       });
       readRec(libId, ctl.id).then((record) => {
-        card.setRecord(record instanceof Error ? null : record);
+        ctlCard.setRecord(record instanceof Error ? null : record);
       });
       if (writable && patchApi) {
         const del = document.createElement("button");
+        del.type = "button";
         del.className = "sh-ctl-del";
         del.textContent = "delete";
+        del.setAttribute("aria-label", `delete control ${ctl.name}`);
         del.title = "deletes this control with its commands, timers/events "
           + "AND its journal — the timeline is terminal; the canonical "
           + "repo's git history is what remains. A published app's control "
@@ -737,10 +867,9 @@ async function init(host, { openLib, openControl, toast }) {
         slot.appendChild(del);
       }
     }
-    fanEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
-  return { showFan };
+  return { showFan, showAll };
 }
 
   return init(ME, ME.DATA || {});

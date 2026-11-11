@@ -12,6 +12,16 @@ fn err(msg: &str) -> DataObject {
 fn now_secs() -> i64 {
   std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
 }
+// Is the runner still alive? /proc answers on Linux; elsewhere (macOS, the
+// BSDs) `kill -0` does - signal 0 only checks that the pid exists.
+fn pid_alive(pid: i64) -> bool {
+  if std::path::Path::new("/proc/self").exists() {
+    return std::path::Path::new(&format!("/proc/{}", pid)).exists();
+  }
+  Command::new("kill").arg("-0").arg(pid.to_string())
+    .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null())
+    .status().map(|s| s.success()).unwrap_or(false)
+}
 
 if !ver_ok(&flowlang) || !ver_ok(&ndata) {
   return err("versions must start with a digit and contain only [0-9A-Za-z.-], e.g. 0.3.35");
@@ -39,7 +49,7 @@ if let Ok(s) = fs::read_to_string(&status_path) {
   if let Ok(o) = DataObject::try_from_string(&s) {
     if o.has("state") && o.get_string("state") == "running" {
       let pid = if o.has("pid") { o.get_int("pid") } else { 0 };
-      if pid > 0 && std::path::Path::new(&format!("/proc/{}", pid)).exists() {
+      if pid > 0 && pid_alive(pid) {
         return err(&format!("refused: an update run is already in progress (runner pid {})", pid));
       }
     }
@@ -95,7 +105,7 @@ D=runtime/dev/update_crates
 LOG="$D/run.log"
 BIN='{bin}'
 st() {{ printf '{{"state":"%s","step":%s,"label":"%s","verdict":"%s","pid":%s,"time":%s}}' "$1" "$2" "$3" "$4" $$ "$(date +%s)" > "$D/status.json.tmp"; mv "$D/status.json.tmp" "$D/status.json"; }}
-h() {{ if [ -f "$BIN" ]; then sha256sum "$BIN" | cut -d' ' -f1; else echo none; fi; }}
+h() {{ if [ -f "$BIN" ]; then {{ sha256sum "$BIN" 2>/dev/null || shasum -a 256 "$BIN"; }} | cut -d' ' -f1; else echo none; fi; }}
 H0=$(h)
 st running 1 'host build with new crates' ''
 echo "== STEP 1: {cargo}" >> "$LOG"
@@ -105,13 +115,15 @@ echo "== STEP 2: $BIN rebuild" >> "$LOG"
 "$BIN" rebuild >> "$LOG" 2>&1 || {{ st failed 2 'rebuild failed' ''; exit 1; }}
 st running 3 'newbound recompile' ''
 echo "== STEP 3: $BIN recompile" >> "$LOG"
-"$BIN" recompile >> "$LOG" 2>&1 || {{ st failed 3 'recompile failed' ''; exit 1; }}
+"$BIN" recompile >> "$LOG" 2>&1 || echo "== STEP 3: some libraries failed to compile (continuing; they keep their old build)" >> "$LOG"
+RC=$(grep -E '^[0-9]+ compiled, [0-9]+ failed' "$LOG" | tail -1 | tr -d '"\\')
 st running 4 'final host build' ''
 echo "== STEP 4: {cargo}" >> "$LOG"
 {cargo} >> "$LOG" 2>&1 || {{ st failed 4 'final host build failed' ''; exit 1; }}
 H1=$(h)
 if [ "$H0" = "$H1" ]; then V=no-restart; else V=restart; fi
-st done 4 'complete' "$V"
+L=complete; [ -n "$RC" ] && L="complete; recompile: $RC"
+st done 4 "$L" "$V"
 echo "== DONE: verdict=$V" >> "$LOG"
 "#, base = base.display(), bin = binpath, cargo = cargo_cmd);
 
@@ -123,14 +135,22 @@ let _ = fs::write(rundir.join("run.log"), "");
 let init_status = format!("{{\"state\":\"running\",\"step\":0,\"label\":\"manifests pinned; launching runner\",\"verdict\":\"\",\"pid\":0,\"time\":{}}}", now_secs());
 let _ = fs::write(&status_path, &init_status);
 
-let spawned = Command::new("setsid")
-  .arg("/bin/sh")
-  .arg(&script_path)
+let mut runner = Command::new("/bin/sh");
+runner.arg(&script_path)
   .current_dir(&base)
   .stdin(Stdio::null())
   .stdout(Stdio::null())
-  .stderr(Stdio::null())
-  .spawn();
+  .stderr(Stdio::null());
+// Detach the runner into its own process group, so stopping this server
+// (Ctrl-C, or a stop of its group) doesn't take the build with it. This was
+// the `setsid` binary, which exists on Linux only; process_group is the
+// same POSIX call (setpgid) on Linux, macOS and the BSDs.
+#[cfg(unix)]
+{
+  use std::os::unix::process::CommandExt;
+  runner.process_group(0);
+}
+let spawned = runner.spawn();
 if let Err(e) = spawned {
   let _ = fs::write(&status_path, format!("{{\"state\":\"failed\",\"step\":0,\"label\":\"could not launch runner: {}\",\"verdict\":\"\",\"pid\":0,\"time\":{}}}", e, now_secs()));
   return err(&format!("manifests are pinned but the runner failed to launch: {}", e));

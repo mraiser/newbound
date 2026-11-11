@@ -21,17 +21,40 @@
   font-size: 16px;
   letter-spacing: 0.06em;
 }
+/* The bar has one centre line. Every boxed item — the crumb pill, the
+   jump field, git, session, the user chip — is 28px tall and centred on
+   it; the unboxed text (home mark, app name, caption) sits on the pill's
+   text baseline, so the left group and the right group read as one row. */
+.nb-frame .fr-title {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  flex: none;
+}
 .nb-frame .fr-crumb {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   font: 13px var(--mono);
 }
-.nb-frame .seg { color: var(--text-dim); padding: 4px 8px; border-radius: 6px; }
+.nb-frame .seg {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--text-dim);
+}
 .nb-frame button.seg:hover { color: var(--accent); }
 .nb-frame .seg.on { color: var(--text); background: var(--panel-2); }
 .nb-frame .sep { color: var(--text-faint); }
+/* the caption stays one line; where the bar gets tight it steps aside
+   rather than wrapping into a column that drags the shared baseline */
+@media (max-width: 1200px) {
+  .nb-frame .fr-cap { display: none; }
+}
 .nb-frame .fr-cap {
+  white-space: nowrap;
   font: 10px var(--mono);
   color: var(--text-faint);
   letter-spacing: 0.06em;
@@ -80,6 +103,22 @@
   background: var(--text-faint);
 }
 .nb-frame .fr-conn.ok .conn-dot { background: var(--good); }
+.nb-frame .fr-git,
+.nb-frame .fr-session,
+.nb-frame .fr-conn {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.nb-frame .fr-jump-slot .j-input { height: 28px; padding-top: 0; padding-bottom: 0; }
+/* when the bar tightens, the labels stay one line and the jump field gives up width */
+.nb-frame .fr-git,
+.nb-frame .fr-session,
+.nb-frame .fr-conn { flex: none; white-space: nowrap; }
+.nb-frame .fr-jump-slot { flex: 0 1 220px; min-width: 96px; }
+.nb-frame .fr-jump-slot .j-input { width: 100%; }
 
 .fr-stage {
   position: fixed;
