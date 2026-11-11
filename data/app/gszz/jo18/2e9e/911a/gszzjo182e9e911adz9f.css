@@ -134,8 +134,9 @@
 }
 .appcard.remote .appcard-ring { display: block; }
 .appcard.remote .appcard-badge { display: flex; }
-/* hover: the dashes give way to the usual amber hover ring */
-.appcard-wrap:hover .appcard.remote .appcard-ring { display: none; }
+/* hover: the dashes close into a solid sky-blue ring, in place of the amber one */
+.appcard-wrap-remote:hover { box-shadow: none; }
+.appcard-wrap:hover .appcard.remote .appcard-ring rect { stroke-dasharray: none; }
 .maximize-app-icon {
   position: absolute;
   top: 7%; /* clear of the 25% rounded corner */
