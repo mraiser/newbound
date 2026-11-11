@@ -89,12 +89,53 @@
 }
 
 
-.inactive .card-title {
+/* App states. Active: full colour. Inactive (installed here, not running):
+   grey and a little darker, colour back on hover. Available (on a connected
+   peer, not here): a dashed sky-blue ring on the tile's rim plus a download
+   badge. Available apps are also active:false, so the grey is scoped to .local. */
+.appcard-wrap { --available: #6fb0e8; }
+.card.appcard { transition: filter .3s ease; }
+.appcard.inactive.local { filter: grayscale(1) brightness(.72); }
+.appcard-wrap:hover .appcard.inactive.local { filter: none; }
+.appcard.inactive.local .card-title {
   color: var(--text-dim);
 }
-.remote .card-title {
-  color: var(--accent);
+/* The ring traces the tile plate's own rim (rect .5/63/rx 15.5 in its 64 box). */
+.appcard-ring {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
+.appcard-ring rect {
+  fill: none;
+  stroke: var(--available);
+  stroke-width: 1;
+  stroke-dasharray: 2.6 2;
+  stroke-linecap: round;
+}
+/* Mirrors the ⋯ button: same 32px circle, same 7% inset from the corner. */
+.appcard-badge {
+  display: none;
+  position: absolute;
+  top: 7%;
+  left: 7%;
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-3);
+  border: 1px solid rgba(111, 176, 232, 0.6);
+  color: var(--available);
+}
+.appcard.remote .appcard-ring { display: block; }
+.appcard.remote .appcard-badge { display: flex; }
+/* hover: the dashes give way to the usual amber hover ring */
+.appcard-wrap:hover .appcard.remote .appcard-ring { display: none; }
 .maximize-app-icon {
   position: absolute;
   top: 7%; /* clear of the 25% rounded corner */
