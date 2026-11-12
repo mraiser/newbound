@@ -13,8 +13,9 @@
   position: absolute;
   top: 40px;
   right: 0;
-  width: 300px;
-  max-height: 320px;
+  width: 440px;
+  max-width: 90vw;
+  max-height: 460px;
   overflow: auto;
   background: var(--panel-2);
   border: 1px solid var(--line);
@@ -24,8 +25,9 @@
 }
 .nb-jump .j-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 4px 10px;
   width: 100%;
   text-align: left;
   padding: 9px 12px;
@@ -44,9 +46,29 @@
 }
 .nb-jump .j-kind.k-lib { background: var(--f-js); }
 .nb-jump .j-kind.k-ctl { background: var(--f-html); }
+.nb-jump .j-kind.k-cmd { background: var(--accent); }
+.nb-jump .j-kind.k-facet { background: var(--f-css, var(--f-html)); }
+.nb-jump .j-kind.k-asset { background: var(--text-faint); }
+.nb-jump .j-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .nb-jump .j-path {
   color: var(--text-faint);
   margin-left: auto;
   font-size: 10px;
+}
+.nb-jump .j-prev {
+  flex: 0 0 100%;
+  color: var(--text-faint);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nb-jump .j-sep {
+  padding: 6px 12px 4px;
+  border-top: 1px solid var(--line);
+  color: var(--text-faint);
+  font: 9px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 .nb-jump .j-none { padding: 12px; color: var(--text-faint); font-size: 12px; }
