@@ -72,6 +72,8 @@
 runtime/dev/libraries/
 runtime/dev/repos.json
 runtime/dev/plugins.json
+# dev.search index files: derived from the store, rebuilt per instance
+runtime/dev/search/
 
 # Stuff that shouldn't be generated
 runtime/src
