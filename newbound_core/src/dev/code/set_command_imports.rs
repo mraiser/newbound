@@ -56,8 +56,8 @@ pub fn set_command_imports(lib: String, ctl: String, cmd: String, imports: Strin
 // Replace a text command's file-level import block (the impl record's
 // `import` field) and recompile — patch_command_body's sibling for the one
 // section the body patch cannot reach. Flow commands have no import field
-// and are refused. Unjournaled like patch_command_body: the compile result
-// is the outcome, canon's git history is the record.
+// and are refused. Journaled on the control's patch journal (facet
+// "command", op "imports") once the compile has run.
 let api = crate::api::new();
 let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
 
@@ -171,5 +171,27 @@ match cres {
     }
 }
 out.put_string("old_imports", &old_imports);
+// Journal the edit on the control's patch journal (facet "command", op
+// "imports"). It runs after the store write and the compile, so the entry describes
+// what the store now holds; a journal problem is reported on the result and
+// never turns the edit into a failure. These commands take no author, label
+// or session, so both are left empty.
+if old_imports != imports.replace("\r", "") {
+    let mut j_entry = DataObject::new();
+    j_entry.put_string("author", "");
+    j_entry.put_string("facet", "command");
+    j_entry.put_string("cmd", &cmd);
+    j_entry.put_string("op", "imports");
+    j_entry.put_string("old", &old_imports);
+    j_entry.put_string("new", &imports.replace("\r", ""));
+    j_entry.put_string("compile", if out.get_string("status") == "ok" { "ok" } else { "err" });
+    j_entry.put_string("label", "");
+    let j_r = crate::dev::code::patch_journal::patch_journal("append".to_string(), lib.clone(), ctlid.clone(), String::new(), j_entry, 0, false, String::new());
+    if j_r.get_string("status") == "ok" {
+        out.put_string("patch_id", &j_r.get_string("patch_id"));
+    } else {
+        out.put_string("journal_warning", &j_r.try_get_string("msg").unwrap_or_default());
+    }
+}
 out
 }

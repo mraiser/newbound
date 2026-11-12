@@ -191,5 +191,27 @@ match cres {
         out.put_string("msg", &msg);
     }
 }
+// Journal the edit on the control's patch journal (facet "command", op
+// "patch"). It runs after the store write and the compile, so the entry describes
+// what the store now holds; a journal problem is reported on the result and
+// never turns the edit into a failure. These commands take no author, label
+// or session, so both are left empty.
+if normalized_old != new_snippet.replace("\r", "") {
+    let mut j_entry = DataObject::new();
+    j_entry.put_string("author", "");
+    j_entry.put_string("facet", "command");
+    j_entry.put_string("cmd", &cmd);
+    j_entry.put_string("op", "patch");
+    j_entry.put_string("old", &normalized_old);
+    j_entry.put_string("new", &new_snippet.replace("\r", ""));
+    j_entry.put_string("compile", if out.get_string("status") == "ok" { "ok" } else { "err" });
+    j_entry.put_string("label", "");
+    let j_r = crate::dev::code::patch_journal::patch_journal("append".to_string(), lib.clone(), ctlid.clone(), String::new(), j_entry, 0, false, String::new());
+    if j_r.get_string("status") == "ok" {
+        out.put_string("patch_id", &j_r.get_string("patch_id"));
+    } else {
+        out.put_string("journal_warning", &j_r.try_get_string("msg").unwrap_or_default());
+    }
+}
 out
 }

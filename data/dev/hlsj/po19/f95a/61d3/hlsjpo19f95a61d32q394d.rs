@@ -64,6 +64,8 @@ let mut impl_doc = impl_rec.get_object("data");
 // desc and groups live on the implementation record (the dev editor's
 // save_command writes them there); empty string leaves a field untouched.
 // Record-level readers/writers are not modified.
+let j_old_desc = impl_doc.try_get_string("desc").unwrap_or_default();
+let j_old_groups = impl_doc.try_get_string("groups").unwrap_or_default();
 let mut changed = false;
 if !desc.is_empty() {
     impl_doc.put_string("desc", &desc);
@@ -91,4 +93,31 @@ if changed {
 let mut o = DataObject::new();
 o.put_string("status", "ok");
 o.put_boolean("changed", changed);
+// old/new carry only the fields whose value actually moved, so re-setting
+// the same desc (the usual call after an upsert) journals nothing.
+let mut j_old = DataObject::new();
+let mut j_new = DataObject::new();
+if !desc.is_empty() && desc != j_old_desc { j_old.put_string("desc", &j_old_desc); j_new.put_string("desc", &desc); }
+if !groups.is_empty() && groups != j_old_groups { j_old.put_string("groups", &j_old_groups); j_new.put_string("groups", &groups); }
+// Journal the edit on the control's patch journal (facet "command", op
+// "meta"). It runs after the store write, so the entry describes
+// what the store now holds; a journal problem is reported on the result and
+// never turns the edit into a failure. These commands take no author, label
+// or session, so both are left empty.
+if j_new.has("desc") || j_new.has("groups") {
+    let mut j_entry = DataObject::new();
+    j_entry.put_string("author", "");
+    j_entry.put_string("facet", "command");
+    j_entry.put_string("cmd", &cmd);
+    j_entry.put_string("op", "meta");
+    j_entry.put_string("old", &j_old.to_string());
+    j_entry.put_string("new", &j_new.to_string());
+    j_entry.put_string("label", "");
+    let j_r = crate::dev::code::patch_journal::patch_journal("append".to_string(), lib.clone(), ctlid.clone(), String::new(), j_entry, 0, false, String::new());
+    if j_r.get_string("status") == "ok" {
+        o.put_string("patch_id", &j_r.get_string("patch_id"));
+    } else {
+        o.put_string("journal_warning", &j_r.try_get_string("msg").unwrap_or_default());
+    }
+}
 o
