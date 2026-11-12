@@ -480,27 +480,34 @@ async function init(host, { lib, ctlId, toast }) {
       const when = new Date(p.time).toTimeString().slice(0, 5);
       chip.innerHTML = `<span class="hdot"></span><span class="ptxt"></span>`;
       chip.querySelector(".hdot").style.background = FACET_HUES[p.facet];
-      const full = `${p.patch_id} · ${p.author || "?"} · ${p.facet}${p.label ? ` · ${p.label}` : ""}`;
+      const what = p.facet === "command" && p.cmd
+        ? `command ${p.cmd}${p.op ? ` (${p.op})` : ""}` : p.facet;
+      const full = `${p.patch_id} · ${p.author || "?"} · ${what}${p.label ? ` · ${p.label}` : ""}`;
       chip.querySelector(".ptxt").textContent = full;
       // the chip ellipsizes (C13) — the title carries the whole line
       chip.title = `${full} · ${when}`;
       // Revert routes per facet family: ui facets = inverse snippet patch,
       // timer/event = re-apply the old component through the setters, scene
       // = write the entry's old whole-object as a new write. Flow entries
-      // get no ↩ — a whole-body revert belongs to the flow editor.
+      // get no ↩ — a whole-body revert belongs to the flow editor. Command
+      // entries (facet "command") revert per op — see revertCommandEntry.
       const componentEntry = p.facet === "timer" || p.facet === "event";
       const sceneEntry = p.facet === "scene";
-      if (patchMode && (UI_FACETS.has(p.facet) || componentEntry || sceneEntry)) {
+      const commandEntry = commandRevertable(p);
+      if (patchMode && (UI_FACETS.has(p.facet) || componentEntry || sceneEntry || commandEntry)) {
         const undo = document.createElement("button");
         undo.className = "wb-revert";
         undo.textContent = "↩";
-        undo.title = componentEntry
+        undo.title = commandEntry
+          ? `revert ${p.patch_id} — ${commandRevertHint(p)}`
+          : componentEntry
           ? `revert ${p.patch_id} — re-applies the previous ${p.facet} state as a new set/remove`
           : sceneEntry
             ? `revert ${p.patch_id} — writes the entry's old scene as a new write`
             : `revert ${p.patch_id} — applies the inverse as a new patch`;
         undo.addEventListener("click", () =>
-          componentEntry ? revertComponent(p) : sceneEntry ? revertScene(p) : revertPatch(p));
+          commandEntry ? revertCommandEntry(p)
+            : componentEntry ? revertComponent(p) : sceneEntry ? revertScene(p) : revertPatch(p));
         chip.appendChild(undo);
       }
       return chip;
@@ -1643,6 +1650,115 @@ async function init(host, { lib, ctlId, toast }) {
     renderStrip();
     wbToast(`Restored ${p.cmd} from ${p.patch_id}.`
       + (r.kind === "compile_error" ? " It was stored but did not compile." : ""));
+  }
+
+  // ── revert of a command journal entry (facet "command") ───
+  // Every revert is a NEW journaled edit through the same commands the
+  // entry came from: patch = the inverse snippet, imports = the old block,
+  // upsert = re-author from the entry's old {command, impl}, create =
+  // delete_command, meta = the old values. delete_command's own entry (no
+  // op) re-authors through revertCommandDelete.
+  function commandMetaOld(p) {
+    let o;
+    try { o = JSON.parse(p.old); } catch { return null; }
+    if (!o || typeof o !== "object") return null;
+    const keys = Object.keys(o).filter((k) => k === "desc" || k === "groups");
+    // set_command_meta reads "" as "leave untouched": a value that was empty
+    // before the edit cannot be put back, so such an entry gets no revert.
+    if (!keys.length || keys.some((k) => typeof o[k] !== "string" || o[k] === "")) return null;
+    return o;
+  }
+  function commandRevertable(p) {
+    if (p.facet !== "command" || !p.cmd) return false;
+    switch (p.op ?? "") {
+      case "": return !!p.old;          // delete_command's entry
+      case "patch": return !!p.new;     // an empty inverse snippet matches everywhere
+      case "imports": case "create": return true;
+      case "upsert": return !!p.old;
+      case "meta": return !!commandMetaOld(p);
+      default: return false;
+    }
+  }
+  function commandRevertHint(p) {
+    switch (p.op ?? "") {
+      case "": return `re-authors ${p.cmd} from the entry's old state`;
+      case "patch": return "applies the inverse snippet as a new patch_command_body";
+      case "imports": return "sets the previous import block again";
+      case "create": return `deletes ${p.cmd} (journaled, so it can be restored)`;
+      case "upsert": return "re-authors the previous signature, imports and body";
+      case "meta": return "sets the previous desc/groups again";
+      default: return "";
+    }
+  }
+  async function revertCommandEntry(p) {
+    const op = p.op ?? "";
+    const exists = (record.cmd ?? []).some((c) => c.name === p.cmd);
+    if (op === "") {
+      if (exists) {
+        toast.show(`cannot revert ${p.patch_id} — ${p.cmd} exists on this control again`);
+        return;
+      }
+      await revertCommandDelete(p);
+      return;
+    }
+    if (!exists) {
+      toast.show(`cannot revert ${p.patch_id} — ${p.cmd} is no longer on this control`);
+      return;
+    }
+    if (codeState?.cmdName === p.cmd && codeState.dirty) {
+      toast.show(`save or discard your changes to ${p.cmd} before reverting ${p.patch_id}`);
+      return;
+    }
+    let r;
+    if (op === "patch") {
+      r = await patchCommandBody(lib, name, p.cmd, p.new, p.old ?? "");
+      if (r.status !== "ok" && /snippet not found/i.test(r.msg ?? "")) {
+        toast.show(`cannot revert ${p.patch_id} cleanly — the body of ${p.cmd} has changed since`);
+        return;
+      }
+    } else if (op === "imports") {
+      r = await setCommandImports(lib, name, p.cmd, p.old ?? "");
+    } else if (op === "upsert") {
+      let old;
+      try { old = JSON.parse(p.old); } catch { old = null; }
+      const implRec = old?.impl;
+      const t = old?.command?.type || "rust";
+      const ext = t === "rust" ? "rs" : t;
+      if (!implRec || typeof implRec[ext] !== "string") {
+        toast.show(`cannot revert ${p.patch_id} — its old state is unreadable`);
+        return;
+      }
+      r = await upsertCommand(lib, name, p.cmd, {
+        lang: t, returnType: implRec.returntype || "String",
+        params: implRec.params ?? [], imports: implRec.import ?? "", codeBody: implRec[ext],
+      });
+    } else if (op === "create") {
+      r = await deleteCommand(lib, name, p.cmd);
+    } else if (op === "meta") {
+      const o = commandMetaOld(p);
+      if (!o) {
+        toast.show(`cannot revert ${p.patch_id} — its old state is unreadable`);
+        return;
+      }
+      r = await setCommandMeta(lib, name, p.cmd, o.desc ?? "", o.groups ?? "");
+    } else {
+      return;
+    }
+    if (r.status !== "ok" && r.kind !== "compile_error") {
+      toast.show(`revert failed: ${r.msg}`);
+      return;
+    }
+    // An open, clean code pane on this command now shows old text: close it,
+    // so reopening reads the store.
+    if (codeState?.cmdName === p.cmd) closeCommandPane();
+    const fresh = await readRec(lib, ctlId);
+    if (!(fresh instanceof Error)) record.cmd = fresh.cmd ?? [];
+    host.querySelector(".wb-cmd-rows").replaceChildren();
+    renderCommands();
+    refreshDirtyUi();
+    renderStrip();
+    toast.show(`${r.patch_id ? `${r.patch_id} · ` : ""}reverted ${p.patch_id} (${p.cmd} ${op})`
+      + (r.kind === "compile_error" ? " — stored, but it did not compile" : ""));
   }
 
   // ── right-pane extras ─────────────────────────────────────
