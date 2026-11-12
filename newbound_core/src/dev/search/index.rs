@@ -20,7 +20,7 @@ use crate::security::security::init::check_auth;
 // so a small record costs tens of bytes instead of a fixed 8 KB.
 // ---------------------------------------------------------------------------
 
-pub const MAGIC: &[u8; 8] = b"NBSRCH01";
+pub const MAGIC: &[u8; 8] = b"NBSRCH02";
 pub const LIB_WORDS: usize = 16384; // 2^20 bits
 pub const MAX_DOC_WORDS: usize = 2048; // 2^17 bits
 pub const MAX_ASSET_BYTES: u64 = 2 * 1024 * 1024;
@@ -187,10 +187,17 @@ pub fn command_text(store: &DataStore, lib: &str, cmd_name: &str, cmd_id: &str) 
     Some(hay)
 }
 
-fn control_docs(lib: &str, cname: &str, cid: &str) -> Vec<(Doc, String)> {
+fn impl_id(store: &DataStore, lib: &str, cmd_id: &str) -> Option<String> {
+    let d = store.get_data(lib, cmd_id).get_object("data");
+    let lang = if d.has("type") && d.get_property("type").is_string() { d.get_string("type") } else { "rust".to_string() };
+    if d.has(&lang) && d.get_property(&lang).is_string() { Some(d.get_string(&lang)) } else { None }
+}
+
+fn control_docs(lib: &str, cname: &str, cid: &str, ids: &mut Vec<String>) -> Vec<(Doc, String)> {
     let store = DataStore::new();
     let mut out = Vec::new();
     if !store.exists(lib, cid) { return out; }
+    ids.push(cid.to_string());
     let d = store.get_data(lib, cid).get_object("data");
     let mut meta = cname.to_string();
     if d.has("desc") && d.get_property("desc").is_string() {
@@ -217,6 +224,8 @@ fn control_docs(lib: &str, cname: &str, cid: &str) -> Vec<(Doc, String)> {
             let n = c.get_string("name");
             let id = c.get_string("id");
             if let Some(t) = command_text(&store, lib, &n, &id) {
+                ids.push(id.clone());
+                if let Some(i) = impl_id(&store, lib, &id) { ids.push(i); }
                 out.push((new_doc(2, cname, cid, &n, &id), t));
             }
         }
@@ -260,9 +269,17 @@ pub fn asset_text(lib: &str, name: &str) -> Option<String> {
 
 // Every document of a library with its text, in a stable order.
 pub fn collect(lib: &str) -> Vec<(Doc, String)> {
+    let mut ids: Vec<String> = Vec::new();
+    collect_ids(lib, &mut ids)
+}
+
+// collect, also naming every record id the documents were read from (the
+// records whose files the freshness fingerprint watches).
+pub fn collect_ids(lib: &str, ids: &mut Vec<String>) -> Vec<(Doc, String)> {
     let store = DataStore::new();
     let mut out = Vec::new();
     if store.exists(lib, "controls") {
+        ids.push("controls".to_string());
         let got = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let mut pairs: Vec<(String, String)> = Vec::new();
             let ctls = store.get_data(lib, "controls").get_object("data");
@@ -282,8 +299,9 @@ pub fn collect(lib: &str) -> Vec<(Doc, String)> {
         if let Ok(pairs) = got {
             for (cname, cid) in pairs {
                 // One unreadable control must not cost the library its index.
-                let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| control_docs(lib, &cname, &cid)));
-                if let Ok(mut v) = r { out.append(&mut v); }
+                let mut got: Vec<String> = Vec::new();
+                let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| control_docs(lib, &cname, &cid, &mut got)));
+                if let Ok(mut v) = r { out.append(&mut v); ids.append(&mut got); } else { ids.push(cid.clone()); }
             }
         }
     }
@@ -329,7 +347,9 @@ pub fn build(lib: &str) -> Result<(usize, usize, i64), String> {
     let t0 = Instant::now();
     if lib.is_empty() || lib.contains('/') || lib.contains("..") { return Err(format!("bad library name '{}'", lib)); }
     if !DataStore::new().root.join(lib).exists() { return Err(format!("library '{}' not found", lib)); }
-    let pairs = collect(lib);
+    let start_ns = now_ns();
+    let mut ids: Vec<String> = Vec::new();
+    let pairs = collect_ids(lib, &mut ids);
     let mut libmask = vec![0u64; LIB_WORDS];
     let mut body: Vec<u8> = Vec::new();
     let mut n: u32 = 0;
@@ -352,15 +372,24 @@ pub fn build(lib: &str) -> Result<(usize, usize, i64), String> {
     }
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
         .map(|x| x.as_millis() as u64).unwrap_or(0);
-    let mut file: Vec<u8> = Vec::with_capacity(16 + LIB_WORDS * 8 + 4 + body.len());
+    let mut watch = watch_paths(lib, &ids);
+    watch.retain(|w| w.len() <= 65535);
+    let (mut fp, newest) = fingerprint(lib, &watch);
+    // A file written while (or just before) it was read: not trusted, so the
+    // next freshness check rebuilds.
+    if newest + 50_000_000 >= start_ns { fp = 0; }
+    let mut file: Vec<u8> = Vec::with_capacity(32 + LIB_WORDS * 8 + body.len());
     file.extend_from_slice(MAGIC);
     file.extend_from_slice(&now.to_le_bytes());
-    for w in &libmask { file.extend_from_slice(&w.to_le_bytes()); }
+    file.extend_from_slice(&fp.to_le_bytes());
     file.extend_from_slice(&n.to_le_bytes());
+    for w in &libmask { file.extend_from_slice(&w.to_le_bytes()); }
+    file.extend_from_slice(&(watch.len() as u32).to_le_bytes());
+    for w in &watch { put_str(&mut file, w); }
     file.extend_from_slice(&body);
     let dir = index_dir();
     std::fs::create_dir_all(&dir).map_err(|e| format!("cannot create {}: {}", dir.display(), e))?;
-    let tmp = dir.join(format!("{}.idx.tmp{}", lib, std::process::id()));
+    let tmp = dir.join(format!("{}.idx.tmp{}-{}", lib, std::process::id(), now_ns()));
     {
         let mut f = std::fs::File::create(&tmp).map_err(|e| format!("cannot write {}: {}", tmp.display(), e))?;
         f.write_all(&file).map_err(|e| format!("cannot write {}: {}", tmp.display(), e))?;
@@ -374,15 +403,135 @@ pub fn header(lib: &str) -> Option<(u64, u32, u64)> {
     let p = index_path(lib);
     let len = std::fs::metadata(&p).ok()?.len();
     let mut f = std::fs::File::open(&p).ok()?;
-    let mut head = vec![0u8; 16];
+    let mut head = vec![0u8; 28];
     f.read_exact(&mut head).ok()?;
     if &head[0..8] != MAGIC { return None; }
     let built = u64::from_le_bytes(head[8..16].try_into().ok()?);
-    let mut skip = vec![0u8; LIB_WORDS * 8];
-    f.read_exact(&mut skip).ok()?;
+    let n = u32::from_le_bytes(head[24..28].try_into().ok()?);
+    Some((built, n, len))
+}
+
+// ---------------------------------------------------------------------------
+// Freshness. The index remembers WHICH FILES it was built from (every record
+// file and its id-prefixed attachment siblings, relative to data/<lib>) and a
+// fingerprint of their (mtime, size) plus every asset's. A query re-stats
+// them - no record is read - and rebuilds the library when anything moved.
+// This sees every writer alike: dev.code commands (journaled or not), git
+// pulls, another process, a hand edit.
+// ---------------------------------------------------------------------------
+
+pub const FRESH_MS: u64 = 2000; // a library is re-checked at most this often
+static CHECKED: std::sync::Mutex<Vec<(String, u64)>> = std::sync::Mutex::new(Vec::new());
+
+pub fn now_ns() -> u128 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0)
+}
+
+fn mtime_len(p: &std::path::Path) -> (u128, u64) {
+    match std::fs::metadata(p) {
+        Ok(m) => (m.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_nanos()).unwrap_or(0), m.len()),
+        Err(_) => (0, 0),
+    }
+}
+
+pub fn watch_paths(lib: &str, ids: &[String]) -> Vec<String> {
+    let store = DataStore::new();
+    let base = store.root.join(lib);
+    let mut v: Vec<String> = Vec::new();
+    for id in ids {
+        let f = store.get_data_file(lib, id);
+        let dir = match f.parent() { Some(d) => d.to_path_buf(), None => continue };
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for e in entries.flatten() {
+                let n = e.file_name().to_string_lossy().to_string();
+                if !n.starts_with(id.as_str()) { continue; }
+                let p = e.path();
+                match p.strip_prefix(&base) {
+                    Ok(r) => v.push(r.to_string_lossy().to_string()),
+                    Err(_) => v.push(p.to_string_lossy().to_string()),
+                }
+            }
+        }
+    }
+    v.sort();
+    v.dedup();
+    v
+}
+
+fn eat(h: &mut u64, s: &str) {
+    for b in s.as_bytes() {
+        *h ^= *b as u64;
+        *h = h.wrapping_mul(0x100000001b3);
+    }
+}
+
+// (fingerprint, newest mtime in ns) over the watched files and every asset.
+pub fn fingerprint(lib: &str, watch: &[String]) -> (u64, u128) {
+    let base = DataStore::new().root.join(lib);
+    let mut h: u64 = 0xcbf29ce484222325;
+    let mut newest = 0u128;
+    for w in watch {
+        let (m, l) = mtime_len(&base.join(w));
+        if m > newest { newest = m; }
+        eat(&mut h, &format!("W {} {} {}\n", w, m, l));
+    }
+    let ab = base.join("_ASSETS");
+    for a in asset_names(lib) {
+        let (m, l) = mtime_len(&ab.join(&a));
+        if m > newest { newest = m; }
+        eat(&mut h, &format!("A {} {} {}\n", a, m, l));
+    }
+    (h, newest)
+}
+
+// The stored fingerprint and watch list. None = no usable index.
+pub fn read_watch(lib: &str) -> Option<(u64, Vec<String>)> {
+    use std::io::Seek;
+    let mut f = std::fs::File::open(index_path(lib)).ok()?;
+    let mut head = vec![0u8; 28];
+    f.read_exact(&mut head).ok()?;
+    if &head[0..8] != MAGIC { return None; }
+    let fp = u64::from_le_bytes(head[16..24].try_into().ok()?);
+    f.seek(std::io::SeekFrom::Current((LIB_WORDS * 8) as i64)).ok()?;
+    let mut r = std::io::BufReader::new(f);
     let mut nb = [0u8; 4];
-    f.read_exact(&mut nb).ok()?;
-    Some((built, u32::from_le_bytes(nb), len))
+    r.read_exact(&mut nb).ok()?;
+    let n = u32::from_le_bytes(nb) as usize;
+    let mut v = Vec::with_capacity(n.min(100000));
+    for _ in 0..n {
+        let mut lb = [0u8; 2];
+        r.read_exact(&mut lb).ok()?;
+        let mut s = vec![0u8; u16::from_le_bytes(lb) as usize];
+        r.read_exact(&mut s).ok()?;
+        v.push(String::from_utf8(s).ok()?);
+    }
+    Some((fp, v))
+}
+
+// Does the index still describe the files on disk? Stats only.
+pub fn is_fresh(lib: &str) -> bool {
+    match read_watch(lib) {
+        Some((fp, w)) => fp != 0 && fingerprint(lib, &w).0 == fp,
+        None => false,
+    }
+}
+
+// Rebuild the library's index when it is missing or stale. true = rebuilt.
+// Checked at most once per FRESH_MS per library in this process.
+pub fn ensure_fresh(lib: &str) -> bool {
+    let now = (now_ns() / 1_000_000) as u64;
+    {
+        let mut g = match CHECKED.lock() { Ok(g) => g, Err(p) => p.into_inner() };
+        match g.iter_mut().find(|e| e.0 == lib) {
+            Some(e) => {
+                if now.saturating_sub(e.1) < FRESH_MS && index_path(lib).exists() { return false; }
+                e.1 = now;
+            }
+            None => g.push((lib.to_string(), now)),
+        }
+    }
+    if is_fresh(lib) { return false; }
+    build(lib).is_ok()
 }
 
 fn take<'a>(b: &'a [u8], pos: &mut usize, n: usize) -> Option<&'a [u8]> {
@@ -404,21 +553,27 @@ fn take_str(b: &[u8], pos: &mut usize) -> Option<String> {
 // the header was read.
 pub fn load(lib: &str, hashes: &[u64]) -> Option<(bool, Vec<Doc>)> {
     let mut f = std::fs::File::open(index_path(lib)).ok()?;
-    let mut head = vec![0u8; 16 + LIB_WORDS * 8];
+    let mut head = vec![0u8; 28 + LIB_WORDS * 8];
     f.read_exact(&mut head).ok()?;
     if &head[0..8] != MAGIC { return None; }
     let bits = LIB_WORDS * 64;
     for h in hashes {
         let i = (*h as usize) & (bits - 1);
-        let o = 16 + (i >> 6) * 8;
+        let o = 28 + (i >> 6) * 8;
         let w = u64::from_le_bytes(head[o..o + 8].try_into().ok()?);
         if w & (1u64 << (i & 63)) == 0 { return Some((true, Vec::new())); }
     }
     let mut b: Vec<u8> = Vec::new();
     f.read_to_end(&mut b).ok()?;
     let mut pos = 0usize;
-    let nb = take(&b, &mut pos, 4)?;
-    let n = u32::from_le_bytes([nb[0], nb[1], nb[2], nb[3]]) as usize;
+    let n = u32::from_le_bytes(head[24..28].try_into().ok()?) as usize;
+    let wn = take(&b, &mut pos, 4)?;
+    let nw = u32::from_le_bytes([wn[0], wn[1], wn[2], wn[3]]) as usize;
+    for _ in 0..nw {
+        let l = take(&b, &mut pos, 2)?;
+        let k = u16::from_le_bytes([l[0], l[1]]) as usize;
+        take(&b, &mut pos, k)?;
+    }
     let mut docs = Vec::with_capacity(n.min(100000));
     for _ in 0..n {
         let kind = take(&b, &mut pos, 1)?[0];
@@ -512,14 +667,9 @@ pub fn search(lib: &str, ctl: &str, kinds: &str, query: &str, limit: i64, sessio
                 None => continue,
             }
         }
-        let loaded = match load(&l, &hashes) {
-            Some(x) => x,
-            None => {
-                if build(&l).is_err() { continue; }
-                built += 1;
-                match load(&l, &hashes) { Some(x) => x, None => continue }
-            }
-        };
+        // Missing or stale (a watched file moved): rebuilt before it is trusted.
+        if ensure_fresh(&l) { built += 1; }
+        let loaded = match load(&l, &hashes) { Some(x) => x, None => continue };
         searched += 1;
         if loaded.0 { pruned += 1; continue; }
         let mut auth: std::collections::HashMap<String, bool> = std::collections::HashMap::new();
