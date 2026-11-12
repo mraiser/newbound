@@ -113,6 +113,8 @@ async function searchContent(q, mine, index) {
     rows.push({
       kind: KIND[m.kind] || m.kind, content: true, lib: m.lib,
       id: ctl ? ctl.id : null, name: label(m), line: m.line,
+      facet: m.kind === "facet" ? m.facet : null,
+      cmd: m.kind === "command" ? m.cmd : null,
       preview: String(m.preview ?? "").split("\n")[0].trim(),
     });
   }
@@ -166,12 +168,43 @@ function render() {
   if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: "nearest" });
 }
 
-// A content hit opens the control that owns it; an asset opens its library.
+// A content hit opens the control that owns it, then its facet tab or its
+// command; an asset opens its library.
 function open(row) {
   close();
   input.value = "";
-  if (row.kind === "lib" || !row.id) ME.DATA.openLib(row.lib);
-  else ME.DATA.openControl(row.lib, row.id);
+  if (row.kind === "lib" || !row.id) return ME.DATA.openLib(row.lib);
+  const before = location.hash;
+  ME.DATA.openControl(row.lib, row.id);
+  if (!row.facet && !row.cmd) return;
+  if (location.hash === before) reveal(row);
+  else window.addEventListener("hashchange", () => reveal(row), { once: true });
+}
+
+// The workbench takes no facet or command in its route, so the hit is shown
+// the way a person would show it: once the workbench has mounted (the frame's
+// breadcrumb carries the control's name), press the facet's tab, or the
+// commands tab and then the command's row. Gives up quietly after 8 s, or as
+// soon as the user navigates elsewhere.
+function reveal(row) {
+  const at = location.hash;
+  const t0 = Date.now();
+  let tabbed = false;
+  const tick = () => {
+    if (location.hash !== at || Date.now() - t0 > 8000) return;
+    const crumb = document.querySelector(".seg-ctl");
+    const facet = row.cmd ? "cmd" : row.facet;
+    const tab = document.querySelector('.wb-chip[id$="-tab-' + facet + '"]');
+    if (!tab || !crumb || crumb.hidden || crumb.textContent === "\u2026") return setTimeout(tick, 60);
+    if (!tabbed) { tabbed = true; tab.click(); }
+    if (!row.cmd) return;
+    const rows = document.querySelector(".wb-cmd-rows");
+    if (rows && rows.hidden) return;   // a command is already open: leave it
+    const hit = [...document.querySelectorAll(".wb-cmd-main")]
+      .find((b) => b.querySelector(".cname")?.textContent === row.cmd);
+    if (hit) hit.click(); else setTimeout(tick, 60);
+  };
+  tick();
 }
 
 function close() {
