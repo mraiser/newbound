@@ -156,9 +156,15 @@ entry.put_string("old", &old.to_string());
 entry.put_string("new", "");
 entry.put_int("time", time());
 entry.put_string("label", &format!("delete command {}", cmd));
-let jr = crate::dev::code::patch_journal::patch_journal("append".to_string(), lib, ctlid, String::new(), entry, 0, false, nn_sessionid);
-if jr.get_string("status") != "ok" { return jr; }
-let patch_id = jr.get_string("patch_id");
+// dev.code.evaluate_rust marks its temp command in globals
+// (dev_nojournal:<lib>:<ctl>:<cmd>): its deletion is not journaled.
+let patch_id = if flowlang::datastore::DataStore::globals().has(&format!("dev_nojournal:{}:{}:{}", lib, ctl, cmd)) {
+    String::new()
+} else {
+    let jr = crate::dev::code::patch_journal::patch_journal("append".to_string(), lib, ctlid, String::new(), entry, 0, false, nn_sessionid);
+    if jr.get_string("status") != "ok" { return jr; }
+    jr.get_string("patch_id")
+};
 
 let mut o = DataObject::new();
 o.put_string("status", "ok");

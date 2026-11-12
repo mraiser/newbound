@@ -56,12 +56,17 @@ pub fn evaluate_rust(imports: String, code: String) -> DataObject {
 let lib = "scratch".to_string();
 let ctl = "scratch".to_string();
 let cmd_name = format!("eval_{}", unique_session_id());
+// The temp command must not reach the patch journal: this runs thousands of
+// times a day. upsert_command and delete_command skip journaling while this
+// global marker exists; cleanup_temp removes it.
+flowlang::datastore::DataStore::globals().put_boolean(&format!("dev_nojournal:{}:{}:{}", lib, ctl, cmd_name), true);
 
 // Best-effort removal of the temp command: datastore docs via delete_command,
 // plus the generated source file and its mod.rs references (delete_command leaves
 // those behind, and stale broken files poison every subsequent build of this crate).
 fn cleanup_temp(lib: &str, ctl: &str, cmd_name: &str) {
     let _ = delete_command(lib.to_string(), ctl.to_string(), cmd_name.to_string(), "admin".to_string(), "".to_string());
+    flowlang::datastore::DataStore::globals().remove_property(&format!("dev_nojournal:{}:{}:{}", lib, ctl, cmd_name));
 
     // Scrub generated artifacts
     let root = flowlang::datastore::DataStore::new().get_lib_root(lib);

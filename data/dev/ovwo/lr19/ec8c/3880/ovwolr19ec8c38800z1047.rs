@@ -248,7 +248,9 @@ if store.exists(&lib, &ctlid) {
   // what the store now holds; a journal problem is reported on the result and
   // never turns the edit into a failure. The entry carries the
   // caller-supplied label (the stated why) and the resolved author.
-  if j_old != j_new {
+  // dev.code.evaluate_rust marks its temp command in globals (dev_nojournal:<lib>:<ctl>:<cmd>)
+  // so a throwaway script leaves no journal entry.
+  if j_old != j_new && !flowlang::datastore::DataStore::globals().has(&format!("dev_nojournal:{}:{}:{}", lib, ctl, cmd)) {
       let mut j_entry = DataObject::new();
       j_entry.put_string("author", &author);
       j_entry.put_string("facet", "command");
