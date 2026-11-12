@@ -1,3 +1,30 @@
+// An empty author defaults to the calling session's user - the platform
+// injects nn_sessionid into params on every web call (HTTP and websocket
+// alike); CLI/MCP callers that want a specific provenance name pass author.
+// Same rule as patch_control_facet and delete_command.
+let author = {
+    let a = author.trim().to_string();
+    if !a.is_empty() { a } else {
+        let mut who = String::new();
+        if !nn_sessionid.is_empty() {
+            let system = flowlang::datastore::DataStore::globals().get_object("system");
+            if system.has("sessions") {
+                let sessions = system.get_object("sessions");
+                if sessions.has(&nn_sessionid) {
+                    let session = sessions.get_object(&nn_sessionid);
+                    if session.has("user") {
+                        who = session.get_object("user").try_get_string("displayname").unwrap_or_default();
+                    }
+                    if who.trim().is_empty() {
+                        who = session.try_get_string("username").unwrap_or_default();
+                    }
+                }
+            }
+        }
+        if who.trim().is_empty() { "anonymous".to_string() } else { who }
+    }
+};
+
 let api = crate::api::new();
 let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
 
@@ -102,18 +129,18 @@ if !groups.is_empty() && groups != j_old_groups { j_old.put_string("groups", &j_
 // Journal the edit on the control's patch journal (facet "command", op
 // "meta"). It runs after the store write, so the entry describes
 // what the store now holds; a journal problem is reported on the result and
-// never turns the edit into a failure. These commands take no author, label
-// or session, so both are left empty.
+// never turns the edit into a failure. The entry carries the
+// caller-supplied label (the stated why) and the resolved author.
 if j_new.has("desc") || j_new.has("groups") {
     let mut j_entry = DataObject::new();
-    j_entry.put_string("author", "");
+    j_entry.put_string("author", &author);
     j_entry.put_string("facet", "command");
     j_entry.put_string("cmd", &cmd);
     j_entry.put_string("op", "meta");
     j_entry.put_string("old", &j_old.to_string());
     j_entry.put_string("new", &j_new.to_string());
-    j_entry.put_string("label", "");
-    let j_r = crate::dev::code::patch_journal::patch_journal("append".to_string(), lib.clone(), ctlid.clone(), String::new(), j_entry, 0, false, String::new());
+    j_entry.put_string("label", label.trim());
+    let j_r = crate::dev::code::patch_journal::patch_journal("append".to_string(), lib.clone(), ctlid.clone(), String::new(), j_entry, 0, false, nn_sessionid.clone());
     if j_r.get_string("status") == "ok" {
         o.put_string("patch_id", &j_r.get_string("patch_id"));
     } else {

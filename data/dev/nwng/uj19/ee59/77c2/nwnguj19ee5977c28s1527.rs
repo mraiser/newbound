@@ -30,7 +30,8 @@ fn cleanup_temp(lib: &str, ctl: &str, cmd_name: &str) {
 // catch_unwind so a panic can't skip cleanup.
 let ax = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| upsert_command(
     lib.clone(), ctl.clone(), cmd_name.clone(), "rust".to_string(),
-    "FLAT".to_string(), DataArray::new(), imports.clone(), code.clone())));
+    "FLAT".to_string(), DataArray::new(), imports.clone(), code.clone(),
+    String::new(), "admin".to_string(), String::new())));
 let upsert_res = match ax {
     Ok(res) => res,
     Err(e) => {

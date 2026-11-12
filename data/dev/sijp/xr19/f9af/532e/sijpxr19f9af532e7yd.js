@@ -35,7 +35,8 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
       new_snippet: newSnippet, base, label, author: "" });
   const listPatches = (l2, c2, n2) => code("list_control_patches", { lib: l2, ctl: c2, limit: n2 ?? 0 });
   const setControlMeta = (l2, c2, d2, g2) => code("set_control_meta", { lib: l2, ctl: c2, desc: d2, groups: g2 });
-  const setCommandMeta = (l2, c2, m2, d2, g2) => code("set_command_meta", { lib: l2, ctl: c2, cmd: m2, desc: d2, groups: g2 });
+  const setCommandMeta = (l2, c2, m2, d2, g2, label = "") =>
+    code("set_command_meta", { lib: l2, ctl: c2, cmd: m2, desc: d2, groups: g2, label, author: "" });
   const setTags = (l2, c2, m2, t2) => code("set_tags", { lib: l2, ctl: c2, cmd: m2, tags: t2, author: "" });
   const setGroups = (l2, c2, m2, g2) => code("set_groups", { lib: l2, ctl: c2, cmd: m2, groups: g2, author: "" });
   const securityGroups = async () => {
@@ -49,11 +50,15 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     if (r2.status !== "ok") return r2;
     return { status: "ok", ...(r2.data && typeof r2.data === "object" ? r2.data : {}) };
   };
-  const patchCommandBody = (l2, c2, m2, o2, n2) =>
-    code("patch_command_body", { lib: l2, ctl: c2, cmd: m2, old_snippet: o2, new_snippet: n2 });
-  const setCommandImports = (l2, c2, m2, i2) => code("set_command_imports", { lib: l2, ctl: c2, cmd: m2, imports: i2 });
-  const upsertCommand = (l2, c2, m2, { lang, returnType, params = [], imports = "", codeBody = "" }) =>
-    code("upsert_command", { lib: l2, ctl: c2, cmd: m2, lang, return_type: returnType, params, imports, code_body: codeBody });
+  // Command edits are journaled like facet edits: label is the stated why,
+  // an empty author resolves to the session's user on the server.
+  const patchCommandBody = (l2, c2, m2, o2, n2, label = "") =>
+    code("patch_command_body", { lib: l2, ctl: c2, cmd: m2, old_snippet: o2, new_snippet: n2, label, author: "" });
+  const setCommandImports = (l2, c2, m2, i2, label = "") =>
+    code("set_command_imports", { lib: l2, ctl: c2, cmd: m2, imports: i2, label, author: "" });
+  const upsertCommand = (l2, c2, m2, { lang, returnType, params = [], imports = "", codeBody = "", label = "" }) =>
+    code("upsert_command", { lib: l2, ctl: c2, cmd: m2, lang, return_type: returnType, params, imports,
+      code_body: codeBody, label, author: "" });
   const writeFlowBody = (l2, c2, m2, b2, { base = "", label = "" } = {}) =>
     code("write_flow_body", { lib: l2, ctl: c2, cmd: m2, body: b2, base, label, author: "" });
   const deleteCommand = (l2, c2, m2) => code("delete_command", { lib: l2, ctl: c2, cmd: m2, author: "" });
@@ -1363,6 +1368,8 @@ async function init(host, { lib, ctlId, toast }) {
     const impEl = codeEl.querySelector(".wcc-imports");
     const source = codeApi.getValue();
     const notes = [];
+    // the same label box facet saves use: the stated why rides the journal entry
+    const label = labelInput?.value.trim() ?? "";
     errEl.hidden = true;
 
     // a signature change can't travel as a body patch: returntype/params
@@ -1379,7 +1386,7 @@ async function init(host, { lib, ctlId, toast }) {
       const ret = codeEl.querySelector(".wcc-ret").value;
       const r = await upsertCommand(lib, name, codeState.cmdName,
         { lang: codeState.lang, returnType: ret, params: parsed.params,
-          imports: impEl.value, codeBody: source });
+          imports: impEl.value, codeBody: source, label });
       if (r.status !== "ok" && r.kind !== "compile_error") {
         errEl.hidden = false;
         errEl.textContent = `upsert_command failed: ${r.msg}`;
@@ -1397,6 +1404,7 @@ async function init(host, { lib, ctlId, toast }) {
         errEl.hidden = false;
         errEl.textContent = `compile failed (the signature, imports and body were stored):\n${r.msg}`;
       }
+      if (labelInput) labelInput.value = "";
       updateCodeDirty();
       toast.show(`upsert_command → signature ${r.status === "ok" ? "· compiled" : "· compile FAILED"} · ${codeState.cmdName}`);
       return;
@@ -1405,7 +1413,7 @@ async function init(host, { lib, ctlId, toast }) {
     // imports first (set_command_imports recompiles): a body edit that
     // needs a new `use` compiles on the second call, not on ordering luck
     if (impEl.value !== (codeState.importsBaseline ?? "")) {
-      const r = await setCommandImports(lib, name, codeState.cmdName, impEl.value);
+      const r = await setCommandImports(lib, name, codeState.cmdName, impEl.value, label);
       if (r.status !== "ok" && r.kind !== "compile_error") {
         errEl.hidden = false;
         errEl.textContent = `set_command_imports failed: ${r.msg}`;
@@ -1422,7 +1430,7 @@ async function init(host, { lib, ctlId, toast }) {
     const patch = computePatch(codeState.baseline, source);
     if (patch && !(patch.oldSnippet === "" && codeState.baseline !== "")) {
       const r = await patchCommandBody(lib, name, codeState.cmdName,
-        patch.oldSnippet, patch.newSnippet);
+        patch.oldSnippet, patch.newSnippet, label);
       if (r.status !== "ok") {
         errEl.hidden = false;
         errEl.textContent = r.kind === "compile_error"
@@ -1438,6 +1446,7 @@ async function init(host, { lib, ctlId, toast }) {
     }
 
     updateCodeDirty();
+    if (notes.length && labelInput) labelInput.value = "";
     if (notes.length) toast.show(`${notes.join(" · ")} · ${codeState.cmdName}`);
   }
 
@@ -1633,13 +1642,14 @@ async function init(host, { lib, ctlId, toast }) {
       r = await upsertCommand(lib, name, p.cmd, {
         lang: t, returnType: implRec.returntype || "String",
         params: implRec.params ?? [], imports: implRec.import ?? "", codeBody,
+        label: `revert ${p.patch_id}`,
       });
     }
     if (r.status !== "ok" && r.kind !== "compile_error") {
       toast.show(`revert failed: ${r.msg}`);
       return;
     }
-    if (implRec.desc) await setCommandMeta(lib, name, p.cmd, implRec.desc, "");
+    if (implRec.desc) await setCommandMeta(lib, name, p.cmd, implRec.desc, "", `revert ${p.patch_id}`);
     if (implRec.tags) await setTags(lib, name, p.cmd, implRec.tags);
     if (implRec.groups) await setGroups(lib, name, p.cmd, implRec.groups);
     const fresh = await readRec(lib, ctlId);
@@ -1711,13 +1721,13 @@ async function init(host, { lib, ctlId, toast }) {
     }
     let r;
     if (op === "patch") {
-      r = await patchCommandBody(lib, name, p.cmd, p.new, p.old ?? "");
+      r = await patchCommandBody(lib, name, p.cmd, p.new, p.old ?? "", `revert ${p.patch_id}`);
       if (r.status !== "ok" && /snippet not found/i.test(r.msg ?? "")) {
         toast.show(`cannot revert ${p.patch_id} cleanly — the body of ${p.cmd} has changed since`);
         return;
       }
     } else if (op === "imports") {
-      r = await setCommandImports(lib, name, p.cmd, p.old ?? "");
+      r = await setCommandImports(lib, name, p.cmd, p.old ?? "", `revert ${p.patch_id}`);
     } else if (op === "upsert") {
       let old;
       try { old = JSON.parse(p.old); } catch { old = null; }
@@ -1731,6 +1741,7 @@ async function init(host, { lib, ctlId, toast }) {
       r = await upsertCommand(lib, name, p.cmd, {
         lang: t, returnType: implRec.returntype || "String",
         params: implRec.params ?? [], imports: implRec.import ?? "", codeBody: implRec[ext],
+        label: `revert ${p.patch_id}`,
       });
     } else if (op === "create") {
       r = await deleteCommand(lib, name, p.cmd);
@@ -1740,7 +1751,7 @@ async function init(host, { lib, ctlId, toast }) {
         toast.show(`cannot revert ${p.patch_id} — its old state is unreadable`);
         return;
       }
-      r = await setCommandMeta(lib, name, p.cmd, o.desc ?? "", o.groups ?? "");
+      r = await setCommandMeta(lib, name, p.cmd, o.desc ?? "", o.groups ?? "", `revert ${p.patch_id}`);
     } else {
       return;
     }
