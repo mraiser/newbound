@@ -1,8 +1,35 @@
+// An empty author defaults to the calling session's user - the platform
+// injects nn_sessionid into params on every web call (HTTP and websocket
+// alike); CLI/MCP callers that want a specific provenance name pass author.
+// Same rule as patch_control_facet and delete_command.
+let author = {
+    let a = author.trim().to_string();
+    if !a.is_empty() { a } else {
+        let mut who = String::new();
+        if !nn_sessionid.is_empty() {
+            let system = flowlang::datastore::DataStore::globals().get_object("system");
+            if system.has("sessions") {
+                let sessions = system.get_object("sessions");
+                if sessions.has(&nn_sessionid) {
+                    let session = sessions.get_object(&nn_sessionid);
+                    if session.has("user") {
+                        who = session.get_object("user").try_get_string("displayname").unwrap_or_default();
+                    }
+                    if who.trim().is_empty() {
+                        who = session.try_get_string("username").unwrap_or_default();
+                    }
+                }
+            }
+        }
+        if who.trim().is_empty() { "anonymous".to_string() } else { who }
+    }
+};
+
 // Replace a text command's file-level import block (the impl record's
 // `import` field) and recompile — patch_command_body's sibling for the one
 // section the body patch cannot reach. Flow commands have no import field
-// and are refused. Unjournaled like patch_command_body: the compile result
-// is the outcome, canon's git history is the record.
+// and are refused. Journaled on the control's patch journal (facet
+// "command", op "imports") once the compile has run.
 let api = crate::api::new();
 let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
 
@@ -116,4 +143,26 @@ match cres {
     }
 }
 out.put_string("old_imports", &old_imports);
+// Journal the edit on the control's patch journal (facet "command", op
+// "imports"). It runs after the store write and the compile, so the entry describes
+// what the store now holds; a journal problem is reported on the result and
+// never turns the edit into a failure. The entry carries the
+// caller-supplied label (the stated why) and the resolved author.
+if old_imports != imports.replace("\r", "") {
+    let mut j_entry = DataObject::new();
+    j_entry.put_string("author", &author);
+    j_entry.put_string("facet", "command");
+    j_entry.put_string("cmd", &cmd);
+    j_entry.put_string("op", "imports");
+    j_entry.put_string("old", &old_imports);
+    j_entry.put_string("new", &imports.replace("\r", ""));
+    j_entry.put_string("compile", if out.get_string("status") == "ok" { "ok" } else { "err" });
+    j_entry.put_string("label", label.trim());
+    let j_r = crate::dev::code::patch_journal::patch_journal("append".to_string(), lib.clone(), ctlid.clone(), String::new(), j_entry, 0, false, nn_sessionid.clone());
+    if j_r.get_string("status") == "ok" {
+        out.put_string("patch_id", &j_r.get_string("patch_id"));
+    } else {
+        out.put_string("journal_warning", &j_r.try_get_string("msg").unwrap_or_default());
+    }
+}
 out
