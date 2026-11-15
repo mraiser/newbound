@@ -4,6 +4,7 @@ var DATACACHE = {};
 var alljsapis = {};
 var allmetas = {};
 var CMDS = {};
+var PENDING = {};
 var SOCK = null;
 
 function guid() {
@@ -53,7 +54,7 @@ function lookupID(lib, name, cb) {
     else {
       x.fetching = true;
       json('../app/read', 'lib='+encodeURIComponent(lib)+'&id=controls', function(result) {
-        if (result.status != 'ok') cb(name);
+        if (result.status != 'ok') { x.fetching = false; cb(name); }
         else {
           x.when = now;
           x.fetching = false;
@@ -237,7 +238,9 @@ function installControl(el, lib, id, cb, data) {
           json('../app/read', 'lib='+encodeURIComponent(lib)+'&id='+encodeURIComponent(id), function(result) {
             var n = allmetas[lib][id].length;
             for (var i=0; i<n; i++) allmetas[lib][id][i](lib, id, Object.assign({}, result));
-            allmetas[lib][id] = result;
+            // A failed read is never cached: the next mount asks again.
+            if (result.status == 'ok') allmetas[lib][id] = result;
+            else delete allmetas[lib][id];
           });
         }
       }
@@ -454,6 +457,19 @@ function lettersAndNumbersOnly(s) {
     return out;
 }
 
+// The websocket went away with requests still unanswered. Each one is
+// settled exactly once: reads (safe to repeat) go again over XHR, anything
+// else gets the error, since the server may already have run it.
+function wsDropped(o) {
+  var cmds = CMDS, pend = PENDING;
+  CMDS = {};
+  PENDING = {};
+  for (var i in cmds) {
+    if (pend[i]) json(pend[i].cmd, pend[i].vars, cmds[i]);
+    else if (cmds[i]) cmds[i](o);
+  }
+}
+
 function startWebSocket() {
   if (!SOCK) {
     var url = document.URL;
@@ -476,8 +492,7 @@ function startWebSocket() {
         console.log('Websocket error:');
         console.log(error);
 
-        var o = { "status": "err", "msg": "Websocket error", "error": error };
-        for (var i in CMDS) CMDS[i](o);
+        wsDropped({ "status": "err", "msg": "Websocket error", "error": error });
     };
 
     connection.onclose = function(error) {
@@ -486,8 +501,7 @@ function startWebSocket() {
         console.log('Websocket close:');
         console.log(error);
 
-        var o = { "status": "err", "msg": "Websocket closed", "error": error };
-        for (var i in CMDS) CMDS[i](o);
+        wsDropped({ "status": "err", "msg": "Websocket closed", "error": error });
     };
 
     connection.onmessage = function(e) {
@@ -498,6 +512,7 @@ function startWebSocket() {
         var cb = CMDS[pid];
         if (cb) {
           delete CMDS[pid];
+          delete PENDING[pid];
           cb(o);
         }
       }
@@ -539,6 +554,7 @@ function json(cmd, vars, cb) {
     console.log('Sending json command via websocket: '+cmd+'?'+vars);
     var pid = guid();
     CMDS[pid] = cb;
+    if (cb && cmd == '../app/read') PENDING[pid] = { cmd: cmd, vars: vars };
 
     var params = {
       "sessionid": sessionid
