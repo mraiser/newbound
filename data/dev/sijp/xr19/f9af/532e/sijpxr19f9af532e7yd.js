@@ -175,12 +175,8 @@ async function init(host, { lib, ctlId, toast }) {
   }
   for (const facet of FACETS) makeChip(facet, facet === "cmd" ? "commands" : facet);
 
-  // Legacy `three` facet: not in the fixed order — a read-only chip appears
-  // only where the facet exists (scene-facet-design Part V).
-  if (record.three !== undefined) {
-    makeChip("three", "three · legacy").title =
-      "the pre-redesign 3D facet — read-only; the go-forward facet is scene";
-  }
+  // Legacy `three` facet: no tab (owner, 2026-11-15). The data stays on the
+  // record untouched; the go-forward facet is scene.
 
   // ── plugin facet tabs ─────────────────────────────────────
   // A plugin (the dev.plugins registry) may add a tab for a facet the
