@@ -182,6 +182,40 @@ async function init(host, { lib, ctlId, toast }) {
       "the pre-redesign 3D facet — read-only; the go-forward facet is scene";
   }
 
+  // ── plugin facet tabs ─────────────────────────────────────
+  // A plugin (the dev.plugins registry) may add a tab for a facet the
+  // workbench knows nothing about. It calls facetTabs.add({facet, label,
+  // hue, title, mount}) and gets a chip plus an empty pane; mount(el,
+  // {lib, ctl, id}) runs once, on first selection. add returns {el,
+  // setCount, setAbsent, select}, or null when the name is taken or
+  // malformed. The registrar rides this control's api (me.facetTabs) and
+  // is announced with an nb-facet-tabs event on the control's element for
+  // plugins that mounted before it existed.
+  const extTabs = new Map();      // facet -> {el, mount, mounted}
+  function addFacetTab(spec) {
+    const facet = String(spec?.facet ?? "").trim();
+    if (!/^[a-z][a-z0-9_-]*$/.test(facet) || facet === "three" || chips.has(facet)
+        || typeof spec.mount !== "function") return null;
+    const el = document.createElement("div");
+    el.className = "wb-ext wb-ext-" + facet;
+    el.hidden = true;
+    el.style.height = "100%";
+    el.style.overflow = "auto";
+    paneEl.insertBefore(el, absentEl);
+    extTabs.set(facet, { el, mount: spec.mount, mounted: false });
+    const chip = makeChip(facet, spec.label || facet);
+    if (spec.hue) chip.querySelector(".dot").style.background = spec.hue;
+    if (spec.title) chip.title = spec.title;
+    return {
+      el,
+      setCount: (t) => { chip.querySelector(".cnt").textContent = t == null ? "" : String(t); },
+      setAbsent: (b) => chip.classList.toggle("absent", Boolean(b)),
+      select: () => setFacet(facet),
+    };
+  }
+  me.facetTabs = { lib, ctl: name, id: ctlId, add: addFacetTab };
+  host.dispatchEvent(new CustomEvent("nb-facet-tabs", { detail: me.facetTabs }));
+
   // Roving tabindex (C1): ←/→ wrap around the tabs, Home/End jump.
   chipsEl.addEventListener("keydown", (e) => {
     if (!e.target.closest(".wb-chip")) return;
@@ -207,7 +241,7 @@ async function init(host, { lib, ctlId, toast }) {
   // save; the commands chip counts, or reads `none` (C1).
   function refreshChip(facet) {
     const chip = chips.get(facet);
-    if (!chip || facet === "three") return;
+    if (!chip || facet === "three" || extTabs.has(facet)) return;
     const cnt = chip.querySelector(".cnt");
     if (facet === "cmd") {
       const n = record.cmd?.length ?? 0;
@@ -289,8 +323,18 @@ async function init(host, { lib, ctlId, toast }) {
     // container pushes the commands/three panes below the fold
     editorsEl.hidden = true;
     for (const { slot } of editors.values()) slot.hidden = true;
+    for (const t of extTabs.values()) t.el.hidden = true;
 
-    if (facet === "scene") {
+    if (extTabs.has(facet)) {
+      // a plugin's tab: the pane is the plugin's, mounted on first use
+      const t = extTabs.get(facet);
+      t.el.hidden = false;
+      if (!t.mounted) {
+        t.mounted = true;
+        try { await t.mount(t.el, { lib, ctl: name, id: ctlId }); }
+        catch (x) { console.log("facet tab " + facet + " failed to mount: " + (x && x.message ? x.message : x)); }
+      }
+    } else if (facet === "scene") {
       // The scene pane owns its own absent/read-only states (the editor
       // creates the facet on first save when the pair is present).
       sceneEl.hidden = false;
