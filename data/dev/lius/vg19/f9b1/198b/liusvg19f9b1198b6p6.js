@@ -3,9 +3,8 @@
 // platform mode control js is a facet, not an importable URL.
 //
 // `scene` is the redesigned 3D facet (docs/scene-facet-design.md). The
-// legacy `three` facet is NOT in the fixed order — where a control carries
-// one, the workbench appends a read-only "three · legacy" chip, and the
-// shelf's 3d dot lights on either (SC-Q2).
+// legacy `three` facet is NOT in the fixed order and has no workbench tab
+// (removed 2026-11-15); the shelf's 3d dot still lights on either (SC-Q2).
 //
 // LIBRARY control — headless: the api rides this control's own element
 // (zero-globals doctrine). Consumers mount it as a hidden data-control
