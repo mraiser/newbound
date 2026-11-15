@@ -22,7 +22,7 @@
         if app_subs.index_of(de.clone()) != -1 {
           let stream = sock.stream.try_clone().unwrap();
           // FIXME - Remove the dead ones
-          if !websock_message(stream, data.to_string()) {
+          if !websock_message(stream, &sock.wlock, data.to_string()) {
             //sockheap.decr(sockref); // Ensure .decr() is available on Heap or via DerefMut
             println!("DEAD WEBSOCK {}", sockref);
           }
@@ -39,6 +39,8 @@
 pub struct WebsockConnection {
   pub stream: TcpStream,
   pub sub: DataObject,
+  // Held for the whole of each frame written to this connection.
+  pub wlock: std::sync::Arc<std::sync::Mutex<()>>,
 }
 
 static START: Once = Once::new();
@@ -1075,9 +1077,11 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
 
   let subs = DataObject::new();
   let subref = subs.data_ref;
+  let wlock = std::sync::Arc::new(std::sync::Mutex::new(()));
   let con = WebsockConnection{
     stream: stream.try_clone().unwrap(),
     sub: subs,
+    wlock: wlock.clone(),
   };
   // Modified: Use .lock()
   let sockref = WEBSOCKHEAP.lock().push(con);
@@ -1193,6 +1197,7 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
       let stream_clone = stream.try_clone().unwrap(); // Renamed stream to stream_clone
       let request_clone = request.clone(); // Renamed request to request_clone
       let sid_clone = session_id.to_owned(); // Renamed sid to sid_clone
+      let wlock_clone = wlock.clone();
       thread::spawn(move || {
         if msg_str.starts_with("cmd ") {
           let cmd_payload = &msg_str[4..]; // Renamed msg to cmd_payload
@@ -1206,7 +1211,7 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
           d.put_object("params", params);
 
           let o = handle_command(d, sid_clone);
-          websock_message(stream_clone, o.to_string());
+          websock_message(stream_clone, &wlock_clone, o.to_string());
         }
         else if msg_str.starts_with("sub ") {
           let sub_payload = &msg_str[4..]; // Renamed msg to sub_payload
@@ -1407,7 +1412,7 @@ pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
   res
 }
 
-fn websock_message(mut stream: TcpStream, msg:String) -> bool {
+fn websock_message(mut stream: TcpStream, wlock: &std::sync::Mutex<()>, msg:String) -> bool {
   let msg_bytes = msg.as_bytes(); // Renamed msg to msg_bytes
 
   let n = msg_bytes.len() as i64;
@@ -1437,8 +1442,14 @@ fn websock_message(mut stream: TcpStream, msg:String) -> bool {
 
   reply.extend_from_slice(msg_bytes);
 
-  let x = stream.write(&reply);
-  x.is_ok()
+  // One frame at a time per connection: command threads and the event
+  // broadcaster all write to clones of the same socket, and a frame larger
+  // than the free send buffer would otherwise interleave with another's.
+  let _guard = wlock.lock().unwrap_or_else(|e| e.into_inner());
+  let ok = stream.write_all(&reply).is_ok();
+  // A frame that stopped partway leaves the stream unreadable: end it cleanly.
+  if !ok { let _ = stream.shutdown(std::net::Shutdown::Both); }
+  ok
 }
 
 pub fn handle_command(d: DataObject, sid: String) -> DataObject {

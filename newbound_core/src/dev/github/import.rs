@@ -136,6 +136,14 @@ for libid in &libids {
     if rsrc.exists() {
         let _x = symlink(rsrc.canonicalize().unwrap(), &runtimedir);
     }
+    // A repo with no runtime/ folder still bundles its apps in
+    // data/<lib>/_APPS - set them up the way install_lib does, or they
+    // only ever show as "Available" from a peer (dev.dev.materialize_apps).
+    // Never fatal to the import.
+    let lid = libid.to_owned();
+    if let Err(_) = std::panic::catch_unwind(move || crate::dev::dev::materialize_apps::materialize_apps(lid)) {
+        println!("dev.github.import: could not set up the apps library {:?} carries", libid);
+    }
 
     load_library(libid);
 
