@@ -57,6 +57,13 @@ var readyP = (async () => {
     if (got.envelope.status !== "ok") return new Error(got.envelope.msg ?? "list_plugins failed");
     return got.envelope.data ?? {};
   };
+  // the plugins that declare themselves (a control's `plugin` facet), each
+  // marked registered or not on this instance
+  const availablePlugins = async () => {
+    const got = await invoke("dev", "plugins", "available", {});
+    if (got.envelope.status !== "ok") return new Error(got.envelope.msg ?? "available failed");
+    return (got.envelope.data ?? {}).plugins ?? [];
+  };
   const appCmdUrl = (a2, m2, p2) => "../" + a2 + "/" + m2 + "?" +
     Object.entries(p2).map(([k2, v2]) => k2 + "=" + encodeURIComponent(String(v2))).join("&");
   // mount a child control and resolve with its api once it is ready —
@@ -656,12 +663,65 @@ async function init(host, { openLib, openControl, toast }) {
   plugOpen.hidden = !(writable && patchApi);
   const plugFields = ["name", "tlib", "tctl", "plib", "pctl", "sel"].map(
     (k) => host.querySelector(".sh-plug-" + k));
+  const plugPick = host.querySelector(".sh-plug-pick");
+  const plugPickField = host.querySelector(".sh-plug-pick-field");
+  const plugPickHint = host.querySelector(".sh-plug-pick-hint");
+  const plugGrid = host.querySelector(".sh-plug-grid");
+  let plugOffers = [];   // declared plugins not yet registered on this instance
+  // the six-field form: Edit, and "custom…" when adding
   function showPlugEditor(title, vals) {
     plugTitle.textContent = title;
     plugFields.forEach((f, i) => { f.value = vals[i] ?? ""; });
+    plugPickField.hidden = true;
+    plugGrid.hidden = false;
     plugEditor.hidden = false;
     plugNote.textContent = "";
     plugFields[0].focus();
+  }
+  // The picker drives the six fields: a declared plugin fills them and keeps
+  // them out of sight (pick + Save is the whole act); "custom…" shows them.
+  function syncPlugPick() {
+    const d = plugOffers[Number(plugPick.value)];
+    plugGrid.hidden = Boolean(d);
+    if (!d) {
+      plugPickHint.textContent = "A registration typed by hand, for a control that does not declare itself.";
+      return;
+    }
+    const vals = [d.name, d.target_lib, d.target_ctl, d.plugin_lib, d.plugin_ctl, d.selector];
+    plugFields.forEach((f, i) => { f.value = vals[i] ?? ""; });
+    plugPickHint.textContent = (d.desc ? d.desc + " " : "")
+      + `Registers as ${d.name} at ${d.selector}.`
+      + (d.name_taken ? " Replaces the existing registration of that name." : "");
+  }
+  plugPick.addEventListener("change", syncPlugPick);
+  // Add: offer the plugins that declare themselves (a control's `plugin`
+  // facet, via dev.plugins.available) and are not registered here yet
+  async function showPlugAdd() {
+    const avail = await availablePlugins();
+    plugOffers = avail instanceof Error ? [] : avail.filter((d) => !d.registered);
+    plugPick.replaceChildren();
+    plugOffers.forEach((d, i) => {
+      const opt = document.createElement("option");
+      opt.value = String(i);
+      opt.textContent = `${d.plugin_lib}.${d.plugin_ctl} → ${d.target_lib}.${d.target_ctl}`;
+      plugPick.append(opt);
+    });
+    const custom = document.createElement("option");
+    custom.value = "custom";
+    custom.textContent = "custom…";
+    plugPick.append(custom);
+    showPlugEditor("New registration", []);
+    plugPickField.hidden = false;
+    plugPick.value = plugOffers.length ? "0" : "custom";
+    syncPlugPick();
+    if (!plugOffers.length) {
+      plugPickHint.textContent = avail instanceof Error
+        ? `Could not list the declared plugins (${avail.message}) — type a custom registration.`
+        : avail.length
+          ? "Every plugin that declares itself is already registered — type a custom registration."
+          : "No installed control declares itself as a plugin — type a custom registration.";
+    }
+    plugPick.focus();
   }
   async function renderPlugins() {
     const entries = await listPlugins();
@@ -734,9 +794,7 @@ async function init(host, { openLib, openControl, toast }) {
   }
   plugOpen.addEventListener("click", () => setPlugins(plugForm.hidden));
   host.querySelector(".sh-plugins-close").addEventListener("click", () => setPlugins(false));
-  host.querySelector(".sh-plug-add").addEventListener("click", () => {
-    showPlugEditor("New registration", []);
-  });
+  host.querySelector(".sh-plug-add").addEventListener("click", showPlugAdd);
   host.querySelector(".sh-plug-cancel").addEventListener("click", () => {
     plugEditor.hidden = true;
     plugNote.textContent = "";
