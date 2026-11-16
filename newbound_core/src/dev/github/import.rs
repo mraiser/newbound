@@ -3,7 +3,10 @@ use ndata::dataarray::DataArray;
 use flowlang::flowlang::system::system_call::system_call;
 use flowlang::flowlang::system::unique_session_id::unique_session_id;
 use std::path::Path;
+#[cfg(unix)]
 use std::os::unix::fs::symlink;
+#[cfg(windows)]
+use std::os::windows::fs::symlink_dir as symlink;
 use crate::dev::dev::activate_lib::activate_lib;
 use flowlang::appserver::load_library;
 
