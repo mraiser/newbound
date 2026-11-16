@@ -93,9 +93,18 @@ ip -o -6 addr list | awk '{print $4}' | cut -d/ -f1 | grep -v -E '^::1$'
 "#.to_string();
 
             let mut cmd_array = DataArray::new();
-            cmd_array.push_string("bash");
-            cmd_array.push_string("-c");
-            cmd_array.push_string(&command_string);
+            if cfg!(windows) {
+                // no bash/ip/awk on Windows: PowerShell lists the same
+                // addresses (link-local scope ids like %12 stripped below)
+                cmd_array.push_string("powershell");
+                cmd_array.push_string("-NoProfile");
+                cmd_array.push_string("-Command");
+                cmd_array.push_string("Get-NetIPAddress | Where-Object { $_.IPAddress -ne '127.0.0.1' -and $_.IPAddress -ne '::1' } | ForEach-Object { $_.IPAddress }");
+            } else {
+                cmd_array.push_string("bash");
+                cmd_array.push_string("-c");
+                cmd_array.push_string(&command_string);
+            }
 
             // println!("NET CMD {}", cmd_array.to_string()); // For debugging
 
@@ -110,7 +119,7 @@ ip -o -6 addr list | awk '{print $4}' | cut -d/ -f1 | grep -v -E '^::1$'
                 // .expect() used assuming 'out' field will exist if status is "ok".
                 let stdout = result_data_object.get_string("out");
                 for line in stdout.lines() {
-                    let ip_str = line.trim();
+                    let ip_str = line.trim().split('%').next().unwrap_or("");
                     if !ip_str.is_empty() {
                         a.push_string(ip_str);
                     }

@@ -26,8 +26,10 @@ if store.exists("runtime", "metaidentity") {
 // ADDITIVE ONLY, matched by canonical path, so hand-tuned entries
 // (names, roles, origins, flags) are never clobbered. No git on PATH,
 // or no .git anywhere: a clean no-op - the zip install never notices.
-let gitok = std::env::var("PATH").unwrap_or_default().split(':')
-    .any(|d| !d.is_empty() && std::path::Path::new(d).join("git").is_file());
+// split_paths: PATH is ';'-separated on Windows, and git there is git.exe
+let gitok = std::env::var_os("PATH").map(|p| std::env::split_paths(&p)
+    .any(|d| !d.as_os_str().is_empty() && (d.join("git").is_file() || d.join("git.exe").is_file())))
+    .unwrap_or(false);
 o.put_boolean("git", gitok);
 let mut registered: i64 = 0;
 if gitok {

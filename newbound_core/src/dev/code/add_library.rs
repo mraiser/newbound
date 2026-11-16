@@ -2,7 +2,22 @@ use ndata::dataobject::DataObject;
 use ndata::dataarray::DataArray;
 use flowlang::datastore::DataStore;
 use flowlang::flowlang::system::system_call::system_call;
+#[cfg(unix)]
 use std::os::unix::fs::symlink;
+// Windows: these links are always directories. A real directory symlink
+// needs Developer Mode or an elevated process, so fall back to a junction
+// (mklink /J), which any user may create. Junction targets must be plain
+// absolute paths, so the \?\ prefix canonicalize() adds is stripped.
+#[cfg(windows)]
+fn symlink<P: AsRef<std::path::Path>, Q: AsRef<std::path::Path>>(src: P, dst: Q) -> std::io::Result<()> {
+  let s = src.as_ref().to_string_lossy().to_string();
+  let s = s.strip_prefix(r"\?\").unwrap_or(&s).to_string();
+  if std::os::windows::fs::symlink_dir(&s, dst.as_ref()).is_ok() { return Ok(()); }
+  let out = std::process::Command::new("cmd").arg("/C").arg("mklink").arg("/J")
+    .arg(dst.as_ref()).arg(&s).stdin(std::process::Stdio::null()).output()?;
+  if out.status.success() { Ok(()) }
+  else { Err(std::io::Error::new(std::io::ErrorKind::Other, String::from_utf8_lossy(&out.stderr).trim().to_string())) }
+}
 
 pub fn execute(o: DataObject) -> DataObject {
     use std::panic;
@@ -64,8 +79,10 @@ let msg = crate::api::new().app.app.newlib(lib.clone(), DataArray::new(), DataAr
 // tracks it, and canon never sees it (the /data/* ignore rule). Without
 // git on PATH this whole block is skipped and the library is a plain
 // data/<lib> directory, exactly as before.
-let gitok = std::env::var("PATH").unwrap_or_default().split(':')
-    .any(|d| !d.is_empty() && std::path::Path::new(d).join("git").is_file());
+// split_paths: PATH is ';'-separated on Windows, and git there is git.exe
+let gitok = std::env::var_os("PATH").map(|p| std::env::split_paths(&p)
+    .any(|d| !d.as_os_str().is_empty() && (d.join("git").is_file() || d.join("git.exe").is_file())))
+    .unwrap_or(false);
 if gitok {
     let root = store.root.parent().unwrap().to_path_buf();
     let datadir = root.join("data").join(&lib);

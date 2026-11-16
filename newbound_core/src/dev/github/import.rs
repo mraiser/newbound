@@ -3,7 +3,22 @@ use ndata::dataarray::DataArray;
 use flowlang::flowlang::system::system_call::system_call;
 use flowlang::flowlang::system::unique_session_id::unique_session_id;
 use std::path::Path;
+#[cfg(unix)]
 use std::os::unix::fs::symlink;
+// Windows: these links are always directories. A real directory symlink
+// needs Developer Mode or an elevated process, so fall back to a junction
+// (mklink /J), which any user may create. Junction targets must be plain
+// absolute paths, so the \?\ prefix canonicalize() adds is stripped.
+#[cfg(windows)]
+fn symlink<P: AsRef<std::path::Path>, Q: AsRef<std::path::Path>>(src: P, dst: Q) -> std::io::Result<()> {
+  let s = src.as_ref().to_string_lossy().to_string();
+  let s = s.strip_prefix(r"\?\").unwrap_or(&s).to_string();
+  if std::os::windows::fs::symlink_dir(&s, dst.as_ref()).is_ok() { return Ok(()); }
+  let out = std::process::Command::new("cmd").arg("/C").arg("mklink").arg("/J")
+    .arg(dst.as_ref()).arg(&s).stdin(std::process::Stdio::null()).output()?;
+  if out.status.success() { Ok(()) }
+  else { Err(std::io::Error::new(std::io::ErrorKind::Other, String::from_utf8_lossy(&out.stderr).trim().to_string())) }
+}
 use crate::dev::dev::activate_lib::activate_lib;
 use flowlang::appserver::load_library;
 

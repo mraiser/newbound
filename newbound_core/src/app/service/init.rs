@@ -333,8 +333,12 @@ pub fn http_listen() {
           s += "/index.html?sessionid=";
           s += &session_id;
 
+          // the desktop's URL opener: open (macOS), the URL protocol
+          // handler (Windows), xdg-open elsewhere
           let mut a = DataArray::new();
-          a.push_string("xdg-open");
+          if cfg!(target_os = "macos") { a.push_string("open"); }
+          else if cfg!(windows) { a.push_string("rundll32"); a.push_string("url.dll,FileProtocolHandler"); }
+          else { a.push_string("xdg-open"); }
           a.push_string(&s);
           system_call(a);
         }

@@ -11,8 +11,10 @@ let msg = crate::api::new().app.app.newlib(lib.clone(), DataArray::new(), DataAr
 // tracks it, and canon never sees it (the /data/* ignore rule). Without
 // git on PATH this whole block is skipped and the library is a plain
 // data/<lib> directory, exactly as before.
-let gitok = std::env::var("PATH").unwrap_or_default().split(':')
-    .any(|d| !d.is_empty() && std::path::Path::new(d).join("git").is_file());
+// split_paths: PATH is ';'-separated on Windows, and git there is git.exe
+let gitok = std::env::var_os("PATH").map(|p| std::env::split_paths(&p)
+    .any(|d| !d.as_os_str().is_empty() && (d.join("git").is_file() || d.join("git.exe").is_file())))
+    .unwrap_or(false);
 if gitok {
     let root = store.root.parent().unwrap().to_path_buf();
     let datadir = root.join("data").join(&lib);
