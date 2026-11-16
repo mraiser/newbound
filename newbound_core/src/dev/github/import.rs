@@ -82,6 +82,11 @@ let tempdir = repodirx.join(unique_session_id());
 let mut a = DataArray::new();
 a.push_string("git");
 a.push_string("clone");
+// LF checkout regardless of the machine's git defaults: Git for Windows
+// ships core.autocrlf=true, which would hand the store CRLF files. -c
+// also writes the setting into the clone, so later git work keeps it.
+a.push_string("-c");
+a.push_string("core.autocrlf=false");
 a.push_string(&url);
 a.push_string(&tempdir.clone().into_os_string().into_string().unwrap());
 system_call(a);
