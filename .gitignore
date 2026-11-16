@@ -18,6 +18,7 @@
 !downgrade.sh
 !hardreset.sh
 !newbound.sh
+!newbound.cmd
 !default.nix
 !config.properties_example
 !Dockerfile

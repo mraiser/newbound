@@ -1,3 +1,9 @@
+# LF everywhere, on every OS. Git for Windows defaults to
+# core.autocrlf=true, which would check the store and every generated
+# source out with CRLF - unlike the Linux/macOS instances the store is
+# shared with. text=auto still leaves binary files untouched.
+* text=auto eol=lf
+
 # Memory facets are line-oriented JSON (one-memory-cycle B2): a JSON
 # array with one canonical object per line, every entry line comma-
 # terminated, closed by a constant {"end": true}] terminator line -
