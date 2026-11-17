@@ -1,3 +1,30 @@
+// An empty author defaults to the calling session's user - the platform
+// injects nn_sessionid into params on every web call (HTTP and websocket
+// alike); CLI/MCP callers that want a specific provenance name pass author.
+// Same rule as patch_control_facet and delete_command.
+let author = {
+    let a = author.trim().to_string();
+    if !a.is_empty() { a } else {
+        let mut who = String::new();
+        if !nn_sessionid.is_empty() {
+            let system = flowlang::datastore::DataStore::globals().get_object("system");
+            if system.has("sessions") {
+                let sessions = system.get_object("sessions");
+                if sessions.has(&nn_sessionid) {
+                    let session = sessions.get_object(&nn_sessionid);
+                    if session.has("user") {
+                        who = session.get_object("user").try_get_string("displayname").unwrap_or_default();
+                    }
+                    if who.trim().is_empty() {
+                        who = session.try_get_string("username").unwrap_or_default();
+                    }
+                }
+            }
+        }
+        if who.trim().is_empty() { "anonymous".to_string() } else { who }
+    }
+};
+
 let api = crate::api::new();
 let ctlid = api.dev.editcontrol.lookup_id(lib.clone(), ctl.clone());
 
@@ -72,6 +99,20 @@ if store.exists(&lib, &ctlid) {
         nuid = item.get_string("id");
         break;
     }
+  }
+
+  // Capture the prior records for the journal before anything is written -
+  // the same {command, impl} shape delete_command journals, so `old` is what
+  // a revert re-authors from. Empty for a command that does not exist yet.
+  let mut j_old = String::new();
+  if exists && store.exists(&lib, &nuid) {
+      let mut jo = DataObject::new();
+      let cd = store.get_data(&lib, &nuid).get_object("data");
+      let t = if cd.has("type") { cd.get_string("type") } else { "rust".to_string() };
+      let iid = if cd.has(&t) { cd.get_string(&t) } else { String::new() };
+      jo.put_object("command", cd);
+      if !iid.is_empty() && store.exists(&lib, &iid) { jo.put_object("impl", store.get_data(&lib, &iid).get_object("data")); }
+      j_old = jo.to_string();
   }
 
   let mut nucmd_doc = DataObject::new();
@@ -163,6 +204,12 @@ if store.exists(&lib, &ctlid) {
       if eximpl.has("writers") { imp_writers = eximpl.get_array("writers"); }
   }
   data::write::write(lib.clone(), rustid.clone(), nurust, imp_readers, imp_writers);
+
+  // What the store holds now, read back in the same shape as j_old.
+  let mut jn = DataObject::new();
+  jn.put_object("command", store.get_data(&lib, &nuid).get_object("data"));
+  jn.put_object("impl", store.get_data(&lib, &rustid).get_object("data"));
+  let j_new = jn.to_string();
   
   // Compile via a direct call: dev.dev.compile lives in this same crate, so
   // no Command indirection is needed. catch_unwind keeps a compile panic
@@ -195,6 +242,30 @@ if store.exists(&lib, &ctlid) {
       o.put_string("kind", "compile_error");
       o.put_string("msg", &msg);
     }
+  }
+  // Journal the edit on the control's patch journal (facet "command", op
+  // "create" or "upsert"). It runs after the store write and the compile, so the entry describes
+  // what the store now holds; a journal problem is reported on the result and
+  // never turns the edit into a failure. The entry carries the
+  // caller-supplied label (the stated why) and the resolved author.
+  // dev.code.evaluate_rust marks its temp command in globals (dev_nojournal:<lib>:<ctl>:<cmd>)
+  // so a throwaway script leaves no journal entry.
+  if j_old != j_new && !flowlang::datastore::DataStore::globals().has(&format!("dev_nojournal:{}:{}:{}", lib, ctl, cmd)) {
+      let mut j_entry = DataObject::new();
+      j_entry.put_string("author", &author);
+      j_entry.put_string("facet", "command");
+      j_entry.put_string("cmd", &cmd);
+      j_entry.put_string("op", if exists { "upsert" } else { "create" });
+      j_entry.put_string("old", &j_old);
+      j_entry.put_string("new", &j_new);
+      j_entry.put_string("compile", if o.get_string("status") == "ok" { "ok" } else { "err" });
+      j_entry.put_string("label", label.trim());
+      let j_r = crate::dev::code::patch_journal::patch_journal("append".to_string(), lib.clone(), ctlid.clone(), String::new(), j_entry, 0, false, nn_sessionid.clone());
+      if j_r.get_string("status") == "ok" {
+          o.put_string("patch_id", &j_r.get_string("patch_id"));
+      } else {
+          o.put_string("journal_warning", &j_r.try_get_string("msg").unwrap_or_default());
+      }
   }
   return o;
 }

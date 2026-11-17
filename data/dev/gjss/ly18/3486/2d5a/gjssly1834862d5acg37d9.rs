@@ -290,11 +290,48 @@ pub fn system_call_in_dir(command: DataArray, dir: String) -> DataObject {
   out
 }
 
+// Windows will not let cargo overwrite the running host's .exe, but it will
+// let us rename it. Park the running image as <exe>.old-<pid>-<n> before a
+// build so the link step can write a fresh one; if the build left none (it
+// failed, or built some other crate), the parked image goes back.
+#[cfg(windows)]
+fn park_running_exe() -> Option<(std::path::PathBuf, std::path::PathBuf)> {
+  use std::sync::atomic::{AtomicUsize, Ordering};
+  static N: AtomicUsize = AtomicUsize::new(0);
+  let exe = std::env::current_exe().ok()?;
+  let name = exe.file_name()?.to_string_lossy().to_string();
+  if name.contains(".old-") { return None; }
+  let dir = exe.parent()?.to_path_buf();
+  // sweep images parked by earlier processes; one still running stays locked and survives
+  let prefix = format!("{}.old-", name);
+  if let Ok(rd) = std::fs::read_dir(&dir) {
+    for e in rd.flatten() {
+      if e.file_name().to_string_lossy().starts_with(&prefix) { let _ = std::fs::remove_file(e.path()); }
+    }
+  }
+  let parked = dir.join(format!("{}{}-{}", prefix, std::process::id(), N.fetch_add(1, Ordering::SeqCst)));
+  std::fs::rename(&exe, &parked).ok()?;
+  // an unlocked copy back in its place, timestamp kept: an unchanged build
+  // stays fresh (no needless relink), a changed one overwrites the copy
+  let _ = std::fs::copy(&parked, &exe);
+  Some((exe, parked))
+}
+#[cfg(windows)]
+fn unpark_running_exe(p: Option<(std::path::PathBuf, std::path::PathBuf)>) {
+  if let Some((exe, parked)) = p {
+    if !exe.exists() { let _ = std::fs::rename(&parked, &exe); }
+  }
+}
+
 pub fn execute_compile_command(ja: DataArray, dir: String) -> (bool, String) {
   // Signature preserved for rebuild_lib / compile_rust. Semantics upgraded:
   // `true` now means "the build FAILED" (exit-code verdict), and the String is
   // the extracted error report — instead of "some line started with 'error'".
+  #[cfg(windows)]
+  let parked = park_running_exe();
   let o = system_call_in_dir(ja, dir);
+  #[cfg(windows)]
+  unpark_running_exe(parked);
   if o.get_string("status") != "ok" {
     return (true, format!("error: {}", o.get_string("err")));
   }

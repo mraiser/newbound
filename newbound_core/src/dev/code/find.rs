@@ -219,44 +219,12 @@ match kind_l.as_str() {
         if query.is_empty() {
             return err("text kind needs `query`");
         }
-        let scope_lib = if lib.is_empty() { "*".to_string() } else { lib.clone() };
-        let scope_ctl = if ctl.is_empty() { "*".to_string() } else { ctl.clone() };
-        let hits = crate::api::new().dev.code.search_commands(scope_lib, scope_ctl, query.clone());
-        let mut arr = DataArray::new();
-        let n = hits.len();
-        for i in 0..n.min(50) {
-            let h = hits.get_object(i);
-            let mut ho = DataObject::new();
-            ho.put_string("lib", &h.get_string("lib"));
-            ho.put_string("ctl", &h.get_string("ctl"));
-            ho.put_string("cmd", &h.get_string("cmd"));
-            let rc = crate::api::new().dev.code.read_command(
-                h.get_string("lib"),
-                h.get_string("ctl"),
-                h.get_string("cmd"),
-            );
-            if let Ok(src) = rc.try_get_string("rs") {
-                let ql = query.to_lowercase();
-                let mut prev = String::new();
-                let mut shown = 0;
-                for line in src.lines() {
-                    if line.to_lowercase().contains(&ql) {
-                        prev.push_str(line.trim());
-                        prev.push('\n');
-                        shown += 1;
-                        if shown >= 3 { break; }
-                    }
-                }
-                ho.put_string("preview", &prev);
-            }
-            arr.push_object(ho);
-        }
-        let mut o = ok();
-        o.put_string("mode", "commands");
-        o.put_string("query", &query);
-        o.put_int("count", n as i64);
-        o.put_boolean("truncated", n > 50);
-        o.put_array("matches", arr);
+        // The global store search (dev.search): commands, control facets,
+        // control names/descs and text assets, by index. find is admin
+        // tooling, so no per-record reader filter is applied here; the
+        // session-filtered door is dev.search.query.
+        let mut o = crate::dev::search::index::search(&lib, &ctl, "", &query, 50, None);
+        o.put_string("mode", "store");
         o
     }
 

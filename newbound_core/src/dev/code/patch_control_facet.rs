@@ -192,39 +192,16 @@ store.set_data(&lib, &ctlid, record);
 // Append to the control's journal: one DataStore record per control, read by
 // list_control_patches. Revert = apply the inverse as a new patch; the
 // journal itself is never rewritten.
-let jid = format!("{}_patches", ctlid);
-let mut jrec;
-let mut jdata;
-let mut list;
-if store.exists(&lib, &jid) {
-    jrec = store.get_data(&lib, &jid);
-    jdata = jrec.get_object("data");
-    list = if jdata.has("list") { jdata.get_array("list") } else { DataArray::new() };
-} else {
-    jrec = DataObject::new();
-    jrec.put_string("id", &jid);
-    jrec.put_string("username", "system");
-    jrec.put_array("readers", DataArray::new());
-    jrec.put_array("writers", DataArray::new());
-    jdata = DataObject::new();
-    list = DataArray::new();
-}
-
-let patch_id = format!("p{}", list.len() + 1);
 let mut entry = DataObject::new();
-entry.put_string("patch_id", &patch_id);
 entry.put_string("author", &author);
 entry.put_string("facet", &facet);
 entry.put_string("old", &journal_old);
 entry.put_string("new", &new_n);
 entry.put_int("time", time());
 entry.put_string("label", &label);
-list.push_object(entry);
-
-jdata.put_array("list", list);
-jrec.put_object("data", jdata);
-jrec.put_int("time", time());
-store.set_data(&lib, &jid, jrec);
+let jr = crate::dev::code::patch_journal::patch_journal("append".to_string(), lib, ctlid, String::new(), entry, 0, false, nn_sessionid);
+if jr.get_string("status") != "ok" { return jr; }
+let patch_id = jr.get_string("patch_id");
 
 let mut o = DataObject::new();
 o.put_string("status", "ok");

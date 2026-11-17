@@ -11,6 +11,11 @@ let tempdir = repodirx.join(unique_session_id());
 let mut a = DataArray::new();
 a.push_string("git");
 a.push_string("clone");
+// LF checkout regardless of the machine's git defaults: Git for Windows
+// ships core.autocrlf=true, which would hand the store CRLF files. -c
+// also writes the setting into the clone, so later git work keeps it.
+a.push_string("-c");
+a.push_string("core.autocrlf=false");
 a.push_string(&url);
 a.push_string(&tempdir.clone().into_os_string().into_string().unwrap());
 system_call(a);
@@ -79,6 +84,14 @@ for libid in &libids {
     let rsrc = repodir.join("runtime").join(libid);
     if rsrc.exists() {
         let _x = symlink(rsrc.canonicalize().unwrap(), &runtimedir);
+    }
+    // A repo with no runtime/ folder still bundles its apps in
+    // data/<lib>/_APPS - set them up the way install_lib does, or they
+    // only ever show as "Available" from a peer (dev.dev.materialize_apps).
+    // Never fatal to the import.
+    let lid = libid.to_owned();
+    if let Err(_) = std::panic::catch_unwind(move || crate::dev::dev::materialize_apps::materialize_apps(lid)) {
+        println!("dev.github.import: could not set up the apps library {:?} carries", libid);
     }
 
     load_library(libid);

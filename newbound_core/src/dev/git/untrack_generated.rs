@@ -94,10 +94,14 @@ if !okr(&reg) { return fail(&errs(&reg)); }
 let repos = reg.get_object("repos");
 if !repos.has(&repo) { return fail(&format!("unknown repo '{}'", repo)); }
 let entry = repos.get_object(&repo);
-let role = entry.try_get_string("role").unwrap_or_default();
 let path = entry.try_get_string("path").unwrap_or_default();
-if role == "canon" { return fail("canon tracks its workspace Cargo.lock on purpose - this is for library repos"); }
 if path.is_empty() { return fail("registry entry has no path"); }
+// A fact, not a label: the checkout this instance runs in tracks its
+// workspace Cargo.lock and newbound_core/src/api.rs on purpose.
+let inst = flowlang::datastore::DataStore::new().root.parent().unwrap().to_path_buf();
+if let (Ok(a), Ok(b)) = (std::fs::canonicalize(&path), std::fs::canonicalize(&inst)) {
+    if a == b { return fail("this is the instance's own checkout - its workspace Cargo.lock and newbound_core/src/api.rs are tracked on purpose; this command is for repos under repositories/"); }
+}
 
 let st = crate::dev::git::read::read(repo.clone(), "status".to_string(), sargs(&["--porcelain=v2", "--branch"]));
 if !okr(&st) { return fail(&format!("status failed: {}", errs(&st))); }

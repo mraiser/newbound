@@ -558,6 +558,21 @@ ME.querySelector('#keepalive').addEventListener('change', function(){
   });
 });
 
+// An address as the host part of a URL, or null when a browser can't open
+// it. IPv6 goes in brackets (http://[fd7a::1]:port); an IPv4-mapped IPv6
+// (::ffff:192.168.1.5) is its IPv4; link-local IPv6 (fe80::/10, or any
+// address carrying a %zone) has no URL form a browser accepts.
+function urlHost(addr){
+  var s = String(addr || '').trim();
+  if (s.charAt(0) == '[' && s.charAt(s.length - 1) == ']') s = s.slice(1, -1);
+  if (!s) return null;
+  if (s.indexOf(':') == -1) return s;
+  var mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(s);
+  if (mapped) return mapped[1];
+  if (s.indexOf('%') != -1 || /^fe[89ab][0-9a-f]:/i.test(s)) return null;
+  return '[' + s + ']';
+}
+
 me.update = function(){
   if (me.check == ME.querySelector('.rp-uuid')) {
     ME.DATA = document.getElementById('peer_'+ME.DATA.id).DATA;
@@ -586,10 +601,21 @@ me.update = function(){
     var addrs = (ME.DATA.addresses || []).slice();
     if (ME.DATA.remote_address && addrs.indexOf(ME.DATA.remote_address) == -1) addrs.push(ME.DATA.remote_address);
     for (var i in addrs) {
-      var a = document.createElement('a');
-      a.className = 'chip';
-      a.target = '_blank';
-      a.href = 'http://' + addrs[i] + ':' + ME.DATA.http_port + '?session_id=' + ME.DATA.session_id;
+      var host = urlHost(addrs[i]);
+      var a;
+      if (host) {
+        a = document.createElement('a');
+        a.target = '_blank';
+        a.href = 'http://' + host + ':' + ME.DATA.http_port + '?session_id=' + ME.DATA.session_id;
+      }
+      else {
+        // link-local IPv6 needs the network interface (fe80::1%en0), and
+        // browsers can't open such a URL: show the address, don't link it
+        a = document.createElement('span');
+        a.classList.add('chip-nolink');
+        a.title = "Link-local address: browsers can't open it.";
+      }
+      a.classList.add('chip');
       a.textContent = addrs[i];
       alist.appendChild(a);
       alist.appendChild(document.createTextNode(' '));

@@ -2,6 +2,9 @@
   <!-- the plugin slot: the registry (dev.plugins) decides what, if
        anything, mounts here — the workbench doesn't know or care -->
   <div class="wb-plugins" hidden></div>
+  <!-- a second slot, for a plugin that adds facet tabs (the registry
+       mounts one plugin per slot; see facetTabs in the js) -->
+  <div class="wb-tab-plugins" hidden></div>
   <div class="wb-left"></div>
   <div class="wb-resize" role="separator" aria-orientation="vertical" tabindex="0"
        aria-label="preview width" aria-valuemin="240"

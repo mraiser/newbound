@@ -242,42 +242,6 @@ if data.has("event") {
     }
 }
 
-// The journal moves with the control (the point of this command existing),
-// then records the move as its own entry.
-let jid = format!("{}_patches", ctlid);
-let _x = move_rec(&store, &lib, &to_lib, &jid);
-
-let mut jrec;
-let mut jdata;
-let mut jlist;
-if store.exists(&to_lib, &jid) {
-    jrec = store.get_data(&to_lib, &jid);
-    jdata = jrec.get_object("data");
-    jlist = if jdata.has("list") { jdata.get_array("list") } else { DataArray::new() };
-} else {
-    jrec = DataObject::new();
-    jrec.put_string("id", &jid);
-    jrec.put_string("username", "system");
-    jrec.put_array("readers", DataArray::new());
-    jrec.put_array("writers", DataArray::new());
-    jdata = DataObject::new();
-    jlist = DataArray::new();
-}
-let patch_id = format!("p{}", jlist.len() + 1);
-let mut entry = DataObject::new();
-entry.put_string("patch_id", &patch_id);
-entry.put_string("author", &author);
-entry.put_string("facet", "move");
-entry.put_string("old", &lib);
-entry.put_string("new", &to_lib);
-entry.put_int("time", time());
-entry.put_string("label", &format!("moved from {} to {}", lib, to_lib));
-jlist.push_object(entry);
-jdata.put_array("list", jlist);
-jrec.put_object("data", jdata);
-jrec.put_int("time", time());
-store.set_data(&to_lib, &jid, jrec);
-
 // The control record itself - facet attachments ride the same get->set.
 let _x = move_rec(&store, &lib, &to_lib, &ctlid);
 
@@ -318,7 +282,20 @@ o.put_string("status", "ok");
 o.put_string("msg", &format!("Control '{}' moved from '{}' to '{}'", ctl, lib, to_lib));
 o.put_int("moved_commands", n_cmds);
 o.put_int("moved_components", n_comps);
-o.put_string("patch_id", &patch_id);
+
+// The journal follows the control (the point of this command existing) and
+// records the move as its own entry. It runs LAST: the control now lives in
+// to_lib, so a journal problem is reported, never a half-moved control.
+let mut entry = DataObject::new();
+entry.put_string("author", &author);
+entry.put_string("facet", "move");
+entry.put_string("old", &lib);
+entry.put_string("new", &to_lib);
+entry.put_int("time", time());
+entry.put_string("label", &format!("moved from {} to {}", lib, to_lib));
+let jr = crate::dev::code::patch_journal::patch_journal("move".to_string(), lib.clone(), ctlid.clone(), to_lib.clone(), entry, 0, false, nn_sessionid);
+if jr.get_string("status") == "ok" { o.put_string("patch_id", &jr.get_string("patch_id")); }
+else { o.put_string("journal_warning", &jr.try_get_string("msg").unwrap_or_default()); }
 o
 
 }

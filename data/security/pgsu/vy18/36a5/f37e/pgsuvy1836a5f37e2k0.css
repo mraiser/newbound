@@ -1,85 +1,340 @@
-.usercard{
-  width:340px;
+/* Page: titlebar on top, the rest fills the window; only the user list scrolls. */
+.wrap {
+  height: 100%;
+  display: flex; /* uiReady shows it as flex */
+  flex-direction: column;
 }
+.wrap > .titlebar { flex: none; }
 
-.usercontrols{
-  position:absolute;
-  top:20px;
-  right:20px;
+.sec-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 24px;
+  box-sizing: border-box;
 }
+.sec-main:not(.sec-on) .whenon { display: none; }
 
-.userfilter, .newuser {
-  display:inline-block;
-  margin-left:20px;
+/* Power switch: the 14px track sits centred on the 20px title line. */
+.sec-power {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 640px;
+  cursor: pointer;
+  user-select: none;
 }
-
-.wrap{
-  height:100%;
+.sec-power .switch {
+  flex: none;
+  top: 0;
+  margin-top: 3px;
 }
-
-.main {
-  position:relative;
-  height:calc(100% - 100px);
+.sec-power-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
-
-.whenon{
-  display:none;
+.sec-power-title {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--text);
 }
-
-.userrow{
-  cursor:pointer;
+.sec-power-desc {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-dim);
 }
+.sec-main:not(.sec-on) .sec-power-desc { color: var(--accent); }
 
-.userrow:hover{
-  background-color:rgba(240, 166, 60, 0.08); /* accent wash — black-alpha is invisible on graphite */
+/* Users header: title left, filter + add right, all on the controls' 38px line. */
+.sec-users {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
-
-.userrow{
-  vertical-align:top;
+.sec-users-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  /* Lines run 12px past the content edge on both sides, like the rows below,
+     so the row content (inset by the cells' 12px padding) lines up with the
+     title and the switch. */
+  margin: 0 -12px;
+  padding: 0 12px 16px;
+  border-bottom: 1px solid var(--line);
 }
-
-
 .usertitle {
-  font-size:x-large;
-  font-weight:900;
-  margin-top:40px;
+  font-size: 20px;
+  line-height: 38px;
+  font-weight: 600;
+  color: var(--text);
+}
+.usercontrols {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
-.usercard-close{
-  position:absolute;
-  top:10px;
-  right:10px;
+/* Fields: label above, one 38px control height for selects, inputs and buttons. */
+.sec-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
-
-.card.usercard-grouplist{
-  /* inset well; .card.x beats the kit's later .card surface rule */
-  background-color:var(--ground);
-  height:80px;
-  overflow-y:auto;
+.sec-field > .textinputlabel { margin-bottom: 6px; }
+.textinput.sec-ctl {
+  height: 38px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: normal;
 }
+select.textinput.sec-ctl { padding-right: 8px; cursor: pointer; }
+.userfilter .sec-ctl { width: 160px; }
+.newuser .sec-inputrow { width: 246px; }
 
-.textinput.usercard-newgroupname, .textinput.newusername{
-  width:205px;
+.sec-inputrow {
+  display: flex;
+  gap: 8px;
 }
+.sec-inputrow .textinput { flex: 1; min-width: 0; width: auto; }
 
-.roundbutton{
-  width:40px;
-  cursor:pointer;
+.sec-addbtn {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
 }
+.sec-addbtn:hover { background-color: var(--panel-3); }
+.sec-addbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sec-addbtn img { display: block; width: 20px; height: 20px; }
 
-.roundbutton.addgroupbutton{
-  margin-top:-20px;
-}
-
-.nowrap{
-  white-space:nowrap;
-}
-
+/* User list: People, then Connected devices. Rows are a grid of icon | name over
+   id (fixed width) | groups, with groups on the name's baseline. The list runs
+   12px past the content edge so row text (inset by the 12px padding) lines up
+   with the title and the switch. */
 .userlist {
-  position: absolute; /* Position the list relative to its parent `.main` */
-  top: 110px; /* Adjust top to start below the title and other controls */
-  bottom: 20px; /* Extend to 20px from the bottom of the parent */
-  left: 20px; /* Align with other content on the left */
-  right: 20px; /* Align with other content on the right */
-  overflow-y: auto; /* Enable vertical scrolling if content overflows */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -12px;
+  padding-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.sec-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 12px 8px;
+}
+.sec-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sec-section-count {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+.sec-section-desc {
+  max-width: 640px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-dim);
+}
+
+.ut-head, .userrow {
+  display: grid;
+  /* Name column grows with the window (40%) but stops at 520px, so groups
+     stay readable next to the name on wide screens. */
+  grid-template-columns: 20px minmax(240px, min(40%, 520px)) minmax(0, 1fr);
+  column-gap: 16px;
+  padding: 12px;
+}
+.ut-head {
+  padding-top: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.ut-head .textinputlabel { margin: 0; line-height: 12px; }
+.ut-head .textinputlabel:first-child { grid-column: 2; }
+
+.userrow {
+  align-items: baseline;
+  border-bottom: 1px solid var(--line-soft);
+  cursor: pointer;
+}
+.userrow:hover, .userrow:focus-visible {
+  background-color: rgba(240, 166, 60, 0.08); /* accent wash — black-alpha is invisible on graphite */
+  outline: none;
+}
+.ut-icon { display: block; width: 20px; height: 20px; align-self: start; }
+.ut-name, .ut-groups {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.ut-id {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.ut-none { color: var(--text-dim); font-style: italic; }
+.sec-empty-list {
+  padding: 12px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* Edit user dialog: same header and footer as the Settings dialog. */
+.usercard {
+  box-sizing: border-box; /* the cap includes the border: 16px either side on phones */
+  width: 380px;
+  max-width: calc(100vw - 32px);
+}
+/* 20px on both sides: the ✕ circle's right edge lines up with the fields and Save. */
+.usercard .usercard-header {
+  padding: 14px 20px;
+  gap: 12px;
+}
+.usercard-head-left { min-width: 0; }
+.usercard-title {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 500;
+  color: var(--text);
+}
+.usercard-header-text {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 16px;
+  margin-top: 2px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.usercard-closebutton { flex: none; }
+
+.usercard-main {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.usercard-grouplist {
+  box-sizing: border-box;
+  min-height: 38px;
+  max-height: 300px; /* about six groups before it scrolls */
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-color: var(--ground);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+}
+/* Checkbox centred on the group name's line; the description sits under the name. */
+.usercard-grouplist .plaincheckbox.sec-gopt {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: start;
+  font-size: 14px;
+  line-height: 20px;
+}
+/* Beats the kit's translateY nudge, which loads after this sheet. */
+.usercard-grouplist .sec-gopt > input { align-self: center; transform: none; }
+.sec-gopt .sec-gname { color: var(--text); overflow-wrap: anywhere; }
+.sec-gopt .sec-gdesc {
+  grid-column: 2;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-dim);
+}
+.sec-gopt .sec-gdesc.sec-new { color: var(--accent); }
+.usercard-grouplist .sec-empty {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-dim);
+}
+
+.usercard-devnote {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-dim);
+}
+.usercard.sec-device .usercard-pwfield { display: none; }
+.usercard:not(.sec-device) .usercard-devnote { display: none; }
+
+/* Two classes plus .usercard: the kit's .card-button-wrap loads after this sheet. */
+.usercard .card-button-wrap.usercard-foot {
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+}
+.usercard-foot button {
+  font-family: inherit;
+  line-height: 1.2;
+}
+/* Text button: its label lines up with the fields' left edge, not its padding. */
+.clearbutton.sec-danger {
+  color: #e08585;
+  padding-left: 12px;
+  padding-right: 12px;
+  margin-left: -12px;
+}
+.clearbutton.sec-danger:hover { background-color: rgba(193, 90, 90, 0.12); }
+
+@media (max-width: 760px) {
+  .ut-head, .userrow { grid-template-columns: 20px minmax(0, 1fr) minmax(0, 40%); column-gap: 12px; }
+}
+
+@media (max-width: 600px) {
+  /* Narrow screens: the whole page scrolls, not a short box under the controls. */
+  .sec-main { padding: 16px; gap: 20px; overflow-y: auto; }
+  .sec-users, .userlist { flex: none; min-height: auto; overflow: visible; }
+  .usercontrols { width: 100%; }
+  .usercontrols .sec-field { flex: 1 1 140px; }
+  .userfilter .sec-ctl, .newuser .sec-inputrow { width: 100%; }
+  .sec-users-head { margin: 0 -8px; padding: 0 8px 16px; }
+  .userlist { margin: 0 -8px; gap: 24px; }
+  .sec-section-head { padding: 0 8px 8px; }
+  .ut-head, .userrow, .sec-empty-list { padding-left: 8px; padding-right: 8px; }
+  .userrow { padding-top: 10px; padding-bottom: 10px; }
+}
+
+@media (max-width: 480px) {
+  .usercontrols .sec-field { flex-basis: 100%; }
 }

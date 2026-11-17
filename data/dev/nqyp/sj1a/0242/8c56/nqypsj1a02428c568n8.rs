@@ -15,8 +15,10 @@ fn fail(msg: &str) -> DataObject {
 // git while the instance runs needs a restart to be noticed.)
 let mut globals = DataStore::globals();
 let gitok = if globals.has("GIT_AVAILABLE") { globals.get_boolean("GIT_AVAILABLE") } else {
-    let ok = std::env::var("PATH").unwrap_or_default().split(':')
-        .any(|d| !d.is_empty() && std::path::Path::new(d).join("git").is_file());
+    // split_paths: PATH is ';'-separated on Windows, and git there is git.exe
+    let ok = std::env::var_os("PATH").map(|p| std::env::split_paths(&p)
+        .any(|d| !d.as_os_str().is_empty() && (d.join("git").is_file() || d.join("git.exe").is_file())))
+        .unwrap_or(false);
     globals.put_boolean("GIT_AVAILABLE", ok);
     ok
 };

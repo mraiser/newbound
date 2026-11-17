@@ -18,6 +18,7 @@
 !downgrade.sh
 !hardreset.sh
 !newbound.sh
+!newbound.cmd
 !default.nix
 !config.properties_example
 !Dockerfile
@@ -72,6 +73,10 @@
 runtime/dev/libraries/
 runtime/dev/repos.json
 runtime/dev/plugins.json
+# update_crates / hard_reset runner state (script, log, status)
+runtime/dev/update_crates/
+# dev.search index files: derived from the store, rebuilt per instance
+runtime/dev/search/
 
 # Stuff that shouldn't be generated
 runtime/src

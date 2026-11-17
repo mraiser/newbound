@@ -1,0 +1,1 @@
+search(&lib, &ctl, &kinds, &query, limit, Some(&nn_sessionid))

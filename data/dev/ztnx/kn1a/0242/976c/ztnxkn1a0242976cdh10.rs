@@ -64,8 +64,11 @@ if name.is_empty() || name.contains('/') || name.contains(char::is_whitespace) {
     return fail("name must be non-empty, with no '/' or whitespace");
 }
 let role = role.trim().to_string();
-if role != "canon" && role != "overlay" && role != "library" && role != "foreign" {
-    return fail("role must be one of: canon | overlay | library | foreign");
+// role is a display label only - no dev.git command branches on it.
+// "canon" is retired: an old caller or registry entry reads as library.
+let role = if role == "canon" { "library".to_string() } else { role };
+if role != "overlay" && role != "library" && role != "foreign" {
+    return fail("role must be one of: overlay | library | foreign");
 }
 let path = match std::fs::canonicalize(path.trim()) {
     Ok(p) => p.to_string_lossy().to_string(),

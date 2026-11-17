@@ -45,9 +45,21 @@
     );
 
     let mut cmd_array = DataArray::new();
-    cmd_array.push_string("bash");
-    cmd_array.push_string("-c");
-    cmd_array.push_string(&unzip_command_string);
+    if cfg!(windows) {
+        // No bash or unzip on Windows. Its own tar (bsdtar, in System32
+        // since Windows 10 1803) reads zip; called by full path because
+        // Git for Windows puts a GNU tar earlier on PATH, and that one can't.
+        let tar = std::path::Path::new(&std::env::var("SystemRoot").unwrap_or_else(|_| "C:/Windows".to_string())).join("System32").join("tar.exe");
+        cmd_array.push_string(&tar.to_string_lossy());
+        cmd_array.push_string("-xf");
+        cmd_array.push_string(&download_path_str);
+        cmd_array.push_string("-C");
+        cmd_array.push_string(&destdir_path_str);
+    } else {
+        cmd_array.push_string("bash");
+        cmd_array.push_string("-c");
+        cmd_array.push_string(&unzip_command_string);
+    }
 
     let result_array = system_call(cmd_array);
 

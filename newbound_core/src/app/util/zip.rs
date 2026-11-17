@@ -88,6 +88,29 @@ let command_string = format!(
   abs_dest_file_path_str  // Absolute path for the output zip file
 );
 
+// No bash or zip on Windows. Its own tar (bsdtar, in System32 since
+// Windows 10 1803) writes zip, -a picking the format from the .zip name;
+// called by full path because Git for Windows puts a GNU tar earlier on
+// PATH, and that one can't. The top-level entries are named one by one
+// (nothing expands a wildcard there), so the archive holds the same
+// relative paths `zip -qr .` writes.
+if cfg!(windows) {
+  let tar = std::path::Path::new(&std::env::var("SystemRoot").unwrap_or_else(|_| "C:/Windows".to_string())).join("System32").join("tar.exe");
+  let mut names: Vec<String> = match std::fs::read_dir(src_path) {
+    Ok(rd) => rd.flatten().map(|e| e.file_name().to_string_lossy().to_string()).collect(),
+    Err(_) => return false,
+  };
+  if names.is_empty() { return false; }
+  names.sort();
+  let _ = std::fs::remove_file(&abs_dest_file_path_str);
+  let mut cmd_array = DataArray::new();
+  cmd_array.push_string(&tar.to_string_lossy());
+  for a in ["-a", "-c", "-f", &abs_dest_file_path_str, "-C", &srcdir] { cmd_array.push_string(a); }
+  for n in names { cmd_array.push_string(&n); }
+  let result_array = system_call(cmd_array);
+  return result_array.get_string("status") == "ok" && Path::new(&abs_dest_file_path_str).is_file();
+}
+
 let mut cmd_array = DataArray::new();
 cmd_array.push_string("bash");
 cmd_array.push_string("-c");

@@ -600,6 +600,12 @@
   padding: 2px 0 6px;
 }
 
+/* an address a browser can't open (link-local IPv6): shown, not a link */
+.hudpanel .hud_address_list .chip-nolink {
+  color: var(--text-dim);
+  cursor: default;
+}
+
 /* 7.5: the dim +N beside the IP when the peer reported more addresses */
 .hudpanel .hud_addr_count {
   color: var(--text-dim);

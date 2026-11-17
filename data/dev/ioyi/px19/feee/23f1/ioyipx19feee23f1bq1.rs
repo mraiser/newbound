@@ -26,8 +26,10 @@ if store.exists("runtime", "metaidentity") {
 // ADDITIVE ONLY, matched by canonical path, so hand-tuned entries
 // (names, roles, origins, flags) are never clobbered. No git on PATH,
 // or no .git anywhere: a clean no-op - the zip install never notices.
-let gitok = std::env::var("PATH").unwrap_or_default().split(':')
-    .any(|d| !d.is_empty() && std::path::Path::new(d).join("git").is_file());
+// split_paths: PATH is ';'-separated on Windows, and git there is git.exe
+let gitok = std::env::var_os("PATH").map(|p| std::env::split_paths(&p)
+    .any(|d| !d.as_os_str().is_empty() && (d.join("git").is_file() || d.join("git.exe").is_file())))
+    .unwrap_or(false);
 o.put_boolean("git", gitok);
 let mut registered: i64 = 0;
 if gitok {
@@ -46,12 +48,17 @@ if gitok {
     if root.join(".git").exists() {
         if let Ok(rootc) = std::fs::canonicalize(&root) {
             let rootc = rootc.to_string_lossy().to_string();
-            if !known.iter().any(|p| *p == rootc) && !reg.has("canon") {
+            // an ordinary repo like the rest: named after its directory
+            let rootname = std::path::Path::new(&rootc).file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .filter(|s| !s.is_empty() && !s.contains(char::is_whitespace))
+                .unwrap_or_else(|| "newbound".to_string());
+            if !known.iter().any(|p| *p == rootc) && !reg.has(&rootname) {
                 let r = crate::dev::git::set_repo::set_repo(
-                    "canon".to_string(), rootc.clone(), String::new(),
-                    "canon".to_string(), false, "system".to_string(), String::new());
+                    rootname.clone(), rootc.clone(), String::new(),
+                    "library".to_string(), true, "system".to_string(), String::new());
                 if r.get_string("status") == "ok" {
-                    println!("dev.code.init: registered working checkout as repo 'canon' ({})", rootc);
+                    println!("dev.code.init: registered working checkout as repo '{}' ({})", rootname, rootc);
                     known.push(rootc);
                     registered += 1;
                 }

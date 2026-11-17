@@ -133,26 +133,7 @@ if f.exists() {
     let _x = std::fs::remove_file(f);
 }
 
-let jid = format!("{}_patches", ctlid);
-let mut jrec;
-let mut jdata;
-let mut jlist;
-if store.exists(&lib, &jid) {
-    jrec = store.get_data(&lib, &jid);
-    jdata = jrec.get_object("data");
-    jlist = if jdata.has("list") { jdata.get_array("list") } else { DataArray::new() };
-} else {
-    jrec = DataObject::new();
-    jrec.put_string("id", &jid);
-    jrec.put_string("username", "system");
-    jrec.put_array("readers", DataArray::new());
-    jrec.put_array("writers", DataArray::new());
-    jdata = DataObject::new();
-    jlist = DataArray::new();
-}
-let patch_id = format!("p{}", jlist.len() + 1);
 let mut entry = DataObject::new();
-entry.put_string("patch_id", &patch_id);
 entry.put_string("author", &author);
 entry.put_string("facet", "timer");
 entry.put_string("cmd", &name);
@@ -160,11 +141,9 @@ entry.put_string("old", &old);
 entry.put_string("new", "");
 entry.put_int("time", time());
 entry.put_string("label", &format!("remove timer {}", name));
-jlist.push_object(entry);
-jdata.put_array("list", jlist);
-jrec.put_object("data", jdata);
-jrec.put_int("time", time());
-store.set_data(&lib, &jid, jrec);
+let jr = crate::dev::code::patch_journal::patch_journal("append".to_string(), lib, ctlid, String::new(), entry, 0, false, nn_sessionid);
+if jr.get_string("status") != "ok" { return jr; }
+let patch_id = jr.get_string("patch_id");
 
 let mut o = DataObject::new();
 o.put_string("status", "ok");

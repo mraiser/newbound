@@ -29,16 +29,44 @@ me.ready = function(){
 // R2.6: every string here is peer-reported (msg, err, the peer name) —
 // textContent only, one div per line so the err text and the update
 // sentence read apart.
-function setStatus(lines){
+// `why`, when given, is the explanation behind an unverified line: an
+// info button on the first line opens it underneath (a tap, not a hover,
+// so it works on phones too).
+function setStatus(lines, why){
   var el = ME.querySelector('.rebootstatus');
   if (!el) return;
   el.textContent = '';
+  var first = null;
   (lines || []).forEach(function(t){
     if (!t) return;
     var d = document.createElement('div');
     d.textContent = t;
     el.appendChild(d);
+    if (!first) first = d;
   });
+  if (why && first) {
+    var detail = document.createElement('div');
+    detail.className = 'rebootwhy';
+    detail.textContent = why;
+    detail.hidden = true;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'rebootinfo';
+    b.title = 'Why "probably"?';
+    b.setAttribute('aria-label', 'Why "probably"?');
+    b.setAttribute('aria-expanded', 'false');
+    var img = document.createElement('img');
+    img.src = '../app/asset/app/icons/ui/dark/info.svg';
+    img.alt = '';
+    b.appendChild(img);
+    b.addEventListener('click', function(e){
+      e.stopPropagation();
+      detail.hidden = !detail.hidden;
+      b.setAttribute('aria-expanded', detail.hidden ? 'false' : 'true');
+    });
+    first.appendChild(b);
+    first.parentNode.insertBefore(detail, first.nextSibling);
+  }
 }
 
 function peerDiv(){ return document.getElementById('peer_' + ME.DATA.peer); }
@@ -58,26 +86,67 @@ function replyError(result){
   return null;
 }
 
-// R2.2: success means the machine is going down — watch the peer's own
-// record (peer.peer's poll keeps it fresh) until the link drops; the orb
-// greys on its own. Still connected after 60 s is its own answer.
-function watchDown(){
+// The peer's link as peer.peer's poll keeps it: true down, false up,
+// null when the page has no record for it.
+function peerDown(){
+  var d = peerDiv();
+  var p = d && d.DATA ? d.DATA : null;
+  if (!p) return null;
+  if (document.body.peerstatus) return document.body.peerstatus(p).kind == 'down';
+  return !(p.tcp || p.udp || p.relay || p.connected);
+}
+
+// The link closed while the reboot request waited for its answer: the
+// machine most likely went down before it could reply (Linux does, the
+// moment systemctl starts the shutdown). Its own failures arrive while
+// it is still up, as an answer with the reason, so they never land here.
+function droppedLink(result){
+  var msg = null;
+  if (!result) return false;
+  if (result.status != 'ok') msg = result.msg;
+  else if (result.data && typeof result.data == 'object' && result.data.status == 'err') msg = result.data.msg;
+  return /P2P connection closed|stale P2P connection/i.test(String(msg || ''));
+}
+
+var WHY_UNVERIFIED = function(){
+  return peerName() + ' stopped responding right after the reboot request, before it could confirm. That usually means it\'s restarting, but it can\'t be verified from here.';
+};
+
+// R2.2, extended: after a reboot request, report what the peer's own
+// record shows (peer.peer's poll keeps it fresh) - it goes offline, then
+// comes back - instead of claiming a reboot nobody saw. `unverified` is
+// the dropped-link case, whose lines keep the explanation until the peer
+// is back. Still connected after 60 s is its own answer; offline for
+// 15 min stops the watch with the line as it stands.
+function watchRestart(unverified){
+  if (me.watch) clearInterval(me.watch);
   var start = Date.now();
-  var t = setInterval(function(){
+  var wentDown = 0;
+  var why = unverified ? WHY_UNVERIFIED() : null;
+  var t = me.watch = setInterval(function(){
     if (!ME.isConnected) { clearInterval(t); return; }
-    var d = peerDiv();
-    var p = d && d.DATA ? d.DATA : null;
-    var down = p ? !(p.tcp || p.udp || p.relay || p.connected) : false;
-    if (p && document.body.peerstatus) down = document.body.peerstatus(p).kind == 'down';
-    if (down) {
-      clearInterval(t);
-      me.busy = false;
-      setStatus([]);
+    var down = peerDown();
+    if (!wentDown) {
+      if (down) {
+        wentDown = Date.now();
+        // the tile is free again once the peer is offline; the watch for
+        // its return goes on until a new request replaces it
+        me.busy = false;
+        setStatus([peerName() + ' went offline, as expected for a restart.', 'It reconnects once Newbound is running there again.'], why);
+      }
+      else if (Date.now() - start >= 60000) {
+        clearInterval(t);
+        me.busy = false;
+        setStatus([peerName() + ' is still connected; the reboot may not have run.']);
+      }
     }
-    else if (Date.now() - start >= 60000) {
+    else if (down === false) {
       clearInterval(t);
-      me.busy = false;
-      setStatus([peerName() + " hasn't gone down yet."]);
+      setStatus([peerName() + ' is back online.']);
+    }
+    else if (Date.now() - wentDown >= 15 * 60000) {
+      clearInterval(t);
+      setStatus([peerName() + " hasn't come back yet.", 'It reconnects once Newbound is running there again.'], why);
     }
   }, 2000);
 }
@@ -85,6 +154,8 @@ function watchDown(){
 function rebootNow(){
   if (me.busy) return;
   me.busy = true;
+  // a new request replaces the last one's watch for the peer's return
+  if (me.watch) { clearInterval(me.watch); me.watch = null; }
   setStatus([]);
   var peer = ME.DATA.peer;
   // the pre-scene constellation hung a THREE api (sphere) off the peer
@@ -97,6 +168,13 @@ function rebootNow(){
     // R2.1: status:ok alone lies (U1) — a wrapped {status:err} in data is
     // an error, and the new command's own failure arrives FLAT as
     // status:err with the sentence in msg.
+    if (droppedLink(result)) {
+      // no answer, so no claim: say what was seen, explain behind ⓘ,
+      // and let the peer's record show what really happens next
+      setStatus(['Connection lost: probably restarting.'], WHY_UNVERIFIED());
+      watchRestart(true);
+      return;
+    }
     var err = replyError(result);
     if (err != null) { setStatus([err]); me.busy = false; return; }
     if (result.dryrun) {
@@ -108,9 +186,9 @@ function rebootNow(){
     }
     if (result.method) {
       // R2.2: the machine named the command it ran — now wait for it to
-      // actually go down (watchDown clears me.busy).
+      // actually go down and come back (watchRestart clears me.busy).
       setStatus(['Rebooting…']);
-      watchDown();
+      watchRestart(false);
       return;
     }
     // R2.4: ok with no method and no dryrun — the peer still runs the OLD

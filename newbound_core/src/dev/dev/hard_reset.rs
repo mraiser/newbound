@@ -4,6 +4,54 @@ use crate::dev::dev::compile::build_compile_command;
 use std::fs;
 use std::process::Command;
 use std::process::Stdio;
+use crate::dev::dev::update_crates::win_launch_runner;
+use crate::dev::dev::update_crates::win_pid_alive;
+use crate::dev::dev::update_crates::win_plain;
+use crate::dev::dev::update_crates::win_runner_prelude;
+
+/// hard_reset's six steps for the Windows runner (the run.sh steps; the
+/// prelude comes from update_crates). robocopy /E merges a tree the way
+/// cp -r does; its exit codes 8 and up are failures.
+const WIN_HARDRESET_STEPS: &str = r##"
+$H0 = BinHash
+St 'running' 1 'clone canon' ''
+if (Test-Path -LiteralPath 'CHUCKTHIS') { Remove-Item -LiteralPath 'CHUCKTHIS' -Recurse -Force -ErrorAction SilentlyContinue }
+Log '== STEP 1: git clone @URL@'
+if ((Run 'git clone -c core.autocrlf=false @URL@ CHUCKTHIS') -ne 0) { St 'failed' 1 'clone failed' ''; exit 1 }
+St 'running' 2 'overlay canon sources and store' ''
+Log '== STEP 2: overlay canon over instance'
+$ok = $true
+foreach ($sub in 'src', 'data', 'newbound_core') {
+  if ((Run "robocopy CHUCKTHIS\$sub $sub /E /NFL /NDL /NJH /NJS /NP") -ge 8) { $ok = $false }
+}
+if ($ok) { Copy-Item -LiteralPath 'CHUCKTHIS\Cargo.toml' -Destination 'Cargo.toml' -Force -ErrorAction SilentlyContinue; $ok = $? }
+if (-not $ok) { St 'failed' 2 'copy failed' ''; exit 1 }
+Remove-Item -LiteralPath 'CHUCKTHIS\Cargo.lock', 'Cargo.lock', 'src\lib.rs' -Force -ErrorAction SilentlyContinue
+foreach ($sub in 'src\app', 'src\dev', 'src\peer', 'src\security', 'cmd') {
+  if (Test-Path -LiteralPath $sub) { Remove-Item -LiteralPath $sub -Recurse -Force -ErrorAction SilentlyContinue }
+}
+if ((Run 'rustup update') -ne 0) { Log 'rustup update failed (continuing)' }
+St 'running' 3 'build canon binary' ''
+Log '== STEP 3: (cd CHUCKTHIS && @CARGO@)'
+if ((Run 'cd CHUCKTHIS && @CARGO@') -ne 0) { St 'failed' 3 'canon build failed' ''; exit 1 }
+$CB = 'CHUCKTHIS\target\@PROFILE@\newbound.exe'
+St 'running' 4 'newbound rebuild via canon binary' ''
+Log "== STEP 4: $CB rebuild"
+if ((Run "$CB rebuild") -ne 0) { St 'failed' 4 'rebuild failed' ''; exit 1 }
+St 'running' 5 'newbound recompile via canon binary' ''
+Log "== STEP 5: $CB recompile"
+if ((Run "$CB recompile") -ne 0) { Log '== STEP 5: some libraries failed to compile (continuing; they keep their old build)' }
+$RC = Select-String -LiteralPath $LOG -Pattern '^[0-9]+ compiled, [0-9]+ failed' | Select-Object -Last 1 | ForEach-Object { $_.Line -replace '["\\]', '' }
+Remove-Item -LiteralPath 'CHUCKTHIS' -Recurse -Force -ErrorAction SilentlyContinue
+St 'running' 6 'final host build' ''
+Log '== STEP 6: @CARGO@'
+if ((Build '@CARGO@') -ne 0) { St 'failed' 6 'final host build failed' ''; exit 1 }
+$H1 = BinHash
+if ($H0 -eq $H1) { $V = 'no-restart' } else { $V = 'restart' }
+$L = 'complete'; if ($RC) { $L = "complete; recompile: $RC" }
+St 'done' 6 $L $V
+Log "== DONE: verdict=$V"
+"##;
 
 pub fn execute(o: DataObject) -> DataObject {
     use std::panic;
@@ -61,6 +109,17 @@ fn err(msg: &str) -> DataObject {
 fn now_secs() -> i64 {
   std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
 }
+// Is the runner still alive? /proc answers on Linux; elsewhere (macOS, the
+// BSDs) `kill -0` does - signal 0 only checks that the pid exists.
+fn pid_alive(pid: i64) -> bool {
+  if cfg!(windows) { return win_pid_alive(pid); }
+  if std::path::Path::new("/proc/self").exists() {
+    return std::path::Path::new(&format!("/proc/{}", pid)).exists();
+  }
+  Command::new("kill").arg("-0").arg(pid.to_string())
+    .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null())
+    .status().map(|s| s.success()).unwrap_or(false)
+}
 
 let url = url.trim().to_string();
 let url = if url.is_empty() { "https://github.com/mraiser/newbound.git".to_string() } else { url };
@@ -80,7 +139,7 @@ if let Ok(s) = fs::read_to_string(&status_path) {
   if let Ok(o) = DataObject::try_from_string(&s) {
     if o.has("state") && o.get_string("state") == "running" {
       let pid = if o.has("pid") { o.get_int("pid") } else { 0 };
-      if pid > 0 && std::path::Path::new(&format!("/proc/{}", pid)).exists() {
+      if pid > 0 && pid_alive(pid) {
         return err(&format!("refused: a crate-update or hard-reset run is already in progress (runner pid {})", pid));
       }
     }
@@ -115,7 +174,7 @@ LOG="$D/run.log"
 BIN='target/{profile}/newbound'
 CB='CHUCKTHIS/target/{profile}/newbound'
 st() {{ printf '{{"state":"%s","step":%s,"steps":6,"kind":"hardreset","label":"%s","verdict":"%s","pid":%s,"time":%s}}' "$1" "$2" "$3" "$4" $$ "$(date +%s)" > "$D/status.json.tmp"; mv "$D/status.json.tmp" "$D/status.json"; }}
-h() {{ if [ -f "$BIN" ]; then sha256sum "$BIN" | cut -d' ' -f1; else echo none; fi; }}
+h() {{ if [ -f "$BIN" ]; then {{ sha256sum "$BIN" 2>/dev/null || shasum -a 256 "$BIN"; }} | cut -d' ' -f1; else echo none; fi; }}
 H0=$(h)
 st running 1 'clone canon' ''
 rm -rf CHUCKTHIS
@@ -135,18 +194,30 @@ echo "== STEP 4: $CB rebuild" >> "$LOG"
 "$CB" rebuild >> "$LOG" 2>&1 || {{ st failed 4 'rebuild failed' ''; exit 1; }}
 st running 5 'newbound recompile via canon binary' ''
 echo "== STEP 5: $CB recompile" >> "$LOG"
-"$CB" recompile >> "$LOG" 2>&1 || {{ st failed 5 'recompile failed' ''; exit 1; }}
+"$CB" recompile >> "$LOG" 2>&1 || echo "== STEP 5: some libraries failed to compile (continuing; they keep their old build)" >> "$LOG"
+RC=$(grep -E '^[0-9]+ compiled, [0-9]+ failed' "$LOG" | tail -1 | tr -d '"\\')
 rm -rf CHUCKTHIS
 st running 6 'final host build' ''
 echo "== STEP 6: {cargo}" >> "$LOG"
 {cargo} >> "$LOG" 2>&1 || {{ st failed 6 'final host build failed' ''; exit 1; }}
 H1=$(h)
 if [ "$H0" = "$H1" ]; then V=no-restart; else V=restart; fi
-st done 6 'complete' "$V"
+L=complete; [ -n "$RC" ] && L="complete; recompile: $RC"
+st done 6 "$L" "$V"
 echo "== DONE: verdict=$V" >> "$LOG"
 "#, base = base.display(), profile = profile, url = url, cargo = cargo_cmd);
 
-let script_path = rundir.join("run.sh");
+// Windows has no /bin/sh: the same steps run as a PowerShell script
+// (update_crates' win_runner_prelude + WIN_HARDRESET_STEPS), whose final
+// cargo build moves the running host .exe aside so the link step can
+// replace it.
+let (script, script_name) = if cfg!(windows) {
+  let steps = WIN_HARDRESET_STEPS.replace("@CARGO@", &cargo_cmd).replace("@URL@", &url).replace("@PROFILE@", profile);
+  (win_runner_prelude(&win_plain(&base), profile, ",\"steps\":6,\"kind\":\"hardreset\"") + &steps, "run.ps1")
+} else {
+  (script, "run.sh")
+};
+let script_path = rundir.join(script_name);
 if let Err(e) = fs::write(&script_path, &script) {
   return err(&format!("cannot write runner script: {}", e));
 }
@@ -154,14 +225,26 @@ let _ = fs::write(rundir.join("run.log"), "");
 let init_status = format!("{{\"state\":\"running\",\"step\":0,\"steps\":6,\"kind\":\"hardreset\",\"label\":\"launching hard-reset runner\",\"verdict\":\"\",\"pid\":0,\"time\":{}}}", now_secs());
 let _ = fs::write(&status_path, &init_status);
 
-let spawned = Command::new("setsid")
-  .arg("/bin/sh")
-  .arg(&script_path)
+let mut runner = Command::new("/bin/sh");
+runner.arg(&script_path)
   .current_dir(&base)
   .stdin(Stdio::null())
   .stdout(Stdio::null())
-  .stderr(Stdio::null())
-  .spawn();
+  .stderr(Stdio::null());
+// Detach the runner into its own process group, so stopping this server
+// (Ctrl-C, or a stop of its group) doesn't take the build with it. This was
+// the `setsid` binary, which exists on Linux only; process_group is the
+// same POSIX call (setpgid) on Linux, macOS and the BSDs.
+#[cfg(unix)]
+{
+  use std::os::unix::process::CommandExt;
+  runner.process_group(0);
+}
+let spawned = if cfg!(windows) {
+  win_launch_runner(&base, &script_path)
+} else {
+  runner.spawn().map(|c| c.id()).map_err(|e| e.to_string())
+};
 if let Err(e) = spawned {
   let _ = fs::write(&status_path, format!("{{\"state\":\"failed\",\"step\":0,\"steps\":6,\"kind\":\"hardreset\",\"label\":\"could not launch runner: {}\",\"verdict\":\"\",\"pid\":0,\"time\":{}}}", e, now_secs()));
   return err(&format!("hard-reset runner failed to launch: {}", e));
