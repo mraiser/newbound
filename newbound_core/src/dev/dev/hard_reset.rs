@@ -4,6 +4,54 @@ use crate::dev::dev::compile::build_compile_command;
 use std::fs;
 use std::process::Command;
 use std::process::Stdio;
+use crate::dev::dev::update_crates::win_launch_runner;
+use crate::dev::dev::update_crates::win_pid_alive;
+use crate::dev::dev::update_crates::win_plain;
+use crate::dev::dev::update_crates::win_runner_prelude;
+
+/// hard_reset's six steps for the Windows runner (the run.sh steps; the
+/// prelude comes from update_crates). robocopy /E merges a tree the way
+/// cp -r does; its exit codes 8 and up are failures.
+const WIN_HARDRESET_STEPS: &str = r##"
+$H0 = H
+St 'running' 1 'clone canon' ''
+if (Test-Path -LiteralPath 'CHUCKTHIS') { Remove-Item -LiteralPath 'CHUCKTHIS' -Recurse -Force -ErrorAction SilentlyContinue }
+Log '== STEP 1: git clone @URL@'
+if ((Run 'git clone -c core.autocrlf=false @URL@ CHUCKTHIS') -ne 0) { St 'failed' 1 'clone failed' ''; exit 1 }
+St 'running' 2 'overlay canon sources and store' ''
+Log '== STEP 2: overlay canon over instance'
+$ok = $true
+foreach ($d in 'src', 'data', 'newbound_core') {
+  if ((Run "robocopy CHUCKTHIS\$d $d /E /NFL /NDL /NJH /NJS /NP") -ge 8) { $ok = $false }
+}
+if ($ok) { Copy-Item -LiteralPath 'CHUCKTHIS\Cargo.toml' -Destination 'Cargo.toml' -Force -ErrorAction SilentlyContinue; $ok = $? }
+if (-not $ok) { St 'failed' 2 'copy failed' ''; exit 1 }
+Remove-Item -LiteralPath 'CHUCKTHIS\Cargo.lock', 'Cargo.lock', 'src\lib.rs' -Force -ErrorAction SilentlyContinue
+foreach ($d in 'src\app', 'src\dev', 'src\peer', 'src\security', 'cmd') {
+  if (Test-Path -LiteralPath $d) { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+}
+if ((Run 'rustup update') -ne 0) { Log 'rustup update failed (continuing)' }
+St 'running' 3 'build canon binary' ''
+Log '== STEP 3: (cd CHUCKTHIS && @CARGO@)'
+if ((Run 'cd CHUCKTHIS && @CARGO@') -ne 0) { St 'failed' 3 'canon build failed' ''; exit 1 }
+$CB = 'CHUCKTHIS\target\@PROFILE@\newbound.exe'
+St 'running' 4 'newbound rebuild via canon binary' ''
+Log "== STEP 4: $CB rebuild"
+if ((Run "$CB rebuild") -ne 0) { St 'failed' 4 'rebuild failed' ''; exit 1 }
+St 'running' 5 'newbound recompile via canon binary' ''
+Log "== STEP 5: $CB recompile"
+if ((Run "$CB recompile") -ne 0) { Log '== STEP 5: some libraries failed to compile (continuing; they keep their old build)' }
+$RC = Select-String -LiteralPath $LOG -Pattern '^[0-9]+ compiled, [0-9]+ failed' | Select-Object -Last 1 | ForEach-Object { $_.Line -replace '["\\]', '' }
+Remove-Item -LiteralPath 'CHUCKTHIS' -Recurse -Force -ErrorAction SilentlyContinue
+St 'running' 6 'final host build' ''
+Log '== STEP 6: @CARGO@'
+if ((Build '@CARGO@') -ne 0) { St 'failed' 6 'final host build failed' ''; exit 1 }
+$H1 = H
+if ($H0 -eq $H1) { $V = 'no-restart' } else { $V = 'restart' }
+$L = 'complete'; if ($RC) { $L = "complete; recompile: $RC" }
+St 'done' 6 $L $V
+Log "== DONE: verdict=$V"
+"##;
 
 pub fn execute(o: DataObject) -> DataObject {
     use std::panic;
@@ -64,6 +112,7 @@ fn now_secs() -> i64 {
 // Is the runner still alive? /proc answers on Linux; elsewhere (macOS, the
 // BSDs) `kill -0` does - signal 0 only checks that the pid exists.
 fn pid_alive(pid: i64) -> bool {
+  if cfg!(windows) { return win_pid_alive(pid); }
   if std::path::Path::new("/proc/self").exists() {
     return std::path::Path::new(&format!("/proc/{}", pid)).exists();
   }
@@ -158,7 +207,17 @@ st done 6 "$L" "$V"
 echo "== DONE: verdict=$V" >> "$LOG"
 "#, base = base.display(), profile = profile, url = url, cargo = cargo_cmd);
 
-let script_path = rundir.join("run.sh");
+// Windows has no /bin/sh: the same steps run as a PowerShell script
+// (update_crates' win_runner_prelude + WIN_HARDRESET_STEPS), whose final
+// cargo build moves the running host .exe aside so the link step can
+// replace it.
+let (script, script_name) = if cfg!(windows) {
+  let steps = WIN_HARDRESET_STEPS.replace("@CARGO@", &cargo_cmd).replace("@URL@", &url).replace("@PROFILE@", profile);
+  (win_runner_prelude(&win_plain(&base), profile, ",\"steps\":6,\"kind\":\"hardreset\"") + &steps, "run.ps1")
+} else {
+  (script, "run.sh")
+};
+let script_path = rundir.join(script_name);
 if let Err(e) = fs::write(&script_path, &script) {
   return err(&format!("cannot write runner script: {}", e));
 }
@@ -181,7 +240,11 @@ runner.arg(&script_path)
   use std::os::unix::process::CommandExt;
   runner.process_group(0);
 }
-let spawned = runner.spawn();
+let spawned = if cfg!(windows) {
+  win_launch_runner(&base, &script_path)
+} else {
+  runner.spawn().map(|c| c.id()).map_err(|e| e.to_string())
+};
 if let Err(e) = spawned {
   let _ = fs::write(&status_path, format!("{{\"state\":\"failed\",\"step\":0,\"steps\":6,\"kind\":\"hardreset\",\"label\":\"could not launch runner: {}\",\"verdict\":\"\",\"pid\":0,\"time\":{}}}", e, now_secs()));
   return err(&format!("hard-reset runner failed to launch: {}", e));
