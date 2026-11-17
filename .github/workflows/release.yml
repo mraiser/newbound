@@ -30,10 +30,6 @@ jobs:
         # "": the default bundle; js: newbound-<target>-js, with the
         # JavaScript runtime (packaging/BUNDLE.md)
         variant: ["", "js"]
-        exclude:
-          # the -js variant has not been built or tested on Windows yet
-          - platform: { target: x86_64-pc-windows-msvc, os: windows-latest }
-            variant: js
     name: bundle (${{ matrix.platform.target }}${{ matrix.variant && format(', {0}', matrix.variant) || '' }})
     runs-on: ${{ matrix.platform.os }}
     timeout-minutes: 60

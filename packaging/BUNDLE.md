@@ -52,3 +52,14 @@ needs a new bundle: install esbuild and its packages next to `data/`
 rebuild the bundle where they are. See the dev library's
 `docs/js-commands.md`.
 
+On Windows, `node_modules\.bin\esbuild` is a shell script that Newbound
+cannot start ("not a valid Win32 application"). Point it at esbuild's own
+executable instead:
+
+    $env:FLOWLANG_ESBUILD = "$PWD\node_modules\@esbuild\win32-x64\esbuild.exe"
+
+Building a `-js` bundle on Windows: work from a short checkout path (about
+110 characters at most). The JavaScript runtime's build files have long
+names, and the linker cannot open paths past Windows' 260-character limit
+(`LNK1104: cannot open file`).
+
