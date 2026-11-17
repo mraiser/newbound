@@ -13,7 +13,7 @@ use crate::dev::dev::update_crates::win_runner_prelude;
 /// prelude comes from update_crates). robocopy /E merges a tree the way
 /// cp -r does; its exit codes 8 and up are failures.
 const WIN_HARDRESET_STEPS: &str = r##"
-$H0 = H
+$H0 = BinHash
 St 'running' 1 'clone canon' ''
 if (Test-Path -LiteralPath 'CHUCKTHIS') { Remove-Item -LiteralPath 'CHUCKTHIS' -Recurse -Force -ErrorAction SilentlyContinue }
 Log '== STEP 1: git clone @URL@'
@@ -46,7 +46,7 @@ Remove-Item -LiteralPath 'CHUCKTHIS' -Recurse -Force -ErrorAction SilentlyContin
 St 'running' 6 'final host build' ''
 Log '== STEP 6: @CARGO@'
 if ((Build '@CARGO@') -ne 0) { St 'failed' 6 'final host build failed' ''; exit 1 }
-$H1 = H
+$H1 = BinHash
 if ($H0 -eq $H1) { $V = 'no-restart' } else { $V = 'restart' }
 $L = 'complete'; if ($RC) { $L = "complete; recompile: $RC" }
 St 'done' 6 $L $V

@@ -24,8 +24,8 @@ pub fn win_plain(p: &std::path::Path) -> String {
 
 /// The shared head of a Windows runner script: cd to the instance, then
 /// St (status.json in the shape update_crates_status reads), Log, Run (a
-/// native command, its output appended to run.log), H (sha256 of the host
-/// binary) and Build (a cargo build that can relink the running host).
+/// native command, its output appended to run.log), BinHash (sha256 of the
+/// host binary; not H, which PowerShell aliases to Get-History) and Build (a cargo build that can relink the running host).
 /// extra_json is appended to every status object, e.g. ,"steps":6.
 pub fn win_runner_prelude(base: &str, profile: &str, extra_json: &str) -> String {
   WIN_RUNNER_PRELUDE
@@ -51,7 +51,7 @@ function Log($m) { [IO.File]::AppendAllText($LOG, "$m`r`n") }
 # Native commands run through cmd so their output reaches run.log byte for
 # byte: Windows PowerShell 5.1 would re-encode it as UTF-16.
 function Run($cmdline) { cmd /c "$cmdline >> `"$LOG`" 2>&1"; return $LASTEXITCODE }
-function H { if (Test-Path -LiteralPath $BIN) { (Get-FileHash -Algorithm SHA256 -LiteralPath $BIN).Hash } else { 'none' } }
+function BinHash { if (Test-Path -LiteralPath $BIN) { (Get-FileHash -Algorithm SHA256 -LiteralPath $BIN).Hash } else { 'none' } }
 # Windows locks a running .exe but lets it be renamed. Park the running host
 # binary and put an unlocked copy, timestamp kept, back in its place: an
 # unchanged build stays fresh (no relink, so the hash verdict holds) and a
@@ -144,7 +144,7 @@ pub fn win_pid_alive(_: i64) -> bool { false }
 
 /// update_crates' four steps for the Windows runner (the run.sh steps).
 const WIN_UPDATE_STEPS: &str = r##"
-$H0 = H
+$H0 = BinHash
 St 'running' 1 'host build with new crates' ''
 Log '== STEP 1: @CARGO@'
 if ((Build '@CARGO@') -ne 0) { St 'failed' 1 'host build failed' ''; exit 1 }
@@ -158,7 +158,7 @@ $RC = Select-String -LiteralPath $LOG -Pattern '^[0-9]+ compiled, [0-9]+ failed'
 St 'running' 4 'final host build' ''
 Log '== STEP 4: @CARGO@'
 if ((Build '@CARGO@') -ne 0) { St 'failed' 4 'final host build failed' ''; exit 1 }
-$H1 = H
+$H1 = BinHash
 if ($H0 -eq $H1) { $V = 'no-restart' } else { $V = 'restart' }
 $L = 'complete'; if ($RC) { $L = "complete; recompile: $RC" }
 St 'done' 4 $L $V
