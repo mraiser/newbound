@@ -141,23 +141,34 @@ function NbRefreshPath {
     if ((Test-Path $cargoBin) -and ($env:Path -notlike "*$cargoBin*")) { $env:Path = "$cargoBin;$env:Path" }
 }
 
-function NbWinget([string]$id, [string[]]$extra) {
-    if (-not (NbHave 'winget')) {
-        NbFail "winget is not available to install $id. Install it from the Microsoft Store (App Installer), or install $id yourself, then re-run."
-    }
-    NbInfo "winget install --id $id"
-    & winget install --id $id -e --source winget --accept-package-agreements --accept-source-agreements @extra
-    if ($LASTEXITCODE -ne 0) { NbFail "winget could not install $id (exit code $LASTEXITCODE)." }
+# Run a downloaded installer and wait for it. Start-Process, not &: an
+# installer that needs admin rights then gets Windows' permission prompt
+# instead of failing with "requires elevation". The official installers are
+# downloaded directly rather than through winget, which not every Windows 10
+# has (LTSC editions, Windows Sandbox, machines without App Installer).
+function NbRunInstaller([string]$name, [string]$url, [string]$file, [string[]]$argv, [int[]]$okCodes = @(0)) {
+    $path = Join-Path $env:TEMP $file
+    NbInfo "Downloading $name"
+    Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $path -ErrorAction Stop
+    NbInfo "Installing $name (Windows may ask for permission)"
+    $p = Start-Process -FilePath $path -ArgumentList $argv -Wait -PassThru -ErrorAction Stop
+    Remove-Item $path -ErrorAction SilentlyContinue
+    if ($okCodes -notcontains $p.ExitCode) { NbFail "The $name installer failed (exit code $($p.ExitCode))." }
     NbRefreshPath
 }
 
 function NbCheckGit {
     if (-not (NbHave 'git')) {
         NbWarn 'Git was not found.'
-        if (-not $script:NbPrereqs -and -not (NbAskYesNo 'Install Git for Windows now with winget?' 'y')) {
+        if (-not $script:NbPrereqs -and -not (NbAskYesNo 'Install Git for Windows now?' 'y')) {
             NbFail 'Git is required. Install it from https://git-scm.com/download/win and re-run.'
         }
-        NbWinget 'Git.Git' @()
+        # the newest Git for Windows release's 64-bit (or ARM64) installer
+        $want = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { '-arm64\.exe$' } else { '-64-bit\.exe$' }
+        $rel = Invoke-RestMethod -UseBasicParsing -Uri 'https://api.github.com/repos/git-for-windows/git/releases/latest' -ErrorAction Stop
+        $asset = $rel.assets | Where-Object { $_.name -match '^Git-.*' + $want } | Select-Object -First 1
+        if (-not $asset) { NbFail 'Could not find the Git for Windows installer. Install it from https://git-scm.com/download/win and re-run.' }
+        NbRunInstaller "Git for Windows $($rel.tag_name)" $asset.browser_download_url $asset.name @('/VERYSILENT', '/NORESTART', '/NOCANCEL', '/SP-', '/SUPPRESSMSGBOXES')
         if (-not (NbHave 'git')) { NbFail 'Git was installed but is not on PATH yet. Open a new PowerShell window and re-run.' }
     }
     NbOk ('git ' + ((& git --version) -replace '^git version ', ''))
@@ -179,7 +190,9 @@ function NbCheckBuildTools {
     if (-not $script:NbPrereqs -and -not (NbAskYesNo 'Install the Visual Studio Build Tools with the C++ workload now (a large download; Windows will ask for permission)?' 'y')) {
         NbFail 'The C++ build tools are required. Install them from https://visualstudio.microsoft.com/visual-cpp-build-tools/ ("Desktop development with C++") and re-run.'
     }
-    NbWinget 'Microsoft.VisualStudio.2022.BuildTools' @('--override', '--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended')
+    # Microsoft's Build Tools bootstrapper; 3010 = done, a restart is recommended
+    NbRunInstaller 'Visual Studio Build Tools (C++)' 'https://aka.ms/vs/17/release/vs_BuildTools.exe' 'vs_BuildTools.exe' `
+        @('--quiet', '--wait', '--norestart', '--nocache', '--add', 'Microsoft.VisualStudio.Workload.VCTools', '--includeRecommended') @(0, 3010)
     if (-not (NbVsWithCpp)) { NbFail 'The build tools installer finished, but the C++ tools were not found. Install "Desktop development with C++" from the Visual Studio Installer and re-run.' }
     NbOk 'MSVC C++ build tools installed'
 }
