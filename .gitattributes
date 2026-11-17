@@ -3,6 +3,8 @@
 # source out with CRLF - unlike the Linux/macOS instances the store is
 # shared with. text=auto still leaves binary files untouched.
 * text=auto eol=lf
+# ...except Windows batch files: cmd mis-finds goto labels in LF-only files
+*.cmd text eol=crlf
 
 # Memory facets are line-oriented JSON (one-memory-cycle B2): a JSON
 # array with one canonical object per line, every entry line comma-

@@ -1,0 +1,49 @@
+name: build
+
+# Every pull request, and every push to master, builds the server on Linux,
+# macOS and Windows and checks that it starts. This is the gate that catches
+# a platform-specific API (std::os::unix, a shell, /proc) breaking another OS.
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    name: build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        run: cargo build --release --features=serde_support
+      - name: Regenerate from the store, then build again
+        run: |
+          ./target/release/newbound rebuild
+          cargo build --release --features=serde_support
+      - name: app.util.zip writes an archive
+        run: |
+          out=$(./target/release/newbound exec app util zip '{"srcdir":"html","destfile":"ci-zip-check.zip"}')
+          echo "$out"
+          echo "$out" | grep -q '"a":true'
+          test -s ci-zip-check.zip
+      - name: The server answers
+        run: |
+          printf 'headless=true\nhttp_port=8080\nhttp_address=127.0.0.1\n' > config.properties
+          ./target/release/newbound > server.log 2>&1 &
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/ || true)
+            case "$code" in 2*|3*) echo "HTTP $code"; exit 0 ;; esac
+            sleep 1
+          done
+          cat server.log
+          exit 1
