@@ -22,6 +22,20 @@ Python packages for your commands go in a virtual environment next to
     ./python/bin/python3 -m venv venv
     ./venv/bin/pip install <packages>
 
+### Windows
+
+The Windows bundle (`newbound-x86_64-pc-windows-msvc.zip`) has
+`newbound.exe`, with the Python DLLs beside it, where Windows looks for
+them; keep them together with `python\`. Unzip it, then from that folder:
+
+    .\newbound.exe
+
+Windows Firewall asks once whether Newbound may accept connections: allow
+it for peers on your network to find this one. Python packages:
+
+    .\python\python.exe -m venv venv
+    .\venv\Scripts\pip install <packages>
+
 Writing Rust commands needs the Rust toolchain and a source checkout; Python
 and flow commands work as is. See the dev library's
 `docs/python-commands.md` for Python commands.
@@ -37,4 +51,15 @@ needs a new bundle: install esbuild and its packages next to `data/`
 (`npm install esbuild <packages>`) and it is rebuilt on its next call, or
 rebuild the bundle where they are. See the dev library's
 `docs/js-commands.md`.
+
+On Windows, `node_modules\.bin\esbuild` is a shell script that Newbound
+cannot start ("not a valid Win32 application"). Point it at esbuild's own
+executable instead:
+
+    $env:FLOWLANG_ESBUILD = "$PWD\node_modules\@esbuild\win32-x64\esbuild.exe"
+
+Building a `-js` bundle on Windows: work from a short checkout path (about
+110 characters at most). The JavaScript runtime's build files have long
+names, and the linker cannot open paths past Windows' 260-character limit
+(`LNK1104: cannot open file`).
 

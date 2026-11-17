@@ -6,6 +6,7 @@
 #
 #   packaging/bundle.sh <target> [outdir] [variant]
 #   target:  x86_64-unknown-linux-gnu | aarch64-unknown-linux-gnu | aarch64-apple-darwin
+#            | x86_64-pc-windows-msvc (run from Git Bash; a .zip, not a .tar.gz)
 #   variant: js - also the JavaScript runtime (V8: the binary grows by about
 #            50 MB), and the esbuild bundles of the JavaScript/TypeScript
 #            commands that run from one, built here (`newbound jsbundle`:
@@ -36,7 +37,12 @@ case "$TARGET" in
   x86_64-unknown-linux-gnu)  PBS_SHA256="571a710c62520b26dbadbd16e8850e24565c01dea94440223bc16caa21614021" ;;
   aarch64-unknown-linux-gnu) PBS_SHA256="8d5ac68458a4df9bc3c349d607da2674d8390ad26162482b17215563e45aca83" ;;
   aarch64-apple-darwin)      PBS_SHA256="06469835e1b0f73bcdb6c498a1d60ce579cc43a980754490a6f1e30062f43850" ;;
+  x86_64-pc-windows-msvc)    PBS_SHA256="91ea0cd883295458fa766eae36241df3ecc21f7029814189707d54b450e55c69" ;;
   *) echo "unsupported target: $TARGET" >&2; exit 2 ;;
+esac
+case "$TARGET" in
+  *-windows-msvc) WINDOWS=1; EXE="newbound.exe" ;;
+  *)              WINDOWS="";  EXE="newbound" ;;
 esac
 PBS_FILE="cpython-${PY_VERSION}+${PBS_TAG}-${TARGET}-install_only_stripped.tar.gz"
 PBS_URL="https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/cpython-${PY_VERSION}%2B${PBS_TAG}-${TARGET}-install_only_stripped.tar.gz"
@@ -54,13 +60,23 @@ fi
 if command -v sha256sum >/dev/null; then SUM="sha256sum"; else SUM="shasum -a 256"; fi
 echo "${PBS_SHA256}  ${OUT}/cache/${PBS_FILE}" | $SUM -c -
 tar -xzf "${OUT}/cache/${PBS_FILE}" -C "$DEST"     # -> $DEST/python
-PYTHON="$(cd "$DEST/python/bin" && pwd)/python3"
-PYLIB="$(cd "$DEST/python/lib" && pwd)"
+if [ -n "$WINDOWS" ]; then
+  # Windows layout: python/python.exe, the import library in python/libs.
+  # Mixed paths (C:/...): cargo and PyO3 are native programs.
+  PYTHON="$(cygpath -m "$(cd "$DEST/python" && pwd)")/python.exe"
+  PYLIB="$(cygpath -m "$(cd "$DEST/python/libs" && pwd)")"
+else
+  PYTHON="$(cd "$DEST/python/bin" && pwd)/python3"
+  PYLIB="$(cd "$DEST/python/lib" && pwd)"
+fi
 
 # 2. newbound, linked against that Python and finding it next to itself.
 case "$TARGET" in
-  *-apple-darwin) RPATH='@executable_path/python/lib' ;;
-  *)              RPATH='$ORIGIN/python/lib' ;;
+  *-apple-darwin) LINKFLAGS='-C link-args=-Wl,-rpath,@executable_path/python/lib' ;;
+  # Windows has no rpath: the Python DLLs are copied next to newbound.exe
+  # below, where the loader looks first.
+  *-windows-msvc) LINKFLAGS='' ;;
+  *)              LINKFLAGS='-C link-args=-Wl,-rpath,$ORIGIN/python/lib' ;;
 esac
 # Its own target dir: these flags must not replace a development build.
 BUILD_DIR="target/bundle-${TARGET}${SUFFIX}"
@@ -68,9 +84,13 @@ BUILD_DIR="target/bundle-${TARGET}${SUFFIX}"
 # PyO3 cannot find libpython by itself: link against the bundled one
 # explicitly (never a system libpython that happens to be on the linker's
 # default path).
-PYO3_PYTHON="$PYTHON" RUSTFLAGS="-L native=${PYLIB} -C link-args=-Wl,-rpath,${RPATH}" CARGO_TARGET_DIR="$BUILD_DIR" \
+PYO3_PYTHON="$PYTHON" RUSTFLAGS="-L native=${PYLIB} ${LINKFLAGS}" CARGO_TARGET_DIR="$BUILD_DIR" \
   cargo build --release --features="$FEATURES"
-cp "$BUILD_DIR/release/newbound" "$DEST/"
+cp "$BUILD_DIR/release/$EXE" "$DEST/"
+if [ -n "$WINDOWS" ]; then
+  # python313.dll (and the VC runtime it was built against) next to the exe
+  cp "$DEST"/python/python3*.dll "$DEST"/python/vcruntime140*.dll "$DEST/"
+fi
 if [[ "$TARGET" == *-apple-darwin ]]; then
   # Make sure the binary references libpython through its rpath.
   LIB=$(otool -L "$DEST/newbound" | awk '/libpython/ {print $1}')
@@ -126,5 +146,13 @@ if [ "$VARIANT" = js ]; then
   echo "smoke test: the JavaScript engine runs from the bundle"
 fi
 
-tar -czf "${OUT}/${NAME}.tar.gz" -C "$OUT" "$NAME"
-echo "${OUT}/${NAME}.tar.gz"
+if [ -n "$WINDOWS" ]; then
+  # A .zip opens in Explorer. System32's tar (bsdtar) writes it, -a picking
+  # the format from the name; Git Bash's own GNU tar cannot.
+  rm -f "${OUT}/${NAME}.zip"
+  "$(cygpath -u "$SYSTEMROOT")/System32/tar.exe" -a -c -f "${OUT}/${NAME}.zip" -C "$OUT" "$NAME"
+  echo "${OUT}/${NAME}.zip"
+else
+  tar -czf "${OUT}/${NAME}.tar.gz" -C "$OUT" "$NAME"
+  echo "${OUT}/${NAME}.tar.gz"
+fi
