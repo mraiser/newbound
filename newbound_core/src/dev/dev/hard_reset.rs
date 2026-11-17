@@ -21,14 +21,14 @@ if ((Run 'git clone -c core.autocrlf=false @URL@ CHUCKTHIS') -ne 0) { St 'failed
 St 'running' 2 'overlay canon sources and store' ''
 Log '== STEP 2: overlay canon over instance'
 $ok = $true
-foreach ($d in 'src', 'data', 'newbound_core') {
-  if ((Run "robocopy CHUCKTHIS\$d $d /E /NFL /NDL /NJH /NJS /NP") -ge 8) { $ok = $false }
+foreach ($sub in 'src', 'data', 'newbound_core') {
+  if ((Run "robocopy CHUCKTHIS\$sub $sub /E /NFL /NDL /NJH /NJS /NP") -ge 8) { $ok = $false }
 }
 if ($ok) { Copy-Item -LiteralPath 'CHUCKTHIS\Cargo.toml' -Destination 'Cargo.toml' -Force -ErrorAction SilentlyContinue; $ok = $? }
 if (-not $ok) { St 'failed' 2 'copy failed' ''; exit 1 }
 Remove-Item -LiteralPath 'CHUCKTHIS\Cargo.lock', 'Cargo.lock', 'src\lib.rs' -Force -ErrorAction SilentlyContinue
-foreach ($d in 'src\app', 'src\dev', 'src\peer', 'src\security', 'cmd') {
-  if (Test-Path -LiteralPath $d) { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+foreach ($sub in 'src\app', 'src\dev', 'src\peer', 'src\security', 'cmd') {
+  if (Test-Path -LiteralPath $sub) { Remove-Item -LiteralPath $sub -Recurse -Force -ErrorAction SilentlyContinue }
 }
 if ((Run 'rustup update') -ne 0) { Log 'rustup update failed (continuing)' }
 St 'running' 3 'build canon binary' ''

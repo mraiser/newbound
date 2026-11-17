@@ -37,15 +37,17 @@ pub fn win_runner_prelude(base: &str, profile: &str, extra_json: &str) -> String
 const WIN_RUNNER_PRELUDE: &str = r##"$ErrorActionPreference = 'Continue'
 $BASE = '@BASE@'
 Set-Location -LiteralPath $BASE
-$D = Join-Path $BASE 'runtime\dev\update_crates'
-$LOG = Join-Path $D 'run.log'
+# PowerShell variable names are case-insensitive: a loop variable $d
+# once overwrote the runner's directory, so it is $RUNDIR
+$RUNDIR = Join-Path $BASE 'runtime\dev\update_crates'
+$LOG = Join-Path $RUNDIR 'run.log'
 $RBIN = 'target\@PROFILE@\newbound.exe'
 $BIN = Join-Path $BASE $RBIN
 function St($state, $step, $label, $verdict) {
   $label = $label -replace '["\\]', ''
   $t = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
   $j = '{"state":"' + $state + '","step":' + $step + '@EXTRA@,"label":"' + $label + '","verdict":"' + $verdict + '","pid":' + $PID + ',"time":' + $t + '}'
-  [IO.File]::WriteAllText((Join-Path $D 'status.json'), $j)
+  [IO.File]::WriteAllText((Join-Path $RUNDIR 'status.json'), $j)
 }
 function Log($m) { [IO.File]::AppendAllText($LOG, "$m`r`n") }
 # Native commands run through cmd so their output reaches run.log byte for
