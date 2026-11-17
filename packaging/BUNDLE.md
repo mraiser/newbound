@@ -22,6 +22,20 @@ Python packages for your commands go in a virtual environment next to
     ./python/bin/python3 -m venv venv
     ./venv/bin/pip install <packages>
 
+### Windows
+
+The Windows bundle (`newbound-x86_64-pc-windows-msvc.zip`) has
+`newbound.exe`, with the Python DLLs beside it, where Windows looks for
+them; keep them together with `python\`. Unzip it, then from that folder:
+
+    .\newbound.exe
+
+Windows Firewall asks once whether Newbound may accept connections: allow
+it for peers on your network to find this one. Python packages:
+
+    .\python\python.exe -m venv venv
+    .\venv\Scripts\pip install <packages>
+
 Writing Rust commands needs the Rust toolchain and a source checkout; Python
 and flow commands work as is. See the dev library's
 `docs/python-commands.md` for Python commands.
