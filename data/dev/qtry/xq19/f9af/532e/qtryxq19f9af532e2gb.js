@@ -130,8 +130,9 @@ async function init(host, { openLib, openControl, toast }) {
   const patchApi = true;
 
   // ── the gallery ───────────────────────────────────────────
-  // ordered root first, then name — the order the old root groups had
-  const byRootThenName = (a, b) => rootOf(a).localeCompare(rootOf(b)) || a.id.localeCompare(b.id);
+  // ordered alphabetically by library name; the root filter is how a reader
+  // narrows to one root, so the order no longer groups by it
+  const byName = (a, b) => a.id.localeCompare(b.id);
 
   function addLibCard(lib) {
     const card = document.createElement("button");
@@ -156,7 +157,7 @@ async function init(host, { openLib, openControl, toast }) {
     });
   }
 
-  for (const lib of [...libs].sort(byRootThenName)) addLibCard(lib);
+  for (const lib of [...libs].sort(byName)) addLibCard(lib);
   for (const r of [...new Set(libs.map(rootOf))].sort()) {
     const opt = document.createElement("option");
     opt.value = r;
