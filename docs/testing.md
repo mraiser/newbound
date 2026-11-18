@@ -1,7 +1,8 @@
 # Testing Newbound core
 
-Status: **plan** (phase 1 of 5). The harness, smoke tests and CI job are
-not written yet; sections marked *planned* describe what they will be.
+Status: phase 2 of 5 — the harness is in (`tests/common/mod.rs`, checked
+by `tests/harness.rs`). The smoke tests and CI job are not written yet;
+sections marked *planned* describe what they will be.
 
 ## Where we start (2026-11-18)
 
@@ -98,34 +99,50 @@ command exists.
 
 ## How (phases 2–4)
 
-### Harness (*planned*, phase 2)
+### Harness (`tests/common/mod.rs`)
 
-An integration-test helper at `tests/common/mod.rs` in the root crate,
-used by `tests/*.rs`:
+Integration tests live in `tests/*.rs` in the root crate and start with
+`mod common;`.
 
-- **Disposable instance.** Creates a fresh directory under
-  `std::env::temp_dir()` and copies into it only what a core instance
-  needs: `data/{app,dev,security}` (and `peer` for tests that need it),
-  `html/`, and `runtime/<lib>/{app.properties,src}`. It never runs in, or
-  writes to, the checkout or a live instance.
-- **Config.** Writes `config.properties` with `headless=true`,
-  `http_address=127.0.0.1`, `http_port=0` and `apps=` the libraries under
-  test. Peer networking (P2P listener and LAN discovery) is left out
-  unless a test asks for it, so test instances never announce themselves
-  to real instances on the same network.
-- **Users.** Writes `users/admin.properties` and a non-admin fixture user,
-  each with a random password the test knows.
-- **Start/ready/stop.** Runs the binary from `CARGO_BIN_EXE_newbound` with
-  the temp directory as working directory, reads stdout until it prints
-  the listening port, then polls `GET /` until it answers. Drop kills the
-  child, waits for it, and removes the directory. One instance is shared
-  per test binary where tests do not interfere.
-- **Client.** A minimal HTTP/1.1 GET client on `std::net::TcpStream`
-  (cookie in, `Set-Cookie` out) and `ndata::DataObject::from_string` for
-  JSON — no new dependencies.
+- **Disposable instance.** `Instance::start()` creates a fresh directory
+  under `std::env::temp_dir()` and copies into it only what a core
+  instance needs: `data/<lib>` for each library under test, `html/`, and
+  `runtime/<lib>/app.properties` and `runtime/<lib>/src/`. It never runs
+  in, or writes to, the checkout or a live instance.
+- **Config.** It writes `config.properties` with `headless=true`,
+  `http_address=127.0.0.1`, `http_port=0`, `security=on` and
+  `apps=app,dev,security` (`Instance::start_with_apps` picks others).
+  `peer` is left out by default: it opens a P2P listener and LAN
+  discovery, and a test instance must never announce itself to real
+  instances on the same network.
+- **Users.** `users/admin.properties` (group `admin`) and
+  `users/tester.properties` (group `testers`, which grants nothing in the
+  core libraries), each with a random password held in
+  `inst.admin_password` / `inst.user_password`.
+- **Start/ready/stop.** Runs the binary Cargo built for this test
+  (`CARGO_BIN_EXE_newbound`) with the temp directory as its working
+  directory and its output in `newbound.log` there, waits for
+  `HTTP TCP listening on port N`, then until `GET /` answers. Startup
+  failures panic with the log. Dropping the `Instance` — including when a
+  test panics — kills the process, waits for it and deletes the directory.
+  Set `NEWBOUND_TEST_KEEP=1` to keep the directory for inspection.
+- **One instance per test.** Booting takes a fraction of a second, so
+  each test starts its own instance and no test can see another's
+  sessions or writes; the tests in a file run in parallel safely.
+- **Client.** `inst.client()` is an anonymous visitor; `inst.login_admin()`
+  and `inst.login_user()` return clients already logged in. A client is a
+  minimal HTTP/1.1 GET client on `std::net::TcpStream` that keeps the
+  `sessionid` cookie like a browser. `client.exec(lib, id, args)` calls a
+  command through `app.exec`. `Response` has `status`, `header()`,
+  `cookie()`, `text()` and `json()` (an ndata `DataObject`). No new
+  dependencies.
 - **Portable.** `std::path` joins only, no shell, no `/tmp` literal, no
   Unix-only APIs, so the same code runs on Linux, NixOS, macOS, Windows
   and Raspberry Pi.
+
+`tests/harness.rs` checks the harness itself: the instance boots under the
+temp dir, answers, is gone (process, port and directory) after drop, two
+instances are independent, and both fixture users can log in.
 
 ### CI (*planned*, phase 4)
 
