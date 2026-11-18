@@ -1235,11 +1235,30 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
   true
 }
 
+/// True when a URL or file path cannot climb out of the folder it is joined
+/// onto: no ".." component (split on / and \), no NUL byte. Lexical on
+/// purpose - symlinks an owner placed inside a served folder keep working.
+pub fn path_is_safe(p:&str) -> bool {
+  !p.contains('\0') && !p.split(|c| c == '/' || c == '\\').any(|s| s == "..")
+}
+
 pub fn do_get(mut request:DataObject, session_id:String) -> DataObject {
-  let system = DataStore::globals().get_object("system");
   let mut res = DataObject::new();
 
   let path_decoded = hex_decode(request.get_string("path")); // Renamed path to path_decoded
+  // Path traversal guard: the URL path is joined onto html/ and
+  // runtime/<app>/html/ below and handed to commands as nn_path. A path
+  // with a ".." component (raw or percent-encoded) is refused before any
+  // of that happens, so no request can name a file outside those folders.
+  if !path_is_safe(&request.get_string("path")) || !path_is_safe(&path_decoded) {
+    res.put_int("code", 400);
+    res.put_string("msg", "BAD REQUEST");
+    res.put_string("mimetype", "text/plain; charset=utf-8");
+    res.put_string("body", "Bad request");
+    return res;
+  }
+
+  let system = DataStore::globals().get_object("system");
   let mut p = "html".to_string() + &path_decoded;
   let mut b_found = false; // Renamed b to b_found
 

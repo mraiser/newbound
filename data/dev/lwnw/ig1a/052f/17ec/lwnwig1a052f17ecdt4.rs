@@ -10,6 +10,7 @@ fn now_secs() -> i64 {
 // Is the runner still alive? /proc answers on Linux; elsewhere (macOS, the
 // BSDs) `kill -0` does - signal 0 only checks that the pid exists.
 fn pid_alive(pid: i64) -> bool {
+  if cfg!(windows) { return win_pid_alive(pid); }
   if std::path::Path::new("/proc/self").exists() {
     return std::path::Path::new(&format!("/proc/{}", pid)).exists();
   }
@@ -104,7 +105,17 @@ st done 6 "$L" "$V"
 echo "== DONE: verdict=$V" >> "$LOG"
 "#, base = base.display(), profile = profile, url = url, cargo = cargo_cmd);
 
-let script_path = rundir.join("run.sh");
+// Windows has no /bin/sh: the same steps run as a PowerShell script
+// (update_crates' win_runner_prelude + WIN_HARDRESET_STEPS), whose final
+// cargo build moves the running host .exe aside so the link step can
+// replace it.
+let (script, script_name) = if cfg!(windows) {
+  let steps = WIN_HARDRESET_STEPS.replace("@CARGO@", &cargo_cmd).replace("@URL@", &url).replace("@PROFILE@", profile);
+  (win_runner_prelude(&win_plain(&base), profile, ",\"steps\":6,\"kind\":\"hardreset\"") + &steps, "run.ps1")
+} else {
+  (script, "run.sh")
+};
+let script_path = rundir.join(script_name);
 if let Err(e) = fs::write(&script_path, &script) {
   return err(&format!("cannot write runner script: {}", e));
 }
@@ -127,7 +138,11 @@ runner.arg(&script_path)
   use std::os::unix::process::CommandExt;
   runner.process_group(0);
 }
-let spawned = runner.spawn();
+let spawned = if cfg!(windows) {
+  win_launch_runner(&base, &script_path)
+} else {
+  runner.spawn().map(|c| c.id()).map_err(|e| e.to_string())
+};
 if let Err(e) = spawned {
   let _ = fs::write(&status_path, format!("{{\"state\":\"failed\",\"step\":0,\"steps\":6,\"kind\":\"hardreset\",\"label\":\"could not launch runner: {}\",\"verdict\":\"\",\"pid\":0,\"time\":{}}}", e, now_secs()));
   return err(&format!("hard-reset runner failed to launch: {}", e));

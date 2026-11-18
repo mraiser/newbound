@@ -311,6 +311,9 @@ fn park_running_exe() -> Option<(std::path::PathBuf, std::path::PathBuf)> {
   }
   let parked = dir.join(format!("{}{}-{}", prefix, std::process::id(), N.fetch_add(1, Ordering::SeqCst)));
   std::fs::rename(&exe, &parked).ok()?;
+  // an unlocked copy back in its place, timestamp kept: an unchanged build
+  // stays fresh (no needless relink), a changed one overwrites the copy
+  let _ = std::fs::copy(&parked, &exe);
   Some((exe, parked))
 }
 #[cfg(windows)]
