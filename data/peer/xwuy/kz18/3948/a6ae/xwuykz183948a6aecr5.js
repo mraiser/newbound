@@ -61,6 +61,10 @@ me.ready = function(){
       ME.lastTabPeer = ME.DATA.id;
     });
   });
+  // ARIA tabs with arrow keys, over the panel's own two tab contents.
+  document.body.api.ui.ariaTabs(ME.querySelector('.hudtop .navbar-dark'), function(t){
+    return ME.querySelector(':scope > .tab-content.' + t.dataset.id);
+  });
 
   var uuid = ME.DATA.id;
   json('../peer/remote/'+uuid+'/app/libs', null, function(result){
@@ -495,6 +499,11 @@ ME.querySelector('.hudeditbutton').addEventListener('click', function(){
 
 ME.querySelector('.closehud').addEventListener('click', function(){
   var el = document.getElementById("headsupdisplay");
+  // Keyboard focus was in the panel: hand it back to this peer's list row.
+  if (el.contains(document.activeElement) && window.CSS && CSS.escape) {
+    var row = document.querySelector('.peerlistrow[data-peer="' + CSS.escape(ME.DATA.id) + '"]');
+    if (row) row.focus({ preventScroll: true });
+  }
   animateTo(el, {width:'0px'}, 300, function(){ el.style.display = 'none'; el.innerHTML = ''; });
   var par = ME.parentElement;
   if (par && par.api && par.api.focus) par.api.focus(null);
@@ -753,6 +762,7 @@ ME.querySelectorAll('.control-settings-popup td').forEach(function(td){
 ME.querySelectorAll('.closeonclick').forEach(function(row){
   row.addEventListener("click", function(){
     ME.querySelector('.control-settings-popup').style.display = 'none';
+    ME.querySelector('.morebutton').setAttribute('aria-expanded', 'false');
   });
 });
 

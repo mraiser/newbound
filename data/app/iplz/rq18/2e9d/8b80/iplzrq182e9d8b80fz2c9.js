@@ -17,8 +17,14 @@ function resolveEl(sel) {
 
 function setStyles(el, styles) { for (var k in styles) el.style[k] = styles[k]; }
 
+function reducedMotion() {
+  try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (x) { return false; }
+}
+
 function animateTo(el, props, ms, cb) {
   var done = function() { setStyles(el, props); if (cb) cb(); };
+  // The OS asks for reduced motion: go straight to the end state.
+  if (reducedMotion()) { done(); return; }
   try {
     var from = {}, cs = getComputedStyle(el);
     for (var k in props) from[k] = cs[k];
@@ -135,6 +141,55 @@ me.initNavbar = function(el) {
       el.querySelectorAll('.' + which).forEach(function(t) { t.classList.add('selected'); });
     });
   });
+  // One tablist per tab bar in el.
+  var bars = [];
+  tabs.forEach(function(t) { if (bars.indexOf(t.parentElement) < 0) bars.push(t.parentElement); });
+  bars.forEach(function(bar) {
+    me.ariaTabs(bar, function(t) { return el.querySelector('.tab-content.' + t.dataset.id); });
+  });
+};
+
+// Tabs as the ARIA tab pattern (WCAG 2.1.1, 4.1.2): the bar is a tablist,
+// each .navbar-tab a tab (only the selected one in the tab order), its
+// content a tabpanel; Left/Right/Home/End move and select. Selection itself
+// stays with the page's own click handler: a key press clicks the tab.
+// panelFor(tab) returns that tab's content element, or null.
+me.ariaTabs = function(bar, panelFor) {
+  var tabs = Array.prototype.slice.call(bar.querySelectorAll(':scope > .navbar-tab'));
+  if (tabs.length == 0) return;
+  bar.setAttribute('role', 'tablist');
+  function sync(sel) {
+    tabs.forEach(function(t) {
+      var on = sel ? t === sel : t.classList.contains('selected');
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+    });
+  }
+  tabs.forEach(function(t) {
+    t.setAttribute('role', 'tab');
+    if (!t.id) t.id = uid('tab');
+    var p = panelFor ? panelFor(t) : null;
+    if (p) {
+      if (!p.id) p.id = uid('tabpanel');
+      t.setAttribute('aria-controls', p.id);
+      p.setAttribute('role', 'tabpanel');
+      p.setAttribute('aria-labelledby', t.id);
+    }
+    t.addEventListener('click', function() { sync(t); });
+    t.addEventListener('keydown', function(e) {
+      var i = tabs.indexOf(t), n = tabs.length, j = -1;
+      if (e.key == 'ArrowRight') j = (i + 1) % n;
+      else if (e.key == 'ArrowLeft') j = (i - 1 + n) % n;
+      else if (e.key == 'Home') j = 0;
+      else if (e.key == 'End') j = n - 1;
+      else if (e.key == 'Enter' || e.key == ' ') { e.preventDefault(); t.click(); return; }
+      if (j < 0) return;
+      e.preventDefault();
+      tabs[j].focus();
+      tabs[j].click();
+    });
+  });
+  sync();
 };
 
 me.initTooltips = function(el) {
@@ -181,13 +236,188 @@ me.initTooltips = function(el) {
   });
 };
 
+// --- Dialog and menu accessibility (WCAG 2.1.1, 2.1.2, 2.4.3, 4.1.2) ---
+// A modal popup is announced as a dialog with a name, takes focus when it
+// opens, keeps Tab inside (everything else is inert), closes on Escape the
+// way its own close control does, and hands focus back to whatever opened it.
+var FOCUSABLE = 'a[href], summary, iframe, button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
+var uidN = 0;
+function uid(prefix) { return prefix + '-' + me.UUID + '-' + (++uidN); }
+
+function shown(x) {
+  return x.getClientRects().length > 0 && getComputedStyle(x).visibility != 'hidden';
+}
+
+function focusables(el) {
+  return Array.prototype.filter.call(el.querySelectorAll(FOCUSABLE), function(x) {
+    return shown(x) && !(x.closest && x.closest('[inert]'));
+  });
+}
+
+function closersOf(el2, data) {
+  var sel = data.closeselector ? data.closeselector : '.popupcard-close';
+  return typeof sel === 'string' ? Array.prototype.slice.call(el2.querySelectorAll(sel)) : [sel];
+}
+
+// The dialog's name: data.label, an existing aria-label(ledby), else its title.
+var TITLE_SELECTORS = ['[data-dialog-title]', '.peer-dlg-title', '.hud-dlg-title', '.usercard-title', '.appname',
+  '.dialog-header .title', '.card-header .title', '.title', '.dialog-header', '.card-header'];
+function nameDialog(el2, data) {
+  if (data.label) { el2.setAttribute('aria-label', data.label); el2.removeAttribute('aria-labelledby'); return; }
+  if (el2.hasAttribute('aria-labelledby') || el2.hasAttribute('aria-label')) return;
+  for (var i = 0; i < TITLE_SELECTORS.length; i++) {
+    var t = el2.querySelector(TITLE_SELECTORS[i]);
+    if (t && t.textContent.trim()) {
+      if (!t.id) t.id = uid('dlg-title');
+      el2.setAttribute('aria-labelledby', t.id);
+      return;
+    }
+  }
+}
+
+// Everything outside the dialog becomes inert, except data.keepLive
+// elements a page keeps clickable above its backdrop (Settings' gear).
+// Returns what was changed.
+function inertOutside(el2, keep) {
+  var live = [el2].concat(keep || []).filter(function(x) { return x && x.isConnected; });
+  var path = [];
+  live.forEach(function(x) {
+    for (var n = x.parentElement; n && n !== document.documentElement; n = n.parentElement)
+      if (path.indexOf(n) < 0) path.push(n);
+  });
+  var changed = [];
+  path.forEach(function(p) {
+    Array.prototype.forEach.call(p.children, function(c) {
+      if (path.indexOf(c) >= 0 || live.indexOf(c) >= 0 || c.inert) return;
+      if (c.tagName == 'SCRIPT' || c.tagName == 'STYLE' || c.tagName == 'LINK') return;
+      c.inert = true;
+      changed.push(c);
+    });
+  });
+  return changed;
+}
+
+// Focus on open: data.focus, then [autofocus], the first field, a close
+// control, the first focusable, and last the dialog itself.
+function focusInto(el2, data) {
+  if (!shown(el2) || el2.contains(document.activeElement)) return;
+  var pick = data.focus ? resolveEl(data.focus) : null;
+  if (!pick || !shown(pick)) pick = el2.querySelector('[autofocus]');
+  var all = focusables(el2);
+  if (!pick || !shown(pick)) pick = all.filter(function(x) {
+    return x.matches('select, textarea, input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="range"])');
+  })[0];
+  if (!pick) pick = closersOf(el2, data).filter(shown)[0];
+  if (!pick) pick = all[0];
+  if (!pick) { if (!el2.hasAttribute('tabindex')) el2.tabIndex = -1; pick = el2; }
+  pick.focus({ preventScroll: true });
+}
+
+// Controls a page draws above its own backdrop (the titlebar's home link and
+// gear) stay clickable with the mouse, as they were; Tab still stays inside.
+function aboveBackdrop(el2) {
+  var keep = [];
+  document.querySelectorAll(FOCUSABLE).forEach(function(x) {
+    if (el2.contains(x) || !shown(x)) return;
+    var r = x.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    if (cx < 0 || cy < 0 || cx >= window.innerWidth || cy >= window.innerHeight) return;
+    var h = document.elementFromPoint(cx, cy);
+    if (h && (h === x || x.contains(h))) keep.push(x);
+  });
+  return keep;
+}
+
+function openModalA11y(el2, data) {
+  if (!el2.hasAttribute('role') || data.role) el2.setAttribute('role', data.role || 'dialog');
+  el2.setAttribute('aria-modal', 'true');
+  nameDialog(el2, data);
+  var keep = (data.keepLive || []).map(resolveEl).concat(data.bg ? aboveBackdrop(el2) : []);
+  var st = { data: data, el: el2, opener: document.activeElement, inerted: inertOutside(el2, keep) };
+  el2._nbModal = st;
+  me.modals.push(st);
+}
+
+function closeModalA11y(el2) {
+  var st = el2 && el2._nbModal;
+  if (!st) return;
+  el2._nbModal = null;
+  var i = me.modals.indexOf(st);
+  if (i >= 0) me.modals.splice(i, 1);
+  st.inerted.forEach(function(x) { x.inert = false; });
+  // Back to the opener, unless focus already moved somewhere live outside.
+  var ae = document.activeElement;
+  var lost = !ae || ae === document.body || el2.contains(ae);
+  var to = st.data.returnFocus ? resolveEl(st.data.returnFocus) : st.opener;
+  if (lost && to && to !== document.body && to.isConnected && shown(to) && !(to.closest && to.closest('[inert]')))
+    to.focus({ preventScroll: true });
+}
+
+me.modals = [];
+me.menu = null;   // the open non-modal popup (menus), if any
+
+document.addEventListener('keydown', function(e) {
+  if (e.isComposing || e.defaultPrevented) return;
+  // An open menu takes Escape first (also when it sits inside a dialog).
+  if (e.key == 'Escape' && me.menu) {
+    var m = me.menu;
+    if (shown(m.el)) {
+      e.preventDefault();
+      me.closePopup(m.data);
+      if (m.trigger && m.trigger.isConnected) m.trigger.focus({ preventScroll: true });
+      return;
+    }
+    me.menu = null;
+  }
+  var top = me.modals[me.modals.length - 1];
+  if (!top) return;
+  if (e.key == 'Escape' && !top.data.noEscape && !(e.target && e.target.tagName == 'SELECT')) {
+    e.preventDefault();
+    if (typeof top.data.escape == 'function') top.data.escape();
+    else {
+      var c = closersOf(top.el, top.data).filter(shown)[0];
+      if (c) c.click(); else me.closePopup(top.data);
+    }
+  } else if (e.key == 'Tab') {
+    // Wrap Tab inside the dialog (inert covers the rest; this keeps focus
+    // off the browser chrome and works where inert is missing).
+    var f = focusables(top.el);
+    if (f.length == 0) { e.preventDefault(); return; }
+    var first = f[0], last = f[f.length - 1];
+    if (!top.el.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+    else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+});
+
+// Safety net: a page that hides or removes a modal itself, without
+// closePopup(), must not leave everything else inert (inert blocks the
+// mouse too).
+setInterval(function() {
+  me.modals.slice().forEach(function(st) {
+    if (!st.el.isConnected || !shown(st.el)) closeModalA11y(st.el);
+  });
+}, 400);
+
 me.initPopups = function(el) {
   el.querySelectorAll('.popupmenu').forEach(function(p) {
+    var d0 = readData(p, 'popup');
+    if (d0 && !d0.modal) {
+      p.setAttribute('aria-haspopup', 'true');
+      p.setAttribute('aria-expanded', 'false');
+    }
     p.addEventListener('click', function(event) {
       var data = readData(this, 'popup');
       if (data) {
         data.clientX = event.clientX;
         data.clientY = event.clientY;
+        data.trigger = this;
+        // A keyboard click has no pointer position: open at the trigger.
+        if (!event.clientX && !event.clientY) {
+          var r = this.getBoundingClientRect();
+          data.clientX = r.left + r.width / 2;
+          data.clientY = data.modal ? r.top + r.height / 2 : r.bottom;
+          data.byKeyboard = true;
+        }
         me.popup(data);
       }
     });
@@ -197,8 +427,11 @@ me.initPopups = function(el) {
 me.closePopup = function(data, cb) {
   var el2 = resolveEl(data.selector);
   if (data && data.modal) {
+    // Already closing (a ✕ can be wired to close twice): nothing more to do.
+    if (data.closed) return;
     // Mark closed first, so an open still animating won't attach re-centring after this
     data.closed = true;
+    closeModalA11y(el2);
     // Stop re-centring before the close animation starts, so they don't fight it
     if (data.resizeObserver) { data.resizeObserver.disconnect(); data.resizeObserver = null; }
     if (data.reflow) { window.removeEventListener('resize', data.reflow); data.reflow = null; }
@@ -217,6 +450,8 @@ me.closePopup = function(data, cb) {
     });
   } else {
     el2.style.display = 'none';
+    if (data.trigger) data.trigger.setAttribute('aria-expanded', 'false');
+    if (me.menu && me.menu.data === data) me.menu = null;
     if (data.close) data.close();
   }
 
@@ -240,6 +475,7 @@ me.popup = function(data, cb) {
     bg.style.display = 'none';
     document.body.appendChild(bg);
     fadeIn(bg, 300);
+    openModalA11y(el2, data);
 
     // Correctly measure the dimensions of the hidden modal
     setStyles(el2, { position: 'absolute', visibility: 'hidden', display: 'block' });
@@ -283,6 +519,7 @@ me.popup = function(data, cb) {
         data.resizeObserver.observe(el2);
         window.addEventListener('resize', data.reflow);
         data.reflow();
+        focusInto(el2, data);
       }
       if (cb) cb();
     });
@@ -325,6 +562,11 @@ me.popup = function(data, cb) {
         }
       }, { once: true });
     }, 50);
+
+    me.menu = { data: data, el: el2, trigger: data.trigger };
+    if (data.trigger) data.trigger.setAttribute('aria-expanded', 'true');
+    // Opened from the keyboard: move into the menu.
+    if (data.byKeyboard) { var f0 = focusables(el2)[0]; if (f0) f0.focus({ preventScroll: true }); }
 
     if (cb) cb();
   }
@@ -426,6 +668,14 @@ me.confirm = function(d) {
     d.close = function() { el.remove(); };
     d.clientX = window.innerWidth / 2;
     d.clientY = window.innerHeight / 2;
+    // A confirmation is an alertdialog described by its text; focus starts
+    // on Cancel (the safe choice) and Escape means Cancel.
+    d.role = 'alertdialog';
+    var txt = el.querySelector('.subtext');
+    txt.id = uid('dlg-text');
+    d.selector.setAttribute('aria-describedby', txt.id);
+    if (!d.focus) d.focus = el.querySelector('.cancelbutton');
+    if (!d.escape) d.escape = function() { el.querySelector('.cancelbutton').click(); };
 
     me.popup(d);
 
