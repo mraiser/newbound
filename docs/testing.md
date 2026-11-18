@@ -1,10 +1,76 @@
 # Testing Newbound core
 
-Status: phase 4 of 5 — the harness (`tests/common/mod.rs`, checked by
-`tests/harness.rs`), the HTTP smoke tests (`tests/smoke.rs`) and the CI
-test step (`.github/workflows/build.yml`) are in.
+The core has three kinds of automated test, all run by one command and by
+CI on Linux, macOS and Windows:
 
-## Where we start (2026-11-18)
+- **Unit tests** inside `newbound_core` (`#[cfg(test)] mod tests`).
+- **Smoke tests** (`tests/smoke.rs`) that boot a disposable instance and
+  drive it over HTTP.
+- **Harness checks** (`tests/harness.rs`) that keep the harness honest.
+
+## Running the suite
+
+```
+cargo test --release --features=serde_support --workspace
+```
+
+- `--workspace` matters: without it `cargo test` tests only the
+  `newbound` binary crate and skips `newbound_core`.
+- On a machine with several Pythons, set `PYO3_PYTHON` to the one the
+  build expects (e.g. `PYO3_PYTHON=/usr/bin/python3.12`).
+- One file: `--test smoke`. One test: add its name, e.g.
+  `cargo test --release --features=serde_support --test smoke login`.
+- Server output: each instance writes `newbound.log` in its own temp
+  directory, and startup failures print it. To keep the directories
+  after the run, set `NEWBOUND_TEST_KEEP=1`; the paths are printed.
+- The suite takes well under a second once built. It never touches the
+  checkout's `data/` or a running instance, so it is safe to run on a
+  machine where Newbound is running.
+
+## Adding a test
+
+An HTTP-level test goes in `tests/smoke.rs`, or in a new `tests/<area>.rs`
+that starts with `mod common;`:
+
+```rust
+mod common;
+use common::Instance;
+
+#[test]
+fn security_groups_needs_admin() {
+    let inst = Instance::start();               // fresh instance, own temp dir
+    let mut anon = inst.client();               // anonymous visitor
+    let mut admin = inst.login_admin();         // logged-in client
+
+    let r = anon.get("/security/groups");
+    assert_eq!(r.status, 200);
+    assert_eq!(r.json().get_string("status"), "err");
+
+    let j = admin.get("/security/groups").json();
+    assert_eq!(j.get_string("status"), "ok");
+}
+```
+
+- Commands on an app's main control are `GET /<app>/<cmd>?<params>`.
+  Others go through `client.exec(lib, common::command_id(lib, ctl, cmd),
+  args_json)`; look ids up by name, never hard-code them.
+- Assert on status codes and JSON shape, not on timing, ports, ids or
+  ordering that can change between runs.
+- Start a new `Instance` per test rather than sharing one, so tests stay
+  independent and can run in parallel. A test that writes to the store
+  writes to its own copy.
+- A fixture user is in `inst.admin_password` / `inst.user_password`;
+  `common::USER` is the non-admin user, in group `common::USER_GROUP`.
+- Keep the harness portable: `std::path` joins, no shell commands, no
+  hard-coded `/tmp`.
+
+A pure-Rust unit test (no server) goes next to the code in
+`newbound_core`, in a `#[cfg(test)] mod tests`. Note that
+`newbound_core/src` is generated from the store: change the command's
+source through the `dev.code` tools (see `CLAUDE.md`), then `newbound
+rebuild`, and commit the store and generated source together.
+
+## Before this work (2026-11-18)
 
 | What | Where | Result |
 |---|---|---|
@@ -15,19 +81,8 @@ test step (`.github/workflows/build.yml`) are in.
 The same 9 tests also appear under `data/peer/…` because the store holds
 the command source the Rust is generated from; they are one set, not two.
 
-Two things to know about running them:
-
-- A plain `cargo test` at the root tests only the `newbound` binary crate,
-  which has no tests. The 9 tests live in `newbound_core`, so the command is
-
-  ```
-  cargo test --release --features=serde_support --workspace
-  ```
-
-  (On a machine with several Pythons, set `PYO3_PYTHON` to the one the
-  build expects, e.g. `PYO3_PYTHON=/usr/bin/python3.12`.)
-- CI (`.github/workflows/build.yml`) builds, regenerates from the store,
-  zips, and checks the server answers on `/`. It never runs `cargo test`.
+A plain `cargo test` ran 0 of them (they need `--workspace`), and CI
+built and started the server but never ran `cargo test`.
 
 ## How a request is served (what the tests exercise)
 
@@ -96,7 +151,27 @@ Core has no logout command; "logout" is covered as the session ending
 Command record ids for `app.exec` are looked up by name from the store
 (`common::command_id(lib, ctl, cmd)`), so the tests survive re-ids.
 
-## How (phases 2–4)
+## Not covered yet
+
+Candidates for the next tests, roughly in order of value:
+
+- Commands that write: `app.write`, `security.setuser` / `deleteuser`,
+  and the `dev.code` editing commands (each on its own instance, so the
+  writes are disposable).
+- `POST` bodies: form posts, multipart uploads, chunked request bodies.
+- WebSockets (event subscriptions and command calls).
+- HTTP Basic auth (`basicauth=true`) and its 401/403 answers.
+- Session expiry (`sessiontimeoutmillis`).
+- The `peer` library: P2P streams between two instances, with discovery
+  kept off the real network.
+- Flows, timers and events; the in-store `test_*` commands, which run
+  through flowlang rather than `cargo test`.
+- The Python and JavaScript runtimes (`newbound pytest` / `jstest`), and
+  the browser front end.
+- NixOS and Raspberry Pi: CI covers Linux, macOS and Windows on x86-64
+  and Apple silicon only.
+
+## How it works
 
 ### Harness (`tests/common/mod.rs`)
 
@@ -163,7 +238,3 @@ was checked instead: the workflow file parses, and a fresh clone of the
 branch (tracked files only, new target dir) builds and passes the whole
 suite on Linux. macOS and Windows will be exercised the first time the
 branch runs on GitHub.
-
-### Running the suite / adding a test (*planned*, phase 5)
-
-Filled in once the harness exists.

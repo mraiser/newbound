@@ -24,7 +24,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Once;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use ndata::dataobject::DataObject;
 
@@ -114,11 +114,11 @@ impl Instance {
     }
 
     pub fn login_admin(&self) -> Client {
-        self.login("admin", &self.admin_password.clone())
+        self.login("admin", &self.admin_password)
     }
 
     pub fn login_user(&self) -> Client {
-        self.login(USER, &self.user_password.clone())
+        self.login(USER, &self.user_password)
     }
 
     /// Everything the instance has printed so far, for failure messages.
@@ -314,13 +314,14 @@ fn parse_port(log: &str) -> Option<u16> {
     }
 }
 
-/// 32 hex chars from the std hasher's per-process random keys.
+/// 32 hex chars: the std hasher's random keys (fresh per RandomState) mixed
+/// with the clock and a counter. Unique per call; not for cryptography.
 pub fn random_token() -> String {
     let mut s = String::new();
     for i in 0..2u64 {
         let mut h = RandomState::new().build_hasher();
         h.write_u64(i);
-        h.write_u128(Instant::now().elapsed().as_nanos());
+        h.write_u128(SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0));
         h.write_usize(COUNTER.load(Ordering::SeqCst));
         s += &format!("{:016x}", h.finish());
     }

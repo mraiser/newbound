@@ -45,6 +45,10 @@ fn strings(a: &DataArray, key: &str) -> Vec<String> {
     a.objects().into_iter().map(|d| d.object().get_string(key)).collect()
 }
 
+fn strings_of(a: &DataArray) -> Vec<String> {
+    a.objects().into_iter().map(|d| d.string()).collect()
+}
+
 fn current_user(c: &mut Client) -> DataObject {
     ok(&c.get("/security/current_user"), "security.current_user").get_object("data")
 }
@@ -256,8 +260,4 @@ fn unknown_paths_are_404() {
         let r = c.get(path);
         assert_eq!(r.status, 404, "{} answered HTTP {}", path, r.status);
     }
-}
-
-fn strings_of(a: &DataArray) -> Vec<String> {
-    a.objects().into_iter().map(|d| d.string()).collect()
 }
