@@ -2,6 +2,7 @@
 // BSDs) `kill -0` does - signal 0 only checks that the pid exists.
 fn pid_alive(pid: i64) -> bool {
   use std::process::{Command, Stdio};
+  if cfg!(windows) { return win_pid_alive(pid); }
   if std::path::Path::new("/proc/self").exists() {
     return std::path::Path::new(&format!("/proc/{}", pid)).exists();
   }
