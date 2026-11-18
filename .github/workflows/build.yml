@@ -1,7 +1,7 @@
 name: build
 
 # Every pull request, and every push to master, builds the server on Linux,
-# macOS and Windows and checks that it starts. This is the gate that catches
+# macOS and Windows, runs the test suite, and checks that it starts. This is the gate that catches
 # a platform-specific API (std::os::unix, a shell, /proc) breaking another OS.
 on:
   push:
@@ -24,8 +24,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      # Caches ~/.cargo and target/ per OS and Cargo.lock.
+      - uses: Swatinem/rust-cache@v2
       - name: Build
         run: cargo build --release --features=serde_support
+      # newbound_core's unit tests, and tests/*.rs, which boot disposable
+      # instances in the temp dir and drive them over HTTP (docs/testing.md).
+      # --workspace: a plain `cargo test` would skip newbound_core.
+      - name: Test
+        run: cargo test --release --features=serde_support --workspace
       - name: Regenerate from the store, then build again
         run: |
           ./target/release/newbound rebuild

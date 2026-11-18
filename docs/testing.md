@@ -1,8 +1,8 @@
 # Testing Newbound core
 
-Status: phase 3 of 5 — the harness (`tests/common/mod.rs`, checked by
-`tests/harness.rs`) and the HTTP smoke tests (`tests/smoke.rs`) are in.
-The CI job is not written yet; sections marked *planned* describe it.
+Status: phase 4 of 5 — the harness (`tests/common/mod.rs`, checked by
+`tests/harness.rs`), the HTTP smoke tests (`tests/smoke.rs`) and the CI
+test step (`.github/workflows/build.yml`) are in.
 
 ## Where we start (2026-11-18)
 
@@ -143,15 +143,26 @@ Integration tests live in `tests/*.rs` in the root crate and start with
 temp dir, answers, is gone (process, port and directory) after drop, two
 instances are independent, and both fixture users can log in.
 
-### CI (*planned*, phase 4)
+### CI (`.github/workflows/build.yml`)
 
-A `test` job (in `build.yml` or a new `test.yml`) on `ubuntu-latest`,
-`macos-latest` and `windows-latest`, caching `~/.cargo` and `target/`,
-running
+The `build` job runs on `ubuntu-latest`, `macos-latest` and
+`windows-latest` for every pull request and every push to master. It
+caches `~/.cargo` and `target/` (`Swatinem/rust-cache`) and, right after
+the release build, runs
 
 ```
 cargo test --release --features=serde_support --workspace
 ```
+
+The tests reuse the build's compiled dependencies, so the step adds
+little time. A failing test fails the job for that OS.
+
+**Not yet run in CI.** The workflow has not run on GitHub (nothing is
+pushed) and `act` was not available on the development machine. What
+was checked instead: the workflow file parses, and a fresh clone of the
+branch (tracked files only, new target dir) builds and passes the whole
+suite on Linux. macOS and Windows will be exercised the first time the
+branch runs on GitHub.
 
 ### Running the suite / adding a test (*planned*, phase 5)
 
