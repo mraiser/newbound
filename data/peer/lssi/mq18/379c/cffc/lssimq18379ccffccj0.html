@@ -64,24 +64,24 @@
              the input's parentElement. -->
         <div class='adduserform'>
           <div class='aufield'>
-            <div class='textinputlabel'>Device Name</div>
-            <input type='text' class='textinput addusername'>
+            <label class='textinputlabel' for='au-name'>Device Name</label>
+            <input type='text' class='textinput addusername' id='au-name' autocomplete='off'>
           </div>
           <div class='aufield'>
-            <div class='textinputlabel'>IP Address (if you have it)</div>
-            <input type='text' class='textinput adduseripaddr'>
+            <label class='textinputlabel' for='au-ip'>IP Address (if you have it)</label>
+            <input type='text' class='textinput adduseripaddr' id='au-ip' autocomplete='off'>
           </div>
           <div class='aufield'>
-            <div class='textinputlabel'>Device UUID</div>
-            <div><input type='text' class='textinput adduseruuid'></div>
+            <label class='textinputlabel' for='au-uuid'>Device UUID</label>
+            <div><input type='text' class='textinput adduseruuid' id='au-uuid' autocomplete='off' spellcheck='false'></div>
           </div>
           <div class='aufield'>
-            <div class='textinputlabel'>Port Number (if you have it)</div>
-            <input type='number' class='textinput adduserport'>
+            <label class='textinputlabel' for='au-port'>Port Number (if you have it)</label>
+            <input type='number' class='textinput adduserport' id='au-port' autocomplete='off' inputmode='numeric'>
           </div>
           <div class='aufield'>
-            <div class='textinputlabel'>Select Group</div>
-            <select class='textinput groupselect addusergroup'></select>
+            <label class='textinputlabel' for='au-group'>Select Group</label>
+            <select class='textinput groupselect addusergroup' id='au-group'></select>
           </div>
           <div class='aufield aufield-check'>
             <label class="plaincheckbox">

@@ -425,6 +425,9 @@ button.roundbutton-small > img, button.roundbutton-small-white > img {
 .chipbutton:hover {
   background-color: var(--text-color);
 }
+/* a chip's ✕ as a <button>: the same 8px glyph in the 20px circle */
+button.chipbutton { padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+button.chipbutton > img { width: 8px; height: 8px; display: block; pointer-events: none; }
 
 /* --- Buttons --- */
 .regularbutton, .accentbutton, .coloredbutton, .clearbutton {
@@ -515,6 +518,49 @@ button.continuebutton, button.cancelbutton {
   font-weight: 500;
   text-transform: uppercase;
   margin-left: 24px;
+}
+/* the action is a <button> now: no button chrome, the bar's type */
+button.snackbar-action {
+  font: inherit;
+  font-weight: 500;
+  letter-spacing: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+/* Visually hidden, still read by assistive tech (live regions, hints). */
+.nb-sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* fieldError(): the message under a field, with an icon so the state is not
+   colour alone. #e08585 is Settings' error text (5.8:1 on the panels). */
+.nb-field-err {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--danger-text, #e08585);
+}
+.nb-field-err[hidden] { display: none; }
+.nb-field-err svg { flex: none; margin-top: 2px; }
+.textinput[aria-invalid="true"], .textinput[aria-invalid="true"]:focus {
+  border-color: var(--danger);
 }
 
 /* --- Popups & Modals --- */

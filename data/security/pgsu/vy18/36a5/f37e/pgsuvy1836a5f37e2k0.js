@@ -41,6 +41,7 @@ me.uiReady = function(ui) {
           if (result.status != 'ok') alert(result.msg);
           else {
             setPower(b);
+            me.ui.announce(b ? 'Security is on' : 'Security is off');
             if (b) me.buildUsers();
           }
         });
@@ -143,6 +144,7 @@ function openUser(e) {
   ME.querySelector('.usercard-displayname').value = user.displayname;
   ME.querySelector('.usercard-password').value = user.password;
   ME.querySelector('.usercard-newgroupname').value = '';
+  document.body.api.ui.clearFieldError(ME.querySelector('.usercard-newgroupname'));
   me.newgroups = [];
 
   buildGroupList(user.groups);
@@ -219,29 +221,47 @@ ME.querySelector('.usercard-save').addEventListener('click', function() {
 
 ME.querySelector('.usercard-delete').addEventListener('click', function() {
   var id = me.selecteduser;
-  if (id == 'admin') document.body.api.ui.snackbar({message:"You can't delete the admin user"});
+  if (id == 'admin') document.body.api.ui.snackbar({message:"You can't delete the admin user", kind:'error'});
   else {
-    send_deleteuser(id, function(result) {
-      if (result.status != 'ok') alert(result.msg);
-      else {
-        me.loadGroups(function() { me.buildUsers(); });
-        var closebtn = ME.querySelector('.usercard-closebutton');
-        if (closebtn) closebtn.click();
-      }
+    // Deleting can't be undone: ask first (WCAG 3.3.4). Names are untrusted.
+    var dev = ME.querySelector('.usercard').classList.contains('sec-device');
+    var user = me.users[id] || {};
+    var who = user.displayname && user.displayname != id ? esc(user.displayname) + ' (' + esc(id) + ')' : esc(id);
+    document.body.api.ui.confirm({
+      title: dev ? 'Delete device?' : 'Delete user?',
+      text: (dev ? 'This removes the device ' + who + ' and the access its groups gave it here.'
+                 : 'This removes ' + who + '. They can no longer sign in.') + " It can't be undone.",
+      ok: 'Delete',
+      cb: function(yes) { if (yes) deleteUser(id); }
     });
   }
 });
+
+function deleteUser(id) {
+  send_deleteuser(id, function(result) {
+    if (result.status != 'ok') alert(result.msg);
+    else {
+      me.loadGroups(function() { me.buildUsers(); });
+      var closebtn = ME.querySelector('.usercard-closebutton');
+      if (closebtn) closebtn.click();
+    }
+  });
+}
 
 function addUser() {
   var input = ME.querySelector('.newusername');
   var name = input.value;
   var b = validateName(name);
-  if (!b) document.body.api.ui.snackbar({message:'Invalid user name: use lowercase letters, digits and _'});
+  // Errors show under the field and are announced (WCAG 3.3.1, 4.1.3).
+  var ui = document.body.api.ui;
+  var where = { into: ME.querySelector('.sec-users-head'), className: 'sec-head-err' };
+  if (!b) ui.fieldError(input, 'User names use lowercase letters, digits and _ only.', where);
   else {
     if (me.users[name]) {
-      document.body.api.ui.snackbar({message:'That user already exists'});
+      ui.fieldError(input, 'That user already exists.', where);
     }
     else {
+      ui.clearFieldError(input);
       json('../app/unique_session_id', null, function(result) {
         var user = {
           displayname: name,
@@ -264,17 +284,24 @@ ME.querySelector('.adduserbutton').addEventListener('click', addUser);
 ME.querySelector('.newusername').addEventListener('keydown', function(e) {
   if (e.key == 'Enter') addUser();
 });
+// Typing again clears the error.
+['.newusername', '.usercard-newgroupname'].forEach(function(s) {
+  ME.querySelector(s).addEventListener('input', function() { document.body.api.ui.clearFieldError(this); });
+});
 
 function addGroup() {
   var input = ME.querySelector('.usercard-newgroupname');
   var name = input.value;
   var b = validateName(name);
-  if (!b) document.body.api.ui.snackbar({message:'Invalid group name: use lowercase letters, digits and _'});
+  var ui = document.body.api.ui;
+  var where = { after: input.parentElement };
+  if (!b) ui.fieldError(input, 'Group names use lowercase letters, digits and _ only.', where);
   else {
     if (me.groups.indexOf(name) != -1) {
-      document.body.api.ui.snackbar({message:'That group already exists'});
+      ui.fieldError(input, 'That group already exists.', where);
     }
     else {
+      ui.clearFieldError(input);
       var checked = checkedGroups();
       me.groups.push(name);
       me.newgroups.push(name);

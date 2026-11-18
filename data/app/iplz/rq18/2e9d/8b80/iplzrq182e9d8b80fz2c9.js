@@ -82,6 +82,34 @@ me.snackbarMsg = function(msg, width) {
   me.snackbar(d);
 };
 
+// --- Status messages (WCAG 4.1.3) ---
+// Two persistent, visually hidden live regions announce messages: polite for
+// status, assertive for errors. They are created once and reused, so every
+// message fires, and dialogs never make them inert (see inertOutside).
+function liveRegion(kind) {
+  var r = document.querySelector('.nb-live-' + kind);
+  if (!r) {
+    r = document.createElement('div');
+    r.className = 'nb-live nb-sr-only nb-live-' + kind;
+    r.setAttribute('role', kind == 'alert' ? 'alert' : 'status');
+    r.setAttribute('aria-live', kind == 'alert' ? 'assertive' : 'polite');
+    r.setAttribute('aria-atomic', 'true');
+    document.body.appendChild(r);
+  }
+  return r;
+}
+
+// Say msg to assistive tech without showing anything.
+me.announce = function(msg, assertive) {
+  var r = liveRegion(assertive ? 'alert' : 'status');
+  r.textContent = '';
+  // a new text node after a beat, so the same message twice is heard twice
+  setTimeout(function() { r.textContent = msg; }, 60);
+};
+
+// data: message (HTML), kind ('error' announces assertively), actionText +
+// actionHandler (a real button), timeout, width. The bar stays while it is
+// hovered or has focus (WCAG 2.2.1); with an action it stays at least 6 s.
 me.snackbar = function(data) {
   if (me.snacking) {
     me.snacks.push(data);
@@ -90,9 +118,13 @@ me.snackbar = function(data) {
     var bar = fromHTML('<div class="snackbar"><div class="snackbar-inner">' + data.message + '</div></div>');
     bar.style.fontFamily = 'var(--font-family)';
     var inner = bar.querySelector('.snackbar-inner');
+    me.announce(inner.textContent.trim(), data.kind == 'error');
 
     if (data.actionHandler) {
-      var action = fromHTML('<div class="snackbar-action">' + data.actionText + '</div>');
+      var action = document.createElement('button');
+      action.type = 'button';
+      action.className = 'snackbar-action';
+      action.textContent = data.actionText;
       action.addEventListener('click', function(e) {
         this.style.display = 'none';
         data.actionHandler(e);
@@ -105,18 +137,79 @@ me.snackbar = function(data) {
 
     animateTo(bar, { bottom: '20px' }, 500);
     var timeout = data.timeout ? data.timeout : 3500;
+    if (data.actionHandler) timeout = Math.max(timeout, 6000);
 
-    setTimeout(function() {
+    var timer = null, held = 0, left = timeout, started = Date.now();
+    function hide() {
+      timer = null;
       animateTo(bar, { bottom: '-100px' }, 500, function() {
         bar.remove();
         me.snacking = false;
         if (me.snacks.length > 0)
           me.snackbar(me.snacks.shift());
       });
-    }, timeout);
+    }
+    function hold() {
+      if (held++ == 0 && timer) { clearTimeout(timer); timer = null; left -= Date.now() - started; }
+    }
+    function release() {
+      if (held > 0 && --held == 0 && bar.isConnected) { started = Date.now(); timer = setTimeout(hide, Math.max(left, 1500)); }
+    }
+    bar.addEventListener('mouseenter', hold);
+    bar.addEventListener('mouseleave', release);
+    bar.addEventListener('focusin', hold);
+    bar.addEventListener('focusout', function(e) { if (!bar.contains(e.relatedTarget)) release(); });
+    timer = setTimeout(hide, timeout);
   }
 };
 
+// --- Field errors (WCAG 3.3.1, 1.4.1, 4.1.2) ---
+// fieldError(input, msg, opts) shows msg as text under the field (or where
+// opts.into / opts.after say), with an icon, marks the input aria-invalid and
+// points its aria-describedby at the message, which is announced (role=alert).
+// clearFieldError(input) undoes it. The snackbar is never the only place a
+// form error shows.
+var ERR_ICON = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="7" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+
+function describedBy(input, id, on) {
+  var ids = (input.getAttribute('aria-describedby') || '').split(/\s+/).filter(function(x) { return x && x != id; });
+  if (on) ids.push(id);
+  if (ids.length) input.setAttribute('aria-describedby', ids.join(' '));
+  else input.removeAttribute('aria-describedby');
+}
+
+me.fieldError = function(input, msg, opts) {
+  opts = opts || {};
+  if (!input.id) input.id = uid('field');
+  var id = input.id + '-err';
+  var err = document.getElementById(id);
+  if (!err) {
+    err = document.createElement('div');
+    err.id = id;
+    err.className = 'nb-field-err' + (opts.className ? ' ' + opts.className : '');
+    err.setAttribute('role', 'alert');
+    if (opts.into) resolveEl(opts.into).appendChild(err);
+    else (opts.after ? resolveEl(opts.after) : input).insertAdjacentElement('afterend', err);
+  }
+  err.innerHTML = ERR_ICON;
+  var t = document.createElement('span');
+  t.textContent = msg;
+  err.appendChild(t);
+  err.hidden = false;
+  input.setAttribute('aria-invalid', 'true');
+  describedBy(input, id, true);
+  if (opts.focus !== false && document.activeElement !== input) input.focus();
+  return err;
+};
+
+me.clearFieldError = function(input) {
+  if (!input) return;
+  input.removeAttribute('aria-invalid');
+  if (!input.id) return;
+  var err = document.getElementById(input.id + '-err');
+  if (err) { err.hidden = true; err.textContent = ''; }
+  describedBy(input, input.id + '-err', false);
+};
 
 me.initSliders = function(el) {
   el.querySelectorAll('.plainslider').forEach(function(s) {
@@ -290,6 +383,7 @@ function inertOutside(el2, keep) {
     Array.prototype.forEach.call(p.children, function(c) {
       if (path.indexOf(c) >= 0 || live.indexOf(c) >= 0 || c.inert) return;
       if (c.tagName == 'SCRIPT' || c.tagName == 'STYLE' || c.tagName == 'LINK') return;
+      if (c.classList.contains('nb-live')) return;   // announcements keep working
       c.inert = true;
       changed.push(c);
     });
@@ -473,6 +567,10 @@ me.popup = function(data, cb) {
     var bg = data.bg = document.createElement('div');
     bg.className = 'greyedout';
     bg.style.display = 'none';
+    // A dialog opened over another (a confirm over Edit user): its backdrop
+    // and card stack above the open one, so the one below is dimmed too.
+    var depth = me.modals.length;
+    if (depth) bg.style.zIndex = String(14 + 2 * depth);
     document.body.appendChild(bg);
     fadeIn(bg, 300);
     openModalA11y(el2, data);
@@ -487,7 +585,7 @@ me.popup = function(data, cb) {
     setStyles(el2, {
       display: 'block',
       position: 'fixed',
-      zIndex: '15',
+      zIndex: depth ? String(15 + 2 * depth) : '15',
       width: '0px',
       height: '0px',
       top: data.clientY + 'px',
@@ -630,7 +728,18 @@ me.prompt = function(d) {
         d.cb(val);
         me.closePopup(d);
       } else {
-        el.querySelector('.subtext').style.color = "var(--error-color)";
+        // Say what is wrong, as text (d.error, else the hint), not by colour only.
+        var sub = el.querySelector('.subtext');
+        sub.style.color = "var(--error-color)";
+        if (!sub.id) sub.id = uid('prompt-err');
+        sub.setAttribute('role', 'alert');
+        var why = d.error || sub.textContent || 'Check this value.';
+        sub.textContent = '';
+        setTimeout(function() { sub.textContent = why; }, 60);
+        var inp = el.querySelector('input.textinput');
+        inp.setAttribute('aria-invalid', 'true');
+        describedBy(inp, sub.id, true);
+        inp.focus();
       }
     } else {
       d.cb(val);

@@ -27,6 +27,7 @@ function showlogin() {
     var username = ME.querySelector('#username').value;
     var password = ME.querySelector('#password').value;
     var remember = ME.querySelector('#remember').checked;
+    loginError(false);
     json('../app/login', 'user='+encodeURIComponent(username)+'&pass='+encodeURIComponent(password), function(result) {
       if (result.status == 'ok') {
         if (remember) {
@@ -38,10 +39,29 @@ function showlogin() {
         }
         window.location.href = document.referrer ? document.referrer : '../';
       }
-      else {
-        me.ui.snackbar({message:"Invalid username or password"});
-        ME.querySelector('.loginmsg').style.color = 'red';
-      }
+      else loginError(true);
     });
+  });
+}
+
+// A failed login says so in the message line itself (WCAG 3.3.1, 4.1.3,
+// 1.4.1): new words, an icon, error colour, announced, both fields invalid.
+var LOGIN_HINT = 'Please enter your username and password to log in.';
+function loginError(on) {
+  var msg = ME.querySelector('.loginmsg');
+  msg.classList.toggle('loginmsg-err', on);
+  if (on) {
+    msg.setAttribute('role', 'alert');
+    msg.innerHTML = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="7" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+    var t = document.createElement('span');
+    t.textContent = 'Wrong username or password.';
+    msg.appendChild(t);
+  } else {
+    msg.removeAttribute('role');
+    msg.textContent = LOGIN_HINT;
+  }
+  ['#username', '#password'].forEach(function(s) {
+    var f = ME.querySelector(s);
+    if (on) f.setAttribute('aria-invalid', 'true'); else f.removeAttribute('aria-invalid');
   });
 }

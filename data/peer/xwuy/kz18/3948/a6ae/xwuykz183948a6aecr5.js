@@ -98,9 +98,14 @@ me.ready = function(){
         click.dataset.version = pr.mylib.version;
         click.textContent = pr.mylib.id + ' v' + pr.theirlib.version + ' ➤ ' + pr.mylib.version;
         chip.appendChild(click);
-        var x = document.createElement('img');
-        x.src = '../app/asset/app/icons/ui/dark/close.svg';
-        x.className = 'roundbutton-small removeupdate mdl-chip__action chipbutton';
+        // the shared named ✕ button (peer.peer publishes it); old <img> without it
+        var x;
+        if (document.body.peerChipClose) x = document.body.peerChipClose(pr.mylib.id + ' update');
+        else {
+          x = document.createElement('img');
+          x.src = '../app/asset/app/icons/ui/dark/close.svg';
+          x.className = 'roundbutton-small removeupdate mdl-chip__action chipbutton';
+        }
         chip.appendChild(x);
         // F12: published by peer.peer, like peerstatus — mark (and
         // deselect) a different-author chip instead of hiding it.

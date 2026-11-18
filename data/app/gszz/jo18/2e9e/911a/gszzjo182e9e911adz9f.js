@@ -291,11 +291,11 @@ function ssUpdate() {
   var loaded = !!me.saved;
   var ipBad = loaded && st.custom && st.cur.http_address !== '' && !st.v.ip;
   q('#ss-name-err').classList.toggle('ss-show', loaded && !st.v.name);
-  dget('devicename').classList.toggle('ss-bad', loaded && !st.v.name);
+  ssBad(dget('devicename'), loaded && !st.v.name);
   q('#ss-port-err').classList.toggle('ss-show', loaded && !st.v.port);
-  dget('portnum').classList.toggle('ss-bad', loaded && !st.v.port);
+  ssBad(dget('portnum'), loaded && !st.v.port);
   q('#ss-ip-err').classList.toggle('ss-show', ipBad);
-  dget('ipaddr').classList.toggle('ss-bad', ipBad);
+  ssBad(dget('ipaddr'), ipBad);
   q('.ss-f-name').classList.toggle('ss-dirty', st.dirty.name);
   q('.ss-f-app').classList.toggle('ss-dirty', st.dirty.app);
   q('.ss-f-bind').classList.toggle('ss-dirty', st.dirty.bind);
@@ -325,6 +325,12 @@ function progHold() {
   SS.querySelectorAll('.ss-prog').forEach(function(p) {
     p.classList.toggle('ss-hold', hold && p.dataset.state != 'running');
   });
+}
+
+// An invalid field: the red border and, for assistive tech, aria-invalid.
+function ssBad(input, bad) {
+  input.classList.toggle('ss-bad', bad);
+  if (bad) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
 }
 
 function ssFootErr(msg) {
