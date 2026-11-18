@@ -18,7 +18,7 @@ use std::collections::hash_map::RandomState;
 use std::fs::{self, File};
 use std::hash::{BuildHasher, Hasher};
 use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpStream};
+use std::net::{Shutdown, SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -68,20 +68,40 @@ impl Instance {
     }
 
     pub fn start_with_apps(apps: &[&str]) -> Instance {
+        Instance::start_with(apps, &[])
+    }
+
+    /// An instance running `DEFAULT_APPS` with extra `config.properties`
+    /// entries, e.g. `[("basicauth", "true")]`. An entry replaces the
+    /// harness default of the same key.
+    pub fn start_with_config(config: &[(&str, &str)]) -> Instance {
+        Instance::start_with(DEFAULT_APPS, config)
+    }
+
+    pub fn start_with(apps: &[&str], config: &[(&str, &str)]) -> Instance {
         let dir = unique_dir();
         let admin_password = random_token();
         let user_password = random_token();
 
         // A failed setup must not leave the directory behind.
-        if let Err(e) = build_fixture(&dir, apps, &admin_password, &user_password) {
+        if let Err(e) = build_fixture(&dir, apps, config, &admin_password, &user_password) {
             let _ = fs::remove_dir_all(&dir);
             panic!("could not build the fixture in {}: {}", dir.display(), e);
         }
+
+        // The server's own temp files (e.g. multipart uploads) stay inside
+        // the instance directory too: std::env::temp_dir() reads TMPDIR on
+        // Unix and TMP/TEMP on Windows.
+        let tmp = dir.join("tmp");
+        fs::create_dir_all(&tmp).expect("create instance tmp");
 
         let log = File::create(dir.join(LOG_FILE)).expect("create instance log");
         let log_err = log.try_clone().expect("clone instance log handle");
         let child = Command::new(env!("CARGO_BIN_EXE_newbound"))
             .current_dir(&dir)
+            .env("TMPDIR", &tmp)
+            .env("TMP", &tmp)
+            .env("TEMP", &tmp)
             .stdin(Stdio::null())
             .stdout(Stdio::from(log))
             .stderr(Stdio::from(log_err))
@@ -231,7 +251,13 @@ fn unique_dir() -> PathBuf {
     std::env::temp_dir().join(name)
 }
 
-fn build_fixture(dir: &Path, apps: &[&str], admin_pw: &str, user_pw: &str) -> std::io::Result<()> {
+fn build_fixture(
+    dir: &Path,
+    apps: &[&str],
+    config: &[(&str, &str)],
+    admin_pw: &str,
+    user_pw: &str,
+) -> std::io::Result<()> {
     let root = repo_root();
     fs::create_dir_all(dir)?;
 
@@ -250,18 +276,23 @@ fn build_fixture(dir: &Path, apps: &[&str], admin_pw: &str, user_pw: &str) -> st
     }
     copy_tree(&root.join("html"), &dir.join("html"))?;
 
-    write_lines(
-        &dir.join("config.properties"),
-        &[
-            "headless=true".to_string(),
-            "http_address=127.0.0.1".to_string(),
-            "http_port=0".to_string(),
-            format!("apps={}", apps.join(",")),
-            "default_app=app".to_string(),
-            "security=on".to_string(),
-            "machineid=NEWBOUND_TEST".to_string(),
-        ],
-    )?;
+    let apps_line = apps.join(",");
+    let defaults = [
+        ("headless", "true"),
+        ("http_address", "127.0.0.1"),
+        ("http_port", "0"),
+        ("apps", apps_line.as_str()),
+        ("default_app", "app"),
+        ("security", "on"),
+        ("machineid", "NEWBOUND_TEST"),
+    ];
+    let mut lines: Vec<String> = defaults
+        .iter()
+        .filter(|(k, _)| !config.iter().any(|(ck, _)| ck == k))
+        .map(|(k, v)| format!("{}={}", k, v))
+        .collect();
+    lines.extend(config.iter().map(|(k, v)| format!("{}={}", k, v)));
+    write_lines(&dir.join("config.properties"), &lines)?;
 
     let users = dir.join("users");
     fs::create_dir_all(&users)?;
@@ -357,18 +388,112 @@ impl Client {
     }
 
     pub fn try_get(&mut self, path: &str) -> std::io::Result<Response> {
-        let addr = SocketAddr::from(([127, 0, 0, 1], self.port));
-        let mut stream = TcpStream::connect_timeout(&addr, IO_TIMEOUT)?;
-        stream.set_read_timeout(Some(IO_TIMEOUT))?;
-        stream.set_write_timeout(Some(IO_TIMEOUT))?;
+        self.try_request("GET", path, &[], None)
+    }
 
-        let mut req = format!("GET {} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\n", path, self.port);
-        if let Some(sid) = &self.session {
-            req += &format!("Cookie: sessionid={}\r\n", sid);
+    /// Any request. `body` adds a Content-Length; extra `headers` go after
+    /// Host, Connection and the session cookie.
+    pub fn request(&mut self, method: &str, path: &str, headers: &[(&str, &str)], body: Option<&[u8]>) -> Response {
+        self.try_request(method, path, headers, body)
+            .unwrap_or_else(|e| panic!("{} {} failed: {}", method, path, e))
+    }
+
+    pub fn try_request(
+        &mut self,
+        method: &str,
+        path: &str,
+        headers: &[(&str, &str)],
+        body: Option<&[u8]>,
+    ) -> std::io::Result<Response> {
+        let mut req = self.head(method, path, headers);
+        if let Some(b) = body {
+            req += &format!("Content-Length: {}\r\n", b.len());
         }
         req += "\r\n";
-        stream.write_all(req.as_bytes())?;
+        let mut bytes = req.into_bytes();
+        if let Some(b) = body {
+            bytes.extend_from_slice(b);
+        }
+        self.send(&bytes)
+    }
 
+    /// POST a JSON object (`Content-Type: application/json`).
+    pub fn post_json(&mut self, path: &str, json: &str) -> Response {
+        self.request("POST", path, &[("Content-Type", "application/json")], Some(json.as_bytes()))
+    }
+
+    /// POST url-encoded form fields.
+    pub fn post_form(&mut self, path: &str, fields: &[(&str, &str)]) -> Response {
+        let body: Vec<String> = fields.iter().map(|(k, v)| format!("{}={}", encode(k), encode(v))).collect();
+        let body = body.join("&");
+        self.request(
+            "POST",
+            path,
+            &[("Content-Type", "application/x-www-form-urlencoded")],
+            Some(body.as_bytes()),
+        )
+    }
+
+    /// POST text fields as multipart/form-data.
+    pub fn post_multipart(&mut self, path: &str, fields: &[(&str, &str)]) -> Response {
+        let boundary = format!("nbtest{}", &random_token()[..16]);
+        let mut body = String::new();
+        for (k, v) in fields {
+            body += &format!("--{}\r\nContent-Disposition: form-data; name=\"{}\"\r\n\r\n{}\r\n", boundary, k, v);
+        }
+        body += &format!("--{}--\r\n", boundary);
+        let ct = format!("multipart/form-data; boundary={}", boundary);
+        self.request("POST", path, &[("Content-Type", ct.as_str())], Some(body.as_bytes()))
+    }
+
+    /// POST a JSON body with `Transfer-Encoding: chunked`, one chunk per
+    /// element of `chunks`.
+    pub fn post_chunked_json(&mut self, path: &str, chunks: &[&str]) -> Response {
+        let mut req = self.head(
+            "POST",
+            path,
+            &[("Content-Type", "application/json"), ("Transfer-Encoding", "chunked")],
+        );
+        req += "\r\n";
+        for c in chunks {
+            req += &format!("{:x}\r\n{}\r\n", c.len(), c);
+        }
+        req += "0\r\n\r\n";
+        self.send(req.as_bytes()).unwrap_or_else(|e| panic!("chunked POST {} failed: {}", path, e))
+    }
+
+    /// Sends `bytes` exactly as given (a whole request, for malformed or
+    /// unusual framing) and reads the response.
+    pub fn raw(&mut self, bytes: &[u8]) -> Response {
+        self.send(bytes).unwrap_or_else(|e| panic!("raw request failed: {}", e))
+    }
+
+    fn head(&self, method: &str, path: &str, headers: &[(&str, &str)]) -> String {
+        let mut h = format!("{} {} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\n", method, path, self.port);
+        if let Some(sid) = &self.session {
+            h += &format!("Cookie: sessionid={}\r\n", sid);
+        }
+        for (k, v) in headers {
+            h += &format!("{}: {}\r\n", k, v);
+        }
+        h
+    }
+
+    fn connect(&self) -> std::io::Result<TcpStream> {
+        let addr = SocketAddr::from(([127, 0, 0, 1], self.port));
+        let stream = TcpStream::connect_timeout(&addr, IO_TIMEOUT)?;
+        stream.set_read_timeout(Some(IO_TIMEOUT))?;
+        stream.set_write_timeout(Some(IO_TIMEOUT))?;
+        Ok(stream)
+    }
+
+    fn send(&mut self, bytes: &[u8]) -> std::io::Result<Response> {
+        let mut stream = self.connect()?;
+        stream.write_all(bytes)?;
+        // Half-close: the request is complete. The server reads a form
+        // body's last field up to end-of-stream, so without this it would
+        // wait for its socket timeout before answering.
+        stream.shutdown(Shutdown::Write)?;
         let mut raw = Vec::new();
         stream.read_to_end(&mut raw)?;
         let r = Response::parse(&raw)?;
@@ -376,6 +501,36 @@ impl Client {
             self.session = Some(sid);
         }
         Ok(r)
+    }
+
+    /// Opens a WebSocket on this client's session and checks the handshake.
+    pub fn websocket(&mut self) -> WebSocket {
+        // The sample key from RFC 6455 section 1.3, and its known answer.
+        const KEY: &str = "dGhlIHNhbXBsZSBub25jZQ==";
+        const ACCEPT: &str = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=";
+        let mut stream = self.connect().expect("connect for WebSocket");
+        let mut req = format!(
+            "GET / HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\
+             Sec-WebSocket-Key: {}\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Protocol: newbound\r\n",
+            self.port, KEY
+        );
+        if let Some(sid) = &self.session {
+            req += &format!("Cookie: sessionid={}\r\n", sid);
+        }
+        req += "\r\n";
+        stream.write_all(req.as_bytes()).expect("send WebSocket handshake");
+
+        // Read the response head only; the connection stays open.
+        let mut head = Vec::new();
+        let mut byte = [0u8; 1];
+        while !head.ends_with(b"\r\n\r\n") {
+            stream.read_exact(&mut byte).expect("read WebSocket handshake");
+            head.push(byte[0]);
+        }
+        let r = Response::parse(&head).expect("parse WebSocket handshake");
+        assert_eq!(r.status, 101, "WebSocket handshake: HTTP {}", r.status);
+        assert_eq!(r.header("sec-websocket-accept"), Some(ACCEPT));
+        WebSocket { stream }
     }
 
     /// Runs `lib`'s command record `id` through `app.exec`, the HTTP route
@@ -447,5 +602,102 @@ impl Response {
         assert!(trimmed.starts_with('{'), "expected a JSON object (HTTP {}), got: {}", self.status, t);
         init_ndata();
         DataObject::from_string(trimmed)
+    }
+}
+
+// ---------------------------------------------------------------- websocket
+
+/// A client end of a WebSocket (RFC 6455): masked text frames out, the
+/// server's unmasked frames in.
+pub struct WebSocket {
+    stream: TcpStream,
+}
+
+impl WebSocket {
+    pub fn send_text(&mut self, text: &str) {
+        self.send_frame(0x1, text.as_bytes()).expect("send WebSocket frame");
+    }
+
+    /// The next text message from the server.
+    pub fn recv_text(&mut self) -> String {
+        loop {
+            let (opcode, payload) = self.recv_frame();
+            match opcode {
+                0x1 => return String::from_utf8_lossy(&payload).to_string(),
+                0x8 => panic!("server closed the WebSocket"),
+                _ => continue,
+            }
+        }
+    }
+
+    /// Runs a command over the socket (`cmd {...}`) and returns the reply
+    /// whose `pid` matches.
+    pub fn command(&mut self, app: &str, cmd: &str, params_json: &str, pid: i64) -> DataObject {
+        self.send_text(&format!(
+            r#"cmd {{"bot":"{}","cmd":"{}","pid":{},"params":{}}}"#,
+            app, cmd, pid, params_json
+        ));
+        loop {
+            let text = self.recv_text();
+            init_ndata();
+            let o = DataObject::from_string(&text);
+            if o.has("pid") && o.get_property("pid").is_int() && o.get_int("pid") == pid {
+                return o;
+            }
+        }
+    }
+
+    fn send_frame(&mut self, opcode: u8, payload: &[u8]) -> std::io::Result<()> {
+        let mut f = vec![0x80 | opcode];
+        let n = payload.len();
+        if n < 126 {
+            f.push(0x80 | n as u8);
+        } else if n < 65536 {
+            f.push(0x80 | 126);
+            f.extend_from_slice(&(n as u16).to_be_bytes());
+        } else {
+            f.push(0x80 | 127);
+            f.extend_from_slice(&(n as u64).to_be_bytes());
+        }
+        let mask: [u8; 4] = random_token().as_bytes()[..4].try_into().unwrap();
+        f.extend_from_slice(&mask);
+        f.extend(payload.iter().enumerate().map(|(i, b)| b ^ mask[i % 4]));
+        self.stream.write_all(&f)
+    }
+
+    fn recv_frame(&mut self) -> (u8, Vec<u8>) {
+        let mut h = [0u8; 2];
+        self.stream.read_exact(&mut h).expect("read WebSocket frame");
+        let opcode = h[0] & 0x0f;
+        let mut len = (h[1] & 0x7f) as u64;
+        if len == 126 {
+            let mut b = [0u8; 2];
+            self.stream.read_exact(&mut b).expect("read frame length");
+            len = u16::from_be_bytes(b) as u64;
+        } else if len == 127 {
+            let mut b = [0u8; 8];
+            self.stream.read_exact(&mut b).expect("read frame length");
+            len = u64::from_be_bytes(b);
+        }
+        let mut mask = [0u8; 4];
+        if h[1] & 0x80 != 0 {
+            self.stream.read_exact(&mut mask).expect("read frame mask");
+        }
+        let mut payload = vec![0u8; len as usize];
+        self.stream.read_exact(&mut payload).expect("read frame payload");
+        if h[1] & 0x80 != 0 {
+            for (i, b) in payload.iter_mut().enumerate() {
+                *b ^= mask[i % 4];
+            }
+        }
+        (opcode, payload)
+    }
+}
+
+impl Drop for WebSocket {
+    fn drop(&mut self) {
+        // A close frame ends the server's read loop for this connection.
+        let _ = self.send_frame(0x8, &[]);
+        let _ = self.stream.shutdown(Shutdown::Both);
     }
 }

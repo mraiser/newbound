@@ -4,8 +4,8 @@ The core has three kinds of automated test, all run by one command and by
 CI on Linux, macOS and Windows:
 
 - **Unit tests** inside `newbound_core` (`#[cfg(test)] mod tests`).
-- **Smoke tests** (`tests/smoke.rs`) that boot a disposable instance and
-  drive it over HTTP.
+- **Integration tests** (`tests/*.rs`) that boot disposable instances and
+  drive them over HTTP and WebSocket.
 - **Harness checks** (`tests/harness.rs`) that keep the harness honest.
 
 ## Running the suite
@@ -23,14 +23,15 @@ cargo test --release --features=serde_support --workspace
 - Server output: each instance writes `newbound.log` in its own temp
   directory, and startup failures print it. To keep the directories
   after the run, set `NEWBOUND_TEST_KEEP=1`; the paths are printed.
-- The suite takes well under a second once built. It never touches the
+- The suite takes about six seconds once built (session expiry waits
+  for the server's sweep; everything else is well under a second). It never touches the
   checkout's `data/` or a running instance, so it is safe to run on a
   machine where Newbound is running.
 
 ## Adding a test
 
-An HTTP-level test goes in `tests/smoke.rs`, or in a new `tests/<area>.rs`
-that starts with `mod common;`:
+An HTTP-level test goes in the `tests/<area>.rs` file for its area, or in
+a new one that starts with `mod common;`:
 
 ```rust
 mod common;
@@ -61,6 +62,11 @@ fn security_groups_needs_admin() {
   writes to its own copy.
 - A fixture user is in `inst.admin_password` / `inst.user_password`;
   `common::USER` is the non-admin user, in group `common::USER_GROUP`.
+- Need a config switch? `Instance::start_with_config(&[("basicauth",
+  "true")])`.
+- Bodies: `client.post_json`, `post_form`, `post_multipart`,
+  `post_chunked_json`, or `client.raw(bytes)` for hand-made framing.
+  WebSocket: `client.websocket()` then `ws.command(app, cmd, params, pid)`.
 - Keep the harness portable: `std::path` joins, no shell commands, no
   hard-coded `/tmp`.
 
@@ -127,10 +133,12 @@ Users live in `users/<name>.properties` beside `data/`. If
 `users/admin.properties` is missing, startup creates it with a random
 password, so a test fixture writes its own users before starting.
 
-## What the smoke tests cover (`tests/smoke.rs`)
+## What the tests cover
 
 Each test starts its own instance and asserts on status codes and JSON
 shape only — never on timing, ports, or anything that changes between runs.
+
+### `tests/smoke.rs` — the main paths
 
 | Test | Checks |
 |---|---|
@@ -145,6 +153,48 @@ shape only — never on timing, ports, or anything that changes between runs.
 | `dev_code_read_commands` | through `app.exec` as admin: `list_libraries`, `list_controls`, `list_commands`, `read_command` return the expected arrays/objects and keys; all four are denied to anonymous and the non-admin user |
 | `unknown_paths_are_404` | unknown app, unknown command, unknown file: 404 |
 
+### `tests/writes.rs` — commands that change data
+
+| Test | Checks |
+|---|---|
+| `admin_creates_and_deletes_a_user` | `security/setuser` writes `users/<id>.properties` in the instance (not the checkout), the user appears in `security/users` and can log in; `security/deleteuser` removes the file and the login |
+| `only_admin_manages_users` | `setuser` / `deleteuser` are denied to anonymous and the plain user, and change nothing |
+| `records_obey_their_reader_groups` | `app/write` stores a record in the instance's store only; `app/read` serves a record with `anonymous` readers to everyone and one with no readers only to admin |
+| `only_admin_writes_records` | `app/write` is denied to anonymous and the plain user, and no record appears |
+| `dev_code_asset_write_list_delete` | `dev.code.write_asset` / `list_assets` / `delete_asset` work for admin and are denied (with no file written or removed) to everyone else |
+
+### `tests/http_bodies.rs` — request bodies
+
+| Test | Checks |
+|---|---|
+| `post_bodies_deliver_parameters` | `app/login` parameters arrive by JSON, url-encoded form, multipart form and chunked JSON (split mid-value) POST |
+| `post_bodies_with_a_wrong_password_fail` | the same four with a wrong password stay anonymous |
+| `malformed_framing_gets_an_http_error` | bad chunk size → 400, unsupported `Transfer-Encoding` → 501, `Content-Length` over 64 MiB → 413, non-numeric `Content-Length` → 400; the server keeps serving |
+
+### `tests/basic_auth.rs` — HTTP Basic (`basicauth=true`)
+
+| Test | Checks |
+|---|---|
+| `valid_credentials_log_in_without_a_cookie` | admin and the plain user are recognised from `Authorization: Basic` alone; repeated cookie-less requests reuse one session |
+| `bad_credentials_stay_anonymous` | wrong password, unknown user, empty password, malformed base64 and a non-Basic scheme stay anonymous |
+| `basic_auth_is_off_unless_configured` | without `basicauth=true` the header is ignored |
+
+### `tests/session_expiry.rs`
+
+| Test | Checks |
+|---|---|
+| `idle_sessions_expire_and_active_ones_survive` | with `sessiontimeoutmillis=1000`, an idle logged-in session is swept (seen in the server log) and is anonymous afterwards, while a session making requests stays logged in |
+
+### `tests/websocket.rs` — commands over a WebSocket
+
+| Test | Checks |
+|---|---|
+| `anonymous_socket_runs_open_commands` | the handshake answers 101 with the RFC 6455 accept value; `cmd` messages run `current_user` and `apps` and echo `pid` |
+| `socket_carries_the_logged_in_session` | a socket opened with an admin cookie runs as admin, including admin-only commands |
+| `socket_commands_obey_permissions` | admin-only commands over the socket are denied to anonymous and the plain user |
+| `unknown_socket_command_is_an_error` | `status=err`, `Unknown command` |
+| `replies_are_matched_by_pid` | ten concurrent commands each get exactly one reply with their `pid` |
+
 Core has no logout command; "logout" is covered as the session ending
 (dropping the session id). Add a real logout test when the command exists.
 
@@ -153,23 +203,29 @@ Command record ids for `app.exec` are looked up by name from the store
 
 ## Not covered yet
 
-Candidates for the next tests, roughly in order of value:
-
-- Commands that write: `app.write`, `security.setuser` / `deleteuser`,
-  and the `dev.code` editing commands (each on its own instance, so the
-  writes are disposable).
-- `POST` bodies: form posts, multipart uploads, chunked request bodies.
-- WebSockets (event subscriptions and command calls).
-- HTTP Basic auth (`basicauth=true`) and its 401/403 answers.
-- Session expiry (`sessiontimeoutmillis`).
-- The `peer` library: P2P streams between two instances, with discovery
-  kept off the real network.
+- File uploads (multipart parts with a filename).
+- Event subscriptions over a WebSocket (`sub` messages).
+- The 401/403 answers for protocol-adapter commands (those declaring
+  `nn_method`): no core command declares it, so they need a fixture
+  command or a library that has one.
+- The `peer` library: P2P streams between two instances. Its LAN
+  discovery always binds a fixed port on every interface, so a test
+  instance would find real instances on the network; it needs a switch
+  to turn discovery off first.
 - Flows, timers and events; the in-store `test_*` commands, which run
   through flowlang rather than `cargo test`.
-- The Python and JavaScript runtimes (`newbound pytest` / `jstest`), and
-  the browser front end.
+- The Python and JavaScript runtimes (`newbound pytest` / `jstest`):
+  they need a build with those features, so a separate CI job.
+- The browser front end.
 - NixOS and Raspberry Pi: CI covers Linux, macOS and Windows on x86-64
   and Apple silicon only.
+
+## Known behaviour the harness works around
+
+- A url-encoded form POST: the server reads the last field up to
+  end-of-stream, so a client that keeps the connection open waits for the
+  3-second socket timeout before getting an answer. The harness client
+  half-closes its side after every request, so tests answer at once.
 
 ## How it works
 
@@ -185,7 +241,8 @@ Integration tests live in `tests/*.rs` in the root crate and start with
   in, or writes to, the checkout or a live instance.
 - **Config.** It writes `config.properties` with `headless=true`,
   `http_address=127.0.0.1`, `http_port=0`, `security=on` and
-  `apps=app,dev,security` (`Instance::start_with_apps` picks others).
+  `apps=app,dev,security` (`Instance::start_with_apps` picks others;
+  `Instance::start_with_config` adds or replaces entries).
   `peer` is left out by default: it opens a P2P listener and LAN
   discovery, and a test instance must never announce itself to real
   instances on the same network.
@@ -197,7 +254,9 @@ Integration tests live in `tests/*.rs` in the root crate and start with
   (`CARGO_BIN_EXE_newbound`) with the temp directory as its working
   directory and its output in `newbound.log` there, waits for
   `HTTP TCP listening on port N`, then until `GET /` answers. Startup
-  failures panic with the log. Dropping the `Instance` — including when a
+  failures panic with the log. The process's `TMPDIR`/`TMP`/`TEMP`
+  point into the instance directory, so its own temp files stay there.
+  Dropping the `Instance` — including when a
   test panics — kills the process, waits for it and deletes the directory.
   Set `NEWBOUND_TEST_KEEP=1` to keep the directory for inspection.
 - **One instance per test.** Booting takes a fraction of a second, so
@@ -205,11 +264,13 @@ Integration tests live in `tests/*.rs` in the root crate and start with
   sessions or writes; the tests in a file run in parallel safely.
 - **Client.** `inst.client()` is an anonymous visitor; `inst.login_admin()`
   and `inst.login_user()` return clients already logged in. A client is a
-  minimal HTTP/1.1 GET client on `std::net::TcpStream` that keeps the
-  `sessionid` cookie like a browser. `client.exec(lib, id, args)` calls a
-  command through `app.exec`. `Response` has `status`, `header()`,
-  `cookie()`, `text()` and `json()` (an ndata `DataObject`). No new
-  dependencies.
+  minimal HTTP/1.1 client on `std::net::TcpStream` that keeps the
+  `sessionid` cookie like a browser: `get`, `request`, the `post_*`
+  helpers, `raw`, and `exec(lib, id, args)` for `app.exec`. `Response`
+  has `status`, `header()`, `cookie()`, `text()` and `json()` (an ndata
+  `DataObject`). `client.websocket()` performs the handshake on the
+  client's session and returns a `WebSocket` with `send_text`,
+  `recv_text` and `command`. No new dependencies.
 - **Portable.** `std::path` joins only, no shell, no `/tmp` literal, no
   Unix-only APIs, so the same code runs on Linux, NixOS, macOS, Windows
   and Raspberry Pi.
