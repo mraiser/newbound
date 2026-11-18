@@ -193,6 +193,38 @@ pub fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
+/// A record from this checkout's store (the same files every fixture copies),
+/// as the JSON object the store holds.
+pub fn store_record(lib: &str, id: &str) -> DataObject {
+    // The store shards a record into four 4-character folders from its id,
+    // padded with '_' (flowlang's DataStore::get_data_file).
+    let padded: String = id.chars().chain(std::iter::repeat('_')).take(16).collect();
+    let mut path = repo_root().join("data").join(lib);
+    for i in 0..4 {
+        path = path.join(&padded[i * 4..i * 4 + 4]);
+    }
+    path = path.join(id);
+    let text = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {}", path.display(), e));
+    init_ndata();
+    DataObject::from_string(&text)
+}
+
+/// The record id of command `cmd` on control `ctl` of library `lib`: what
+/// `app.exec` takes as `id`. Looked up by name so tests survive re-ids.
+pub fn command_id(lib: &str, ctl: &str, cmd: &str) -> String {
+    let find = |list: ndata::dataarray::DataArray, name: &str| -> Option<String> {
+        list.objects()
+            .into_iter()
+            .map(|d| d.object())
+            .find(|o| o.has("name") && o.get_string("name") == name)
+            .map(|o| o.get_string("id"))
+    };
+    let controls = store_record(lib, "controls").get_object("data").get_array("list");
+    let ctl_id = find(controls, ctl).unwrap_or_else(|| panic!("no control {}.{}", lib, ctl));
+    let cmds = store_record(lib, &ctl_id).get_object("data").get_array("cmd");
+    find(cmds, cmd).unwrap_or_else(|| panic!("no command {}.{}.{}", lib, ctl, cmd))
+}
+
 fn unique_dir() -> PathBuf {
     let n = COUNTER.fetch_add(1, Ordering::SeqCst);
     let name = format!("newbound-test-{}-{}-{}", std::process::id(), n, &random_token()[..8]);

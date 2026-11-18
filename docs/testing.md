@@ -1,8 +1,8 @@
 # Testing Newbound core
 
-Status: phase 2 of 5 — the harness is in (`tests/common/mod.rs`, checked
-by `tests/harness.rs`). The smoke tests and CI job are not written yet;
-sections marked *planned* describe what they will be.
+Status: phase 3 of 5 — the harness (`tests/common/mod.rs`, checked by
+`tests/harness.rs`) and the HTTP smoke tests (`tests/smoke.rs`) are in.
+The CI job is not written yet; sections marked *planned* describe it.
 
 ## Where we start (2026-11-18)
 
@@ -72,30 +72,29 @@ Users live in `users/<name>.properties` beside `data/`. If
 `users/admin.properties` is missing, startup creates it with a random
 password, so a test fixture writes its own users before starting.
 
-## What to test (phase 3)
+## What the smoke tests cover (`tests/smoke.rs`)
 
-The smoke suite asserts on status codes and JSON shape only — never on
-timing, port numbers, or anything that changes between runs.
+Each test starts its own instance and asserts on status codes and JSON
+shape only — never on timing, ports, or anything that changes between runs.
 
-| Area | Test | Expect |
-|---|---|---|
-| Static | `GET /app/` | 200, HTML |
-| Static | `GET /app/index.html` | 200, HTML |
-| Static | `GET /` | 302 to `/app/index.html` |
-| `app.apps` | `GET /app/apps` anonymously | 200, JSON, `status=ok`, the fixture's apps listed |
-| Login | `GET /app/login?user=…&pass=…` with the fixture password | `status=ok`; `security/current_user` now reports the fixture user |
-| Login | the same with a wrong password | `status=err`, `msg` starts `UNAUTHORIZED`; session stays anonymous |
-| Session end | drop the cookie / use a new session id | back to anonymous |
-| Security | an admin-only `app` command (e.g. `app/libs`) anonymously | `status=err`, `msg` starts `UNAUTHORIZED` |
-| Security | the same command as admin | `status=ok` |
-| Security | a non-admin fixture user in a group the command does not list | denied |
-| `dev.code` | `list_libraries`, `list_controls`, `list_commands`, `read_command` through `app.exec` as admin | `status=ok`, expected keys/arrays present |
-| `dev.code` | the same anonymously | denied |
-| 404 | an unknown app, and an unknown command on a known app | 404 |
+| Test | Checks |
+|---|---|
+| `root_redirects_to_the_default_app` | `GET /` is a 302 to `/app/index.html` |
+| `app_pages_are_served` | `/app/` and `/app/index.html` are the same 200 HTML page; `dev` and `security` index pages are 200 HTML; `/favicon.ico` comes from `html/` |
+| `app_apps_lists_the_loaded_apps` | anonymous `app/apps` is `status=ok` with exactly the configured apps, each with `id`, `name`, `active` |
+| `a_new_visitor_is_anonymous_and_gets_a_session_cookie` | first request sets `sessionid`; `security/current_user` is anonymous with no groups |
+| `login_with_the_right_password` | `app/login` succeeds for the fixture user and admin; `current_user` then shows the user and their groups; the session id is kept |
+| `login_with_a_wrong_password_or_unknown_user_fails` | wrong password, empty password, unknown user: `status=err`, `msg` starts `UNAUTHORIZED`, session stays anonymous |
+| `a_session_ends_with_its_cookie` | a client without the cookie is anonymous; the logged-in session is unaffected |
+| `admin_only_commands_are_denied_to_anonymous_and_plain_users` | `app/libs`, `app/settings`, `security/users`, `security/groups`: denied (`status=err`, `UNAUTHORIZED`, no `data`) to anonymous and to the non-admin user, `status=ok` for admin |
+| `dev_code_read_commands` | through `app.exec` as admin: `list_libraries`, `list_controls`, `list_commands`, `read_command` return the expected arrays/objects and keys; all four are denied to anonymous and the non-admin user |
+| `unknown_paths_are_404` | unknown app, unknown command, unknown file: 404 |
 
 Core has no logout command; "logout" is covered as the session ending
-(dropping the session id), and a real logout test is added when the
-command exists.
+(dropping the session id). Add a real logout test when the command exists.
+
+Command record ids for `app.exec` are looked up by name from the store
+(`common::command_id(lib, ctl, cmd)`), so the tests survive re-ids.
 
 ## How (phases 2–4)
 
