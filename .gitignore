@@ -24,6 +24,10 @@
 !Dockerfile
 !.dockerignore
 
+# Docs
+!docs/
+!docs/**
+
 # Packaging and CI
 !packaging/
 !packaging/**
