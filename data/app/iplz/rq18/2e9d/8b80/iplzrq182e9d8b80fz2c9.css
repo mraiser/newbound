@@ -235,6 +235,24 @@ img.icon-small-white[src*="/icons/ui/"] {
   padding: 6px;
   box-sizing: border-box;
 }
+/* Icon buttons: a <button> holding the icon <img alt=""> draws the same
+   20px glyph in the same 32px circle as the old clickable <img>. */
+button.roundbutton-small, button.roundbutton-small-white {
+  padding: 0;
+}
+button.roundbutton-small > img, button.roundbutton-small-white > img {
+  display: block;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+}
+
+/* Keyboard focus is always visible (WCAG 2.4.7). Zero specificity, so a
+   component's own :focus-visible style still wins. */
+:where(a[href], button, [role="button"], [role="link"], [role="switch"], [role="tab"], [role="menuitem"], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 
 /* --- Navbar --- */
@@ -455,6 +473,13 @@ img.icon-small-white[src*="/icons/ui/"] {
 .clearbutton:hover {
   background-color: rgba(240, 166, 60, 0.12);
 }
+/* prompt()/confirm() buttons were <a>; as <button>s they take the page's
+   type the way the <a> did (pages without app.tokens' button reset). */
+button.continuebutton, button.cancelbutton {
+  font-family: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+}
 
 /* --- Snackbar --- */
 .snackbar {
@@ -535,7 +560,22 @@ img.icon-small-white[src*="/icons/ui/"] {
   vertical-align: middle;
   top: -2px;
 }
-.switch-input { display: none; }
+/* The input stays in the tab order (WCAG 2.1.1): invisible, laid over the
+   track so a click lands on it, and its focus ring is drawn on the track. */
+.switch-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.switch-input:focus-visible + .switch-label::before {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
 .switch-label {
   display: block;
   width: 36px;

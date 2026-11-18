@@ -22,8 +22,8 @@
       <div class='localhttpport'></div>
     </div>
     <div class='localdevactions'>
-      <button class='addpeerbutton localdevbtn popupmenu' title='Add connection' data-popup='{"selector":".addusercard","closeselector":".close-add-user","modal":true}'><img src='../app/asset/app/icons/ui/dark/user-add.svg' class='mediumicon'></button>
-      <button class='updateallpeersbutton localdevbtn popupmenu' title='Update peers' data-popup='{"selector":".updateallpeerscard","closeselector":".close-update-peers","modal":true}'><img src='../app/asset/app/icons/ui/dark/upload.svg' class='mediumicon'></button>
+      <button type='button' class='addpeerbutton localdevbtn popupmenu' title='Add connection' aria-label='Add connection' data-popup='{"selector":".addusercard","closeselector":".close-add-user","modal":true}'><img src='../app/asset/app/icons/ui/dark/user-add.svg' class='mediumicon' alt=''></button>
+      <button type='button' class='updateallpeersbutton localdevbtn popupmenu' title='Update peers' aria-label='Update peers' data-popup='{"selector":".updateallpeerscard","closeselector":".close-update-peers","modal":true}'><img src='../app/asset/app/icons/ui/dark/upload.svg' class='mediumicon' alt=''></button>
     </div>
   </div>
   
@@ -31,7 +31,7 @@
     <div class='dialog-header'>
       <div class='padme'>
         <span class='peer-dlg-title'>Update Peers</span>
-        <img src='../app/asset/app/icons/ui/dark/close.svg' class='upper-right close-update-peers roundbutton-small out10'>
+        <button type='button' class='upper-right close-update-peers roundbutton-small out10' aria-label='Close'><img src='../app/asset/app/icons/ui/dark/close.svg' alt=''></button>
       </div>
     </div>
     <div class='padme peerupdatelist'></div>
@@ -44,7 +44,7 @@
     <div class='dialog-header'>
       <div class='padme'>
         <span class='peer-dlg-title'>Add Connection</span>
-        <img src='../app/asset/app/icons/ui/dark/close.svg' class='upper-right close-add-user roundbutton-small out10'>
+        <button type='button' class='upper-right close-add-user roundbutton-small out10' aria-label='Close'><img src='../app/asset/app/icons/ui/dark/close.svg' alt=''></button>
       </div>
       <div class = "navbar navbar-dark addusernavbar">
         <div class = "navbar-tab autab autab1 selected" data-id='autab1'>LAN</div>

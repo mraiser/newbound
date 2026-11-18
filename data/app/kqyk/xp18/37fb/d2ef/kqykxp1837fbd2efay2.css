@@ -7,3 +7,10 @@
 .loginmsg {
   margin-top:-30px;
 }
+
+/* LOG IN is a <button> now: same type as the old <a> */
+.loginbutton {
+  font-family: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+}

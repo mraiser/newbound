@@ -225,6 +225,7 @@ me.ready = function(){
       else { el.innerHTML = ''; el.appendChild(tbl); }
       markAdded(me.data && me.data.list);
       el.querySelectorAll('.add-ctl-item').forEach(function(item){
+        document.body.api.ui.pressable(item);
         item.addEventListener('click', function(){
           // D6: a control already on the dashboard can't be picked
           if (this.classList.contains('added')) return;
@@ -666,14 +667,19 @@ me.update = function(){
 
 ME.querySelector('.addressexpandbutton').addEventListener('click', function(){
   this.style.display = 'none';
-  ME.querySelector('.closeaddressbutton').style.display = 'inline-block';
+  // inline-flex: the kit's icon-button display, which centres the glyph
+  var hide = ME.querySelector('.closeaddressbutton');
+  hide.style.display = 'inline-flex';
   ME.querySelector('.addressexpand').style.display = 'block';
+  hide.focus();
 });
 
 ME.querySelector('.closeaddressbutton').addEventListener('click', function(){
   this.style.display = 'none';
-  ME.querySelector('.addressexpandbutton').style.display = 'inline-block';
+  var show = ME.querySelector('.addressexpandbutton');
+  show.style.display = 'inline-flex';
   ME.querySelector('.addressexpand').style.display = 'none';
+  show.focus();
 });
 
 ME.querySelector('.cancelupdateall').addEventListener('click', function(){
@@ -739,6 +745,11 @@ ME.querySelector('.refreshhud').addEventListener("click", me.refresh);
 // Add Control left the menu open on top of the modal, and still open after
 // the modal closed. app.ui's non-modal close only fires for clicks OUTSIDE
 // the card, so the rows must close it themselves.
+// The ⋮ card's rows are table cells: make each keyboard-operable.
+ME.querySelectorAll('.control-settings-popup td').forEach(function(td){
+  document.body.api.ui.pressable(td);
+});
+
 ME.querySelectorAll('.closeonclick').forEach(function(row){
   row.addEventListener("click", function(){
     ME.querySelector('.control-settings-popup').style.display = 'none';

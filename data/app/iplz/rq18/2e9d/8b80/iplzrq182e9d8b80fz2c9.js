@@ -43,6 +43,19 @@ function fromHTML(html) {
   return tempDiv.firstElementChild;
 }
 
+// Keyboard access for an element that can't be a <button> (a table row or
+// cell): focusable, exposed as a button, and Enter or Space fires its click
+// handler (WCAG 2.1.1, 4.1.2). Prefer a real <button> wherever one fits.
+me.pressable = function(el, label) {
+  el.setAttribute('role', 'button');
+  el.tabIndex = 0;
+  if (label) el.setAttribute('aria-label', label);
+  el.addEventListener('keydown', function(e) {
+    if (e.target !== el) return;
+    if (e.key == 'Enter' || e.key == ' ') { e.preventDefault(); el.click(); }
+  });
+};
+
 me.ready = function() {
   var el = ME.parentElement;
   me.snacks = [];
@@ -334,8 +347,8 @@ me.prompt = function(d) {
       <div class="card modal mydialog">
         <div class="pad16 card-header dialog-header">
           <span class="title">${d.title}</span>
-          <button class="popupcard-close close-prompt-dialog">
-             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          <button type="button" class="popupcard-close close-prompt-dialog" aria-label="Close">
+             <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
         <div class="pad16">
@@ -344,7 +357,7 @@ me.prompt = function(d) {
         </div>
         <div class="subtext card-description pad16" style="padding-top:0;">${sub}</div>
         <div class="card-button-wrap">
-          <a class="continuebutton coloredbutton">${ok}</a>
+          <button type="button" class="continuebutton coloredbutton">${ok}</button>
         </div>
       </div>
     </div>
@@ -362,6 +375,10 @@ me.prompt = function(d) {
     var input = el.querySelector('input.textinput');
     input.select();
     input.focus();
+  });
+
+  el.querySelector('input.textinput').addEventListener('keydown', function(e) {
+    if (e.key == 'Enter') { e.preventDefault(); el.querySelector('.continuebutton').click(); }
   });
 
   el.querySelector('.continuebutton').addEventListener('click', function() {
@@ -390,14 +407,14 @@ me.confirm = function(d) {
         <div class="card modal mydialog">
             <div class="pad16 card-header dialog-header">
                 <span class="title">${d.title}</span>
-                 <button class="popupcard-close close-prompt-dialog">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                 <button type="button" class="popupcard-close close-prompt-dialog" aria-label="Close">
+                    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                  </button>
             </div>
             <div class="subtext card-description pad16">${text}</div>
             <div class="card-button-wrap">
-                <a class="cancelbutton regularbutton">${cancel}</a>
-                <a class="continuebutton coloredbutton">${ok}</a>
+                <button type="button" class="cancelbutton regularbutton">${cancel}</button>
+                <button type="button" class="continuebutton coloredbutton">${ok}</button>
             </div>
         </div>
     </div>`);

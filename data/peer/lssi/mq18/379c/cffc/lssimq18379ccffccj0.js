@@ -245,6 +245,9 @@ function showPeerList(reason){
 function renderPeerList(){
   if (!me.listMode) return;
   var list = ME.querySelector('.peerlist');
+  // The poll rebuilds the list: keep keyboard focus on the same peer's row.
+  var ae = document.activeElement;
+  var focusPeer = ae && list.contains(ae) ? ae.dataset.peer : null;
   list.innerHTML = '';
   var now = Date.now();
   var labels = { tcp: 'TCP', udp: 'UDP', relay: 'Relay', down: 'Disconnected' };
@@ -254,7 +257,9 @@ function renderPeerList(){
     var p = peers[i];
     if (me.info && p.id == me.info.uuid) continue;
     var st = document.body.peerstatus(p, now);
-    var row = document.createElement('div');
+    // A real button (WCAG 2.1.1): Enter/Space open the panel like a click.
+    var row = document.createElement('button');
+    row.type = 'button';
     row.className = 'peerlistrow';
     row.dataset.peer = p.id;
     var dots = document.createElement('span');
@@ -286,11 +291,16 @@ function renderPeerList(){
       : ago < 3600000 ? Math.round(ago / 60000) + ' min ago'
       : Math.round(ago / 3600000) + ' h ago');
     row.appendChild(last);
+    row.setAttribute('aria-label', p.name + ', ' + labels[st.kind] + ', ' + last.textContent);
     row.addEventListener('click', listRowClick);
     list.appendChild(row);
     shown++;
   }
   if (shown == 0) list.innerHTML = '<div class="peerlistempty"><i>No peers connected yet — add one with the + button below.</i></div>';
+  if (focusPeer) {
+    var again = list.querySelector('[data-peer="' + CSS.escape(focusPeer) + '"]');
+    if (again) again.focus();
+  }
 }
 
 function listRowClick(){
@@ -1018,6 +1028,9 @@ ME.querySelector('.addpeerbutton').addEventListener('click', function(){
     }
     var tbl = document.createElement('table');
     tbl.className = 'lantable';
+    // Each row is one pick-this-device button (made pressable below), so
+    // the table is layout only.
+    tbl.setAttribute('role', 'presentation');
     var now = new Date().getTime();
     var found = [];
     for (var sip in result.data) {
@@ -1073,6 +1086,8 @@ ME.querySelector('.addpeerbutton').addEventListener('click', function(){
     if (tbl.rows.length == 0) disc.innerHTML = '<div class="padme"><i>No new devices found on LAN</i></div>';
     else { disc.innerHTML = ''; disc.appendChild(tbl); }
     disc.querySelectorAll('.clickme').forEach(function(rowEl){
+      var rd = me.discovery[rowEl.dataset.sip];
+      document.body.api.ui.pressable(rowEl, rd.name + ', ' + rd.address);
       rowEl.addEventListener('click', function(){
         var sip = this.dataset.sip;
         var rds = me.discovery[sip];
@@ -1081,6 +1096,9 @@ ME.querySelector('.addpeerbutton').addEventListener('click', function(){
         ME.querySelector('.adduseruuid').value = rds.uuid;
         ME.querySelector('.adduseripaddr').value = rds.address;
         ME.querySelector('.adduserport').value = rds.p2pport;
+        // the picked row is now hidden with the LAN tab: keep focus in the
+        // dialog, on the form it just filled (WCAG 2.4.3)
+        ME.querySelector('.addusername').focus();
       });
     });
   });

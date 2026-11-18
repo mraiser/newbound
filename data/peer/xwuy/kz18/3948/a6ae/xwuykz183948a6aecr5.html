@@ -1,6 +1,6 @@
 <div class='hudtop'>
 <div class='hudheader'>
-  <img src='../app/asset/app/icons/ui/dark/close.svg' class='closehud roundbutton-small-white'>
+  <button type='button' class='closehud roundbutton-small-white' aria-label='Close'><img src='../app/asset/app/icons/ui/dark/close.svg' alt=''></button>
   <div class='rp-info hudtitle'>
     <div class='headline rp-name'></div>
     <div class='rp-uuid'></div>
@@ -10,9 +10,9 @@
       <div class="connectionindicator"></div><div class="connectionindicator"></div><div class="connectionindicator"></div>
       <div class='connectionlatency'></div>
     </div>
-    <img src='../app/asset/app/icons/ui/dark/more-vertical.svg' class='roundbutton-small-white popupmenu morebutton' data-popup='{"selector":".control-settings-popup","closeselector":".control-settings-popup-close","popup":true}'>
+    <button type='button' class='roundbutton-small-white popupmenu morebutton' aria-label='More actions' data-popup='{"selector":".control-settings-popup","closeselector":".control-settings-popup-close","popup":true}'><img src='../app/asset/app/icons/ui/dark/more-vertical.svg' alt=''></button>
     <div class='card popupcard mini control-settings-popup'>
-      <table class="tablelist">
+      <table class="tablelist" role="presentation">
         <tr><td class="refreshhud closeonclick">Refresh</td></tr>
         <tr><td class="hudaddcontrol adminonly popupmenu closeonclick" data-popup='{"selector":".add-control-popup","closeselector":".add-control-popup-close","modal":true}'>Add Control</td></tr>
         <tr><td class="adminonly closeonclick">Control Settings</td></tr>
@@ -32,7 +32,7 @@
   <div class='padme tab-content hudtab-info selected'>
     <div class='hudinfogrid'>
       <div class='hudinfolabel'>IP Address</div>
-      <div class='hudinfovalue'><span class='hud_ipaddr'></span><span class='hud_addr_count hideme'></span><img src='../app/asset/app/icons/ui/accent/more.svg' class='roundbutton-small addressexpandbutton'><img src='../app/asset/app/icons/ui/accent/close.svg' class='roundbutton-small closeaddressbutton hideme'></div>
+      <div class='hudinfovalue'><span class='hud_ipaddr'></span><span class='hud_addr_count hideme'></span><button type='button' class='roundbutton-small addressexpandbutton' aria-label='Show all addresses'><img src='../app/asset/app/icons/ui/accent/more.svg' alt=''></button><button type='button' class='roundbutton-small closeaddressbutton hideme' aria-label='Hide addresses'><img src='../app/asset/app/icons/ui/accent/close.svg' alt=''></button></div>
       <div class='hud_address_list addressexpand hudinfofull hideme'></div>
       <div class='hudinfolabel'>P2P Port</div>
       <div class='hudinfovalue hud_port'></div>
@@ -48,9 +48,9 @@
         <button class='accentbutton hudcraterestart hideme'>Restart Instance</button>
       </div>
       <div class='hudcratestatus hudinfofull hudcrates adminonly hideme' style='white-space:pre-wrap; font-family:monospace; font-size:11px; max-height:120px; overflow:auto;'></div>
-      <div class='hudinfolabel'><img src="../app/asset/app/icons/ui/dark/key.svg" class="icon-small-white" title="Groups this peer grants you"></div>
+      <div class='hudinfolabel'><img src="../app/asset/app/icons/ui/dark/key.svg" class="icon-small-white" title="Groups this peer grants you" alt="Groups this peer grants you"></div>
       <div class='hudinfovalue rp-key'><i>checking...</i></div>
-      <div class='hudinfolabel'><img src="../app/asset/app/icons/ui/dark/lock.svg" class="icon-small-white" title="Groups you grant this peer"></div>
+      <div class='hudinfolabel'><img src="../app/asset/app/icons/ui/dark/lock.svg" class="icon-small-white" title="Groups you grant this peer" alt="Groups you grant this peer"></div>
       <div class='hudinfovalue rp-lock'><i>checking...</i></div>
       <div class='hudinfofull'>
         <label class="plaincheckbox">
@@ -81,7 +81,7 @@
   <div class='add-control-popup card popup-card modal hideme'>
     <div class='dialog-header hud-dlg-head'>
       <span class='hud-dlg-title'>Add Control</span>
-      <img src='../app/asset/app/icons/ui/dark/close.svg' class='add-control-popup-close roundbutton-small-white' alt='Close' title='Close'>
+      <button type='button' class='add-control-popup-close roundbutton-small-white' aria-label='Close' title='Close'><img src='../app/asset/app/icons/ui/dark/close.svg' alt=''></button>
     </div>
     <div class='card-text'>
       <div class = 'add-control-available'></div>

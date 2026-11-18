@@ -20,7 +20,10 @@ function showlogin() {
   ME.querySelector('.wrap').style.display = 'block';
   ME.querySelector('.mydialog').style.display = 'block';
   ME.querySelector('#username').focus();
-  ME.querySelector('.loginbutton').addEventListener('click', function() {
+  // The form's submit covers the LOG IN button, Enter in either field, and
+  // assistive tech alike (it used to hang off a click on an href-less <a>).
+  ME.querySelector('#loginform').addEventListener('submit', function(e) {
+    e.preventDefault();
     var username = ME.querySelector('#username').value;
     var password = ME.querySelector('#password').value;
     var remember = ME.querySelector('#remember').checked;
