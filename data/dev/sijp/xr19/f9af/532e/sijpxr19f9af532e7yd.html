@@ -10,16 +10,11 @@
        aria-label="preview width" aria-valuemin="240"
        title="drag to resize the preview — double-click to reset"><span class="grip" aria-hidden="true"></span></div>
   <div class="wb-right">
-    <div class="wb-chipbar">
-      <div class="wb-chips" role="tablist" aria-label="facets"></div>
-      <div class="wb-actions">
-        <span class="wb-ctl-state" role="status">no control changes</span>
-        <input class="wb-label" placeholder="label this patch"
-               aria-label="label this patch (optional)"
-               title="short label for the journal entry (optional)">
-        <button class="wb-save" disabled
-          title="saves every facet with unsaved changes — one journaled patch per facet">Save control <kbd></kbd></button>
-      </div>
+    <div class="wb-ctlhead" role="group" aria-label="this control">
+    <div class="wb-ctl-title">
+      <span class="wb-ctl-kind">Control</span>
+      <b class="wb-ctl-id"></b>
+      <span class="wb-ctl-hint">everything in this box applies to the whole control</span>
     </div>
     <div class="wb-about">
       <div class="wb-about-line">
@@ -32,13 +27,13 @@
       </div>
     </div>
     <div class="wb-meta">
-      <span class="wm-groups-view" title="security groups — who can see and run this control; empty = admin only"></span>
+      <span class="wm-groups-view wb-sec" role="status"></span>
       <button class="wm-preview wb-tog" aria-pressed="true" title="show or hide the preview pane">hide preview</button>
       <button class="wm-edit wb-tog" aria-expanded="false" hidden>meta <span class="car" aria-hidden="true">▸</span></button>
       <button class="wm-publish wb-tog" aria-expanded="false" hidden>publish <span class="car" aria-hidden="true">▸</span></button>
       <button class="wm-wiring wb-tog" aria-expanded="false">timers/events <span class="car" aria-hidden="true">▸</span></button>
       <button class="wm-groups-btn wb-tog" aria-expanded="false" hidden
-        title="security groups — the deliberate set_groups act: writes the groups string and derives the enforced readers on this control and its inline data">groups <span class="car" aria-hidden="true">▸</span></button>
+        title="change who can see and run this CONTROL — writes the groups string and the enforced readers on the control record and its inline data; commands keep their own security">change control security <span class="car" aria-hidden="true">▸</span></button>
       <form class="wm-form" hidden>
         <input class="wm-desc" placeholder="describe this control — agents discover it through desc">
         <input class="wm-tags" placeholder="tags (comma-delimited — categorization, never security)">
@@ -46,11 +41,13 @@
         <span class="wm-note"></span>
       </form>
       <form class="wm-groups-form" hidden>
-        <input class="wm-groups-in"
+        <span class="wm-groups-scope wb-sec-scope"></span>
+        <input class="wm-groups-in" aria-label="security groups of this control"
           placeholder="groups (comma-delimited, e.g. anonymous) — empty = admin only">
+        <button type="submit" class="wm-groups-apply">change control security…</button>
         <span class="wm-groups-known lbl"></span>
-        <button type="submit" class="wm-groups-apply">set groups</button>
         <span class="wm-groups-note"></span>
+        <div class="wm-groups-confirm" hidden></div>
       </form>
     </div>
     <div class="wb-publish" hidden>
@@ -105,6 +102,20 @@
         </section>
       </div>
     </div>
+    </div>
+    <!-- everything above this line is about the CONTROL; the tabs and the
+         pane below them are the control's facets and commands -->
+    <div class="wb-chipbar">
+      <div class="wb-chips" role="tablist" aria-label="facets"></div>
+      <div class="wb-actions">
+        <span class="wb-ctl-state" role="status">no control changes</span>
+        <input class="wb-label" placeholder="label this patch"
+               aria-label="label this patch (optional)"
+               title="short label for the journal entry (optional)">
+        <button class="wb-save" disabled
+          title="saves every facet with unsaved changes — one journaled patch per facet">Save control <kbd></kbd></button>
+      </div>
+    </div>
     <div class="wb-conflict" role="alert" aria-live="assertive" hidden>
       <span class="wc-msg"></span>
       <button class="wc-theirs">load theirs</button>
@@ -147,6 +158,7 @@
             <span class="wcc-type wb-cmd-type"></span>
             <span class="wcc-name"></span>
             <span class="wcc-sig"></span>
+            <button type="button" class="wcc-sec wb-sec" aria-expanded="false"></button>
             <span class="wcc-spacer"></span>
             <span class="wcc-status clean" role="status"></span>
             <button class="wcc-save" hidden disabled></button>
@@ -159,6 +171,15 @@
               <button class="wcc-guard-keep wb-tog">keep editing</button>
             </div>
           </div>
+          <form class="wcc-sec-form" hidden>
+            <span class="wcc-sec-scope wb-sec-scope"></span>
+            <input class="wcc-sec-in" aria-label="security groups of this command"
+              placeholder="groups (comma-delimited, e.g. anonymous) — empty = admin only">
+            <button type="submit" class="wcc-sec-apply">change command security…</button>
+            <span class="wcc-sec-known lbl"></span>
+            <span class="wcc-sec-note"></span>
+            <div class="wcc-sec-confirm" hidden></div>
+          </form>
           <div class="wcc-sig-row" hidden>
             <label class="wcc-field wcc-f-params"><span class="lbl">params</span>
               <input class="wcc-params" spellcheck="false"

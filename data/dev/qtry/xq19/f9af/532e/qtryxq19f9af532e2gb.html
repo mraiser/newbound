@@ -85,11 +85,12 @@
         </div>
       </div>
       <p class="fh-desc"></p>
+      <p class="fh-secline"><span class="fh-sec" role="status"></span></p>
 
       <nav class="fh-tools" aria-label="Library actions">
         <button type="button" data-open="meta" aria-expanded="false" hidden>meta</button>
         <button type="button" data-open="groups" aria-expanded="false" hidden
-          title="security groups — who can see and run this library's contents; the deliberate set_groups act, distinct from meta">groups</button>
+          title="change who can reach this LIBRARY at all — the library gate; controls and commands keep their own security">change library security</button>
         <button type="button" data-open="assets" aria-expanded="false">assets</button>
         <button type="button" data-open="settings" aria-expanded="false">rust settings</button>
         <button type="button" data-open="rebuild" aria-expanded="false" hidden>rebuild</button>
@@ -121,7 +122,7 @@
 
       <form class="sh-panel fh-groups" data-panel="groups" hidden>
         <div class="sh-panel-head">
-          <h3>Groups · <span class="sh-mono fh-lib"></span></h3>
+          <h3>Library security · <span class="sh-mono fh-lib"></span></h3>
           <button type="button" class="sh-btn sh-outline sh-icon-btn" data-close aria-label="Close groups">
             <i class="sh-i sh-i-close" aria-hidden="true"></i></button>
         </div>
@@ -132,14 +133,15 @@
         library serving non-admin users is <code>anonymous</code> here, with
         fine-grained groups on individual controls and commands. Takes effect
         on restart.</p>
-        <label class="sh-field">Library groups
+        <label class="sh-field"><span>Security groups of the LIBRARY <b class="sh-mono fh-lib"></b> — who can reach anything in it</span>
           <input class="fg-input" placeholder="groups (comma-delimited, e.g. anonymous) — empty = admin only">
           <span class="sh-hint fg-known"></span></label>
         <div class="sh-form-actions">
-          <button type="submit" class="sh-btn sh-primary fg-apply">Set groups</button>
+          <button type="submit" class="sh-btn sh-primary fg-apply">Change library security…</button>
           <button type="button" class="sh-btn" data-close>Cancel</button>
           <span class="sh-note fg-note"></span>
         </div>
+        <div class="fg-confirm" hidden></div>
       </form>
 
       <div class="sh-panel fh-assets" data-panel="assets" hidden>

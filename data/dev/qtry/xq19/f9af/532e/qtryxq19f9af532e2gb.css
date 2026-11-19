@@ -419,6 +419,39 @@
 .nb-shelf .sh-legend span { display: flex; align-items: center; gap: 5px; }
 .nb-shelf .sh-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dot); }
 
+/* library security: the enforced gate as a badge, and the change confirmation */
+.nb-shelf .fh-secline { margin-bottom: 14px; }
+.nb-shelf .fh-sec {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--text-dim);
+  background: var(--panel-2);
+  font: 600 11.5px var(--mono);
+  color: var(--text);
+}
+.nb-shelf .fh-sec.sec-admin { border-color: var(--good, #4fae6e); color: var(--good, #4fae6e); }
+.nb-shelf .fh-sec.sec-open { border-color: var(--accent); color: var(--accent); }
+.nb-shelf .fh-sec.sec-bad { border-color: var(--danger); color: var(--danger); }
+.nb-shelf .fg-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--danger);
+  background: rgba(184, 74, 74, 0.12);
+  font-size: 12.5px;
+  color: var(--text);
+}
+.nb-shelf .fg-confirm .sc-msg { flex: 1 1 320px; display: flex; flex-direction: column; gap: 4px; }
+.nb-shelf .fg-confirm .sc-msg b { font-family: var(--mono); }
+.nb-shelf .fg-confirm .sc-yes { background: var(--danger); color: #fff; font-weight: 600; }
+
 /* ── narrower widths ─────────────────────────────────────── */
 @container (max-width: 760px) {
   .nb-shelf .sh-grid,
