@@ -39,6 +39,85 @@ var readyP = new Promise(function (res) { me.ready = res; }).then(async () => {
     code("set_command_meta", { lib: l2, ctl: c2, cmd: m2, desc: d2, groups: g2, label, author: "" });
   const setTags = (l2, c2, m2, t2) => code("set_tags", { lib: l2, ctl: c2, cmd: m2, tags: t2, author: "" });
   const setGroups = (l2, c2, m2, g2) => code("set_groups", { lib: l2, ctl: c2, cmd: m2, groups: g2, author: "" });
+  // ── security: what is ENFORCED is a record's top-level readers array
+  // (check_security / check_auth read it); the groups string is only the
+  // label it was derived from. The UI shows the readers and says so when
+  // the two disagree. app.read answers the whole record, readers included.
+  const readSec = async (l2, id2) => {
+    const r2 = await jsonP("../app/read", "lib=" + encodeURIComponent(l2) + "&id=" + encodeURIComponent(id2));
+    if (!r2 || r2.status !== "ok") return null;
+    return { data: r2.data ?? {}, readers: Array.isArray(r2.readers) ? r2.readers.map(String) : [] };
+  };
+  const derivedReaders = (g2) => String(g2 ?? "").split(",").map((s2) => s2.trim()).filter(Boolean);
+  const sameSet = (a2, b2) => {
+    const x2 = [...new Set(a2)].sort();
+    const y2 = [...new Set(b2)].sort();
+    return x2.length === y2.length && x2.every((v2, i2) => v2 === y2[i2]);
+  };
+  const readersText = (r2) => (r2.length ? r2.join(", ") : "admin only");
+  // sec = { groups, readers, implReaders? }; null = unreadable; undefined = loading
+  const secConsistent = (sec) => sameSet(derivedReaders(sec.groups), sec.readers)
+    && (!sec.implReaders || sameSet(sec.readers, sec.implReaders));
+  // paint a security badge: scope is "Control" / "Command" ("" = compact, in
+  // a command row), target the full name for the tooltip
+  function paintSec(el, scope, sec, target) {
+    const pre = scope ? `${scope} security: ` : "";
+    el.classList.add("wb-sec");
+    el.classList.remove("sec-admin", "sec-open", "sec-bad");
+    if (sec === undefined) { el.textContent = `${pre}…`; el.title = ""; return; }
+    if (!sec) {
+      el.textContent = `${pre}unreadable`;
+      el.classList.add("sec-bad");
+      el.title = `could not read the security of ${target}`;
+      return;
+    }
+    const open = sec.readers.includes("anonymous");
+    const ok = secConsistent(sec);
+    if (!ok) el.classList.add("sec-bad");
+    else if (sec.readers.length === 0) el.classList.add("sec-admin");
+    else if (open) el.classList.add("sec-open");
+    el.textContent = `${pre}${readersText(sec.readers)}${open ? " (anyone)" : ""}${ok ? "" : " ⚠ label differs"}`;
+    el.title = `${target} — enforced readers: [${sec.readers.join(", ")}]`
+      + (sec.readers.length ? "" : " (empty = admin only)")
+      + ` · groups label: "${sec.groups ?? ""}"`
+      + (ok ? "" : " — the label and the enforced readers disagree; setting the security again makes them match");
+  }
+  // the confirmation every security change passes through: names the target
+  // and shows who can use it before and after. Resolves true / false.
+  function confirmSecurity(box, { scope, target, before, after, extra = "" }) {
+    return new Promise((res2) => {
+      box.replaceChildren();
+      box.classList.add("wb-sec-confirm");
+      const msg = document.createElement("div");
+      msg.className = "sc-msg";
+      const head = document.createElement("b");
+      head.textContent = `Change the security of the ${scope.toUpperCase()} ${target}?`;
+      const delta = document.createElement("span");
+      delta.textContent = `Who can use it now: ${readersText(before)}. After this change: ${readersText(after)}`
+        + (after.includes("anonymous") ? " — anyone, without logging in." : ".");
+      msg.append(head, delta);
+      if (extra) {
+        const x2 = document.createElement("span");
+        x2.className = "sc-extra";
+        x2.textContent = extra;
+        msg.append(x2);
+      }
+      const yes = document.createElement("button");
+      yes.type = "button";
+      yes.className = "wb-btn danger";
+      yes.textContent = `Apply to ${scope} ${target}`;
+      const no = document.createElement("button");
+      no.type = "button";
+      no.className = "wb-btn";
+      no.textContent = "Cancel";
+      const done = (v2) => { box.hidden = true; box.replaceChildren(); res2(v2); };
+      yes.addEventListener("click", () => done(true));
+      no.addEventListener("click", () => done(false));
+      box.append(msg, yes, no);
+      box.hidden = false;
+      no.focus();
+    });
+  }
   const securityGroups = async () => {
     const r2 = await jsonP("../security/groups", null);
     return r2 && r2.status === "ok" && Array.isArray(r2.data) ? r2.data : [];
@@ -655,6 +734,14 @@ async function init(host, { lib, ctlId, toast }) {
   // deliberate set_groups act, never through a meta form.
   const metaEl = host.querySelector(".wb-meta");
   const aboutEl = host.querySelector(".wb-about");
+  host.querySelector(".wb-ctl-id").textContent = `${lib}.${name}`;
+  // security state: the control's, and one setter per command row
+  let ctlSec;                    // { groups, readers } once read; null = unreadable
+  const rowSec = new Map();      // command name -> the row's setter(sec)
+  const loadCtlSec = async () => {
+    const c = await readSec(lib, ctlId);
+    return c ? { groups: c.data.groups ?? "", readers: c.readers } : null;
+  };
 
   // C4: the first sentence of the desc reads as a plain paragraph; the
   // rest (and the tags) sit behind "Details and config".
@@ -741,14 +828,7 @@ async function init(host, { lib, ctlId, toast }) {
       details.setAttribute("aria-expanded", "false");
       details.textContent = "Details and config";
     }
-    const g = metaEl.querySelector(".wm-groups-view");
-    g.replaceChildren();
-    if (record.groups) {
-      g.appendChild(document.createTextNode(`groups: ${record.groups}`));
-    } else {
-      g.insertAdjacentHTML("afterbegin", LOCK_SVG);
-      g.appendChild(document.createTextNode(" admin only"));
-    }
+    paintCtlSec();
     metaEl.querySelector(".wm-edit").hidden = !patchMode;
     metaEl.querySelector(".wm-groups-btn").hidden = !patchMode;
     // publish rides dev commands, not the write API — live mode is enough
@@ -812,15 +892,67 @@ async function init(host, { lib, ctlId, toast }) {
   // the enforced readers on the control record AND its inline data records
   // — the records app.read serves, so this is what gates rendering for
   // non-admin users.
+  function paintCtlSec() {
+    paintSec(metaEl.querySelector(".wm-groups-view"), "Control", ctlSec, `control ${lib}.${name}`);
+  }
+  loadCtlSec().then((s) => { ctlSec = s; paintCtlSec(); });
+
+  // A command's security, as enforced: readers of the command record (the
+  // array check_security consults), the impl record's readers beside it,
+  // and the groups label (kept on the impl record).
+  async function loadCmdSec(cmdEntry) {
+    const c = await readSec(lib, cmdEntry.id);
+    if (!c) return null;
+    const t = c.data.type ?? commandLang(cmdEntry);
+    const implId = c.data[t];
+    const i = implId ? await readSec(lib, implId) : null;
+    return { groups: i?.data.groups ?? "", readers: c.readers, implReaders: i ? i.readers : c.readers };
+  }
+
+  // The ONE path for every security change made here. It compares against
+  // what is enforced (not only the label, so a record whose readers and
+  // label disagree can always be put right — including clearing to admin
+  // only), confirms with the target named, writes through set_groups, then
+  // re-reads the record: what it reports is what the store now holds.
+  // cmd "" = the control. Returns the re-read security, or null when nothing
+  // was written.
+  async function changeGroups({ scope, target, cmd, value, sec, box, note, reload, extra = "" }) {
+    const after = derivedReaders(value);
+    if (sec && value === String(sec.groups ?? "").trim() && secConsistent(sec)) {
+      note.textContent = "nothing changed";
+      return null;
+    }
+    note.textContent = "";
+    const before = sec ? sec.readers : [];
+    if (!(await confirmSecurity(box, { scope, target, before, after, extra }))) return null;
+    const r = await setGroups(lib, name, cmd, value);
+    if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return null; }
+    const fresh = await reload();
+    if (!fresh) {
+      note.textContent = "written, but the record could not be read back to confirm it";
+      return { groups: value, readers: r.readers ?? after };
+    }
+    if (!sameSet(fresh.readers, after) || !secConsistent(fresh)) {
+      note.textContent = `NOT applied as asked — the store now has readers [${fresh.readers.join(", ")}]`
+        + ` and groups label "${fresh.groups}"`;
+    } else {
+      toast.show(`${scope} ${target} → ${readersText(fresh.readers)} (read back from the store)`);
+    }
+    return fresh;
+  }
+
   metaEl.querySelector(".wm-groups-btn").addEventListener("click", async (ev) => {
     const form = metaEl.querySelector(".wm-groups-form");
     form.hidden = !form.hidden;
     ev.currentTarget.setAttribute("aria-expanded", String(!form.hidden));
     if (!form.hidden) {
       const input = form.querySelector(".wm-groups-in");
-      input.value = record.groups ?? "";
+      input.value = ctlSec?.groups ?? record.groups ?? "";
       form.querySelector(".wm-groups-note").textContent = "";
-      form.querySelector(".wm-groups-apply").textContent = "set groups";
+      form.querySelector(".wm-groups-confirm").hidden = true;
+      form.querySelector(".wm-groups-scope").textContent =
+        `Security of the CONTROL ${lib}.${name} — who can see and run the control itself. `
+        + "Each command has its own security, shown on its row and in its header.";
       input.focus();
       const known = await securityGroups();
       form.querySelector(".wm-groups-known").textContent =
@@ -832,21 +964,23 @@ async function init(host, { lib, ctlId, toast }) {
     ev.preventDefault();
     const form = metaEl.querySelector(".wm-groups-form");
     const note = form.querySelector(".wm-groups-note");
-    const apply = form.querySelector(".wm-groups-apply");
     const v = form.querySelector(".wm-groups-in").value.trim();
-    if (v === (record.groups ?? "").trim()) { note.textContent = "nothing changed"; return; }
-    if (!v && apply.textContent !== "really clear? (admin-only)") {
-      apply.textContent = "really clear? (admin-only)";
-      setTimeout(() => { apply.textContent = "set groups"; }, 2500);
-      return;
+    if (ctlSec === undefined) ctlSec = await loadCtlSec();
+    const nData = (record.data ?? []).length;
+    const fresh = await changeGroups({
+      scope: "control", target: `${lib}.${name}`, cmd: "", value: v, sec: ctlSec,
+      box: form.querySelector(".wm-groups-confirm"), note, reload: loadCtlSec,
+      extra: `Applies to the control record${nData ? ` and its ${nData} inline data record${nData === 1 ? "" : "s"}` : ""}. `
+        + `Its ${(record.cmd ?? []).length} commands keep their own security.`,
+    });
+    if (!fresh) return;
+    ctlSec = fresh;
+    if (fresh.groups) record.groups = fresh.groups; else delete record.groups;
+    if (!note.textContent) {
+      form.hidden = true;
+      metaEl.querySelector(".wm-groups-btn").setAttribute("aria-expanded", "false");
     }
-    const r = await setGroups(lib, name, "", v);
-    if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
-    if (v) record.groups = v; else delete record.groups;
-    form.hidden = true;
-    apply.textContent = "set groups";
     renderMeta();
-    toast.show(`set_groups → readers [${(r.readers ?? []).join(", ") || "— admin only"}] on this control + its inline data`);
   });
 
   // ── publish (G-6, reusing dev.editcontrol) ────────────────
@@ -1218,6 +1352,59 @@ async function init(host, { lib, ctlId, toast }) {
   const cmdsHeadEl = host.querySelector(".wb-cmds-head");
   const guardEl = codeEl.querySelector(".wcc-guard");
 
+  // The open command's OWN security: a badge in the pane header and, in
+  // patch mode, its editor right under it. With a command open this is the
+  // security field beside the code — the control's is in the header above
+  // the tabs.
+  const paneSecBtn = codeEl.querySelector(".wcc-sec");
+  const paneSecForm = codeEl.querySelector(".wcc-sec-form");
+  let paneCmd = null;     // the command entry the pane shows
+  let paneSec;            // its { groups, readers, implReaders }
+  function setPaneSec(s) {
+    paneSec = s;
+    paintSec(paneSecBtn, "Command", s, paneCmd ? `command ${lib}.${name}.${paneCmd.name}` : "");
+    if (patchMode) paneSecBtn.title += " — click to change";
+  }
+  function closePaneSecForm() {
+    paneSecForm.hidden = true;
+    paneSecBtn.setAttribute("aria-expanded", "false");
+  }
+  paneSecBtn.addEventListener("click", async () => {
+    if (!patchMode || !paneCmd) return;
+    if (!paneSecForm.hidden) { closePaneSecForm(); return; }
+    paneSecForm.hidden = false;
+    paneSecBtn.setAttribute("aria-expanded", "true");
+    paneSecForm.querySelector(".wcc-sec-scope").textContent =
+      `Security of the COMMAND ${lib}.${name}.${paneCmd.name} — who can run it. `
+      + "The control's own security is in the control box above the tabs.";
+    const input = paneSecForm.querySelector(".wcc-sec-in");
+    input.value = paneSec?.groups ?? "";
+    paneSecForm.querySelector(".wcc-sec-note").textContent = "";
+    paneSecForm.querySelector(".wcc-sec-confirm").hidden = true;
+    input.focus();
+    const known = await securityGroups();
+    paneSecForm.querySelector(".wcc-sec-known").textContent =
+      known.length ? `known groups: ${known.join(", ")}` : "";
+  });
+  paneSecForm.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const cmdEntry = paneCmd;
+    if (!cmdEntry) return;
+    const note = paneSecForm.querySelector(".wcc-sec-note");
+    const fresh = await changeGroups({
+      scope: "command", target: `${lib}.${name}.${cmdEntry.name}`, cmd: cmdEntry.name,
+      value: paneSecForm.querySelector(".wcc-sec-in").value.trim(), sec: paneSec,
+      box: paneSecForm.querySelector(".wcc-sec-confirm"), note,
+      reload: () => loadCmdSec(cmdEntry),
+    });
+    if (!fresh) return;
+    rowSec.get(cmdEntry.name)?.(fresh);
+    if (paneCmd === cmdEntry) {
+      setPaneSec(fresh);
+      if (!note.textContent) closePaneSecForm();
+    }
+  });
+
   // C12: ● Saved (green) / ● unsaved changes (accent) in the pane header
   function setCodeStatus() {
     const st = codeEl.querySelector(".wcc-status");
@@ -1230,6 +1417,8 @@ async function init(host, { lib, ctlId, toast }) {
   function closeCommandPane() {
     codeEl.hidden = true;
     guardEl.hidden = true;
+    paneCmd = null;
+    closePaneSecForm();
     codeState = null;
     cmdsHeadEl.hidden = false;
     host.querySelector(".wb-cmd-rows").hidden = false;
@@ -1264,6 +1453,13 @@ async function init(host, { lib, ctlId, toast }) {
     host.querySelector(".wb-cmd-rows").hidden = true;
     codeEl.hidden = false;
     guardEl.hidden = true;
+    // opening a command closes the control's security form above the tabs
+    metaEl.querySelector(".wm-groups-form").hidden = true;
+    metaEl.querySelector(".wm-groups-btn").setAttribute("aria-expanded", "false");
+    paneCmd = cmdEntry;
+    closePaneSecForm();
+    setPaneSec(undefined);
+    loadCmdSec(cmdEntry).then((s) => { if (paneCmd === cmdEntry) setPaneSec(s); });
     const errEl = codeEl.querySelector(".wcc-err");
     errEl.hidden = true;
     codeEl.querySelector(".wcc-name").textContent = cmdEntry.name;
@@ -1839,7 +2035,7 @@ async function init(host, { lib, ctlId, toast }) {
     main.type = "button";
     main.className = "wb-cmd-main";
     main.innerHTML = `<span class="wb-cmd-type"></span>
-      <span class="wb-cmd-sig"><span class="cname"></span><span class="params"></span><span class="ret"></span></span>
+      <span class="wb-cmd-sig"><span class="cname"></span><span class="params"></span><span class="ret"></span><span class="sec"></span></span>
       <span class="wb-cmd-desc"><i>no description yet — discovery reads desc</i></span>`;
     main.querySelector(".cname").textContent = cmdEntry.name;
     line.appendChild(main);
@@ -1856,15 +2052,28 @@ async function init(host, { lib, ctlId, toast }) {
     };
     setLang(state.lang);
 
+    // the row's security badge shows the ENFORCED readers
+    const secEl = main.querySelector(".sec");
+    const setRowSec = (s) => {
+      state.sec = s;
+      paintSec(secEl, "", s, `command ${lib}.${name}.${cmdEntry.name}`);
+      if (s && state.meta) state.meta.groups = s.groups;
+    };
+    setRowSec(undefined);
+    rowSec.set(cmdEntry.name, setRowSec);
+
     const resolved = (async () => {
-      const cmdRec = await readRec(lib, cmdEntry.id);
-      if (cmdRec instanceof Error) return;
+      const cmdFull = await readSec(lib, cmdEntry.id);
+      if (!cmdFull) { setRowSec(null); return; }
+      const cmdRec = cmdFull.data;
       if (cmdRec.type && cmdRec.type !== state.lang) setLang(cmdRec.type);
       const t = cmdRec.type ?? state.lang;
       const implId = cmdRec[t];
-      if (!implId) return;
-      const impl = await readRec(lib, implId);
-      if (impl instanceof Error) return;
+      if (!implId) { setRowSec({ groups: "", readers: cmdFull.readers }); return; }
+      const implFull = await readSec(lib, implId);
+      if (!implFull) { setRowSec(null); return; }
+      const impl = implFull.data;
+      setRowSec({ groups: impl.groups ?? "", readers: cmdFull.readers, implReaders: implFull.readers });
       state.meta = { desc: impl.desc ?? "", tags: impl.tags ?? "",
                      groups: impl.groups ?? "", implId };
       const params = impl.params ? paramsText(impl.params)
@@ -1960,7 +2169,10 @@ async function init(host, { lib, ctlId, toast }) {
         "mono");
       add("Language", LANG_NAMES[state.lang] ?? state.lang);
       add("Tags", meta?.tags ? meta.tags : none("none"));
-      add("Security", meta?.groups ? `groups: ${meta.groups}` : "admin only");
+      add("Security", !state.sec ? none("unreadable")
+        : `${readersText(state.sec.readers)}${state.sec.readers.includes("anonymous") ? " (anyone)" : ""}`
+          + (secConsistent(state.sec) ? ""
+            : ` ⚠ the groups label says "${state.sec.groups}" — readers are what is enforced`));
     }
 
     // C9: the per-command meta editor — desc / tags · set · plugin slot /
@@ -1991,12 +2203,16 @@ async function init(host, { lib, ctlId, toast }) {
         <input class="cm-desc-in full" placeholder="describe this command — discovery reads this">
         <input class="cm-tags-in" placeholder="tags (comma-delimited — categorization, never security)">
         <div class="span2"><button class="cm-apply">set</button><span class="cm-ext"></span></div>
+        <span class="cm-sec-scope wb-sec-scope"></span>
         <input class="cm-groups-in"
           placeholder="security groups (comma-delimited) — empty = admin only"
           title="who can execute this command — check_security reads the readers derived from this">
-        <div class="span2"><button class="cm-groups-apply"
-          title="the deliberate set_groups act — writes the groups string and derives the enforced readers on this command's meta + impl records">set groups</button></div>
-        <p class="cm-note" role="status"></p>`;
+        <div class="span2"><button type="button" class="cm-groups-apply"
+          title="writes the groups string and the enforced readers on this command's meta + impl records — asks for confirmation first">change command security…</button></div>
+        <p class="cm-note" role="status"></p>
+        <div class="cm-sec-confirm" hidden></div>`;
+      sub.querySelector(".cm-sec-scope").textContent =
+        `Security of the COMMAND ${lib}.${name}.${cmdEntry.name} — who can run it`;
       const descIn = sub.querySelector(".cm-desc-in");
       const tagsIn = sub.querySelector(".cm-tags-in");
       const groupsIn = sub.querySelector(".cm-groups-in");
@@ -2009,19 +2225,17 @@ async function init(host, { lib, ctlId, toast }) {
       const note = sub.querySelector(".cm-note");
       const groupsApply = sub.querySelector(".cm-groups-apply");
       groupsApply.addEventListener("click", async () => {
-        const gv = groupsIn.value.trim();
-        if (gv === (meta.groups ?? "").trim()) { note.textContent = "groups: nothing changed"; return; }
-        if (!gv && groupsApply.textContent !== "really clear? (admin-only)") {
-          groupsApply.textContent = "really clear? (admin-only)";
-          setTimeout(() => { groupsApply.textContent = "set groups"; }, 2500);
-          return;
-        }
-        const r = await setGroups(lib, name, cmdEntry.name, gv);
-        if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
-        meta.groups = gv;
-        groupsApply.textContent = "set groups";
-        note.textContent = "";
-        toast.show(`set_groups → readers [${(r.readers ?? []).join(", ") || "— admin only"}] on ${cmdEntry.name}`);
+        const fresh = await changeGroups({
+          scope: "command", target: `${lib}.${name}.${cmdEntry.name}`, cmd: cmdEntry.name,
+          value: groupsIn.value.trim(), sec: state.sec,
+          box: sub.querySelector(".cm-sec-confirm"), note,
+          reload: () => loadCmdSec(cmdEntry),
+        });
+        if (!fresh) return;
+        setRowSec(fresh);
+        meta.groups = fresh.groups;
+        groupsIn.value = fresh.groups;
+        if (paneCmd === cmdEntry) setPaneSec(fresh);
       });
       // the command-meta extension point: a slot plus one bubbling event —
       // whatever plugin cares (if any) injects its own affordances here;
