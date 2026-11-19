@@ -8,6 +8,7 @@ me.uiReady = function(ui) {
     var pair = JSON.parse(atob(check));
     json('../app/login', "user="+encodeURIComponent(pair[0])+"&pass="+encodeURIComponent(pair[1]), function(result) {
         if (result.status == 'ok') {
+          adoptSession(result);
           window.location.href='../';
         }
         else showlogin();
@@ -15,6 +16,16 @@ me.uiReady = function(ui) {
   }
   else showlogin();
 };
+
+// A successful login moves the session to a fresh id (session fixation fix).
+// Over HTTP the response's Set-Cookie already carries it; over the websocket
+// nothing does, so store it here before the page navigates.
+function adoptSession(result) {
+  if (result && result.sessionid) {
+    setCookie('sessionid', result.sessionid, 365);
+    sessionid = result.sessionid;
+  }
+}
 
 function showlogin() {
   ME.querySelector('.wrap').style.display = 'block';
@@ -26,6 +37,7 @@ function showlogin() {
     var remember = ME.querySelector('#remember').checked;
     json('../app/login', 'user='+encodeURIComponent(username)+'&pass='+encodeURIComponent(password), function(result) {
       if (result.status == 'ok') {
+        adoptSession(result);
         if (remember) {
           var savestring = btoa(JSON.stringify([username,password]));
           setCookie("obj_placeholder",savestring,365);
