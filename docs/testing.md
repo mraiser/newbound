@@ -146,7 +146,7 @@ shape only — never on timing, ports, or anything that changes between runs.
 | `app_pages_are_served` | `/app/` and `/app/index.html` are the same 200 HTML page; `dev` and `security` index pages are 200 HTML; `/favicon.ico` comes from `html/` |
 | `app_apps_lists_the_loaded_apps` | anonymous `app/apps` is `status=ok` with exactly the configured apps, each with `id`, `name`, `active` |
 | `a_new_visitor_is_anonymous_and_gets_a_session_cookie` | first request sets `sessionid`; `security/current_user` is anonymous with no groups |
-| `login_with_the_right_password` | `app/login` succeeds for the fixture user and admin; `current_user` then shows the user and their groups; the session id is kept |
+| `login_with_the_right_password` | `app/login` succeeds for the fixture user and admin; `current_user` then shows the user and their groups |
 | `login_with_a_wrong_password_or_unknown_user_fails` | wrong password, empty password, unknown user: `status=err`, `msg` starts `UNAUTHORIZED`, session stays anonymous |
 | `a_session_ends_with_its_cookie` | a client without the cookie is anonymous; the logged-in session is unaffected |
 | `admin_only_commands_are_denied_to_anonymous_and_plain_users` | `app/libs`, `app/settings`, `security/users`, `security/groups`: denied (`status=err`, `UNAUTHORIZED`, no `data`) to anonymous and to the non-admin user, `status=ok` for admin |

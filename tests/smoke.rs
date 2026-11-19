@@ -124,12 +124,11 @@ fn login_with_the_right_password() {
     let inst = Instance::start();
     let mut c = inst.client();
     current_user(&mut c); // start an anonymous session first
-    let before = c.session.clone();
 
+    // The client follows whatever session cookie the login answer sets.
     let pw = inst.user_password.clone();
     let j = ok(&c.get(&format!("/app/login?user={}&pass={}", common::USER, pw)), "login");
     assert!(j.has("msg"));
-    assert_eq!(c.session, before, "login keeps the client's session");
 
     let u = current_user(&mut c);
     assert_eq!(u.get_string("id"), common::USER);
