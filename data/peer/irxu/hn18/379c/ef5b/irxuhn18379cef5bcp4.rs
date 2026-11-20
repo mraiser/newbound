@@ -968,12 +968,19 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
     }
 
     if isok {
-      user.put_string("publickey", &peer_public_string);
-      let (conid, con) = P2PConnection::begin(uuid.to_owned(), stream.try_clone().unwrap());
-
       if saveme {
-        set_user(&uuid, user.clone());
+        // P-2: first-contact key, proof verified. If an offline or vouched key
+        // was pinned while this handshake ran, it wins: a different key is refused.
+        if user.has("publickey") {
+          if !user.get_string("publickey").eq_ignore_ascii_case(&peer_public_string) { return None; }
+        }
+        else {
+          user.put_string("publickey", &peer_public_string);
+          crate::peer::peer::peer_key::stamp(&mut user, "tofu", "");
+          set_user(&uuid, user.clone());
+        }
       }
+      let (conid, con) = P2PConnection::begin(uuid.to_owned(), stream.try_clone().unwrap());
 
       let mut capabilities = DataObject::new();
       capabilities.put_boolean("xfrm", true);
@@ -1587,16 +1594,31 @@ mod tests {
         let (mut con, mut server) = fixture();
         let first = legacy_frame(&con.cipher, b"cap {}").unwrap();
         let second = legacy_frame(&con.cipher, b"res {}").unwrap();
+        // Handshakes, not sleeps: the rest of the frame is written only after
+        // the reader has seen the partial one, and later reads retry until
+        // the frame completes, so a slow scheduler cannot reorder the steps.
+        let (partial_sent, wait_partial) = std::sync::mpsc::channel::<()>();
+        let (go_on, wait_go) = std::sync::mpsc::channel::<()>();
         let writer = thread::spawn(move || {
             server.write_all(&first[..1]).unwrap();
-            thread::sleep(Duration::from_millis(100));
+            partial_sent.send(()).unwrap();
+            wait_go.recv().unwrap();
             server.write_all(&first[1..]).unwrap();
             server.write_all(&second).unwrap();
         });
+        fn next_frame(con: &mut P2PConnection) -> Vec<u8> {
+            let deadline = std::time::Instant::now() + Duration::from_secs(10);
+            loop {
+                if let Some(frame) = read_frame(con).unwrap() { return frame; }
+                assert!(std::time::Instant::now() < deadline, "frame never completed");
+            }
+        }
+        wait_partial.recv().unwrap();
         assert_eq!(read_frame(&mut con).unwrap(), None);
-        let one = read_frame(&mut con).unwrap().unwrap();
+        go_on.send(()).unwrap();
+        let one = next_frame(&mut con);
         assert_eq!(decrypt(&con.cipher,&one)[..6], b"cap {}"[..]);
-        let two = read_frame(&mut con).unwrap().unwrap();
+        let two = next_frame(&mut con);
         assert_eq!(decrypt(&con.cipher,&two)[..6], b"res {}"[..]);
         writer.join().unwrap();
     }

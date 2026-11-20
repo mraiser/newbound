@@ -76,6 +76,13 @@
   font-weight: 600;
   color: var(--text);
 }
+/* Add user's error: its own full-width line under the header row, under
+   the field, so nothing in the row above moves. */
+.sec-users-head > .sec-head-err {
+  flex-basis: 100%;
+  justify-content: flex-end;
+  margin-top: -8px;
+}
 .usercontrols {
   display: flex;
   align-items: flex-end;

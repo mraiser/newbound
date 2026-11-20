@@ -254,7 +254,7 @@ fn do_listen() {
         (cipher, response_buf)
     }
 
-    fn welcome(cmd_val: u8, data_buf: &[u8], local_session_public: [u8; 32], local_session_private: [u8; 32], local_uuid: String, local_public_key: String, local_permanent_private: [u8; 32]) -> Option<(String, DataObject, Aes256, Vec<u8>)> {
+    fn welcome(cmd_val: u8, data_buf: &[u8], local_session_public: [u8; 32], local_session_private: [u8; 32], local_uuid: String, local_public_key: String, local_permanent_private: [u8; 32]) -> Option<(String, DataObject, Aes256, Vec<u8>, Option<String>)> {
         let (session_cipher, response_bytes) = helo(cmd_val, data_buf, local_session_public, local_session_private, local_uuid, local_public_key);
         
         let remote_uuid_encrypted: [u8; 48] = data_buf[33..81].try_into().unwrap();
@@ -272,19 +272,34 @@ fn do_listen() {
                 peer_public_key_arr = decode_hex(&user_data.get_string("publickey")).unwrap().try_into().unwrap();
                 if peer_public_key_arr.to_vec() != remote_public_key_decrypted { ok = false; }
             } else {
-                peer_public_key_arr = remote_public_key_decrypted.try_into().unwrap();
-                user_data.put_string("publickey", &to_hex(&peer_public_key_arr));
-                set_user(&remote_uuid_str, user_data.clone());
+                // P-2: keyless record - use the offered key for this handshake only.
+                // It is NOT written here; pin_key saves it after the proof verifies.
+                peer_public_key_arr = match remote_public_key_decrypted.try_into() { Ok(a) => a, Err(_) => return None };
             }
             if ok {
+                let offered: Option<String> = if user_data.has("publickey") { None } else { Some(to_hex(&peer_public_key_arr)) };
                 let permanent_shared_secret = x25519(local_permanent_private, peer_public_key_arr);
                 let permanent_cipher = Aes256::new(&permanent_shared_secret);
-                return Some((remote_uuid_str, user_data, permanent_cipher, response_bytes));
+                return Some((remote_uuid_str, user_data, permanent_cipher, response_bytes, offered));
             } else {
                 println!("BAD PUB KEY GIVEN");
             }
         }
         None
+    }
+
+    // P-2: the only place a first-contact (offered) key is written to a keyless
+    // peer record. Called after the handshake proof has verified, never before.
+    // Returns false when a different key was pinned in the meantime.
+    fn pin_key(uuid: &str, user: &DataObject, offered: &Option<String>) -> bool {
+        if let Some(key) = offered {
+            let mut u = user.clone();
+            if u.has("publickey") { return u.get_string("publickey").eq_ignore_ascii_case(key); }
+            u.put_string("publickey", key);
+            crate::peer::peer::peer_key::stamp(&mut u, "tofu", "");
+            set_user(uuid, u.clone());
+        }
+        true
     }
 
     let sessiontimeoutmillis = system.get_object("config").get_int("sessiontimeoutmillis");
@@ -313,7 +328,7 @@ fn do_listen() {
             },
             WELCOME => {
                 if amt == 113 {
-                    if let Some((_uuid, _user, cipher, mut welcome_response_buf)) = welcome(YO, current_packet_buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private_arr.to_owned()) {
+                    if let Some((_uuid, _user, cipher, mut welcome_response_buf, _offered)) = welcome(YO, current_packet_buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private_arr.to_owned()) {
                         let encrypted_proof = encrypt(&cipher, b"What's good, yo?");
                         welcome_response_buf.extend_from_slice(&encrypted_proof);
                         UDPCON.lock().send_to(&welcome_response_buf, src).unwrap();
@@ -322,10 +337,10 @@ fn do_listen() {
             },
             YO => {
                 if amt == 129 {
-                    if let Some((uuid, _user, cipher, yo_response_buf)) = welcome(SUP, current_packet_buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private_arr.to_owned()) {
+                    if let Some((uuid, user, cipher, yo_response_buf, offered)) = welcome(SUP, current_packet_buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private_arr.to_owned()) {
                         let proof_bytes = decrypt(&cipher, &current_packet_buf[113..129]);
                         if let Ok(s) = String::from_utf8(proof_bytes) {
-                            if s == "What's good, yo?" {
+                            if s == "What's good, yo?" && pin_key(&uuid, &user, &offered) {
                                 let mut final_yo_response_buf = yo_response_buf;
                                 let encrypted_final_proof = encrypt(&cipher, b"All is good now!");
                                 final_yo_response_buf.extend_from_slice(&encrypted_final_proof);
@@ -340,10 +355,10 @@ fn do_listen() {
             },
             SUP => {
                 if amt == 137 {
-                    if let Some((uuid, mut user, cipher, sup_response_buf)) = welcome(RDY, current_packet_buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private_arr.to_owned()) {
+                    if let Some((uuid, mut user, cipher, sup_response_buf, offered)) = welcome(RDY, current_packet_buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private_arr.to_owned()) {
                         let proof_bytes = decrypt(&cipher, &current_packet_buf[113..129]);
                         if let Ok(s) = String::from_utf8(proof_bytes) {
-                            if s == "All is good now!" {
+                            if s == "All is good now!" && pin_key(&uuid, &user, &offered) {
                                 let remote_id_bytes: [u8; 8] = current_packet_buf[129..137].try_into().unwrap();
                                 let remote_id = i64::from_be_bytes(remote_id_bytes);
 
@@ -371,7 +386,7 @@ fn do_listen() {
             },
             RDY => {
                 if amt == 129 {
-                    if let Some((_uuid, mut user, _cipher, _rdy_response_buf)) = welcome(RDY, current_packet_buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private_arr.to_owned()) {
+                    if let Some((_uuid, mut user, _cipher, _rdy_response_buf, _offered)) = welcome(RDY, current_packet_buf, my_session_public, my_session_private.to_owned(), my_uuid.to_owned(), my_public.to_owned(), my_private_arr.to_owned()) {
                         let id_bytes: [u8; 8] = current_packet_buf[113..121].try_into().unwrap();
                         let id = i64::from_be_bytes(id_bytes);
                         

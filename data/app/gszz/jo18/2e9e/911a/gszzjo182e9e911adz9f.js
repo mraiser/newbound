@@ -105,8 +105,17 @@ ME.querySelector('.open-system-settings').addEventListener('click', function(e) 
   }
   var d = me.settingsPopup = {
     selector: '.system-settings', closeselector: '.close-system-settings', modal: true,
-    clientX: e.clientX, clientY: e.clientY
+    clientX: e.clientX, clientY: e.clientY,
+    // Escape is handled below (it skips the restart overlay and selects);
+    // the gear stays clickable above the backdrop to toggle Settings shut.
+    noEscape: true, keepLive: [this]
   };
+  // From the keyboard there is no pointer: grow the dialog out of the gear.
+  if (!e.clientX && !e.clientY) {
+    var r = this.getBoundingClientRect();
+    d.clientX = r.left + r.width / 2;
+    d.clientY = r.top + r.height / 2;
+  }
   // app.ui calls close() once the close animation ends, whichever control closed it
   d.close = function() { if (me.settingsPopup === d) me.settingsPopup = null; };
   me.ui.popup(d);
@@ -282,11 +291,11 @@ function ssUpdate() {
   var loaded = !!me.saved;
   var ipBad = loaded && st.custom && st.cur.http_address !== '' && !st.v.ip;
   q('#ss-name-err').classList.toggle('ss-show', loaded && !st.v.name);
-  dget('devicename').classList.toggle('ss-bad', loaded && !st.v.name);
+  ssBad(dget('devicename'), loaded && !st.v.name);
   q('#ss-port-err').classList.toggle('ss-show', loaded && !st.v.port);
-  dget('portnum').classList.toggle('ss-bad', loaded && !st.v.port);
+  ssBad(dget('portnum'), loaded && !st.v.port);
   q('#ss-ip-err').classList.toggle('ss-show', ipBad);
-  dget('ipaddr').classList.toggle('ss-bad', ipBad);
+  ssBad(dget('ipaddr'), ipBad);
   q('.ss-f-name').classList.toggle('ss-dirty', st.dirty.name);
   q('.ss-f-app').classList.toggle('ss-dirty', st.dirty.app);
   q('.ss-f-bind').classList.toggle('ss-dirty', st.dirty.bind);
@@ -316,6 +325,12 @@ function progHold() {
   SS.querySelectorAll('.ss-prog').forEach(function(p) {
     p.classList.toggle('ss-hold', hold && p.dataset.state != 'running');
   });
+}
+
+// An invalid field: the red border and, for assistive tech, aria-invalid.
+function ssBad(input, bad) {
+  input.classList.toggle('ss-bad', bad);
+  if (bad) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
 }
 
 function ssFootErr(msg) {

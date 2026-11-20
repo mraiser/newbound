@@ -53,7 +53,7 @@
       <br><br>
       <label style="display:inline-flex; align-items:center; gap: 8px;">
         <div class="switch">
-          <input id="appfilter-switch-1" type="checkbox" class="switch-input" />
+          <input id="appfilter-switch-1" type="checkbox" class="switch-input" role="switch" aria-label="Toggle Switch" />
           <label for="appfilter-switch-1" class="switch-label"></label>
         </div>
         <span>Toggle Switch</span>
@@ -93,14 +93,14 @@
       <div class='card modal mydialog'>
         <div class="pad16 card-header dialog-header">
             <span>Static Dialog</span>
-            <button class="popupcard-close mydialog-close">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <button type="button" class="popupcard-close mydialog-close" aria-label="Close">
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
         </div>
         <div class="card-description pad16">This is a modal dialog that was pre-defined in the HTML, triggered by the 'Dialog' button.</div>
         <div class="card-button-wrap">
-          <a class="regularbutton mydialog-close">Cancel</a>
-          <a class="coloredbutton mydialog-close">Continue</a>
+          <button type="button" class="regularbutton mydialog-close">Cancel</button>
+          <button type="button" class="coloredbutton mydialog-close">Continue</button>
         </div>
       </div>
       <br><br>

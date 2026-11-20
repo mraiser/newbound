@@ -1,0 +1,14 @@
+{
+  "peer.peer.local": {
+    "code_sha": "dab144cd8b2fd6ed",
+    "desc": "Runs `request` through this instance's own HTTP handling under the caller's session. A 404 comes back as an error result. When the answer is a file or a byte stream, the content is sent to the calling peer over a new peer stream, and the result carries that `stream_id` instead of the body.",
+    "mode": "supplement",
+    "store_desc": "Execute the given remote request as a local HTTP request."
+  },
+  "security.security.current_user": {
+    "code_sha": "15e05fb911fb8a9b",
+    "desc": "Looks up the caller's session in the live session table and returns a copy of that session's user object with `sessionid` added.",
+    "mode": "supplement",
+    "store_desc": "Retrieve the system metadata for the currently logged in user"
+  }
+}

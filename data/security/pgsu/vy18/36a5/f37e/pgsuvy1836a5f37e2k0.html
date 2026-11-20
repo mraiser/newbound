@@ -8,12 +8,12 @@
   <div class='sec-main'>
     <label class='sec-power'>
       <span class="switch">
-        <input id="security-power-switch" type="checkbox" class="switch-input" />
+        <input id="security-power-switch" type="checkbox" class="switch-input" role="switch" aria-label="Security" aria-describedby="sec-power-desc" />
         <span class="switch-label"></span>
       </span>
       <span class='sec-power-text'>
         <span class='sec-power-title'>Security <span class='sec-power-state'></span></span>
-        <span class='sec-power-desc'></span>
+        <span class='sec-power-desc' id='sec-power-desc'></span>
       </span>
     </label>
     <div class='sec-users whenon'>
@@ -59,7 +59,7 @@
         <div class='usercard-title'>Edit user</div>
         <div class='usercard-header-text'></div>
       </div>
-      <img src='../app/asset/app/icons/ui/dark/close.svg' class='roundbutton-small usercard-closebutton usercard-cancel' alt='Close' title='Close'>
+      <button type='button' class='roundbutton-small usercard-closebutton usercard-cancel' aria-label='Close' title='Close'><img src='../app/asset/app/icons/ui/dark/close.svg' alt=''></button>
     </div>
     <div class='usercard-main'>
       <label class='sec-field'>

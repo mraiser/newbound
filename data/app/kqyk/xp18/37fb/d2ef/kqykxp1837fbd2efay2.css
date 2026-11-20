@@ -7,3 +7,21 @@
 .loginmsg {
   margin-top:-30px;
 }
+
+/* A failed login: the message line turns into the error (icon + words). */
+.loginmsg.loginmsg-err {
+  color: var(--danger-text, #e08585);
+  /* the hint's two lines, so LOG IN doesn't jump when the error replaces it */
+  min-height: 48px;
+}
+.loginmsg.loginmsg-err svg {
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+
+/* LOG IN is a <button> now: same type as the old <a> */
+.loginbutton {
+  font-family: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+}

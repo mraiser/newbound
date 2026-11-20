@@ -61,6 +61,10 @@ me.ready = function(){
       ME.lastTabPeer = ME.DATA.id;
     });
   });
+  // ARIA tabs with arrow keys, over the panel's own two tab contents.
+  document.body.api.ui.ariaTabs(ME.querySelector('.hudtop .navbar-dark'), function(t){
+    return ME.querySelector(':scope > .tab-content.' + t.dataset.id);
+  });
 
   var uuid = ME.DATA.id;
   json('../peer/remote/'+uuid+'/app/libs', null, function(result){
@@ -94,9 +98,14 @@ me.ready = function(){
         click.dataset.version = pr.mylib.version;
         click.textContent = pr.mylib.id + ' v' + pr.theirlib.version + ' ➤ ' + pr.mylib.version;
         chip.appendChild(click);
-        var x = document.createElement('img');
-        x.src = '../app/asset/app/icons/ui/dark/close.svg';
-        x.className = 'roundbutton-small removeupdate mdl-chip__action chipbutton';
+        // the shared named ✕ button (peer.peer publishes it); old <img> without it
+        var x;
+        if (document.body.peerChipClose) x = document.body.peerChipClose(pr.mylib.id + ' update');
+        else {
+          x = document.createElement('img');
+          x.src = '../app/asset/app/icons/ui/dark/close.svg';
+          x.className = 'roundbutton-small removeupdate mdl-chip__action chipbutton';
+        }
         chip.appendChild(x);
         // F12: published by peer.peer, like peerstatus — mark (and
         // deselect) a different-author chip instead of hiding it.
@@ -225,6 +234,7 @@ me.ready = function(){
       else { el.innerHTML = ''; el.appendChild(tbl); }
       markAdded(me.data && me.data.list);
       el.querySelectorAll('.add-ctl-item').forEach(function(item){
+        document.body.api.ui.pressable(item);
         item.addEventListener('click', function(){
           // D6: a control already on the dashboard can't be picked
           if (this.classList.contains('added')) return;
@@ -494,6 +504,11 @@ ME.querySelector('.hudeditbutton').addEventListener('click', function(){
 
 ME.querySelector('.closehud').addEventListener('click', function(){
   var el = document.getElementById("headsupdisplay");
+  // Keyboard focus was in the panel: hand it back to this peer's list row.
+  if (el.contains(document.activeElement) && window.CSS && CSS.escape) {
+    var row = document.querySelector('.peerlistrow[data-peer="' + CSS.escape(ME.DATA.id) + '"]');
+    if (row) row.focus({ preventScroll: true });
+  }
   animateTo(el, {width:'0px'}, 300, function(){ el.style.display = 'none'; el.innerHTML = ''; });
   var par = ME.parentElement;
   if (par && par.api && par.api.focus) par.api.focus(null);
@@ -572,6 +587,94 @@ function urlHost(addr){
   if (s.indexOf('%') != -1 || /^fe[89ab][0-9a-f]:/i.test(s)) return null;
   return '[' + s + ']';
 }
+
+// P-2: the Public Key row. The key and how it was obtained ride the peer
+// record (peer.peer.peers): publickey, key_source (offline | vouched | tofu |
+// verified; absent on keys saved before sources were recorded), key_voucher,
+// key_conflict ("<voucher uuid> <key>" when a trusted peer reports a
+// different key). Everything is peer- or store-reported: textContent only (F3).
+function peerName(id){
+  var d = document.getElementById('peer_' + id);
+  return d && d.DATA && d.DATA.name ? d.DATA.name : (id || 'a trusted peer');
+}
+
+function renderKey(){
+  var fp = ME.querySelector('.hudkey-fp');
+  if (!fp) return;
+  var d = ME.DATA || {};
+  var badge = ME.querySelector('.hudkey-badge');
+  var note = ME.querySelector('.hudkey-note');
+  var key = d.publickey ? String(d.publickey) : '';
+  var src = d.key_source ? String(d.key_source) : '';
+  var text, cls = '', n = '', bad = false;
+  if (!key) {
+    fp.textContent = '—';
+    fp.title = '';
+    text = 'No key yet';
+    cls = 'warn';
+    n = 'No key is on record for this peer. Unless a peer you already trust reports one, the first device that answers as this ID will be trusted.';
+  }
+  else {
+    fp.textContent = key.substring(0, 8) + ' ' + key.substring(8, 16) + ' … ' + key.substring(key.length - 8);
+    fp.title = key;
+    if (src == 'verified') { text = 'Verified'; cls = 'good'; }
+    else if (src == 'offline') { text = 'Entered by hand'; cls = 'good'; }
+    else if (src == 'vouched') { text = 'Vouched by ' + peerName(d.key_voucher); }
+    else {
+      text = 'Unverified';
+      cls = 'warn';
+      n = (src == 'tofu'
+        ? 'This key was accepted from the device itself on first contact.'
+        : 'How this key was obtained was not recorded.')
+        + ' Compare it with the key shown on that device (hover the key for the full value), then mark it verified.';
+    }
+  }
+  if (key && d.key_conflict) {
+    text = 'Key conflict';
+    cls = 'bad';
+    bad = true;
+    n = peerName(String(d.key_conflict).split(' ')[0]) + ' reports a different key for this peer. Check the key on the device itself, then mark this one verified or forget it.';
+  }
+  badge.textContent = text;
+  badge.className = 'hudkey-badge' + (cls ? ' ' + cls : '');
+  note.textContent = n;
+  note.classList.toggle('hideme', !n);
+  note.classList.toggle('bad', bad);
+  ME.querySelector('.hudkey-verify').classList.toggle('hideme', !key || ((src == 'verified' || src == 'offline') && !bad));
+  ME.querySelector('.hudkey-forget').classList.toggle('hideme', !key);
+}
+
+// Both acts change THIS instance's record for the peer (peer.peer.peer_key).
+// verify sends the key the user was looking at, so a key that changed
+// meanwhile is refused instead of being blessed unseen.
+function keyAct(action, btn){
+  var status = ME.querySelector('.hudkey-status');
+  status.textContent = '';
+  var id = ME.DATA.id;
+  var key = action == 'verify' ? (ME.DATA.publickey || '') : '';
+  btn.disabled = true;
+  json('../peer/peer_key', 'uuid=' + encodeURIComponent(id) + '&action=' + action + '&publickey=' + encodeURIComponent(key), function(r){
+    btn.disabled = false;
+    if (!r || r.status != 'ok') { status.textContent = errText(r); return; }
+    var div = document.getElementById('peer_' + id);
+    var rec = div && div.DATA ? div.DATA : ME.DATA;
+    ['publickey', 'key_source', 'key_voucher'].forEach(function(k){
+      if (r[k] !== undefined) rec[k] = r[k]; else delete rec[k];
+    });
+    delete rec.key_conflict;
+    if (ME.DATA.id == id) { ME.DATA = rec; renderKey(); }
+  });
+}
+
+ME.querySelector('.hudkey-verify').addEventListener('click', function(){
+  if (!confirm('Mark this key as verified? Do this only after comparing it with the key shown on ' + (ME.DATA.name || 'that device') + ' itself.')) return;
+  keyAct('verify', this);
+});
+
+ME.querySelector('.hudkey-forget').addEventListener('click', function(){
+  if (!confirm('Forget the key for ' + (ME.DATA.name || 'this peer') + '? Its connections close, and the next contact is trusted as a first contact unless a peer you already trust reports its key.')) return;
+  keyAct('forget', this);
+});
 
 me.update = function(){
   if (me.check == ME.querySelector('.rp-uuid')) {
@@ -660,20 +763,27 @@ me.update = function(){
     var l = isdown ? '—' : ME.DATA.latency ? ME.DATA.latency+'ms' : '--';
     ME.querySelector('.connectionlatency').textContent = l;
 
+    renderKey();
+
     setTimeout(me.update, 3000);
   }
 };
 
 ME.querySelector('.addressexpandbutton').addEventListener('click', function(){
   this.style.display = 'none';
-  ME.querySelector('.closeaddressbutton').style.display = 'inline-block';
+  // inline-flex: the kit's icon-button display, which centres the glyph
+  var hide = ME.querySelector('.closeaddressbutton');
+  hide.style.display = 'inline-flex';
   ME.querySelector('.addressexpand').style.display = 'block';
+  hide.focus();
 });
 
 ME.querySelector('.closeaddressbutton').addEventListener('click', function(){
   this.style.display = 'none';
-  ME.querySelector('.addressexpandbutton').style.display = 'inline-block';
+  var show = ME.querySelector('.addressexpandbutton');
+  show.style.display = 'inline-flex';
   ME.querySelector('.addressexpand').style.display = 'none';
+  show.focus();
 });
 
 ME.querySelector('.cancelupdateall').addEventListener('click', function(){
@@ -739,9 +849,15 @@ ME.querySelector('.refreshhud').addEventListener("click", me.refresh);
 // Add Control left the menu open on top of the modal, and still open after
 // the modal closed. app.ui's non-modal close only fires for clicks OUTSIDE
 // the card, so the rows must close it themselves.
+// The ⋮ card's rows are table cells: make each keyboard-operable.
+ME.querySelectorAll('.control-settings-popup td').forEach(function(td){
+  document.body.api.ui.pressable(td);
+});
+
 ME.querySelectorAll('.closeonclick').forEach(function(row){
   row.addEventListener("click", function(){
     ME.querySelector('.control-settings-popup').style.display = 'none';
+    ME.querySelector('.morebutton').setAttribute('aria-expanded', 'false');
   });
 });
 

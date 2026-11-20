@@ -21,9 +21,11 @@
       <div class='localpeerport'></div>
       <div class='localhttpport'></div>
     </div>
+    <div class='localcopystatus' role='status'></div>
     <div class='localdevactions'>
-      <button class='addpeerbutton localdevbtn popupmenu' title='Add connection' data-popup='{"selector":".addusercard","closeselector":".close-add-user","modal":true}'><img src='../app/asset/app/icons/ui/dark/user-add.svg' class='mediumicon'></button>
-      <button class='updateallpeersbutton localdevbtn popupmenu' title='Update peers' data-popup='{"selector":".updateallpeerscard","closeselector":".close-update-peers","modal":true}'><img src='../app/asset/app/icons/ui/dark/upload.svg' class='mediumicon'></button>
+      <button type='button' class='copyinfobutton localdevbtn' title='Copy my connection info (ID, public key, address, port) to give to another device' aria-label='Copy my connection info'><img src='../app/asset/app/icons/ui/dark/copy.svg' class='mediumicon' alt=''></button>
+      <button type='button' class='addpeerbutton localdevbtn popupmenu' title='Add connection' aria-label='Add connection' data-popup='{"selector":".addusercard","closeselector":".close-add-user","modal":true}'><img src='../app/asset/app/icons/ui/dark/user-add.svg' class='mediumicon' alt=''></button>
+      <button type='button' class='updateallpeersbutton localdevbtn popupmenu' title='Update peers' aria-label='Update peers' data-popup='{"selector":".updateallpeerscard","closeselector":".close-update-peers","modal":true}'><img src='../app/asset/app/icons/ui/dark/upload.svg' class='mediumicon' alt=''></button>
     </div>
   </div>
   
@@ -31,7 +33,7 @@
     <div class='dialog-header'>
       <div class='padme'>
         <span class='peer-dlg-title'>Update Peers</span>
-        <img src='../app/asset/app/icons/ui/dark/close.svg' class='upper-right close-update-peers roundbutton-small out10'>
+        <button type='button' class='upper-right close-update-peers roundbutton-small out10' aria-label='Close'><img src='../app/asset/app/icons/ui/dark/close.svg' alt=''></button>
       </div>
     </div>
     <div class='padme peerupdatelist'></div>
@@ -44,7 +46,7 @@
     <div class='dialog-header'>
       <div class='padme'>
         <span class='peer-dlg-title'>Add Connection</span>
-        <img src='../app/asset/app/icons/ui/dark/close.svg' class='upper-right close-add-user roundbutton-small out10'>
+        <button type='button' class='upper-right close-add-user roundbutton-small out10' aria-label='Close'><img src='../app/asset/app/icons/ui/dark/close.svg' alt=''></button>
       </div>
       <div class = "navbar navbar-dark addusernavbar">
         <div class = "navbar-tab autab autab1 selected" data-id='autab1'>LAN</div>
@@ -63,25 +65,36 @@
              plain wrapper div: the js paints the validation border on
              the input's parentElement. -->
         <div class='adduserform'>
-          <div class='aufield'>
-            <div class='textinputlabel'>Device Name</div>
-            <input type='text' class='textinput addusername'>
+          <!-- P-2: the offline exchange. The other device's Copy my
+               connection info string fills every field below, key included. -->
+          <div class='aufield aufield-full'>
+            <label class='textinputlabel' for='au-paste'>Connection info (paste what the other device copied)</label>
+            <input type='text' class='textinput adduserpaste' id='au-paste' autocomplete='off' spellcheck='false'>
+          </div>
+          <div class='aufield aufield-full'>
+            <label class='textinputlabel' for='au-key'>Public Key (if you have it)</label>
+            <div><input type='text' class='textinput adduserkey' id='au-key' autocomplete='off' spellcheck='false'></div>
+            <div class='adduserkeywarn' role='status'>No key given. Unless a peer you already trust knows this device, the first device that answers as this ID will be trusted. You can check its key afterwards on the peer's Info tab.</div>
           </div>
           <div class='aufield'>
-            <div class='textinputlabel'>IP Address (if you have it)</div>
-            <input type='text' class='textinput adduseripaddr'>
+            <label class='textinputlabel' for='au-name'>Device Name</label>
+            <input type='text' class='textinput addusername' id='au-name' autocomplete='off'>
           </div>
           <div class='aufield'>
-            <div class='textinputlabel'>Device UUID</div>
-            <div><input type='text' class='textinput adduseruuid'></div>
+            <label class='textinputlabel' for='au-ip'>IP Address (if you have it)</label>
+            <input type='text' class='textinput adduseripaddr' id='au-ip' autocomplete='off'>
           </div>
           <div class='aufield'>
-            <div class='textinputlabel'>Port Number (if you have it)</div>
-            <input type='number' class='textinput adduserport'>
+            <label class='textinputlabel' for='au-uuid'>Device UUID</label>
+            <div><input type='text' class='textinput adduseruuid' id='au-uuid' autocomplete='off' spellcheck='false'></div>
           </div>
           <div class='aufield'>
-            <div class='textinputlabel'>Select Group</div>
-            <select class='textinput groupselect addusergroup'></select>
+            <label class='textinputlabel' for='au-port'>Port Number (if you have it)</label>
+            <input type='number' class='textinput adduserport' id='au-port' autocomplete='off' inputmode='numeric'>
+          </div>
+          <div class='aufield'>
+            <label class='textinputlabel' for='au-group'>Select Group</label>
+            <select class='textinput groupselect addusergroup' id='au-group'></select>
           </div>
           <div class='aufield aufield-check'>
             <label class="plaincheckbox">
