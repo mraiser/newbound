@@ -42,7 +42,7 @@ var readyP = (async () => {
   };
   const deleteLibrary = (l2) => code("delete_library", { lib: l2, author: "" });
   const deleteControl = (l2, c2) => code("delete_control", { lib: l2, ctl: c2, author: "" });
-  const addControl = (l2, c2) => code("add_control", { lib: l2, ctl: c2 });
+  const addControl = (l2, c2) => code("create_control", { lib: l2, name: c2, desc: "", author: "" });
   const addLibrary = (l2) => code("add_library", { lib: l2 });
   const listAssets = (l2) => code("list_assets", { lib: l2 });
   const writeAsset = (l2, n2, c2, t2) => code("write_asset", { lib: l2, name: n2, content: c2, tempfile: t2 });
@@ -220,6 +220,7 @@ async function init(host, { openLib, openControl, toast }) {
     descEl.textContent = lib.desc
       || "no description — discovery reads desc";
     descEl.classList.toggle("empty", !lib.desc);
+    paintLibSec(lib);
     const show = (sel, on) => { for (const el of libEl.querySelectorAll(sel)) el.hidden = !on; };
     show('[data-open="meta"]', writable && patchApi);
     show('[data-open="groups"]', writable && patchApi);
@@ -310,9 +311,10 @@ async function init(host, { openLib, openControl, toast }) {
     const note = form.querySelector(".fg-note");
     const apply = form.querySelector(".fg-apply");
     onOpen.groups = async () => {
-      input.value = lib.groups ?? "";
+      // no label on record: show what is enforced, never an empty field
+      input.value = lib.groups ?? libReaders(lib).join(", ");
       note.textContent = "";
-      apply.textContent = "Set groups";
+      form.querySelector(".fg-confirm").hidden = true;
       input.focus();
       const known = await securityGroups();
       form.querySelector(".fg-known").textContent =
@@ -321,22 +323,77 @@ async function init(host, { openLib, openControl, toast }) {
     form.onsubmit = async (ev) => {
       ev.preventDefault();
       const v = input.value.trim();
-      if (v === (lib.groups ?? "").trim()) { note.textContent = "nothing changed"; return; }
-      if (!v && apply.textContent !== "really clear? (admin-only)") {
-        apply.textContent = "really clear? (admin-only)";
-        setTimeout(() => { apply.textContent = "Set groups"; }, 2500);
+      const before = libReaders(lib);
+      const after = secList(v);
+      // compared against what is enforced, not only the label, so clearing a
+      // library whose label was already empty still writes
+      if (secKey(before) === secKey(after)
+          && secKey(secList(lib.groups ?? before.join(","))) === secKey(after)) {
+        note.textContent = "nothing changed";
         return;
       }
+      note.textContent = "";
+      const box = form.querySelector(".fg-confirm");
+      const ok = await new Promise((res) => {
+        box.replaceChildren();
+        const msg = document.createElement("div");
+        msg.className = "sc-msg";
+        const head = document.createElement("b");
+        head.textContent = `Change the security of the LIBRARY ${lib.id}?`;
+        const delta = document.createElement("span");
+        delta.textContent = `Who can reach it now: ${secText(before)}. After this change: ${secText(after)}`
+          + (after.includes("anonymous") ? " — anyone, without logging in." : ".");
+        const extra = document.createElement("span");
+        extra.textContent = "This is the gate in front of every control and command in the library; "
+          + "they keep their own security. Written to meta.json now; the running gate changes on restart.";
+        msg.append(head, delta, extra);
+        const yes = document.createElement("button");
+        yes.type = "button";
+        yes.className = "sh-btn sc-yes";
+        yes.textContent = `Apply to library ${lib.id}`;
+        const no = document.createElement("button");
+        no.type = "button";
+        no.className = "sh-btn sh-outline";
+        no.textContent = "Cancel";
+        const done = (a) => { box.hidden = true; box.replaceChildren(); res(a); };
+        yes.addEventListener("click", () => done(true));
+        no.addEventListener("click", () => done(false));
+        box.append(msg, yes, no);
+        box.hidden = false;
+        no.focus();
+      });
+      if (!ok) return;
       const r = await setGroups(lib.id, "", "", v);
       if (r.status !== "ok") { note.textContent = `failed: ${r.msg}`; return; }
-      lib.groups = v;
-      lib.readers = r.readers ?? [];
+      if (v) lib.groups = v; else delete lib.groups;
+      lib.readers = Array.isArray(r.readers) ? r.readers : after;
       const card = libCards.get(lib.id);
       if (card) renderGate(card, lib);
-      apply.textContent = "Set groups";
+      paintLibSec(lib);
       showPanel(null);
-      toast.show(`set_groups → readers [${(r.readers ?? []).join(", ") || "— admin only"}] — the library gate refreshes on restart`);
+      toast.show(`library ${lib.id} → ${secText(lib.readers)} written to meta.json — the running gate changes on restart`);
     };
+  }
+
+  // library security, as enforced: meta's readers array is the gate; the
+  // groups string is the label it was derived from
+  function libReaders(lib) { return Array.isArray(lib.readers) ? lib.readers.map(String) : []; }
+  function secList(g) { return String(g ?? "").split(",").map((s) => s.trim()).filter(Boolean); }
+  function secKey(a) { return [...new Set(a)].sort().join(","); }
+  function secText(a) { return a.length ? a.join(", ") : "admin only"; }
+  function paintLibSec(lib) {
+    const el = host.querySelector(".fh-sec");
+    const readers = libReaders(lib);
+    const hasLabel = typeof lib.groups === "string";
+    const same = !hasLabel || secKey(secList(lib.groups)) === secKey(readers);
+    const open = readers.includes("anonymous");
+    el.className = "fh-sec " + (!same ? "sec-bad" : readers.length === 0 ? "sec-admin" : open ? "sec-open" : "");
+    el.textContent = `Library security: ${secText(readers)}${open ? " (anyone)" : ""}${same ? "" : " ⚠ label differs"}`;
+    el.title = `library ${lib.id} — enforced readers: [${readers.join(", ")}]`
+      + (readers.length ? "" : " (empty = admin only)")
+      + (hasLabel ? ` · groups label: "${lib.groups}"` : " · no groups label")
+      + (same ? "" : " — the label and the enforced readers disagree; setting the security again makes them match")
+      + " · as of this instance's start; changes take effect on restart";
   }
 
   // ── assets (G-1, the P1 asset commands) ───────────────────
@@ -604,7 +661,7 @@ async function init(host, { openLib, openControl, toast }) {
     const controls = await controlsOf(fanLib);
     const made = controls instanceof Error
       ? null : controls.find((c) => c.name === name);
-    toast.show(`add_control → ${fanLib} ▸ ${name} — its facets are empty; type and save to create them`);
+    toast.show(`create_control → ${fanLib} ▸ ${name} — admin only until you set its security; its facets are empty`);
     if (made) {
       openControl(fanLib, made.id);   // straight into the new control's workbench
     } else {

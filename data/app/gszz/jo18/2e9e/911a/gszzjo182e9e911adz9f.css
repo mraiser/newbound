@@ -143,6 +143,29 @@
   right: 7%;
   opacity: 0.5;
 }
+.maximize-app-icon:focus-visible { opacity: 1; }
+
+/* The title is the tile's keyboard target (a link, or a button for tiles
+   that open details). It looks like plain title text; its focus shows as the
+   same ring (and colour) the whole tile gets on hover. */
+.card-title .appcard-open,
+.card-title .appcard-open:hover {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-align: inherit;
+  text-decoration: none;
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+}
+.appcard-wrap:has(.appcard-open:focus-visible) {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.appcard-wrap:has(:focus-visible) .appcard.inactive.local { filter: none; }
 
 .dialog-wide {
   width: 90vw;

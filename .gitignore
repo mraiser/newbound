@@ -24,6 +24,12 @@
 !Dockerfile
 !.dockerignore
 
+# Docs and integration tests
+!docs/
+!docs/**
+!tests/
+!tests/**
+
 # Packaging and CI
 !packaging/
 !packaging/**
@@ -51,6 +57,13 @@
 !runtime/peer/**
 !runtime/security/
 !runtime/security/**
+
+# Command reference: the generator and its output (regenerate, never hand-edit)
+!tools/
+!tools/gen-command-reference.py
+!docs/
+!docs/reference/
+!docs/reference/**
 
 # Build trees
 !html/

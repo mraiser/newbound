@@ -235,6 +235,24 @@ img.icon-small-white[src*="/icons/ui/"] {
   padding: 6px;
   box-sizing: border-box;
 }
+/* Icon buttons: a <button> holding the icon <img alt=""> draws the same
+   20px glyph in the same 32px circle as the old clickable <img>. */
+button.roundbutton-small, button.roundbutton-small-white {
+  padding: 0;
+}
+button.roundbutton-small > img, button.roundbutton-small-white > img {
+  display: block;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+}
+
+/* Keyboard focus is always visible (WCAG 2.4.7). Zero specificity, so a
+   component's own :focus-visible style still wins. */
+:where(a[href], button, [role="button"], [role="link"], [role="switch"], [role="tab"], [role="menuitem"], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 
 /* --- Navbar --- */
@@ -283,6 +301,11 @@ img.icon-small-white[src*="/icons/ui/"] {
 .navbar-tab.selected {
   color: var(--accent);
   border-bottom-color: var(--accent);
+}
+/* inside the bar, so a dialog's edge can't clip the ring */
+.navbar-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .main, .padme {
@@ -402,6 +425,9 @@ img.icon-small-white[src*="/icons/ui/"] {
 .chipbutton:hover {
   background-color: var(--text-color);
 }
+/* a chip's ✕ as a <button>: the same 8px glyph in the 20px circle */
+button.chipbutton { padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+button.chipbutton > img { width: 8px; height: 8px; display: block; pointer-events: none; }
 
 /* --- Buttons --- */
 .regularbutton, .accentbutton, .coloredbutton, .clearbutton {
@@ -455,6 +481,13 @@ img.icon-small-white[src*="/icons/ui/"] {
 .clearbutton:hover {
   background-color: rgba(240, 166, 60, 0.12);
 }
+/* prompt()/confirm() buttons were <a>; as <button>s they take the page's
+   type the way the <a> did (pages without app.tokens' button reset). */
+button.continuebutton, button.cancelbutton {
+  font-family: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+}
 
 /* --- Snackbar --- */
 .snackbar {
@@ -485,6 +518,49 @@ img.icon-small-white[src*="/icons/ui/"] {
   font-weight: 500;
   text-transform: uppercase;
   margin-left: 24px;
+}
+/* the action is a <button> now: no button chrome, the bar's type */
+button.snackbar-action {
+  font: inherit;
+  font-weight: 500;
+  letter-spacing: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+/* Visually hidden, still read by assistive tech (live regions, hints). */
+.nb-sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* fieldError(): the message under a field, with an icon so the state is not
+   colour alone. #e08585 is Settings' error text (5.8:1 on the panels). */
+.nb-field-err {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--danger-text, #e08585);
+}
+.nb-field-err[hidden] { display: none; }
+.nb-field-err svg { flex: none; margin-top: 2px; }
+.textinput[aria-invalid="true"], .textinput[aria-invalid="true"]:focus {
+  border-color: var(--danger);
 }
 
 /* --- Popups & Modals --- */
@@ -535,7 +611,22 @@ img.icon-small-white[src*="/icons/ui/"] {
   vertical-align: middle;
   top: -2px;
 }
-.switch-input { display: none; }
+/* The input stays in the tab order (WCAG 2.1.1): invisible, laid over the
+   track so a click lands on it, and its focus ring is drawn on the track. */
+.switch-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.switch-input:focus-visible + .switch-label::before {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
 .switch-label {
   display: block;
   width: 36px;

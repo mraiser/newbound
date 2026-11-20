@@ -222,7 +222,7 @@ pub fn load_users() {
       let mut admin = DataObject::new();
       admin.put_string("displayname", "System Administrator");
       admin.put_string("groups", "admin");
-      admin.put_string("password", &unique_session_id());
+      admin.put_string("password", &secure_id());
       write_properties(propfile.into_os_string().into_string().unwrap(), admin);
     }
     
@@ -251,3 +251,25 @@ pub fn load_users() {
     
     if b { system.put_object("users", users.clone()); }
   }
+}
+
+// Audit C3: session ids, generated passwords and other secrets must not come
+// from flowlang's unique_session_id() - that is 7 chars of xorshift64 % 20 plus
+// a timestamp and a counter, and the generator's whole state is recoverable
+// from a handful of ids. secure_id() is 128 bits straight from the OS CSPRNG,
+// as 32 hex chars. It fails closed: on unix an unreadable /dev/urandom panics
+// rather than falling back to a predictable generator. (Elsewhere flowlang's
+// fill_bytes is used: BCryptGenRandom on Windows.)
+pub fn secure_id() -> String {
+  let mut b = [0u8; 16];
+  #[cfg(unix)]
+  {
+    use std::io::Read;
+    let mut f = fs::File::open("/dev/urandom").expect("secure_id: cannot open /dev/urandom");
+    f.read_exact(&mut b).expect("secure_id: cannot read /dev/urandom");
+  }
+  #[cfg(not(unix))]
+  { flowlang::rand::fill_bytes(&mut b); }
+  let mut s = String::with_capacity(32);
+  for x in b.iter() { s += &format!("{:02x}", x); }
+  s

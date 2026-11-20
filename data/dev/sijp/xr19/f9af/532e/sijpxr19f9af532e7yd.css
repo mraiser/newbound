@@ -488,18 +488,140 @@
   border-bottom: 1px solid var(--line-soft);
   font-size: 12px;
 }
-.nb-workbench .wm-groups-view {
+.nb-workbench .wm-groups-view { margin-right: 8px; }
+
+/* ── the control header: everything about the CONTROL sits in this box,
+      above the facet tabs; the tabs and the pane below are its contents ── */
+.nb-workbench .wb-ctlhead {
+  flex: none;
+  max-height: 60%;
+  overflow: auto;
+  margin: 14px 26px 0;
+  padding-bottom: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.nb-workbench .wb-ctl-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 10px 16px 0;
+}
+.nb-workbench .wb-ctl-kind {
+  font: 700 10px var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ground);
+  background: var(--text-dim);
+  border-radius: 4px;
+  padding: 3px 7px;
+}
+.nb-workbench .wb-ctl-id { font: 600 15px var(--mono); color: var(--text); }
+.nb-workbench .wb-ctl-hint { font-size: 11.5px; color: var(--text-dim); }
+.nb-workbench .wb-ctlhead .wb-about { padding: 8px 16px 0; }
+.nb-workbench .wb-ctlhead .wb-meta { padding: 6px 12px; border-bottom: none; }
+.nb-workbench .wb-ctlhead .wb-publish,
+.nb-workbench .wb-ctlhead .wb-wiring { margin: 8px 16px 6px; background: var(--panel-2); }
+.nb-workbench .wb-ctlhead + .wb-chipbar { padding-top: 14px; }
+
+/* ── security: a badge that shows who is ENFORCED, by scope ─ */
+.nb-workbench .wb-sec {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-height: 26px;
   padding: 0 10px;
-  margin-right: 8px;
   border-radius: 999px;
-  border: 1px solid var(--line);
-  font: 11px var(--mono);
-  color: var(--text-dim);
+  border: 1px solid var(--text-dim);
+  background: var(--panel-3);
+  font: 600 11.5px var(--mono);
+  color: var(--text);
+  white-space: nowrap;
 }
+.nb-workbench button.wb-sec { cursor: pointer; }
+.nb-workbench button.wb-sec:hover { border-color: var(--text); }
+.nb-workbench .wb-sec.sec-admin { border-color: var(--good, #4fae6e); color: var(--good, #4fae6e); }
+.nb-workbench .wb-sec.sec-open {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(240, 166, 60, 0.1);
+}
+.nb-workbench .wb-sec.sec-bad {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: rgba(224, 122, 122, 0.1);
+}
+.nb-workbench .wb-cmd-sig .sec.wb-sec {
+  margin-left: 10px;
+  min-height: 20px;
+  padding: 0 8px;
+  font-size: 10.5px;
+  vertical-align: middle;
+}
+.nb-workbench .wb-sec-scope {
+  flex-basis: 100%;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.nb-workbench .wb-cmd-meta .wb-sec-scope { padding-top: 6px; border-top: 1px solid var(--line-soft); }
+.nb-workbench .wcc-sec-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--panel-3);
+}
+.nb-workbench .wcc-sec-form[hidden] { display: none; }
+.nb-workbench .wcc-sec-form input {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 9px;
+  min-height: 28px;
+  font: 11.5px var(--mono);
+  color: var(--text);
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.nb-workbench .wcc-sec-form .wcc-sec-apply {
+  font: 11px var(--mono);
+  color: var(--accent-ink, #241a08);
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  padding: 0 12px;
+  min-height: 28px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nb-workbench .wcc-sec-known { flex-basis: 100%; font: 10.5px var(--mono); color: var(--text-dim); }
+.nb-workbench .wcc-sec-known:empty { display: none; }
+.nb-workbench .wcc-sec-note { font: 11px var(--mono); color: var(--danger); }
+/* the confirmation every security change passes through */
+.nb-workbench .wb-sec-confirm {
+  flex-basis: 100%;
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--danger-fill, #b84a4a);
+  background: rgba(184, 74, 74, 0.12);
+  font-size: 12.5px;
+  color: var(--text);
+}
+.nb-workbench .wb-sec-confirm[hidden] { display: none; }
+.nb-workbench .wb-sec-confirm .sc-msg { flex: 1 1 320px; display: flex; flex-direction: column; gap: 4px; }
+.nb-workbench .wb-sec-confirm .sc-msg b { font-family: var(--mono); }
+.nb-workbench .wb-sec-confirm .sc-extra { color: var(--text-dim); }
 .nb-workbench .wm-groups-form,
 .nb-workbench .wm-form {
   flex-basis: 100%;

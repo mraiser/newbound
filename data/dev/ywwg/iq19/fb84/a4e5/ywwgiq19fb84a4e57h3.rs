@@ -36,8 +36,10 @@ let author = {
 // else the command META record (the record check_security reads via
 // lookup_command_id) plus its impl record (the old editcommand set both).
 // EXPLICIT REPLACE: the value is stored verbatim; empty string CLEARS the
-// groups field and derives an empty readers array (= admin-only). Unjournaled
-// like the meta family. writers is never modified here.
+// groups field and derives an empty readers array (= admin-only). JOURNALED:
+// control and command changes on the control's patch journal (facet
+// "security"), library changes in runtime/dev/security_journal.jsonl.
+// writers is never modified here.
 
 fn derived(value: &str) -> DataArray {
     let mut a = DataArray::new();
@@ -79,7 +81,20 @@ fn set_record_groups(lib: &str, id: &str, value: &str) -> bool {
     true
 }
 
-let _author = author;
+// JOURNAL helpers: what a record holds right now, for the before/after entry.
+fn readers_of(lib: &str, id: &str) -> DataArray {
+    let rec = DataStore::new().get_data(lib, id);
+    let mut a = DataArray::new();
+    if rec.has("readers") {
+        let r = rec.get_array("readers");
+        for i in 0..r.len() { a.push_string(&r.get_string(i)); }
+    }
+    a
+}
+fn groups_of(lib: &str, id: &str) -> String {
+    let d = DataStore::new().get_data(lib, id).get_object("data");
+    if d.has("groups") { d.get_string("groups") } else { String::new() }
+}
 let value = groups.trim().to_string();
 let store = DataStore::new();
 
@@ -119,6 +134,41 @@ if ctl.is_empty() {
     let mut o = DataObject::new();
     o.put_string("status", "ok");
     o.put_boolean("changed", changed);
+    // JOURNAL (library level): a library has no control, so no patch journal
+    // to write to. The change is appended as one JSON line to the
+    // instance-local runtime/dev/security_journal.jsonl. A journal problem is
+    // reported on the result and never turns the edit into a failure.
+    if changed {
+        let mut j_old = DataObject::new();
+        j_old.put_string("groups", &old);
+        let mut oa = DataArray::new();
+        for g in oldreaders.iter() { oa.push_string(g); }
+        j_old.put_array("readers", oa);
+        let mut j_new = DataObject::new();
+        j_new.put_string("groups", &value);
+        j_new.put_array("readers", derived(&value));
+        let mut line = DataObject::new();
+        line.put_int("time", time());
+        line.put_string("author", &author);
+        line.put_string("scope", "library");
+        line.put_string("lib", &lib);
+        line.put_object("old", j_old);
+        line.put_object("new", j_new);
+        let jdir = match store.root.parent() {
+            Some(p) => p.join("runtime").join("dev"),
+            None => std::path::PathBuf::from("runtime").join("dev"),
+        };
+        let jpath = jdir.join("security_journal.jsonl");
+        let wrote = std::fs::create_dir_all(&jdir).and_then(|_| {
+            use std::io::Write;
+            let mut f = std::fs::OpenOptions::new().create(true).append(true).open(&jpath)?;
+            f.write_all(format!("{}\n", line.to_string()).as_bytes())
+        });
+        match wrote {
+            Ok(_) => o.put_string("journal", &jpath.to_string_lossy()),
+            Err(e) => o.put_string("journal_warning", &format!("{}", e)),
+        }
+    }
     o.put_string("groups", &value);
     o.put_array("readers", derived(&value));
     return o;
@@ -134,8 +184,32 @@ if !store.exists(&lib, &ctlid) {
 }
 
 let mut changed = false;
+let mut j_old = DataObject::new();
+let mut j_new = DataObject::new();
 
 if cmd.is_empty() {
+    // JOURNAL: the control's state before the write, inline data included.
+    j_old.put_string("groups", &groups_of(&lib, &ctlid));
+    j_old.put_array("readers", readers_of(&lib, &ctlid));
+    {
+        let d0 = store.get_data(&lib, &ctlid).get_object("data");
+        if d0.has("data") {
+            let l0 = d0.get_array("data");
+            let mut dr = DataObject::new();
+            let mut any = false;
+            for i in 0..l0.len() {
+                let item = l0.get_object(i);
+                if item.has("id") {
+                    let did = item.get_string("id");
+                    if store.exists(&lib, &did) {
+                        dr.put_array(&did, readers_of(&lib, &did));
+                        any = true;
+                    }
+                }
+            }
+            if any { j_old.put_object("data_readers", dr); }
+        }
+    }
     // The control record: intent string + enforced readers, then the same
     // readers onto its inline data records — these are the records app.read
     // serves to the browser, so they gate what the UI can even render.
@@ -189,6 +263,12 @@ if cmd.is_empty() {
     // The groups intent string lives on the impl record (set_command_meta's
     // chain); readers go on BOTH the meta record (the array check_security
     // consults) and the impl record (old editcommand parity).
+    // JOURNAL: the command's state before the write (groups label on the
+    // impl record; readers on the meta record and on the impl record).
+    j_old.put_string("groups", &groups_of(&lib, &impl_id));
+    j_old.put_array("readers", readers_of(&lib, &cmd_id));
+    j_old.put_array("impl_readers", readers_of(&lib, &impl_id));
+    j_new.put_array("impl_readers", derived(&value));
     if set_record_groups(&lib, &impl_id, &value) { changed = true; }
     if set_record_readers(&lib, &cmd_id, &value) { changed = true; }
     if set_record_readers(&lib, &impl_id, &value) { changed = true; }
@@ -199,4 +279,35 @@ o.put_string("status", "ok");
 o.put_boolean("changed", changed);
 o.put_string("groups", &value);
 o.put_array("readers", derived(&value));
+// JOURNAL the change on the control's patch journal (facet "security"; cmd =
+// the command name, or empty for the control itself; old/new = JSON of the
+// groups label and readers before and after). Runs after the store write, so
+// the entry describes what the store now holds; nothing changed = no entry.
+// A journal problem is reported on the result, never as a failed edit.
+if changed {
+    j_new.put_string("groups", &value);
+    j_new.put_array("readers", derived(&value));
+    fn show(o: &DataObject) -> String {
+        let r = o.get_array("readers");
+        let mut v = Vec::new();
+        for i in 0..r.len() { v.push(r.get_string(i)); }
+        if v.is_empty() { "admin only".to_string() } else { v.join(", ") }
+    }
+    let target = if cmd.is_empty() { format!("control {}.{}", lib, ctl) } else { format!("command {}.{}.{}", lib, ctl, cmd) };
+    let j_label = format!("security of {}: {} -> {}", target, show(&j_old), show(&j_new));
+    let mut j_entry = DataObject::new();
+    j_entry.put_string("author", &author);
+    j_entry.put_string("facet", "security");
+    j_entry.put_string("cmd", &cmd);
+    j_entry.put_string("op", "groups");
+    j_entry.put_string("old", &j_old.to_string());
+    j_entry.put_string("new", &j_new.to_string());
+    j_entry.put_string("label", &j_label);
+    let j_r = crate::dev::code::patch_journal::patch_journal("append".to_string(), lib.clone(), ctlid.clone(), String::new(), j_entry, 0, false, nn_sessionid.clone());
+    if j_r.get_string("status") == "ok" {
+        o.put_string("patch_id", &j_r.get_string("patch_id"));
+    } else {
+        o.put_string("journal_warning", &j_r.try_get_string("msg").unwrap_or_default());
+    }
+}
 o

@@ -556,8 +556,10 @@ function json(cmd, vars, cb) {
     CMDS[pid] = cb;
     if (cb && cmd == '../app/read') PENDING[pid] = { cmd: cmd, vars: vars };
 
+    // The cookie, read at send time: a login (here or in another tab) moves
+    // the session to a fresh id, and the id captured at page load goes stale.
     var params = {
-      "sessionid": sessionid
+      "sessionid": getCookie('sessionid') || sessionid
     };
 
     if (vars) {
