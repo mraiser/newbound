@@ -4,7 +4,7 @@
 
 Users, groups, and sessions — the security framework woven into every record read and write via readers/writers.
 
-Version 44 · Root: `newbound_core` · App `/security/`, boot control `security`
+Version 46 · Root: `newbound_core` · App `/security/`, boot control `security`
 
 [← Index](README.md)
 

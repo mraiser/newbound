@@ -4,7 +4,7 @@
 
 The peer-to-peer layer: transports (tcp/udp/relay), remote command execution, discovery, and the peer constellation app with its heads-up display.
 
-Version 163 · Root: `newbound_core` · App `/peer/`, boot control `peer`
+Version 166 · Root: `newbound_core` · App `/peer/`, boot control `peer`
 
 [← Index](README.md)
 
