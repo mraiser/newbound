@@ -14,12 +14,12 @@ python3 tools/gen-command-reference.py
 
 | Library | Controls | Commands | Description |
 |---|---|---|---|
-| [`app`](app.md) | 3 | 28 | The cross-app runtime: the stock mount and module system (api.js), shared UI chrome, the scene stack, tokens, the client store, and the bridge/player bricks. Every app page is served through this library. |
-| [`dev`](dev.md) | 10 | 117 | Creation and modification — the Development app: the IDE (shelf, workbench, editors, flow, scene), the write API (dev.code), compile and publish, and plugins. |
+| [`app`](app.md) | 3 | 27 | The cross-app runtime: the stock mount and module system (api.js), shared UI chrome, the scene stack, tokens, the client store, and the bridge/player bricks. Every app page is served through this library. |
+| [`dev`](dev.md) | 10 | 116 | Creation and modification — the Development app: the IDE (shelf, workbench, editors, flow, scene), the write API (dev.code), compile and publish, and plugins. |
 | [`peer`](peer.md) | 3 | 20 | The peer-to-peer layer: transports (tcp/udp/relay), remote command execution, discovery, and the peer constellation app with its heads-up display. |
 | [`security`](security.md) | 1 | 6 | Users, groups, and sessions — the security framework woven into every record read and write via readers/writers. |
 
-**171 commands.** Descriptions written by the author: 171. Inferred from the code and marked *(inferred)*: 0. Thin author text with inferred detail added: 3. Still missing: 0. See [missing-descriptions.md](missing-descriptions.md).
+**169 commands.** Descriptions written by the author: 169. Inferred from the code and marked *(inferred)*: 0. Thin author text with inferred detail added: 2. Still missing: 0. See [missing-descriptions.md](missing-descriptions.md).
 
 ## Reading a command entry
 
