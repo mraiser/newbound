@@ -20,7 +20,9 @@ me.refresh = function(){
 };
 
 me.ready = function(){
-  me.check = ME.querySelector('.rp-uuid');
+  // liveness sentinel: a re-mount swaps the panel's innerHTML, so a stale
+  // me.update / crate poll sees a different node here and stops
+  me.check = ME.querySelector('.hud_uuid');
   me.update();
   // D9: initNavbar(ME) is gone — the kit's handler selects tab content BY
   // CLASS over the WHOLE subtree (removes 'selected' from every
@@ -599,8 +601,10 @@ function peerName(id){
 }
 
 function renderKey(){
-  var fp = ME.querySelector('.hudkey-fp');
+  var fp = ME.querySelector('.hudkey-fpkey');
   if (!fp) return;
+  // the Peer ID row above the key: the full UUID (the only place it is shown)
+  ME.querySelector('.hud_uuid').textContent = (ME.DATA || {}).id || '—';
   var d = ME.DATA || {};
   var badge = ME.querySelector('.hudkey-badge');
   var note = ME.querySelector('.hudkey-note');
@@ -642,7 +646,57 @@ function renderKey(){
   note.classList.toggle('bad', bad);
   ME.querySelector('.hudkey-verify').classList.toggle('hideme', !key || ((src == 'verified' || src == 'offline') && !bad));
   ME.querySelector('.hudkey-forget').classList.toggle('hideme', !key);
+  ME.querySelector('.hudcopy-key').classList.toggle('hideme', !key);
 }
+
+// The copy buttons beside the peer ID and the public key put the FULL value
+// (ME.DATA[data-copy], not the shortened text on screen) on the clipboard.
+// navigator.clipboard needs a secure context, and this app is usually served
+// over plain http on a LAN address, so a hidden textarea + execCommand is the
+// fallback. The glyph turns into a check for a moment on success; a failure
+// says so beside the key buttons.
+function copyText(text, done){
+  function fallback(){
+    var ok = false;
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { ok = document.execCommand('copy'); } catch (x) { ok = false; }
+    ta.remove();
+    done(ok);
+  }
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(function(){ done(true); }, fallback);
+  else fallback();
+}
+
+ME.querySelectorAll('.hudcopy').forEach(function(btn){
+  var label = btn.getAttribute('aria-label');
+  btn.addEventListener('click', function(){
+    var text = ME.DATA && ME.DATA[btn.dataset.copy] ? String(ME.DATA[btn.dataset.copy]) : '';
+    if (!text) return;
+    var status = ME.querySelector('.hudkey-status');
+    status.textContent = '';
+    copyText(text, function(ok){
+      btn.focus();
+      if (!ok) { status.textContent = 'Could not copy the ' + btn.dataset.what + '.'; return; }
+      var img = btn.querySelector('img');
+      img.src = '../app/asset/app/icons/ui/dark/check.svg';
+      btn.title = 'Copied';
+      btn.setAttribute('aria-label', 'Copied the ' + btn.dataset.what);
+      clearTimeout(btn.copyTimer);
+      btn.copyTimer = setTimeout(function(){
+        img.src = '../app/asset/app/icons/ui/dark/copy.svg';
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
+      }, 1500);
+    });
+  });
+});
 
 // Both acts change THIS instance's record for the peer (peer.peer.peer_key).
 // verify sends the key the user was looking at, so a key that changed
@@ -677,12 +731,11 @@ ME.querySelector('.hudkey-forget').addEventListener('click', function(){
 });
 
 me.update = function(){
-  if (me.check == ME.querySelector('.rp-uuid')) {
+  if (me.check == ME.querySelector('.hud_uuid')) {
     ME.DATA = document.getElementById('peer_'+ME.DATA.id).DATA;
     // F14: BOTH name slots — the headline and the one inside the
     // "libraries on <name> can be updated" sentence.
     ME.querySelectorAll('.rp-name').forEach(function(el){ el.textContent = ME.DATA.name; });
-    ME.querySelector('.rp-uuid').textContent = ME.DATA.id;
     // F13: a peer that dialled in has an empty saved address — fall back to
     // the IP the server saw on the wire (remote_address; TCP/UDP only).
     // 7.4: an absent value reads as an em dash, never a bare label
@@ -891,7 +944,7 @@ function pollRemoteCrates(){
   if (me.cratePoll) clearInterval(me.cratePoll);
   me.cratePoll = setInterval(function(){
     // same liveness idiom as me.update: a torn-down panel stops polling
-    if (me.check != ME.querySelector('.rp-uuid')) { clearInterval(me.cratePoll); return; }
+    if (me.check != ME.querySelector('.hud_uuid')) { clearInterval(me.cratePoll); return; }
     json('../peer/remote/'+uuid+'/dev/update_crates_status', null, function(r){
       var s = r.state + ' — step ' + (r.step||0) + '/' + (r.steps||4) + ' ' + (r.label||'');
       if (r.state == 'done') s += ' — verdict: ' + r.verdict;

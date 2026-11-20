@@ -9,10 +9,6 @@
   font-weight: 400;
 }
 
-.rp-uuid {
-  font-size:x-small;
-}
-
 /* 7.3: ONE inner gutter for the whole panel — the header, the tab bar
    and both tab bodies start at the same x (the tab bodies' .padme is
    24px, so the gutter is 24). */
@@ -41,10 +37,10 @@
   min-width: 0;
 }
 
-/* D2: a long peer name ellipsizes on its one 32px line (it used to wrap
-   and push the UUID down) — the same rule as the UUID. */
-.hudtitle .rp-name,
-.hudtitle .rp-uuid {
+/* D2: a long peer name ellipsizes on its one 32px line (it used to
+   wrap). The UUID that sat under it now lives in the Info tab's Peer ID
+   row. */
+.hudtitle .rp-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -624,6 +620,48 @@
   font-family: var(--mono);
   font-size: 12px;
   margin-right: 8px;
+}
+
+/* The copy buttons beside the peer ID and the public key: the kit's round
+   icon button shrunk to 24px (16px glyph) so the rows keep the Info grid's
+   rhythm. The kit's inline-flex out-ranks .hideme (the closeaddressbutton
+   precedent), so hiding is restated here. */
+.hudpanel .hudkey {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+
+.hudpanel .hudkey .hudkey-fp {
+  margin-right: 0;
+  min-width: 0;
+}
+
+/* value + its copy button travel together: in a narrow panel the value
+   wraps inside this group and the button stays beside it */
+.hudpanel .hudkey-val {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hudpanel .hudcopy {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 4px;
+}
+
+.hudpanel .hudcopy > img {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.hudpanel .hudcopy.hideme {
+  display: none;
 }
 
 .hudpanel .hudkey-badge {
