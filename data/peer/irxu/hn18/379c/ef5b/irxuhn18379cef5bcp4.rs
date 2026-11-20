@@ -1587,16 +1587,31 @@ mod tests {
         let (mut con, mut server) = fixture();
         let first = legacy_frame(&con.cipher, b"cap {}").unwrap();
         let second = legacy_frame(&con.cipher, b"res {}").unwrap();
+        // Handshakes, not sleeps: the rest of the frame is written only after
+        // the reader has seen the partial one, and later reads retry until
+        // the frame completes, so a slow scheduler cannot reorder the steps.
+        let (partial_sent, wait_partial) = std::sync::mpsc::channel::<()>();
+        let (go_on, wait_go) = std::sync::mpsc::channel::<()>();
         let writer = thread::spawn(move || {
             server.write_all(&first[..1]).unwrap();
-            thread::sleep(Duration::from_millis(100));
+            partial_sent.send(()).unwrap();
+            wait_go.recv().unwrap();
             server.write_all(&first[1..]).unwrap();
             server.write_all(&second).unwrap();
         });
+        fn next_frame(con: &mut P2PConnection) -> Vec<u8> {
+            let deadline = std::time::Instant::now() + Duration::from_secs(10);
+            loop {
+                if let Some(frame) = read_frame(con).unwrap() { return frame; }
+                assert!(std::time::Instant::now() < deadline, "frame never completed");
+            }
+        }
+        wait_partial.recv().unwrap();
         assert_eq!(read_frame(&mut con).unwrap(), None);
-        let one = read_frame(&mut con).unwrap().unwrap();
+        go_on.send(()).unwrap();
+        let one = next_frame(&mut con);
         assert_eq!(decrypt(&con.cipher,&one)[..6], b"cap {}"[..]);
-        let two = read_frame(&mut con).unwrap().unwrap();
+        let two = next_frame(&mut con);
         assert_eq!(decrypt(&con.cipher,&two)[..6], b"res {}"[..]);
         writer.join().unwrap();
     }

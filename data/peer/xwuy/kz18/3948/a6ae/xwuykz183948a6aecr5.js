@@ -61,6 +61,10 @@ me.ready = function(){
       ME.lastTabPeer = ME.DATA.id;
     });
   });
+  // ARIA tabs with arrow keys, over the panel's own two tab contents.
+  document.body.api.ui.ariaTabs(ME.querySelector('.hudtop .navbar-dark'), function(t){
+    return ME.querySelector(':scope > .tab-content.' + t.dataset.id);
+  });
 
   var uuid = ME.DATA.id;
   json('../peer/remote/'+uuid+'/app/libs', null, function(result){
@@ -94,9 +98,14 @@ me.ready = function(){
         click.dataset.version = pr.mylib.version;
         click.textContent = pr.mylib.id + ' v' + pr.theirlib.version + ' ➤ ' + pr.mylib.version;
         chip.appendChild(click);
-        var x = document.createElement('img');
-        x.src = '../app/asset/app/icons/ui/dark/close.svg';
-        x.className = 'roundbutton-small removeupdate mdl-chip__action chipbutton';
+        // the shared named ✕ button (peer.peer publishes it); old <img> without it
+        var x;
+        if (document.body.peerChipClose) x = document.body.peerChipClose(pr.mylib.id + ' update');
+        else {
+          x = document.createElement('img');
+          x.src = '../app/asset/app/icons/ui/dark/close.svg';
+          x.className = 'roundbutton-small removeupdate mdl-chip__action chipbutton';
+        }
         chip.appendChild(x);
         // F12: published by peer.peer, like peerstatus — mark (and
         // deselect) a different-author chip instead of hiding it.
@@ -225,6 +234,7 @@ me.ready = function(){
       else { el.innerHTML = ''; el.appendChild(tbl); }
       markAdded(me.data && me.data.list);
       el.querySelectorAll('.add-ctl-item').forEach(function(item){
+        document.body.api.ui.pressable(item);
         item.addEventListener('click', function(){
           // D6: a control already on the dashboard can't be picked
           if (this.classList.contains('added')) return;
@@ -494,6 +504,11 @@ ME.querySelector('.hudeditbutton').addEventListener('click', function(){
 
 ME.querySelector('.closehud').addEventListener('click', function(){
   var el = document.getElementById("headsupdisplay");
+  // Keyboard focus was in the panel: hand it back to this peer's list row.
+  if (el.contains(document.activeElement) && window.CSS && CSS.escape) {
+    var row = document.querySelector('.peerlistrow[data-peer="' + CSS.escape(ME.DATA.id) + '"]');
+    if (row) row.focus({ preventScroll: true });
+  }
   animateTo(el, {width:'0px'}, 300, function(){ el.style.display = 'none'; el.innerHTML = ''; });
   var par = ME.parentElement;
   if (par && par.api && par.api.focus) par.api.focus(null);
@@ -666,14 +681,19 @@ me.update = function(){
 
 ME.querySelector('.addressexpandbutton').addEventListener('click', function(){
   this.style.display = 'none';
-  ME.querySelector('.closeaddressbutton').style.display = 'inline-block';
+  // inline-flex: the kit's icon-button display, which centres the glyph
+  var hide = ME.querySelector('.closeaddressbutton');
+  hide.style.display = 'inline-flex';
   ME.querySelector('.addressexpand').style.display = 'block';
+  hide.focus();
 });
 
 ME.querySelector('.closeaddressbutton').addEventListener('click', function(){
   this.style.display = 'none';
-  ME.querySelector('.addressexpandbutton').style.display = 'inline-block';
+  var show = ME.querySelector('.addressexpandbutton');
+  show.style.display = 'inline-flex';
   ME.querySelector('.addressexpand').style.display = 'none';
+  show.focus();
 });
 
 ME.querySelector('.cancelupdateall').addEventListener('click', function(){
@@ -739,9 +759,15 @@ ME.querySelector('.refreshhud').addEventListener("click", me.refresh);
 // Add Control left the menu open on top of the modal, and still open after
 // the modal closed. app.ui's non-modal close only fires for clicks OUTSIDE
 // the card, so the rows must close it themselves.
+// The ⋮ card's rows are table cells: make each keyboard-operable.
+ME.querySelectorAll('.control-settings-popup td').forEach(function(td){
+  document.body.api.ui.pressable(td);
+});
+
 ME.querySelectorAll('.closeonclick').forEach(function(row){
   row.addEventListener("click", function(){
     ME.querySelector('.control-settings-popup').style.display = 'none';
+    ME.querySelector('.morebutton').setAttribute('aria-expanded', 'false');
   });
 });
 

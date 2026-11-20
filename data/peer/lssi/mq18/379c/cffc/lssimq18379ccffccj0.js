@@ -245,6 +245,9 @@ function showPeerList(reason){
 function renderPeerList(){
   if (!me.listMode) return;
   var list = ME.querySelector('.peerlist');
+  // The poll rebuilds the list: keep keyboard focus on the same peer's row.
+  var ae = document.activeElement;
+  var focusPeer = ae && list.contains(ae) ? ae.dataset.peer : null;
   list.innerHTML = '';
   var now = Date.now();
   var labels = { tcp: 'TCP', udp: 'UDP', relay: 'Relay', down: 'Disconnected' };
@@ -254,7 +257,9 @@ function renderPeerList(){
     var p = peers[i];
     if (me.info && p.id == me.info.uuid) continue;
     var st = document.body.peerstatus(p, now);
-    var row = document.createElement('div');
+    // A real button (WCAG 2.1.1): Enter/Space open the panel like a click.
+    var row = document.createElement('button');
+    row.type = 'button';
     row.className = 'peerlistrow';
     row.dataset.peer = p.id;
     var dots = document.createElement('span');
@@ -286,11 +291,16 @@ function renderPeerList(){
       : ago < 3600000 ? Math.round(ago / 60000) + ' min ago'
       : Math.round(ago / 3600000) + ' h ago');
     row.appendChild(last);
+    row.setAttribute('aria-label', p.name + ', ' + labels[st.kind] + ', ' + last.textContent);
     row.addEventListener('click', listRowClick);
     list.appendChild(row);
     shown++;
   }
   if (shown == 0) list.innerHTML = '<div class="peerlistempty"><i>No peers connected yet — add one with the + button below.</i></div>';
+  if (focusPeer) {
+    var again = list.querySelector('[data-peer="' + CSS.escape(focusPeer) + '"]');
+    if (again) again.focus();
+  }
 }
 
 function listRowClick(){
@@ -483,7 +493,7 @@ function buildUpdateDialog(){
   // F3: peer display names are untrusted — the static table shell is literal
   // HTML, every row is built with DOM calls and textContent.
   var el = ME.querySelector('.peerupdatelist');
-  el.innerHTML = '<table cellpadding="10px" class="updateablepeerstable"><thead><tr><th><label class="plaincheckbox"><input type="checkbox" class="toggleallupdates"><span></span></label></th><th style="text-align:left;">Peer</th><th style="text-align:left;">Available Updates</th></tr></thead><tbody></tbody></table>';
+  el.innerHTML = '<table cellpadding="10px" class="updateablepeerstable"><thead><tr><th><label class="plaincheckbox"><input type="checkbox" class="toggleallupdates" aria-label="Select all peers"><span></span></label></th><th style="text-align:left;">Peer</th><th style="text-align:left;">Available Updates</th></tr></thead><tbody></tbody></table>';
   var tbody = el.querySelector('tbody');
   // F10: rows still checking — when the last one resolves and none is left,
   // the dialog says so (checkDone) instead of sitting there as an empty table.
@@ -497,6 +507,7 @@ function buildUpdateDialog(){
       tr.dataset.peer = uuid;
       var td = document.createElement('td');
       td.innerHTML = '<label class="plaincheckbox"><input type="checkbox" class="libupdate"><span></span></label>';
+      td.querySelector('.libupdate').setAttribute('aria-label', 'Update ' + p.name);   // untrusted: attribute only
       tr.appendChild(td);
       td = document.createElement('td');
       td.textContent = p.name;
@@ -522,12 +533,19 @@ function buildUpdateDialog(){
 }
 
 // F3 helper: the chips' close button, shared by every chip builder below.
-function chipCloseImg(){
-  var x = document.createElement('img');
-  x.src = '../app/asset/app/icons/ui/dark/close.svg';
+// A real button named for what it removes (WCAG 2.1.1, 4.1.2).
+function chipCloseImg(what){
+  var x = document.createElement('button');
+  x.type = 'button';
   x.className = 'roundbutton-small removeupdate mdl-chip__action chipbutton';
+  x.setAttribute('aria-label', 'Remove ' + (what || 'this update'));
+  var i = document.createElement('img');
+  i.src = '../app/asset/app/icons/ui/dark/close.svg';
+  i.alt = '';
+  x.appendChild(i);
   return x;
 }
+document.body.peerChipClose = chipCloseImg;
 
 // F5: the words for a refused or failed peer call — shared with the F10
 // update-flow rewrite (session 2), so keep it a tiny helper. 'Unauthorized'
@@ -643,6 +661,17 @@ function applyAuthorWarn(chip, mylib, theirlib){
   w.textContent = '⚠ different author';
   var x = chip.querySelector('.removeupdate');
   if (x) chip.insertBefore(w, x); else chip.appendChild(w);
+  // The include toggle as a keyboard checkbox on the chip's text (the ✕
+  // beside it stays its own button).
+  var t = chip.querySelector('.clickupdate');
+  if (t) {
+    t.setAttribute('role', 'checkbox');
+    t.setAttribute('aria-checked', 'false');
+    t.tabIndex = 0;
+    t.addEventListener('keydown', function(e){
+      if (e.key == ' ' || e.key == 'Enter') { e.preventDefault(); t.click(); }
+    });
+  }
   chip.addEventListener('click', function(ev){
     if (ev.target.closest && ev.target.closest('.removeupdate, .chipretry')) return;
     // U2: a chip with no package can never run — clicking must not include it
@@ -650,6 +679,7 @@ function applyAuthorWarn(chip, mylib, theirlib){
     var inc = chip.dataset.included == '1';
     chip.dataset.included = inc ? '0' : '1';
     chip.style.opacity = inc ? '0.45' : '1';
+    if (t) t.setAttribute('aria-checked', inc ? 'false' : 'true');
   });
 }
 document.body.peerAuthorWarn = applyAuthorWarn;
@@ -886,7 +916,7 @@ function checkForUpdates(peer) {
         click.dataset.version = pr.mylib.version;
         click.textContent = pr.mylib.id + ' v' + pr.theirlib.version + ' ➤ ' + pr.mylib.version;
         chip.appendChild(click);
-        chip.appendChild(chipCloseImg());
+        chip.appendChild(chipCloseImg(pr.mylib.id + ' update'));
         applyAuthorWarn(chip, pr.mylib, pr.theirlib);
         return chip;
       }
@@ -914,7 +944,7 @@ function checkForUpdates(peer) {
           chip.dataset.flowlang = lc.flowlang;
           chip.dataset.ndata = lc.ndata;
           chip.textContent = 'crates: flowlang ' + cr.flowlang + ' ➤ ' + lc.flowlang + ' / ndata ' + cr.ndata + ' ➤ ' + lc.ndata;
-          chip.appendChild(chipCloseImg());
+          chip.appendChild(chipCloseImg('the crates update'));
           chips.push(chip);
         }
         var el = ME.querySelector('.r_'+uuid);
@@ -926,7 +956,11 @@ function checkForUpdates(peer) {
           chips.forEach(function(c){ status.appendChild(c); status.appendChild(document.createTextNode(' ')); });
           el.querySelectorAll('.removeupdate').forEach(function(x){
             x.addEventListener('click', function(){
+              var row = this.closest('tr');
               this.closest('.chip').remove();
+              // the focused ✕ is gone: keep focus on this peer's row
+              var cb = row && row.querySelector('.libupdate');
+              if (cb && (!document.activeElement || document.activeElement === document.body)) cb.focus();
             });
           });
         }
@@ -1018,6 +1052,9 @@ ME.querySelector('.addpeerbutton').addEventListener('click', function(){
     }
     var tbl = document.createElement('table');
     tbl.className = 'lantable';
+    // Each row is one pick-this-device button (made pressable below), so
+    // the table is layout only.
+    tbl.setAttribute('role', 'presentation');
     var now = new Date().getTime();
     var found = [];
     for (var sip in result.data) {
@@ -1073,6 +1110,8 @@ ME.querySelector('.addpeerbutton').addEventListener('click', function(){
     if (tbl.rows.length == 0) disc.innerHTML = '<div class="padme"><i>No new devices found on LAN</i></div>';
     else { disc.innerHTML = ''; disc.appendChild(tbl); }
     disc.querySelectorAll('.clickme').forEach(function(rowEl){
+      var rd = me.discovery[rowEl.dataset.sip];
+      document.body.api.ui.pressable(rowEl, rd.name + ', ' + rd.address);
       rowEl.addEventListener('click', function(){
         var sip = this.dataset.sip;
         var rds = me.discovery[sip];
@@ -1081,23 +1120,28 @@ ME.querySelector('.addpeerbutton').addEventListener('click', function(){
         ME.querySelector('.adduseruuid').value = rds.uuid;
         ME.querySelector('.adduseripaddr').value = rds.address;
         ME.querySelector('.adduserport').value = rds.p2pport;
+        // the picked row is now hidden with the LAN tab: keep focus in the
+        // dialog, on the form it just filled (WCAG 2.4.3)
+        ME.querySelector('.addusername').focus();
       });
     });
   });
 });
 
+ME.querySelector('.adduseruuid').addEventListener('input', function(){ document.body.api.ui.clearFieldError(this); });
+
 ME.querySelector('#addconnection').addEventListener('click', function(){
   var el_uuid = ME.querySelector('.adduseruuid');
-  el_uuid.parentElement.style.border = 'none';
+  var ui = document.body.api.ui;
+  ui.clearFieldError(el_uuid);
   var uuid = el_uuid.value;
   const regexExp = /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/gi;
+  // Errors show as text under the field and are announced (WCAG 3.3.1, 4.1.3).
   if (!regexExp.test(uuid)) {
-    el_uuid.parentElement.style.border = 'thin red solid';
-    document.body.api.ui.snackbar({"message":"A valid device ID is required"});
+    ui.fieldError(el_uuid, 'Enter the device ID: 32 hex digits in the form 8-4-4-4-12.', { after: el_uuid.parentElement });
   }
   else if (uuid == me.info.uuid) {
-    el_uuid.parentElement.style.border = 'thin red solid';
-    document.body.api.ui.snackbar({"message":"You cannot connect to yourself"});
+    ui.fieldError(el_uuid, "That is this device's own ID. You can't connect to yourself.", { after: el_uuid.parentElement });
   }
   else {
     ME.querySelector('.close-add-user').click();
