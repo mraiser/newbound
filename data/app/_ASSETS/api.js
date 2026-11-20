@@ -545,7 +545,9 @@ function subscribe_event(app, event, cb) {
   if (!SUBSCRIPTIONS[app][event]) SUBSCRIPTIONS[app][event] = [];
   SUBSCRIPTIONS[app][event].push(cb);
 
-  var d = { app: app, event: event }
+  // The cookie, read at send time (as json() does): only an admin session may
+  // subscribe, and a login moves the session to a fresh id.
+  var d = { app: app, event: event, sessionid: getCookie('sessionid') || sessionid }
   SOCK.send("sub "+JSON.stringify(d));
 }
 
