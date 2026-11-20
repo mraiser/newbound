@@ -56,12 +56,19 @@ pub fn execute(o: DataObject) -> DataObject {
 }
 
 pub fn tcp_connect(uuid: String, ipaddr: String, port: i64) -> bool {
-let sock_addr = ipaddr+":"+&port.to_string();
-let addr = match sock_addr.parse::<std::net::SocketAddr>() {
-  Ok(addr) => addr,
+use std::net::ToSocketAddrs;
+if port < 1 || port > 65535 { return false; }
+// Resolve first (hostnames, IPv4 and bare IPv6 literals), then try each
+// resolved address with the 10 s connect timeout.
+let addrs = match (ipaddr.trim(), port as u16).to_socket_addrs() {
+  Ok(addrs) => addrs,
   Err(_) => return false,
 };
-let stream = TcpStream::connect_timeout(&addr, std::time::Duration::from_secs(10));
+let mut stream: std::io::Result<TcpStream> = Err(std::io::Error::new(std::io::ErrorKind::NotFound, "no address resolved"));
+for addr in addrs {
+  stream = TcpStream::connect_timeout(&addr, std::time::Duration::from_secs(10));
+  if stream.is_ok() { break; }
+}
 if stream.is_ok() {
   let stream = stream.unwrap();
   let _ = stream.set_nodelay(true);
