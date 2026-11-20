@@ -8,6 +8,5 @@ Inferred text lives in `inferred-descriptions.json` next to these pages, keyed b
 
 | Command | Store description | Reference shows |
 |---|---|---|
-| [`app.app.remembersession`](app.md#appappremembersession) | Keep the current session logged in | store text + inferred detail |
 | [`peer.peer.local`](peer.md#peerpeerlocal) | Execute the given remote request as a local HTTP request. | store text + inferred detail |
 | [`security.security.current_user`](security.md#securitysecuritycurrent_user) | Retrieve the system metadata for the currently logged in user | store text + inferred detail |

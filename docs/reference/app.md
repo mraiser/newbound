@@ -4,7 +4,7 @@
 
 The cross-app runtime: the stock mount and module system (api.js), shared UI chrome, the scene stack, tokens, the client store, and the bridge/player bricks. Every app page is served through this library.
 
-Version 130 · Root: `newbound_core` · App `/app/`, boot control `app`
+Version 134 · Root: `newbound_core` · App `/app/`, boot control `app`
 
 [← Index](README.md)
 
@@ -12,7 +12,7 @@ Version 130 · Root: `newbound_core` · App `/app/`, boot control `app`
 
 | Control | Commands |
 |---|---|
-| `app` | [apps](#appappapps), [asset](#appappasset), [assets](#appappassets), [delete](#appappdelete), [deletelib](#appappdeletelib), [deviceid](#appappdeviceid), [eventoff](#appappeventoff), [eventon](#appappeventon), [events](#appappevents), [exec](#appappexec), [jsapi](#appappjsapi), [libs](#appapplibs), [login](#appapplogin), [newlib](#appappnewlib), [read](#appappread), [remembersession](#appappremembersession), [settings](#appappsettings), [spawn](#appappspawn), [timeroff](#appapptimeroff), [timeron](#appapptimeron), [uninstall](#appappuninstall), [unique_session_id](#appappunique_session_id), [write](#appappwrite) |
+| `app` | [apps](#appappapps), [asset](#appappasset), [assets](#appappassets), [delete](#appappdelete), [deletelib](#appappdeletelib), [deviceid](#appappdeviceid), [eventoff](#appappeventoff), [eventon](#appappeventon), [events](#appappevents), [exec](#appappexec), [jsapi](#appappjsapi), [libs](#appapplibs), [login](#appapplogin), [newlib](#appappnewlib), [read](#appappread), [settings](#appappsettings), [spawn](#appappspawn), [timeroff](#appapptimeroff), [timeron](#appapptimeron), [uninstall](#appappuninstall), [unique_session_id](#appappunique_session_id), [write](#appappwrite) |
 | `service` | [init](#appserviceinit), [test_path_traversal](#appservicetest_path_traversal) |
 | `util` | [hash](#apputilhash), [init](#apputilinit), [zip](#apputilzip) |
 
@@ -449,33 +449,6 @@ cmd {"pid":"1","bot":"app","cmd":"read","params":{"lib":"<lib>","id":"<id>"}}
 
 **See also:** [write](#appappwrite)
 
-### app.app.remembersession
-
-**Language:** rust · **Returns:** `String` · **Groups:** `anonymous` · **Readers:** `["anonymous"]`
-
-Keep the current session logged in
-
-*(inferred)* Writes `<session id>=<username>` for the calling session into `runtime/securitybot/session.properties`, creating the file if needed, so the session is remembered across restarts. Returns a confirmation message that includes the session id.
-
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `nn_session` | JSONObject | server | An object encapsulating details of the current user session, including its unique identifier and user-specific information like the username, which are then persisted. This request metadata is provided automatically by the Newbound framework. Pass a placeholder value like null when calling this command from javascript. |
-
-**HTTP:** `GET /app/remembersession`
-
-```bash
-curl -b nb.cookies \
-  "http://localhost:8080/app/remembersession"
-```
-
-**WebSocket frame:**
-
-```text
-cmd {"pid":"1","bot":"app","cmd":"remembersession","params":{}}
-```
-
-**MCP tool:** `app-app-remembersession`
-
 ### app.app.settings
 
 **Language:** rust · **Returns:** `JSONObject` · **Groups:** (not set) · **Readers:** `[]`
@@ -686,7 +659,7 @@ Headless COMMAND HOST for app-level service startup (init runs at boot).
 
 **Language:** rust · **Returns:** `String` · **Groups:** (not set) · **Readers:** `[]`
 
-Initializes the Newbound backend, launching a comprehensive web server that handles incoming HTTP requests, manages user sessions, and facilitates real-time communication via WebSockets. Sessions come from the session_id query parameter, the sessionid cookie, or - only when config.properties has basicauth=true - an HTTP Basic Authorization header checked against the security users on every request (one reused session per user, kept in system.basic_sessions; valid Basic credentials override an anonymous or foreign cookie session). A command that declares an nn_method parameter is a protocol adapter: when it is denied, the listener answers 401 with WWW-Authenticate: Basic (Basic enabled and nobody logged in, or wrong credentials) or 403 (logged in but not in the command's groups; also every denial when Basic is off) instead of the JSON UNAUTHORIZED error in a 200 that ordinary commands keep.
+Initializes the Newbound backend, launching a comprehensive web server that handles incoming HTTP requests, manages user sessions, and facilitates real-time communication via WebSockets. Sessions come from the session_id query parameter, the sessionid cookie, or - only when config.properties has basicauth=true - an HTTP Basic Authorization header checked against the security users on every request (one reused session per user, kept in system.basic_sessions; valid Basic credentials override an anonymous or foreign cookie session). A command that declares an nn_method parameter is a protocol adapter: when it is denied, the listener answers 401 with WWW-Authenticate: Basic (Basic enabled and nobody logged in, or wrong credentials) or 403 (logged in but not in the command's groups; also every denial when Basic is off) instead of the JSON UNAUTHORIZED error in a 200 that ordinary commands keep. MULTIPART UPLOADS: each file part of a multipart/form-data POST is written as upload_&lt;n> (0600) inside a private per-request directory &lt;tmp>/newbound_uploads/&lt;random> (0700); the client's filename is never used as a path. The command receives the temp file's path under the part's name and the original name, reduced to a basename (safe_upload_name: no separators, "..", control characters or ':'), under &lt;name>_filename. The directory is removed when the request is finished, after the command has returned and the response is written - copy the file if it must outlive the request.
 
 No parameters.
 

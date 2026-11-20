@@ -4,7 +4,7 @@
 
 Creation and modification — the Development app: the IDE (shelf, workbench, editors, flow, scene), the write API (dev.code), compile and publish, and plugins.
 
-Version 77 · Root: `newbound_core` · App `/dev/`, boot control `dev`
+Version 79 · Root: `newbound_core` · App `/dev/`, boot control `dev`
 
 [← Index](README.md)
 
@@ -12,7 +12,7 @@ Version 77 · Root: `newbound_core` · App `/dev/`, boot control `dev`
 
 | Control | Commands |
 |---|---|
-| `code` | [add_control](#devcodeadd_control), [add_library](#devcodeadd_library), [check_js](#devcodecheck_js), [check_python](#devcodecheck_python), [convert_patch_journals](#devcodeconvert_patch_journals), [create_control](#devcodecreate_control), [delete_asset](#devcodedelete_asset), [delete_command](#devcodedelete_command), [delete_control](#devcodedelete_control), [delete_library](#devcodedelete_library), [evaluate_rust](#devcodeevaluate_rust), [find](#devcodefind), [get_meta_identity](#devcodeget_meta_identity), [init](#devcodeinit), [invoke_command](#devcodeinvoke_command), [list_assets](#devcodelist_assets), [list_commands](#devcodelist_commands), [list_control_patches](#devcodelist_control_patches), [list_controls](#devcodelist_controls), [list_libraries](#devcodelist_libraries), [move_control](#devcodemove_control), [patch_command_body](#devcodepatch_command_body), [patch_control_facet](#devcodepatch_control_facet), [patch_journal](#devcodepatch_journal), [read_command](#devcoderead_command), [read_control_facet](#devcoderead_control_facet), [read_control_scene](#devcoderead_control_scene), [read_flow_body](#devcoderead_flow_body), [remove_event_handler](#devcoderemove_event_handler), [remove_plugin](#devcoderemove_plugin), [remove_timer](#devcoderemove_timer), [rename_asset](#devcoderename_asset), [search_commands](#devcodesearch_commands), [set_command_imports](#devcodeset_command_imports), [set_command_meta](#devcodeset_command_meta), [set_control_meta](#devcodeset_control_meta), [set_event_handler](#devcodeset_event_handler), [set_groups](#devcodeset_groups), [set_library_meta](#devcodeset_library_meta), [set_meta_identity](#devcodeset_meta_identity), [set_plugin](#devcodeset_plugin), [set_tags](#devcodeset_tags), [set_timer](#devcodeset_timer), [trace_flow](#devcodetrace_flow), [unpublish_app](#devcodeunpublish_app), [upsert_command](#devcodeupsert_command), [write_asset](#devcodewrite_asset), [write_control_scene](#devcodewrite_control_scene), [write_flow_body](#devcodewrite_flow_body) |
+| `code` | [add_library](#devcodeadd_library), [check_js](#devcodecheck_js), [check_python](#devcodecheck_python), [convert_patch_journals](#devcodeconvert_patch_journals), [create_control](#devcodecreate_control), [delete_asset](#devcodedelete_asset), [delete_command](#devcodedelete_command), [delete_control](#devcodedelete_control), [delete_library](#devcodedelete_library), [evaluate_rust](#devcodeevaluate_rust), [find](#devcodefind), [get_meta_identity](#devcodeget_meta_identity), [init](#devcodeinit), [invoke_command](#devcodeinvoke_command), [list_assets](#devcodelist_assets), [list_commands](#devcodelist_commands), [list_control_patches](#devcodelist_control_patches), [list_controls](#devcodelist_controls), [list_libraries](#devcodelist_libraries), [move_control](#devcodemove_control), [patch_command_body](#devcodepatch_command_body), [patch_control_facet](#devcodepatch_control_facet), [patch_journal](#devcodepatch_journal), [read_command](#devcoderead_command), [read_control_facet](#devcoderead_control_facet), [read_control_scene](#devcoderead_control_scene), [read_flow_body](#devcoderead_flow_body), [remove_event_handler](#devcoderemove_event_handler), [remove_plugin](#devcoderemove_plugin), [remove_timer](#devcoderemove_timer), [rename_asset](#devcoderename_asset), [search_commands](#devcodesearch_commands), [set_command_imports](#devcodeset_command_imports), [set_command_meta](#devcodeset_command_meta), [set_control_meta](#devcodeset_control_meta), [set_event_handler](#devcodeset_event_handler), [set_groups](#devcodeset_groups), [set_library_meta](#devcodeset_library_meta), [set_meta_identity](#devcodeset_meta_identity), [set_plugin](#devcodeset_plugin), [set_tags](#devcodeset_tags), [set_timer](#devcodeset_timer), [trace_flow](#devcodetrace_flow), [unpublish_app](#devcodeunpublish_app), [upsert_command](#devcodeupsert_command), [write_asset](#devcodewrite_asset), [write_control_scene](#devcodewrite_control_scene), [write_flow_body](#devcodewrite_flow_body) |
 | `dev` | [activate_lib](#devdevactivate_lib), [check](#devdevcheck), [compile](#devdevcompile), [compile_rust](#devdevcompile_rust), [crate_versions](#devdevcrate_versions), [hard_reset](#devdevhard_reset), [install_lib](#devdevinstall_lib), [lib_archive](#devdevlib_archive), [lib_info](#devdevlib_info), [materialize_apps](#devdevmaterialize_apps), [rebuild_lib](#devdevrebuild_lib), [restart_instance](#devdevrestart_instance), [update_crates](#devdevupdate_crates), [update_crates_status](#devdevupdate_crates_status) |
 | `editcommand` | [compile_command](#deveditcommandcompile_command), [delete_command](#deveditcommanddelete_command), [lookup_cmd_id](#deveditcommandlookup_cmd_id), [read_command](#deveditcommandread_command), [save_command](#deveditcommandsave_command) |
 | `editcontrol` | [add_component](#deveditcontroladd_component), [appdata](#deveditcontrolappdata), [get_control](#deveditcontrolget_control), [get_publish_context](#deveditcontrolget_publish_context), [lookup_id](#deveditcontrollookup_id), [publishapp](#deveditcontrolpublishapp), [save_control](#deveditcontrolsave_control) |
@@ -28,37 +28,6 @@ Controls without commands: `card`, `editor`, `facets`, `flowdebug`, `flowdoc`, `
 ## Control `code`
 
 THE WRITE API: every programmatic read and edit of libraries, controls, facets, commands, flows, scenes, assets, timers/events, tags/groups, plugins, and memory. FLAT returns; journaled where it mutates. This is the surface agents drive.
-
-### dev.code.add_control
-
-**Language:** rust · **Returns:** `String` · **Groups:** (not set) · **Readers:** `[]`
-
-Add a control with the `ctl` name to the library with the `lib` name.
-
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `lib` | String | yes |  |
-| `ctl` | String | yes |  |
-
-**HTTP:** `GET /app/exec?lib=dev&id=tquvxg19ec8a857c8j1004&args=…` (via `app.app.exec`)
-
-```bash
-curl -b nb.cookies -G \
-  "http://localhost:8080/app/exec" \
-  --data-urlencode 'lib=dev' \
-  --data-urlencode 'id=tquvxg19ec8a857c8j1004' \
-  --data-urlencode 'args={"lib":"<lib>","ctl":"<ctl>"}'
-```
-
-**WebSocket frame:**
-
-```text
-cmd {"pid":"1","bot":"app","cmd":"exec","params":{"lib":"dev","id":"tquvxg19ec8a857c8j1004","args":{"lib":"<lib>","ctl":"<ctl>"}}}
-```
-
-**MCP tool:** `dev-code-add_control`
-
-**See also:** [add_library](#devcodeadd_library), [create_control](#devcodecreate_control), [delete_control](#devcodedelete_control), [list_control_patches](#devcodelist_control_patches), [move_control](#devcodemove_control), [patch_control_facet](#devcodepatch_control_facet)
 
 ### dev.code.add_library
 
@@ -88,7 +57,7 @@ cmd {"pid":"1","bot":"app","cmd":"exec","params":{"lib":"dev","id":"jytnoy19ec8a
 
 **MCP tool:** `dev-code-add_library`
 
-**See also:** [add_control](#devcodeadd_control), [delete_library](#devcodedelete_library), [set_library_meta](#devcodeset_library_meta)
+**See also:** [delete_library](#devcodedelete_library), [set_library_meta](#devcodeset_library_meta)
 
 ### dev.code.check_js
 
@@ -190,15 +159,17 @@ cmd {"pid":"1","bot":"app","cmd":"exec","params":{"lib":"dev","id":"vxiuon1a1c18
 
 ### dev.code.create_control
 
-**Language:** rust · **Returns:** `FLAT` · **Groups:** `anonymous` · **Readers:** `["anonymous"]`
+**Language:** rust · **Returns:** `FLAT` · **Groups:** `admin` · **Readers:** `["admin"]`
 
-Create a new control the journaled way: builds the record with the platform's exact internal shape and registers it in the library's controls index, so patch_control_facet / read_control_facet / delete_control work on it immediately. Refuses to clobber an existing control of the same name. Use this instead of hand-writing data-folder records (which corrupts the index). Returns {status, id, name, lib, created}.
+THE way to create a control (add_control is retired). Builds the record with the platform's exact internal shape and registers it in the library's controls index, so patch_control_facet / read_control_facet / delete_control work on it immediately. A new control is ADMIN-ONLY: readers [] and no groups label - open it afterwards, deliberately, with set_groups. JOURNALED: the first entry of the new control's patch journal (facet "control", op "create", new = the record data). Refuses an existing control of the same name; a phantom (name in the index, record missing) is healed under its indexed id (healed:true). An empty author defaults to the calling session's user, else anonymous. Use this instead of hand-writing data-folder records (which corrupts the index). Returns FLAT {status, id, name, lib, created, healed, patch_id | journal_warning}.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `lib` | String | yes | Library that will own the new control. |
 | `name` | String | yes | Human-facing control name (unique within the library); this is what data-control='lib:name:{}' resolves and what other dev.code commands take as `ctl`. |
-| `desc` | String | yes | Optional description; discoverable via list_controls / set_control_meta. |
+| `desc` | String | yes | Description of the control; discoverable via list_controls / set_control_meta. May be empty. |
+| `author` | String | yes | Who is creating the control, recorded on the journal entry. Empty defaults to the calling session's user, else anonymous. |
+| `nn_sessionid` | String | server | Request metadata filled in by the framework; pass an empty string from tools. |
 
 **HTTP:** `GET /app/exec?lib=dev&id=nttqgj1a108282fe6x3b&args=…` (via `app.app.exec`)
 
@@ -207,18 +178,18 @@ curl -b nb.cookies -G \
   "http://localhost:8080/app/exec" \
   --data-urlencode 'lib=dev' \
   --data-urlencode 'id=nttqgj1a108282fe6x3b' \
-  --data-urlencode 'args={"lib":"<lib>","name":"<name>","desc":"<desc>"}'
+  --data-urlencode 'args={"lib":"<lib>","name":"<name>","desc":"<desc>","author":"<author>"}'
 ```
 
 **WebSocket frame:**
 
 ```text
-cmd {"pid":"1","bot":"app","cmd":"exec","params":{"lib":"dev","id":"nttqgj1a108282fe6x3b","args":{"lib":"<lib>","name":"<name>","desc":"<desc>"}}}
+cmd {"pid":"1","bot":"app","cmd":"exec","params":{"lib":"dev","id":"nttqgj1a108282fe6x3b","args":{"lib":"<lib>","name":"<name>","desc":"<desc>","author":"<author>"}}}
 ```
 
 **MCP tool:** `dev-code-create_control`
 
-**See also:** [add_control](#devcodeadd_control), [delete_control](#devcodedelete_control), [list_control_patches](#devcodelist_control_patches), [patch_control_facet](#devcodepatch_control_facet), [read_control_facet](#devcoderead_control_facet), [set_control_meta](#devcodeset_control_meta)
+**See also:** [delete_control](#devcodedelete_control), [list_control_patches](#devcodelist_control_patches), [move_control](#devcodemove_control), [patch_control_facet](#devcodepatch_control_facet), [read_control_facet](#devcoderead_control_facet), [set_control_meta](#devcodeset_control_meta)
 
 ### dev.code.delete_asset
 
@@ -316,7 +287,7 @@ cmd {"pid":"1","bot":"app","cmd":"exec","params":{"lib":"dev","id":"yhlzwi19faf5
 
 **MCP tool:** `dev-code-delete_control`
 
-**See also:** [add_control](#devcodeadd_control), [create_control](#devcodecreate_control), [delete_asset](#devcodedelete_asset), [delete_command](#devcodedelete_command), [delete_library](#devcodedelete_library), [list_control_patches](#devcodelist_control_patches)
+**See also:** [create_control](#devcodecreate_control), [delete_asset](#devcodedelete_asset), [delete_command](#devcodedelete_command), [delete_library](#devcodedelete_library), [list_control_patches](#devcodelist_control_patches), [move_control](#devcodemove_control)
 
 ### dev.code.delete_library
 
@@ -596,7 +567,7 @@ cmd {"pid":"1","bot":"app","cmd":"exec","params":{"lib":"dev","id":"ttvzzy19f95a
 
 **MCP tool:** `dev-code-list_control_patches`
 
-**See also:** [add_control](#devcodeadd_control), [list_assets](#devcodelist_assets), [list_commands](#devcodelist_commands), [list_controls](#devcodelist_controls), [list_libraries](#devcodelist_libraries), [patch_control_facet](#devcodepatch_control_facet)
+**See also:** [create_control](#devcodecreate_control), [list_assets](#devcodelist_assets), [list_commands](#devcodelist_commands), [list_controls](#devcodelist_controls), [list_libraries](#devcodelist_libraries), [patch_control_facet](#devcodepatch_control_facet)
 
 ### dev.code.list_controls
 
@@ -688,7 +659,7 @@ cmd {"pid":"1","bot":"app","cmd":"exec","params":{"lib":"dev","id":"htkvon19fb05
 
 **MCP tool:** `dev-code-move_control`
 
-**See also:** [add_control](#devcodeadd_control), [create_control](#devcodecreate_control), [delete_control](#devcodedelete_control), [list_control_patches](#devcodelist_control_patches), [patch_control_facet](#devcodepatch_control_facet), [read_control_facet](#devcoderead_control_facet)
+**See also:** [create_control](#devcodecreate_control), [delete_control](#devcodedelete_control), [list_control_patches](#devcodelist_control_patches), [patch_control_facet](#devcodepatch_control_facet), [read_control_facet](#devcoderead_control_facet), [read_control_scene](#devcoderead_control_scene)
 
 ### dev.code.patch_command_body
 
@@ -865,7 +836,7 @@ cmd {"pid":"1","bot":"app","cmd":"exec","params":{"lib":"dev","id":"ksympp19f95a
 
 **MCP tool:** `dev-code-read_control_facet`
 
-**See also:** [add_control](#devcodeadd_control), [create_control](#devcodecreate_control), [patch_control_facet](#devcodepatch_control_facet), [read_command](#devcoderead_command), [read_control_scene](#devcoderead_control_scene), [read_flow_body](#devcoderead_flow_body)
+**See also:** [create_control](#devcodecreate_control), [delete_control](#devcodedelete_control), [patch_control_facet](#devcodepatch_control_facet), [read_command](#devcoderead_command), [read_control_scene](#devcoderead_control_scene), [read_flow_body](#devcoderead_flow_body)
 
 ### dev.code.read_control_scene
 
@@ -896,7 +867,7 @@ cmd {"pid":"1","bot":"app","cmd":"exec","params":{"lib":"dev","id":"jgquux19fa34
 
 **MCP tool:** `dev-code-read_control_scene`
 
-**See also:** [add_control](#devcodeadd_control), [create_control](#devcodecreate_control), [read_command](#devcoderead_command), [read_control_facet](#devcoderead_control_facet), [read_flow_body](#devcoderead_flow_body), [write_control_scene](#devcodewrite_control_scene)
+**See also:** [create_control](#devcodecreate_control), [delete_control](#devcodedelete_control), [read_command](#devcoderead_command), [read_control_facet](#devcoderead_control_facet), [read_flow_body](#devcoderead_flow_body), [write_control_scene](#devcodewrite_control_scene)
 
 ### dev.code.read_flow_body
 
@@ -1241,7 +1212,7 @@ cmd {"pid":"1","bot":"app","cmd":"exec","params":{"lib":"dev","id":"mvoysl19f99e
 
 **Language:** rust · **Returns:** `FLAT` · **Groups:** (not set) · **Readers:** `[]`
 
-Sets the SECURITY groups on a library, control, or command — a deliberate permission act, distinct from tags (categorization). Empty ctl targets the library's meta.json; empty cmd targets the control record plus its inline data records; else the command's meta and impl records. Writes the comma-delimited groups string AND derives the enforced readers arrays from it (split on comma, trimmed) — the enforcement check_security/check_auth actually read. Explicit replace; empty string clears groups and derives [] (= admin-only). Library-level readers take effect on restart (system.libraries snapshot). writers is never modified. Returns changed, groups, and the derived readers.
+Sets the SECURITY groups on a library, control, or command — a deliberate permission act, distinct from tags (categorization). Empty ctl targets the library's meta.json; empty cmd targets the control record plus its inline data records; else the command's meta and impl records. Writes the comma-delimited groups string AND derives the enforced readers arrays from it (split on comma, trimmed) — the enforcement check_security/check_auth actually read. Explicit replace; empty string clears groups and derives [] (= admin-only). Library-level readers take effect on restart (system.libraries snapshot). writers is never modified. JOURNALED: a control or command change appends an entry to the control's patch journal (facet "security", op "groups", cmd = the command name or empty for the control, old/new = JSON of the groups label and readers before and after, label = "security of &lt;target>: &lt;before> -> &lt;after>"); a library change appends one JSON line {time, author, scope, lib, old, new} to the instance-local runtime/dev/security_journal.jsonl. A call that changes nothing writes no entry. An empty author defaults to the calling session's user, else anonymous. Returns changed, groups, the derived readers, and patch_id (control/command) or journal (the file path, library) when an entry was written, or journal_warning when the change landed but could not be journaled.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -1624,7 +1595,7 @@ cmd {"pid":"1","bot":"app","cmd":"exec","params":{"lib":"dev","id":"suwiuy19fa34
 
 **MCP tool:** `dev-code-write_control_scene`
 
-**See also:** [add_control](#devcodeadd_control), [create_control](#devcodecreate_control), [patch_control_facet](#devcodepatch_control_facet), [read_control_scene](#devcoderead_control_scene), [write_asset](#devcodewrite_asset), [write_flow_body](#devcodewrite_flow_body)
+**See also:** [create_control](#devcodecreate_control), [delete_control](#devcodedelete_control), [patch_control_facet](#devcodepatch_control_facet), [read_control_scene](#devcoderead_control_scene), [write_asset](#devcodewrite_asset), [write_flow_body](#devcodewrite_flow_body)
 
 ### dev.code.write_flow_body
 
