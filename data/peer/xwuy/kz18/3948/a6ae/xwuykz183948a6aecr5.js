@@ -588,6 +588,94 @@ function urlHost(addr){
   return '[' + s + ']';
 }
 
+// P-2: the Public Key row. The key and how it was obtained ride the peer
+// record (peer.peer.peers): publickey, key_source (offline | vouched | tofu |
+// verified; absent on keys saved before sources were recorded), key_voucher,
+// key_conflict ("<voucher uuid> <key>" when a trusted peer reports a
+// different key). Everything is peer- or store-reported: textContent only (F3).
+function peerName(id){
+  var d = document.getElementById('peer_' + id);
+  return d && d.DATA && d.DATA.name ? d.DATA.name : (id || 'a trusted peer');
+}
+
+function renderKey(){
+  var fp = ME.querySelector('.hudkey-fp');
+  if (!fp) return;
+  var d = ME.DATA || {};
+  var badge = ME.querySelector('.hudkey-badge');
+  var note = ME.querySelector('.hudkey-note');
+  var key = d.publickey ? String(d.publickey) : '';
+  var src = d.key_source ? String(d.key_source) : '';
+  var text, cls = '', n = '', bad = false;
+  if (!key) {
+    fp.textContent = '—';
+    fp.title = '';
+    text = 'No key yet';
+    cls = 'warn';
+    n = 'No key is on record for this peer. Unless a peer you already trust reports one, the first device that answers as this ID will be trusted.';
+  }
+  else {
+    fp.textContent = key.substring(0, 8) + ' ' + key.substring(8, 16) + ' … ' + key.substring(key.length - 8);
+    fp.title = key;
+    if (src == 'verified') { text = 'Verified'; cls = 'good'; }
+    else if (src == 'offline') { text = 'Entered by hand'; cls = 'good'; }
+    else if (src == 'vouched') { text = 'Vouched by ' + peerName(d.key_voucher); }
+    else {
+      text = 'Unverified';
+      cls = 'warn';
+      n = (src == 'tofu'
+        ? 'This key was accepted from the device itself on first contact.'
+        : 'How this key was obtained was not recorded.')
+        + ' Compare it with the key shown on that device (hover the key for the full value), then mark it verified.';
+    }
+  }
+  if (key && d.key_conflict) {
+    text = 'Key conflict';
+    cls = 'bad';
+    bad = true;
+    n = peerName(String(d.key_conflict).split(' ')[0]) + ' reports a different key for this peer. Check the key on the device itself, then mark this one verified or forget it.';
+  }
+  badge.textContent = text;
+  badge.className = 'hudkey-badge' + (cls ? ' ' + cls : '');
+  note.textContent = n;
+  note.classList.toggle('hideme', !n);
+  note.classList.toggle('bad', bad);
+  ME.querySelector('.hudkey-verify').classList.toggle('hideme', !key || ((src == 'verified' || src == 'offline') && !bad));
+  ME.querySelector('.hudkey-forget').classList.toggle('hideme', !key);
+}
+
+// Both acts change THIS instance's record for the peer (peer.peer.peer_key).
+// verify sends the key the user was looking at, so a key that changed
+// meanwhile is refused instead of being blessed unseen.
+function keyAct(action, btn){
+  var status = ME.querySelector('.hudkey-status');
+  status.textContent = '';
+  var id = ME.DATA.id;
+  var key = action == 'verify' ? (ME.DATA.publickey || '') : '';
+  btn.disabled = true;
+  json('../peer/peer_key', 'uuid=' + encodeURIComponent(id) + '&action=' + action + '&publickey=' + encodeURIComponent(key), function(r){
+    btn.disabled = false;
+    if (!r || r.status != 'ok') { status.textContent = errText(r); return; }
+    var div = document.getElementById('peer_' + id);
+    var rec = div && div.DATA ? div.DATA : ME.DATA;
+    ['publickey', 'key_source', 'key_voucher'].forEach(function(k){
+      if (r[k] !== undefined) rec[k] = r[k]; else delete rec[k];
+    });
+    delete rec.key_conflict;
+    if (ME.DATA.id == id) { ME.DATA = rec; renderKey(); }
+  });
+}
+
+ME.querySelector('.hudkey-verify').addEventListener('click', function(){
+  if (!confirm('Mark this key as verified? Do this only after comparing it with the key shown on ' + (ME.DATA.name || 'that device') + ' itself.')) return;
+  keyAct('verify', this);
+});
+
+ME.querySelector('.hudkey-forget').addEventListener('click', function(){
+  if (!confirm('Forget the key for ' + (ME.DATA.name || 'this peer') + '? Its connections close, and the next contact is trusted as a first contact unless a peer you already trust reports its key.')) return;
+  keyAct('forget', this);
+});
+
 me.update = function(){
   if (me.check == ME.querySelector('.rp-uuid')) {
     ME.DATA = document.getElementById('peer_'+ME.DATA.id).DATA;
@@ -674,6 +762,8 @@ me.update = function(){
     var isdown = st ? st.kind == 'down' : !(ME.DATA.tcp || ME.DATA.udp || ME.DATA.connected);
     var l = isdown ? '—' : ME.DATA.latency ? ME.DATA.latency+'ms' : '--';
     ME.querySelector('.connectionlatency').textContent = l;
+
+    renderKey();
 
     setTimeout(me.update, 3000);
   }

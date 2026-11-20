@@ -616,3 +616,65 @@
 .hudpanel .availableupgrades {
   margin-top: 16px;
 }
+
+/* P-2: the Public Key row. The key is shown shortened (full value in the
+   title); the badge says how it was obtained. Amber = taken on trust,
+   red = a trusted peer reports a different key. */
+.hudpanel .hudkey-fp {
+  font-family: var(--mono);
+  font-size: 12px;
+  margin-right: 8px;
+}
+
+.hudpanel .hudkey-badge {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 9px;
+  font-size: 11px;
+  line-height: 18px;
+  white-space: nowrap;
+  background: var(--panel-3);
+  color: var(--text-dim);
+}
+
+.hudpanel .hudkey-badge.warn {
+  background: #6b5310;
+  color: #ffe08a;
+}
+
+.hudpanel .hudkey-badge.bad {
+  background: #6b1f1f;
+  color: #ffb4ab;
+}
+
+.hudpanel .hudkey-badge.good {
+  background: #1f4d2a;
+  color: #a8e6b4;
+}
+
+.hudpanel .hudkey-note {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #ffe08a;
+}
+
+.hudpanel .hudkey-note.bad {
+  color: #ffb4ab;
+}
+
+.hudpanel .hudkey-note.hideme,
+.hudpanel .hudkey-actions .hideme {
+  display: none;
+}
+
+.hudpanel .hudkey-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hudpanel .hudkey-status {
+  color: #d06060;
+  font-size: 12px;
+}

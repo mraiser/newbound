@@ -52,6 +52,20 @@
       <div class='hudinfovalue rp-key'><i>checking...</i></div>
       <div class='hudinfolabel'><img src="../app/asset/app/icons/ui/dark/lock.svg" class="icon-small-white" title="Groups you grant this peer" alt="Groups you grant this peer"></div>
       <div class='hudinfovalue rp-lock'><i>checking...</i></div>
+      <!-- P-2: the public key this instance holds for the peer, how it was
+           obtained, and the two acts on it. The buttons act on THIS
+           instance's record (peer.peer.peer_key), not on the remote peer. -->
+      <div class='hudinfolabel'>Public Key</div>
+      <div class='hudinfovalue hudkey'>
+        <span class='hudkey-fp'></span>
+        <span class='hudkey-badge'></span>
+      </div>
+      <div class='hudinfofull hudkey-note hideme' role='status'></div>
+      <div class='hudinfofull hudkey-actions'>
+        <button type='button' class='regularbutton hudkey-verify hideme'>Mark verified</button>
+        <button type='button' class='regularbutton hudkey-forget hideme'>Forget key</button>
+        <span class='hudkey-status'></span>
+      </div>
       <div class='hudinfofull'>
         <label class="plaincheckbox">
           <input type='checkbox' id='keepalive'>
