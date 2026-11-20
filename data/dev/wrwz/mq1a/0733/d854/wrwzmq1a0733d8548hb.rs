@@ -82,6 +82,7 @@ if behind == 0 {
     return o;
 }
 
+let old_head = outs(&crate::dev::git::read::read(repo.clone(), "rev-parse".to_string(), sargs(&["HEAD"]))).trim().to_string();
 let r = crate::dev::git::write::write(repo.clone(), "merge".to_string(), sargs(&["-m", &format!("update {} from {}", branch, base), &base]));
 if !okr(&r) {
     if ref_exists(&repo, "MERGE_HEAD") {
@@ -91,6 +92,13 @@ if !okr(&r) {
     return fail(&format!("merge {} refused: {} - nothing merged", base, errs(&r)));
 }
 steps.push_string(&format!("merge {}", base));
+
+// the tree moved: bring the running instance in line (apps refreshed, changed libraries rebuilt)
+let install = crate::dev::git::after_update::after_update(repo.clone(), old_head, String::new());
+if let Ok(a) = install.try_get_array("steps") {
+    for s in a.objects() { if let ndata::data::Data::DString(x) = s { steps.push_string(&x); } }
+}
+let restart = install.try_get_boolean("restart").unwrap_or(false);
 
 let mut pushed = false;
 let mut push_err = String::new();
@@ -111,5 +119,7 @@ o.put_int("merged", behind);
 o.put_boolean("pushed", pushed);
 o.put_string("push_err", &push_err);
 o.put_int("carried", dirty);
+o.put_boolean("restart", restart);
+o.put_object("install", install);
 o.put_array("steps", steps);
 o
