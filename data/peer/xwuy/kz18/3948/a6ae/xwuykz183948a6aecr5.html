@@ -3,7 +3,6 @@
   <button type='button' class='closehud roundbutton-small-white' aria-label='Close'><img src='../app/asset/app/icons/ui/dark/close.svg' alt=''></button>
   <div class='rp-info hudtitle'>
     <div class='headline rp-name'></div>
-    <div class='rp-uuid'></div>
   </div>
   <div class='hudheadright'>
     <div class='rp-info hudconn'>
@@ -55,9 +54,13 @@
       <!-- P-2: the public key this instance holds for the peer, how it was
            obtained, and the two acts on it. The buttons act on THIS
            instance's record (peer.peer.peer_key), not on the remote peer. -->
+      <div class='hudinfolabel'>Peer ID</div>
+      <div class='hudinfovalue hudkey'>
+        <span class='hudkey-val'><span class='hudkey-fp hud_uuid'></span><button type='button' class='roundbutton-small-white hudcopy' data-copy='id' data-what='peer ID' title='Copy the full peer ID' aria-label='Copy the full peer ID'><img src='../app/asset/app/icons/ui/dark/copy.svg' alt=''></button></span>
+      </div>
       <div class='hudinfolabel'>Public Key</div>
       <div class='hudinfovalue hudkey'>
-        <span class='hudkey-fp'></span>
+        <span class='hudkey-val'><span class='hudkey-fp hudkey-fpkey'></span><button type='button' class='roundbutton-small-white hudcopy hudcopy-key hideme' data-copy='publickey' data-what='public key' title='Copy the full public key' aria-label='Copy the full public key'><img src='../app/asset/app/icons/ui/dark/copy.svg' alt=''></button></span>
         <span class='hudkey-badge'></span>
       </div>
       <div class='hudinfofull hudkey-note hideme' role='status'></div>
