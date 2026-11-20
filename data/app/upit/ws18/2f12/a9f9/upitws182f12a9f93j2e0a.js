@@ -5,7 +5,19 @@ me.ready = function() {
   var data = ME.DATA;
   var img = data.img.replace("botmanager/asset/", "app/asset/");
   loadImg(img);
-  ME.querySelector(".card-title").textContent = data.name;
+  // The tile's keyboard target (WCAG 2.1.1): the title is a link when the
+  // tile opens the app, else a button that opens its details, like a click
+  // anywhere on the tile does. The name says the state the colour shows.
+  var open = document.createElement(data.active ? 'a' : 'button');
+  open.className = 'appcard-open';
+  open.textContent = data.name;
+  if (data.active) open.href = "../" + data.id + "/index.html";
+  else {
+    open.type = 'button';
+    open.setAttribute('aria-label', data.name + (data.remote ? ', available on a connected peer' : ', inactive'));
+  }
+  ME.querySelector(".card-title").appendChild(open);
+  ME.querySelector('.maximize-app-icon').setAttribute('aria-label', 'Details for ' + data.name);
   var card = ME.querySelector(".appcard");
   card.classList.add(data.active ? "active" : "inactive");
   card.classList.add(data.remote ? "remote" : "local");
@@ -43,6 +55,9 @@ me.updateFilters = function() {
     y = 16;
   }
 
+  // A filtered-out tile shrinks to nothing; take it out of the tab order too.
+  ME.inert = !b;
+
   var props = { width: x + 'px', height: x + 'px', margin: y + 'px' };
   try {
     // single-keyframe form animates from the current computed style
@@ -54,6 +69,8 @@ me.updateFilters = function() {
 }
 
 ME.querySelector('.appcard').addEventListener('click', function(e) {
+  // The title link navigates on its own (and keeps ctrl/middle-click).
+  if (e.target.closest && e.target.closest('a.appcard-open')) return;
   if (!e.defaultPrevented) {
     window.lastClick = e;
     if (!ME.DATA.active) ME.querySelector('.maximize-app-icon').click();
@@ -64,6 +81,11 @@ ME.querySelector('.appcard').addEventListener('click', function(e) {
 ME.querySelector('.maximize-app-icon').addEventListener('click', function(e) {
   e.preventDefault();
   if (!e.clientX) e = window.lastClick;
+  // From the keyboard there is no pointer: grow the dialog out of the tile.
+  if (!e || !e.clientX) {
+    var r = ME.getBoundingClientRect();
+    e = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+  }
   var d = {"selector":".app-settings", "closeselector":".close-app-settings", "modal":true};
   d.clientX = e.clientX;
   d.clientY = e.clientY;

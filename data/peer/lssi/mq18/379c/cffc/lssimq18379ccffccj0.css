@@ -248,6 +248,10 @@
 .lantable tr:hover {
   background-color: #0002;
 }
+.lantable tr:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 
 .smalltext{
   font-size:x-small;
@@ -388,6 +392,12 @@
   border-radius: 6px;
   background: #ffffff0a;
   cursor: pointer;
+  /* a <button>: fill the list like the old div, in the page's type */
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  color: inherit;
+  text-align: left;
 }
 
 .peerlistrow:hover {
