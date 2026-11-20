@@ -546,7 +546,7 @@ impl P2PConnection {
         let shared_secret = x25519(my_private_arr, peer_public_arr);
         let cipher = Aes256::new(&shared_secret);
 
-        let sessionid = unique_session_id();
+        let sessionid = crate::security::security::init::secure_id(); // audit C3
         let new_p2p_connection = P2PConnection {
             stream,
             sessionid: sessionid.to_owned(),

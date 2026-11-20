@@ -310,7 +310,7 @@ pub fn http_listen() {
         let user = user_opt.unwrap();
 
         // FIXME - Make session creation a function
-        let session_id = unique_session_id();
+        let session_id = crate::security::security::init::secure_id(); // audit C3
         let mut session = DataObject::new();
         session.put_int("count", 0);
         session.put_string("id", &session_id);
@@ -463,6 +463,10 @@ pub fn http_listen() {
           }
         }
 
+        // Owns this request's multipart upload dir (if any); dropped - and the dir
+        // removed - when this request is finished, after the command has returned
+        // and the response has been written.
+        let mut upload_tmp = UploadDirGuard(None);
         if method == "POST" && !chunked_body && request_error.is_empty() {
           // A chunked body has already been consumed above and is passed to
           // the command as raw_body. Never read its payload a second time.
@@ -510,13 +514,13 @@ pub fn http_listen() {
                 let boundary_sep = "--".to_string() + boundary_str;
                 let boundary_end = boundary_sep.clone() + "--";
 
-                let mut temp_dir = std::env::temp_dir();
-                temp_dir.push("newbound_uploads");
-                temp_dir.push(unique_session_id()); // Unique dir per request
-                if let Err(e) = fs::create_dir_all(&temp_dir) { 
-                    println!("Failed to create temp dir: {}", e);
-                    // Continue with empty params
+                // Private per-request dir (random name, 0700). When it cannot be
+                // created safely, file parts are dropped; text fields still parse.
+                upload_tmp.0 = new_upload_dir();
+                if upload_tmp.0.is_none() {
+                    println!("Failed to create upload temp dir; file parts will be dropped");
                 }
+                let mut upload_seq = 0;
 
                 // Read until first boundary
                 loop {
@@ -573,11 +577,19 @@ pub fn http_listen() {
                     if let Some(filename) = filename_opt {
                         if !filename.is_empty() {
                             // It's a file
-                            let temp_path = temp_dir.join(&filename);
-                            if let Err(e) = fs::write(&temp_path, &part_data) { // Pass part_data by ref
-                                println!("Failed to write temp file: {}", e);
-                            } else {
-                                params.put_string(&name, temp_path.to_str().unwrap_or(""));
+                            // Server-chosen name; the client's filename is only a
+                            // sanitized display param (<name>_filename), never a path.
+                            if let Some(temp_dir) = upload_tmp.0.as_ref() {
+                                let temp_path = temp_dir.join(format!("upload_{}", upload_seq));
+                                upload_seq += 1;
+                                if let Err(e) = write_upload_file(&temp_path, &part_data) {
+                                    println!("Failed to write temp file: {}", e);
+                                } else {
+                                    params.put_string(&name, temp_path.to_str().unwrap_or(""));
+                                    if let Some(display) = safe_upload_name(&filename) {
+                                        params.put_string(&(name.clone() + "_filename"), &display);
+                                    }
+                                }
                             }
                         } else {
                              // Field with an empty filename, treat as text
@@ -591,10 +603,8 @@ pub fn http_listen() {
                     if is_end { break; }
                 }
 
-                // Cleanup temp dir
-                if let Err(e) = fs::remove_dir_all(&temp_dir) {
-                    println!("Failed to clean temp dir: {}", e);
-                }
+                // No cleanup here: upload_tmp (UploadDirGuard) removes the dir when
+                // the request is finished, so commands can read their tempfile params.
 
             } else {
                 println!("Multipart request without boundary!");
@@ -916,7 +926,11 @@ pub fn http_listen() {
 
           let mut reshead = "HTTP/1.1 ".to_string() + &code.to_string() + " " + &msg + "\r\n";
           for (k,v) in response_headers.objects() {
-            reshead = reshead + &k + ": " + &Data::as_string(v) + "\r\n";
+            let hv = Data::as_string(v);
+            // audit C4, defence in depth: a header name or value carrying
+            // CR or LF is never written (no response splitting).
+            if k.contains('\r') || k.contains('\n') || hv.contains('\r') || hv.contains('\n') { continue; }
+            reshead = reshead + &k + ": " + &hv + "\r\n";
           }
           reshead = reshead + "\r\n";
 
@@ -1039,7 +1053,7 @@ fn basic_session(username: &str, password: &str, current: &str) -> String {
     if owned(&sid) { return sid; }
   }
 
-  let sid = unique_session_id();
+  let sid = crate::security::security::init::secure_id(); // audit C3
   let mut session = DataObject::new();
   session.put_int("count", 0);
   session.put_string("id", &sid);
@@ -1054,6 +1068,14 @@ fn basic_session(username: &str, password: &str, current: &str) -> String {
   if !log_in(&sid, username, password) { return "".to_string(); }
   map.put_string(username, &sid);
   sid
+}
+
+// audit C4: the shape of a session id a client may present (query parameter
+// or cookie): 16-128 chars of [A-Za-z0-9_-]. Covers secure_id (32 hex) and
+// unique_session_id (alphanumeric).
+pub fn valid_session_id(id: &str) -> bool {
+  let n = id.len();
+  n >= 16 && n <= 128 && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
 pub fn prep_request(mut request: DataObject) -> String {
@@ -1077,6 +1099,10 @@ pub fn prep_request(mut request: DataObject) -> String {
       }
     }
   }
+  // audit C4: a client may bring its own session id, but only one in the
+  // server's own alphabet. Anything else (CR/LF, ';', spaces...) is dropped
+  // and a fresh id is minted below, so it can never reach Set-Cookie.
+  if session_id != "" && !valid_session_id(&session_id) { session_id = "".to_string(); }
   // HTTP Basic, opt-in (basicauth=true in config.properties). Mount clients
   // (rclone, davfs2) keep no cookies, so valid credentials select one reused
   // session per user. The password is checked on every request.
@@ -1087,7 +1113,7 @@ pub fn prep_request(mut request: DataObject) -> String {
       else { request.put_boolean("basic_failed", true); }
     }
   }
-  if session_id == "" { session_id = unique_session_id(); }
+  if session_id == "" { session_id = crate::security::security::init::secure_id(); } // audit C3
   let mut sessions = system.get_object("sessions");
   let mut session;
   if !sessions.has(&session_id) {
@@ -1139,6 +1165,29 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
   };
   if !is_websocket { return false; }
   let headers = request.get_object("headers");
+
+  // SECURITY (audit C1): browsers attach Origin to every websocket handshake
+  // and send the session cookie cross-site, so a page on another site could
+  // otherwise drive this socket as the logged-in user. When Origin is present
+  // its host[:port] must equal Host (or X-Forwarded-Host, which a browser
+  // cannot set, for reverse proxies). Non-browser clients send no Origin and
+  // are governed by check_security alone.
+  if headers.has("ORIGIN") {
+    let origin = Data::as_string(headers.get_property("ORIGIN")).trim().to_lowercase();
+    let origin_host = origin.splitn(2, "://").nth(1).unwrap_or("").trim_end_matches('/').to_string();
+    let mut origin_ok = false;
+    if !origin_host.is_empty() {
+      for h in ["HOST", "X-FORWARDED-HOST"] {
+        if headers.has(h) && Data::as_string(headers.get_property(h)).trim().to_lowercase() == origin_host { origin_ok = true; }
+      }
+    }
+    if !origin_ok {
+      println!("Websocket refused: cross-origin handshake from {}", origin);
+      let _ = stream.write(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+      let _ = stream.shutdown(std::net::Shutdown::Both);
+      return true;
+    }
+  }
 
   stream.set_read_timeout(None).expect("set_read_timeout call failed");
 
@@ -1221,13 +1270,36 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
           len += len_buf_large[7] as i64 & 0x000000FF;
         }
 
+        // Frame size cap (C5). The length comes straight off the wire - up to
+        // 2^63, or negative once the top bit is set - and used to be handed to
+        // vec![0; len]. A failed allocation ABORTS the whole process, so one
+        // unauthenticated frame could kill the instance. A frame, and the
+        // message its fragments add up to, is capped at 16 MiB: above it the
+        // socket gets close code 1009 (message too big) and is dropped, and
+        // nothing is allocated.
+        const MAX_WS_MESSAGE: i64 = 16 * 1024 * 1024;
+        if len < 0 || len > MAX_WS_MESSAGE || (baos.len() as i64) + len > MAX_WS_MESSAGE {
+          println!("Websocket closed: frame length {} is over the {} byte message limit", len, MAX_WS_MESSAGE);
+          {
+            let _guard = wlock.lock().unwrap_or_else(|e| e.into_inner());
+            let _ = stream.write_all(&[0x88, 0x02, 0x03, 0xF1]);
+          }
+          let _ = stream.shutdown(std::net::Shutdown::Both);
+          dead = true;
+          break;
+        }
+
         let len_usize = len as usize; // Renamed len to len_usize
 
         let mut maskkey = [0; 4];
         let _ = stream.read_exact(&mut maskkey).unwrap();
 
-        let mut payload_buf = vec![0; len_usize]; // Renamed buf to payload_buf
-        let _ = stream.read_exact(&mut payload_buf).unwrap();
+        // Read incrementally: the buffer grows with the bytes that actually
+        // arrive, so a client that announces a large frame and sends nothing
+        // holds no memory.
+        let mut payload_buf: Vec<u8> = Vec::new(); // Renamed buf to payload_buf
+        let got = (&mut stream).take(len as u64).read_to_end(&mut payload_buf);
+        if got.is_err() || payload_buf.len() != len_usize { dead = true; break; }
         let mut idx:usize = 0; // Renamed i to idx
         while idx < len_usize {
           payload_buf[idx] = payload_buf[idx] ^ maskkey[idx % 4];
@@ -1286,12 +1358,46 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
 
           let mut params = d.get_object("params").deep_copy();
 
+          // A login moves the session to a fresh id (app.app.login), so the id
+          // this socket was opened on can go stale while the socket stays up.
+          // A frame may therefore name its session in params.sessionid, as an
+          // HTTP request does with its cookie - but only an id of the valid
+          // shape that ALREADY EXISTS on the server. An unknown id is ignored,
+          // never created, so nothing can be planted through a frame; knowing
+          // a live id is the same bearer capability HTTP already honours.
+          let sessions = DataStore::globals().get_object("system").get_object("sessions");
+          let mut sid = sid_clone;
+          if params.has("sessionid") && params.get_property("sessionid").is_string() {
+            let named = params.get_string("sessionid");
+            if named != sid && valid_session_id(&named) && sessions.has(&named) { sid = named; }
+          }
+
           for (k,v) in request_clone.objects() {
             params.set_property(&("nn_".to_string()+&k), v);
           }
+          // nn_session / nn_sessionid come from the session resolved for THIS
+          // frame, not from the handle taken at the handshake: that handle
+          // follows the session object when a login moves it, and would hand
+          // the logged-in session to a socket opened on the retired id.
+          if sessions.has(&sid) {
+            params.put_object("nn_session", sessions.get_object(&sid));
+          }
+          else {
+            let mut user = DataObject::new();
+            user.put_string("displayname", "Anonymous");
+            user.put_array("groups", DataArray::new());
+            user.put_string("username", "anonymous");
+            let mut anon = DataObject::new();
+            anon.put_int("count", 0);
+            anon.put_string("id", &sid);
+            anon.put_string("username", "anonymous");
+            anon.put_object("user", user);
+            params.put_object("nn_session", anon);
+          }
+          params.put_string("nn_sessionid", &sid);
           d.put_object("params", params);
 
-          let o = handle_command(d, sid_clone);
+          let o = handle_command(d, sid);
           websock_message(stream_clone, &wlock_clone, o.to_string());
         }
         else if msg_str.starts_with("sub ") {
@@ -1570,8 +1676,25 @@ pub fn handle_command(d: DataObject, sid: String) -> DataObject {
   let params = d.get_object("params");
 
   let mut o_result; // Renamed o to o_result
-  if d.has("peer") {
-    o_result = exec(d.get_string("peer"), app, cmd, params);
+  // SECURITY (audit C1): a "peer" field must never bypass authorization.
+  // "local" is not a peer: it falls through to the ordinary check_security
+  // path below under the caller's own session. Any other peer is forwarded
+  // only when the caller may run peer.peer.remote - the same permission the
+  // HTTP route /peer/remote/<uuid>/... requires (the far side then applies
+  // its own check_security to the peer session).
+  let peer_target = if d.has("peer") { Data::as_string(d.get_property("peer")) } else { "local".to_string() };
+  if peer_target != "local" {
+    let (b_remote_found, remote_db, remote_id) = lookup_command_id("peer".to_string(), "remote".to_string());
+    if b_remote_found && check_security(&Command::new(&remote_db, &remote_id), &sid) {
+      o_result = exec(peer_target, app, cmd, params);
+    }
+    else {
+      o_result = DataObject::new();
+      o_result.put_string("status", "err");
+      let err = format!("UNAUTHORIZED: {}", &cmd);
+      o_result.put_string("msg", &err);
+      o_result.put_string("nn_return_type", "String");
+    }
   }
   else {
     let (b_cmd_found, ctldb, id) = lookup_command_id(app, cmd.to_owned()); // Renamed b to b_cmd_found
@@ -1767,16 +1890,98 @@ fn parse_mime_headers(stream: &mut TcpStream) -> DataObject {
     headers
 }
 
+// ---- multipart upload hardening (C2) ----
+// The client's filename is NEVER used as a path. File parts are written under
+// server-chosen names inside a private per-request directory, which lives until
+// the request is finished and is removed by this guard on every exit path.
+struct UploadDirGuard(Option<std::path::PathBuf>);
+impl Drop for UploadDirGuard {
+    fn drop(&mut self) {
+        if let Some(p) = self.0.take() {
+            if let Err(e) = fs::remove_dir_all(&p) { println!("Failed to clean temp dir: {}", e); }
+        }
+    }
+}
+
+fn upload_random_name() -> String {
+    let mut s = String::new();
+    #[cfg(unix)]
+    {
+        let mut b = [0u8; 16];
+        if let Ok(mut f) = fs::File::open("/dev/urandom") {
+            if f.read_exact(&mut b).is_ok() { for x in b.iter() { s += &format!("{:02x}", x); } }
+        }
+    }
+    s += &unique_session_id();
+    s.chars().filter(|c| c.is_ascii_alphanumeric()).collect()
+}
+
+// Creates <tmp>/newbound_uploads/<random> (0700 on unix). The leaf must be NEW,
+// and on unix the parent must be a real directory owned by this user and closed
+// to everyone else - otherwise no directory is returned and file parts are dropped.
+fn new_upload_dir() -> Option<std::path::PathBuf> {
+    let mut parent = std::env::temp_dir();
+    parent.push("newbound_uploads");
+    let leaf_name = upload_random_name();
+    if leaf_name.is_empty() { return None; }
+    let leaf = parent.join(&leaf_name);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
+        let mut b = fs::DirBuilder::new();
+        b.mode(0o700);
+        let _ = b.create(&parent); // already existing is fine; verified below
+        if b.create(&leaf).is_err() { return None; }
+        let ok = match (fs::symlink_metadata(&parent), fs::symlink_metadata(&leaf)) {
+            (Ok(pm), Ok(lm)) => {
+                let mut ok = pm.file_type().is_dir() && lm.file_type().is_dir() && pm.uid() == lm.uid();
+                if ok && pm.mode() & 0o077 != 0 {
+                    ok = fs::set_permissions(&parent, fs::Permissions::from_mode(0o700)).is_ok();
+                }
+                ok
+            },
+            _ => false
+        };
+        if !ok { let _ = fs::remove_dir(&leaf); return None; }
+    }
+    #[cfg(not(unix))]
+    {
+        if fs::create_dir_all(&parent).is_err() { return None; }
+        if fs::create_dir(&leaf).is_err() { return None; }
+    }
+    Some(leaf)
+}
+
+// Writes one upload; refuses to follow or replace anything already at the path.
+fn write_upload_file(path: &Path, data: &[u8]) -> std::io::Result<()> {
+    let mut o = fs::OpenOptions::new();
+    o.write(true).create_new(true);
+    #[cfg(unix)]
+    { use std::os::unix::fs::OpenOptionsExt; o.mode(0o600); }
+    let mut f = o.open(path)?;
+    f.write_all(data)
+}
+
+// The client's filename reduced to a DISPLAY name: the text after the last / or \,
+// refused when empty, "." or "..", over 255 bytes, or holding a control character
+// (NUL included) or ':' (drive prefixes, alternate data streams).
+pub fn safe_upload_name(raw: &str) -> Option<String> {
+    let base = raw.rsplit(|c| c == '/' || c == '\\').next().unwrap_or("").trim();
+    if base.is_empty() || base == "." || base == ".." || base.len() > 255 { return None; }
+    if base.chars().any(|c| c.is_control() || c == ':') { return None; }
+    Some(base.to_string())
+}
+
 // Helper to parse Content-Disposition header
 fn parse_content_disposition(disp: &str) -> (String, Option<String>) {
     let mut name = "".to_string();
     let mut filename = None;
     for part in disp.split(';') {
         let part = part.trim();
-        if part.starts_with("name=\"") {
-            name = part[6..part.len()-1].to_string();
-        } else if part.starts_with("filename=\"") {
-            filename = Some(part[10..part.len()-1].to_string());
+        if let Some(v) = part.strip_prefix("name=\"") {
+            name = v.strip_suffix('"').unwrap_or(v).to_string();
+        } else if let Some(v) = part.strip_prefix("filename=\"") {
+            filename = Some(v.strip_suffix('"').unwrap_or(v).to_string());
         }
     }
     (name, filename)

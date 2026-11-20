@@ -21,7 +21,9 @@
       <div class='localpeerport'></div>
       <div class='localhttpport'></div>
     </div>
+    <div class='localcopystatus' role='status'></div>
     <div class='localdevactions'>
+      <button type='button' class='copyinfobutton localdevbtn' title='Copy my connection info (ID, public key, address, port) to give to another device' aria-label='Copy my connection info'><img src='../app/asset/app/icons/ui/dark/copy.svg' class='mediumicon' alt=''></button>
       <button type='button' class='addpeerbutton localdevbtn popupmenu' title='Add connection' aria-label='Add connection' data-popup='{"selector":".addusercard","closeselector":".close-add-user","modal":true}'><img src='../app/asset/app/icons/ui/dark/user-add.svg' class='mediumicon' alt=''></button>
       <button type='button' class='updateallpeersbutton localdevbtn popupmenu' title='Update peers' aria-label='Update peers' data-popup='{"selector":".updateallpeerscard","closeselector":".close-update-peers","modal":true}'><img src='../app/asset/app/icons/ui/dark/upload.svg' class='mediumicon' alt=''></button>
     </div>
@@ -63,6 +65,17 @@
              plain wrapper div: the js paints the validation border on
              the input's parentElement. -->
         <div class='adduserform'>
+          <!-- P-2: the offline exchange. The other device's Copy my
+               connection info string fills every field below, key included. -->
+          <div class='aufield aufield-full'>
+            <label class='textinputlabel' for='au-paste'>Connection info (paste what the other device copied)</label>
+            <input type='text' class='textinput adduserpaste' id='au-paste' autocomplete='off' spellcheck='false'>
+          </div>
+          <div class='aufield aufield-full'>
+            <label class='textinputlabel' for='au-key'>Public Key (if you have it)</label>
+            <div><input type='text' class='textinput adduserkey' id='au-key' autocomplete='off' spellcheck='false'></div>
+            <div class='adduserkeywarn' role='status'>No key given. Unless a peer you already trust knows this device, the first device that answers as this ID will be trusted. You can check its key afterwards on the peer's Info tab.</div>
+          </div>
           <div class='aufield'>
             <label class='textinputlabel' for='au-name'>Device Name</label>
             <input type='text' class='textinput addusername' id='au-name' autocomplete='off'>
