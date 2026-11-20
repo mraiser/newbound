@@ -217,9 +217,15 @@ ip -o -6 addr list | awk '{print $4}' | cut -d/ -f1 | grep -v -E '^::1$'
       o.put_string("session_id", &nn_sessionid);
       o.put_int("p2p_port", port);
       o.put_int("http_port", http_port);
+      // P-2: this instance's own public key, for the Peers app's "copy my connection info"
+      o.put_string("publickey", &system.get_object("apps").get_object("app").get_object("runtime").get_string("publickey"));
     }
     let mut cons = DataObject::new();
     o.put_object("connections", cons.clone());
+    // P-2: keys this instance holds for the peers asked about, so a peer that
+    // already trusts us can pin them instead of trusting first contact.
+    let mut keys = DataObject::new();
+    o.put_object("keys", keys.clone());
 
     if uuid.is_array() || (uuid.is_string() && uuid.string().starts_with("[")) {
       let salt = salt.string();
@@ -242,6 +248,10 @@ ip -o -6 addr list | awk '{print $4}' | cut -d/ -f1 | grep -v -E '^::1$'
         if u_option.is_some(){
           let u = u_option.unwrap();
           let current_uuid = u.get_string("id");
+          if u.has("publickey") {
+            let k = u.get_string("publickey");
+            if k.len() == 64 { keys.put_string(&current_uuid, &k); }
+          }
           let mut p = user_to_peer(u.clone(), current_uuid.to_owned());
           if p.has("p2pport") && !p.has("p2p_port") { p.set_property("p2p_port", p.get_property("p2pport")); }
           if p.has("p2p_port") && p.has("address") && p.get_boolean("tcp") { cons.put_string(&current_uuid, &("tcp#".to_string()+&p.get_string("address")+"#"+&Data::as_string(p.get_property("p2p_port")))); }
