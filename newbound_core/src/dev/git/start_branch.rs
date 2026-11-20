@@ -120,6 +120,7 @@ let default = if locals.iter().any(|b| b == "master") { "master".to_string() }
     else { return fail("no local master or main branch to start from") };
 if branch == default { return fail("the default branch is not a working branch"); }
 
+let old_head = outs(&crate::dev::git::read::read(repo.clone(), "rev-parse".to_string(), sargs(&["HEAD"]))).trim().to_string();
 // onto the default branch (git refuses if an uncommitted edit would be overwritten; then nothing has changed)
 if cur != default {
     let r = crate::dev::git::write::write(repo.clone(), "checkout".to_string(), sargs(&[&default]));
@@ -148,6 +149,12 @@ if has_origin {
     if published { steps.push_string(&format!("push -u origin {}", branch)); } else { publish_err = errs(&r); }
 }
 let head = crate::dev::git::read::read(repo.clone(), "rev-parse".to_string(), sargs(&["--short", "HEAD"]));
+// the tree may now be a different commit than where we started: bring the running instance in line
+let install = crate::dev::git::after_update::after_update(repo.clone(), old_head, String::new());
+if let Ok(a) = install.try_get_array("steps") {
+    for s in a.objects() { if let ndata::data::Data::DString(x) = s { steps.push_string(&x); } }
+}
+let restart = install.try_get_boolean("restart").unwrap_or(false);
 
 let mut o = DataObject::new();
 o.put_string("status", "ok");
@@ -158,6 +165,8 @@ o.put_boolean("fetched", fetched);
 o.put_boolean("published", published);
 o.put_string("publish_err", &publish_err);
 o.put_int("carried", dirty);
+o.put_boolean("restart", restart);
+o.put_object("install", install);
 o.put_array("steps", steps);
 o.put_string("msg", &format!("on {} from {}{}{}", branch,
     if fetched { remote_ref.clone() } else { default.clone() },
