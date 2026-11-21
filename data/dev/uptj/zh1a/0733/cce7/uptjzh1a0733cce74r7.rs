@@ -152,6 +152,20 @@ parts.push(if detached { "detached HEAD".to_string() } else { branch.clone() });
 if !op.is_empty() { parts.push(format!("mid-{}", op)); }
 if conflicts > 0 { parts.push(format!("{} conflicted", conflicts)); }
 parts.push(if dirty > 0 { format!("{} uncommitted", dirty) } else { "clean".to_string() });
+// a push from a peer standing in this checkout explains the dirt
+let mut overlays = DataArray::new();
+{
+    let ovl = crate::dev::git::overlay::overlay("list".to_string(), repo.clone(), String::new(), DataObject::new());
+    if let Ok(a) = ovl.try_get_array("overlays") {
+        for x in a.objects() {
+            let e = x.object();
+            let who = { let n = e.try_get_string("peer_name").unwrap_or_default(); if n.is_empty() { e.try_get_string("peer").unwrap_or_default() } else { n } };
+            parts.push(format!("testing a push of {} from {} - not committed; update restores git", e.try_get_string("lib").unwrap_or_default(), who));
+            overlays.push_object(e.deep_copy());
+        }
+    }
+}
+o.put_array("overlays", overlays);
 if !detached {
     if !has_origin { parts.push("no origin".to_string()); }
     else if !published { parts.push("unpublished".to_string()); }
