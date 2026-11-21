@@ -1,5 +1,6 @@
 // This file is auto-generated and managed by the flowlang build script.
 use flowlang::rustcmd::Transform;
+pub mod overlay;
 pub mod after_update;
 pub mod commit_paths;
 pub mod untrack_generated;
@@ -41,4 +42,5 @@ pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
     cmds.push(("slhoyo1a0740a96d8s3".to_string(), untrack_generated::execute, "".to_string()));
     cmds.push(("syixmu1a1c65a566fh1".to_string(), commit_paths::execute, "".to_string()));
     cmds.push(("gjymhm1a1fa195533h4".to_string(), after_update::execute, "".to_string()));
+    cmds.push(("ktslky1a1fba9bd72u1".to_string(), overlay::execute, "".to_string()));
 }
