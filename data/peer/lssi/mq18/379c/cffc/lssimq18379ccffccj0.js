@@ -1130,15 +1130,108 @@ ME.querySelector('.addpeerbutton').addEventListener('click', function(){
 
 ME.querySelector('.adduseruuid').addEventListener('input', function(){ document.body.api.ui.clearFieldError(this); });
 
+// P-2: where a new peer's public key comes from, best source first:
+// (1) the key typed or pasted here (offline exchange), (2) a peer we already
+// trust that knows the device (peer_key lookup; maintenance keeps asking in
+// the background), (3) the device itself on first contact. Only then do we
+// dial. A typed key that cannot be saved is said out loud, not dropped.
+function keyThenConnect(uuid, key, connectParams, cb){
+  var q = 'uuid=' + encodeURIComponent(uuid) + '&action=' + (key ? 'set' : 'lookup') + '&publickey=' + encodeURIComponent(key || '');
+  json('../peer/peer_key', q, function(r){
+    if (key && (!r || r.status != 'ok')) {
+      alert('The connection was added, but its public key could not be saved (' + peerErrorText(r)
+        + '). The first device that answers as this ID will be trusted. Check its key on the peer\'s Info tab.');
+    }
+    json('../peer/udp_connect', connectParams, cb);
+  });
+}
+
+function addUserKeyWarn(){
+  var k = ME.querySelector('.adduserkey');
+  ME.querySelector('.adduserkeywarn').classList.toggle('hideme', k.value.trim() != '');
+}
+
+ME.querySelector('.adduserkey').addEventListener('input', function(){
+  document.body.api.ui.clearFieldError(this);
+  addUserKeyWarn();
+});
+
+// The other device's "Copy my connection info" string: one JSON object
+// {name, uuid, publickey, address, port}. It fills the form; nothing is saved
+// until Add Connection, so every field can still be corrected.
+ME.querySelector('.adduserpaste').addEventListener('input', function(){
+  var ui = document.body.api.ui;
+  ui.clearFieldError(this);
+  var t = this.value.trim();
+  if (!t) return;
+  var o = null;
+  try { o = JSON.parse(t); } catch (x) {}
+  if (!o || typeof o != 'object' || typeof o.uuid != 'string') {
+    ui.fieldError(this, "That doesn't look like connection info copied from another device.", { after: this });
+    return;
+  }
+  function put(sel, v){
+    if (typeof v == 'string' || typeof v == 'number') ME.querySelector(sel).value = String(v);
+  }
+  put('.addusername', o.name);
+  put('.adduseruuid', o.uuid);
+  put('.adduserkey', o.publickey);
+  put('.adduseripaddr', o.address);
+  put('.adduserport', o.port);
+  ui.clearFieldError(ME.querySelector('.adduseruuid'));
+  ui.clearFieldError(ME.querySelector('.adduserkey'));
+  addUserKeyWarn();
+});
+
+ME.querySelector('.copyinfobutton').addEventListener('click', function(){
+  var st = ME.querySelector('.localcopystatus');
+  if (!me.info) { st.textContent = 'Not ready yet.'; return; }
+  var addr = '';
+  (me.info.addresses || []).some(function(a){
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(a)) { addr = a; return true; }
+    return false;
+  });
+  var o = { name: me.info.name, uuid: me.info.uuid, publickey: me.info.publickey || '', address: addr, port: me.info.p2p_port };
+  var text = JSON.stringify(o);
+  function done(ok){
+    st.textContent = !ok ? 'Could not copy.'
+      : o.publickey ? 'Connection info copied.'
+      : 'Copied, but without a public key (restart Newbound to include it).';
+    setTimeout(function(){ st.textContent = ''; }, 5000);
+  }
+  function fallback(){
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (x) {}
+    ta.remove();
+    if (!ok) { window.prompt('Copy this connection info:', text); ok = true; }
+    done(ok);
+  }
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(function(){ done(true); }, fallback);
+  else fallback();
+});
+
 ME.querySelector('#addconnection').addEventListener('click', function(){
   var el_uuid = ME.querySelector('.adduseruuid');
   var ui = document.body.api.ui;
   ui.clearFieldError(el_uuid);
   var uuid = el_uuid.value;
+  // P-2: the optional offline-exchanged key; spaces from a grouped paste are dropped
+  var el_key = ME.querySelector('.adduserkey');
+  ui.clearFieldError(el_key);
+  var pubkey = el_key.value.replace(/\s+/g, '');
   const regexExp = /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/gi;
   // Errors show as text under the field and are announced (WCAG 3.3.1, 4.1.3).
   if (!regexExp.test(uuid)) {
     ui.fieldError(el_uuid, 'Enter the device ID: 32 hex digits in the form 8-4-4-4-12.', { after: el_uuid.parentElement });
+  }
+  else if (pubkey && !/^[0-9a-fA-F]{64}$/.test(pubkey)) {
+    ui.fieldError(el_key, 'A public key is 64 hex digits. Leave the field empty if you do not have it.', { after: el_key.parentElement });
   }
   else if (uuid == me.info.uuid) {
     ui.fieldError(el_uuid, "That is this device's own ID. You can't connect to yourself.", { after: el_uuid.parentElement });
@@ -1161,7 +1254,7 @@ ME.querySelector('#addconnection').addEventListener('click', function(){
     json('../security/setuser', params, function(result){
       var params = "ipaddr="+encodeURIComponent(address)
         + "&port="+encodeURIComponent(port);
-      json('../peer/udp_connect', params, function(result){
+      keyThenConnect(uuid, pubkey, params, function(result){
 
       });
     });

@@ -89,13 +89,40 @@ match ok_step("push", r) {
     }
 }
 // return to the feature branch
-let _ = crate::dev::git::write::write(repo.clone(), "checkout".to_string(), sargs(&[&branch]));
-steps.push_string(&format!("checkout {}", branch));
+let back = crate::dev::git::write::write(repo.clone(), "checkout".to_string(), sargs(&[&branch]));
+let back_ok = back.try_get_string("status").unwrap_or_default() == "ok";
+if back_ok { steps.push_string(&format!("checkout {}", branch)); }
+
+// the merge made a commit on the default branch that this branch lacks: fold it
+// straight back in (update_from_master: fetch, merge, install step, push), so the
+// branch is never left "behind master" by its own merge.
+let mut update = DataObject::new();
+let mut update_note = String::new();
+let mut restart = false;
+if back_ok {
+    update = crate::dev::git::update_from_master::update_from_master(repo.clone(), branch.clone());
+    if update.try_get_string("status").unwrap_or_default() == "ok" {
+        if let Ok(a) = update.try_get_array("steps") {
+            for s in a.objects() { if let ndata::data::Data::DString(x) = s { steps.push_string(&format!("update: {}", x)); } }
+        }
+        restart = update.try_get_boolean("restart").unwrap_or(false);
+        update_note = format!("; {} updated from {}", branch, default);
+    } else {
+        update_note = format!("; updating {} from {} failed: {}", branch, default, update.try_get_string("msg").unwrap_or_default());
+    }
+} else {
+    update.put_string("status", "err");
+    update.put_string("msg", "skipped: could not check the branch out again");
+    update_note = format!("; could not return to '{}' - still on '{}', branch not updated", branch, default);
+}
 
 let mut o = DataObject::new();
 o.put_string("status", "ok");
-o.put_string("msg", &format!("merged {} → {} and pushed{}", branch, default,
-    if dirty > 0 { format!(" ({} uncommitted change(s) carried along untouched)", dirty) } else { String::new() }));
+o.put_boolean("restart", restart);
+o.put_object("update", update);
+o.put_string("msg", &format!("merged {} → {} and pushed{}{}", branch, default,
+    if dirty > 0 { format!(" ({} uncommitted change(s) carried along untouched)", dirty) } else { String::new() },
+    update_note));
 o.put_string("branch", &branch);
 o.put_string("default", &default);
 o.put_int("carried", dirty);

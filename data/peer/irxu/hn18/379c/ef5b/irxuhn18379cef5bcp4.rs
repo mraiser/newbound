@@ -968,12 +968,19 @@ pub fn handshake(stream: &mut P2PStream, peer: Option<String>) -> Option<(i64, P
     }
 
     if isok {
-      user.put_string("publickey", &peer_public_string);
-      let (conid, con) = P2PConnection::begin(uuid.to_owned(), stream.try_clone().unwrap());
-
       if saveme {
-        set_user(&uuid, user.clone());
+        // P-2: first-contact key, proof verified. If an offline or vouched key
+        // was pinned while this handshake ran, it wins: a different key is refused.
+        if user.has("publickey") {
+          if !user.get_string("publickey").eq_ignore_ascii_case(&peer_public_string) { return None; }
+        }
+        else {
+          user.put_string("publickey", &peer_public_string);
+          crate::peer::peer::peer_key::stamp(&mut user, "tofu", "");
+          set_user(&uuid, user.clone());
+        }
       }
+      let (conid, con) = P2PConnection::begin(uuid.to_owned(), stream.try_clone().unwrap());
 
       let mut capabilities = DataObject::new();
       capabilities.put_boolean("xfrm", true);

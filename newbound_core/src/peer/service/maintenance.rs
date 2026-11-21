@@ -141,6 +141,12 @@ for (uuid, user) in users.objects(){
           
           let cons = o.get_object("connections");
           user.put_object("peers", cons.clone());
+
+          // P-2: a connected, trusted peer vouches for keys we lack. Keyless
+          // records get the key pinned; a differing first-contact key is flagged.
+          if o.has("keys") && o.get_property("keys").is_object() {
+            let _ = crate::peer::peer::peer_key::apply_vouch(&uuid, &o.get_object("keys"));
+          }
           
           /**
           * Disabled relay

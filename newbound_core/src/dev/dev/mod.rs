@@ -1,5 +1,6 @@
 // This file is auto-generated and managed by the flowlang build script.
 use flowlang::rustcmd::Transform;
+pub mod refresh_apps;
 pub mod materialize_apps;
 pub mod hard_reset;
 pub mod restart_instance;
@@ -29,4 +30,5 @@ pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
     cmds.push(("zosxwm1a052c55690j10".to_string(), restart_instance::execute, "".to_string()));
     cmds.push(("lwnwig1a052f17ecdt4".to_string(), hard_reset::execute, "".to_string()));
     cmds.push(("xoxqhg1a1d58553dcz1".to_string(), materialize_apps::execute, "".to_string()));
+    cmds.push(("ztrojz1a1fa186c0ex1".to_string(), refresh_apps::execute, "".to_string()));
 }
