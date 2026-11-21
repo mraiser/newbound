@@ -86,6 +86,10 @@
 runtime/dev/libraries/
 runtime/dev/repos.json
 runtime/dev/plugins.json
+# Peer-push overlay markers (dev.git.overlay): which libraries here hold a push from a peer
+runtime/dev/peer_overlays.json
+# Library-level security changes (dev.code.set_groups): this instance's own journal
+runtime/dev/security_journal.jsonl
 # update_crates / hard_reset runner state (script, log, status)
 runtime/dev/update_crates/
 # dev.search index files: derived from the store, rebuilt per instance

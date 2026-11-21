@@ -1328,9 +1328,43 @@ pub fn handle_websocket(mut request: DataObject, mut stream: TcpStream, session_
           let d = DataObject::from_string(sub_payload);
           let app = d.get_string("app");
           let event = d.get_string("event");
-          let mut subs_obj = DataObject::get(subref); // Renamed subs to subs_obj
-          if !subs_obj.has(&app) { subs_obj.put_array(&app, DataArray::new()); }
-          subs_obj.get_array(&app).push_string(&event);
+
+          // Audit X-0: events carry whole HTTP requests and responses, login
+          // records and peer records, so only an ADMIN session may subscribe
+          // (any session when security is off, as check_security). The
+          // session is resolved per frame exactly as a cmd frame's is: the
+          // handshake id, or a sessionid named in the frame when it has the
+          // valid shape and already exists. A refused sub adds nothing.
+          let system = DataStore::globals().get_object("system");
+          let mut allowed = !system.get_object("config").get_boolean("security");
+          if !allowed {
+            let sessions = system.get_object("sessions");
+            let mut sid = sid_clone;
+            if d.has("sessionid") && d.get_property("sessionid").is_string() {
+              let named = d.get_string("sessionid");
+              if named != sid && valid_session_id(&named) && sessions.has(&named) { sid = named; }
+            }
+            if sessions.has(&sid) {
+              let session = sessions.get_object(&sid);
+              if session.has("user") && session.get_property("user").is_object() {
+                let user = session.get_object("user");
+                if user.has("groups") && user.get_property("groups").is_array() {
+                  for g in user.get_array("groups").objects() {
+                    if g.is_string() && g.string() == "admin" { allowed = true; break; }
+                  }
+                }
+              }
+            }
+          }
+
+          if allowed {
+            let mut subs_obj = DataObject::get(subref); // Renamed subs to subs_obj
+            if !subs_obj.has(&app) { subs_obj.put_array(&app, DataArray::new()); }
+            subs_obj.get_array(&app).push_string(&event);
+          }
+          else {
+            println!("WEBSOCK sub refused (not an admin session): {} / {}", app, event);
+          }
         }
         else {
           println!("Unknown websocket command: {}", msg_str);

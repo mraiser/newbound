@@ -42,6 +42,21 @@ if regpath.exists() {
                 continue;
             }
             swept += 1;
+            // a push from a peer is standing in this checkout (dev.git.overlay):
+            // its content has no author here and is being tested, not saved -
+            // never commit it. The repo is left alone until an update verb
+            // restores it (dev.github.update / update_from_master).
+            let ovl = crate::dev::git::overlay::overlay("list".to_string(), n.clone(), String::new(), DataObject::new());
+            if ovl.try_get_int("count").unwrap_or(0) > 0 {
+                let mut libs = DataArray::new();
+                if let Ok(a) = ovl.try_get_array("overlays") {
+                    for x in a.objects() { libs.push_string(&x.object().try_get_string("lib").unwrap_or_default()); }
+                }
+                r.put_string("result", "peer_overlay");
+                r.put_array("overlay_libs", libs);
+                results.push_object(r);
+                continue;
+            }
             let st = crate::dev::git::read::read(n.clone(), "status".to_string(), sargs(&["--porcelain=v2", "--branch"]));
             if !okr(&st) {
                 r.put_string("result", "status_failed");

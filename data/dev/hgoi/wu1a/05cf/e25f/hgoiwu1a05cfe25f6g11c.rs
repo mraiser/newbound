@@ -52,6 +52,7 @@ for line in outs(&st).lines() {
     else if line.starts_with("? ") || line.starts_with("1 ") || line.starts_with("2 ") || line.starts_with("u ") { dirty += 1; }
 }
 let mid_merge = ref_exists(&repo, "MERGE_HEAD");
+let old_head = outs(&crate::dev::git::read::read(repo.clone(), "rev-parse".to_string(), sargs(&["HEAD"]))).trim().to_string();
 
 // the tree: discard it, or refuse to lose it
 let mut discarded = false;
@@ -96,6 +97,16 @@ if has_origin && delete_remote && ref_exists(&repo, &format!("refs/remotes/origi
     if remote_deleted { steps.push_string(&format!("push origin --delete {}", branch)); }
     else { notes.push(format!("origin/{} not deleted: {}", branch, errs(&r))); }
 }
+// the tree is now the default branch's: bring the running instance in line
+// (start_branch below runs the same step for whatever it moves after this)
+let mut restart = false;
+let mut installs = DataArray::new();
+let install = crate::dev::git::after_update::after_update(repo.clone(), old_head, String::new());
+if let Ok(a) = install.try_get_array("steps") {
+    for s in a.objects() { if let ndata::data::Data::DString(x) = s { steps.push_string(&x); } }
+}
+if install.try_get_boolean("restart").unwrap_or(false) { restart = true; }
+installs.push_object(install);
 let mut next = DataObject::new();
 let mut now_on = default.clone();
 if !next_branch.is_empty() {
@@ -113,8 +124,17 @@ if !next_branch.is_empty() {
         steps.push_string("fetch --prune");
         let remote_ref = format!("origin/{}", default);
         if ref_exists(&repo, &format!("refs/remotes/{}", remote_ref)) {
+            let mid_head = outs(&crate::dev::git::read::read(repo.clone(), "rev-parse".to_string(), sargs(&["HEAD"]))).trim().to_string();
             let m = crate::dev::git::write::write(repo.clone(), "merge".to_string(), sargs(&["--ff-only", &remote_ref]));
-            if okr(&m) { steps.push_string(&format!("merge --ff-only {}", remote_ref)); }
+            if okr(&m) {
+                steps.push_string(&format!("merge --ff-only {}", remote_ref));
+                let install = crate::dev::git::after_update::after_update(repo.clone(), mid_head, String::new());
+                if let Ok(a) = install.try_get_array("steps") {
+                    for s in a.objects() { if let ndata::data::Data::DString(x) = s { steps.push_string(&x); } }
+                }
+                if install.try_get_boolean("restart").unwrap_or(false) { restart = true; }
+                installs.push_object(install);
+            }
             else { notes.push(format!("local {} could not fast-forward to {}: {}", default, remote_ref, errs(&m))); }
         }
     } else { notes.push(format!("fetch failed: {}", errs(&r))); }
@@ -131,6 +151,9 @@ o.put_string("abandoned", &branch);
 o.put_string("now_on", &now_on);
 o.put_boolean("discarded", discarded);
 o.put_boolean("remote_deleted", remote_deleted);
+if next.try_get_boolean("restart").unwrap_or(false) { restart = true; }
 o.put_object("next", next);
+o.put_boolean("restart", restart);
+o.put_array("installs", installs);
 o.put_array("steps", steps);
 o

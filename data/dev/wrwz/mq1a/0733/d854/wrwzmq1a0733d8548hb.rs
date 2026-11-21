@@ -66,13 +66,48 @@ if branch == default { return fail("already on the default branch - nothing to u
 let remote_ref = format!("origin/{}", default);
 let base = if has_origin && ref_exists(&repo, &format!("refs/remotes/{}", remote_ref)) { remote_ref } else { default.clone() };
 
+// Restore first: a library pushed here from a peer (dev.git.overlay) is
+// discarded - its files go back to the branch's HEAD - before anything is
+// merged, so the merge meets a tree git knows. The running instance is put
+// back in line below, whether or not HEAD then moves.
+let ov = crate::dev::git::overlay::overlay("restore".to_string(), repo.clone(), String::new(), DataObject::new());
+if !okr(&ov) { return fail(&format!("could not discard the push from a peer: {} - nothing merged", ov.try_get_string("msg").unwrap_or_default())); }
+if let Ok(a) = ov.try_get_array("steps") {
+    for s in a.objects() { if let ndata::data::Data::DString(x) = s { steps.push_string(&x); } }
+}
+let restored = ov.try_get_array("restored").unwrap_or_else(|_| DataArray::new());
+let n_restored = restored.len() as i64;
+if n_restored > 0 { dirty = 0; }
+// forced re-install of the restored libraries; `built` = libraries after_update already rebuilt
+let reinstall = |built: &Vec<String>, steps: &mut DataArray| -> bool {
+    let mut restart = false;
+    for r in restored.objects() {
+        let r = r.object();
+        let l = r.get_string("lib");
+        let mut e = DataObject::new();
+        e.put_array("removed", r.try_get_array("removed").unwrap_or_else(|_| DataArray::new()));
+        e.put_boolean("rust", r.try_get_boolean("rust").unwrap_or(false));
+        e.put_boolean("activate", !built.contains(&l));
+        let i = crate::dev::git::overlay::overlay("install".to_string(), String::new(), l, e);
+        if i.try_get_boolean("restart").unwrap_or(false) { restart = true; }
+        if let Ok(a) = i.try_get_array("steps") {
+            for s in a.objects() { if let ndata::data::Data::DString(x) = s { steps.push_string(&x); } }
+        }
+    }
+    restart
+};
+
 // already current?
 let cnt = crate::dev::git::read::read(repo.clone(), "rev-list".to_string(), sargs(&["--count", &format!("HEAD..{}", base)]));
 let behind: i64 = outs(&cnt).trim().parse().unwrap_or(0);
 if behind == 0 {
+    let restart = reinstall(&Vec::new(), &mut steps);
     let mut o = DataObject::new();
     o.put_string("status", "ok");
-    o.put_string("msg", &format!("{} already has everything in {}", branch, base));
+    o.put_string("msg", &if n_restored > 0 { format!("{} peer-pushed librar{} restored to {}; it already has everything in {}{}", n_restored, if n_restored == 1 { "y" } else { "ies" }, branch, base, if restart { " - restart Newbound to finish" } else { "" }) }
+        else { format!("{} already has everything in {}", branch, base) });
+    o.put_boolean("restart", restart);
+    o.put_int("restored", n_restored);
     o.put_string("branch", &branch);
     o.put_string("base", &base);
     o.put_int("merged", 0);
@@ -82,6 +117,7 @@ if behind == 0 {
     return o;
 }
 
+let old_head = outs(&crate::dev::git::read::read(repo.clone(), "rev-parse".to_string(), sargs(&["HEAD"]))).trim().to_string();
 let r = crate::dev::git::write::write(repo.clone(), "merge".to_string(), sargs(&["-m", &format!("update {} from {}", branch, base), &base]));
 if !okr(&r) {
     if ref_exists(&repo, "MERGE_HEAD") {
@@ -91,6 +127,19 @@ if !okr(&r) {
     return fail(&format!("merge {} refused: {} - nothing merged", base, errs(&r)));
 }
 steps.push_string(&format!("merge {}", base));
+
+// the tree moved: bring the running instance in line (apps refreshed, changed libraries rebuilt)
+let install = crate::dev::git::after_update::after_update(repo.clone(), old_head, String::new());
+if let Ok(a) = install.try_get_array("steps") {
+    for s in a.objects() { if let ndata::data::Data::DString(x) = s { steps.push_string(&x); } }
+}
+let mut restart = install.try_get_boolean("restart").unwrap_or(false);
+// libraries restored from a peer push: re-install them even where the merge did not touch them
+let mut built: Vec<String> = Vec::new();
+if let Ok(a) = install.try_get_array("libs") {
+    for l in a.objects() { let l = l.object(); if l.has("activate") { built.push(l.try_get_string("lib").unwrap_or_default()); } }
+}
+if reinstall(&built, &mut steps) { restart = true; }
 
 let mut pushed = false;
 let mut push_err = String::new();
@@ -111,5 +160,8 @@ o.put_int("merged", behind);
 o.put_boolean("pushed", pushed);
 o.put_string("push_err", &push_err);
 o.put_int("carried", dirty);
+o.put_boolean("restart", restart);
+o.put_int("restored", n_restored);
+o.put_object("install", install);
 o.put_array("steps", steps);
 o
