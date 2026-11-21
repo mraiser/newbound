@@ -62,6 +62,7 @@ names.dedup();
 let mut installed = DataArray::new();
 let mut refreshed = DataArray::new();
 let mut linked = DataArray::new();
+let mut through = DataArray::new();
 let mut missing = DataArray::new();
 let mut errors = DataArray::new();
 let mut files = 0i64;
@@ -72,7 +73,18 @@ for name in &names {
     if !src.join("app.properties").is_file() { missing.push_string(name); continue; }
     let dest = appruntime.join(name);
     let is_link = fs::symlink_metadata(&dest).map(|m| m.file_type().is_symlink()).unwrap_or(false);
-    if is_link { linked.push_string(name); continue; }
+    if is_link {
+        // A link is written THROUGH (it normally points at the repo's
+        // runtime/<app>, which is NOT the bundle) - only a link that resolves
+        // to the bundle itself is left alone.
+        match (dest.canonicalize(), src.canonicalize()) {
+            (Ok(d), Ok(s)) => {
+                if d == s || d.starts_with(&s) || s.starts_with(&d) { linked.push_string(name); continue; }
+                through.push_string(name);
+            }
+            _ => { errors.push_string(&format!("{}: runtime/{} is a symlink whose target is missing", name, name)); continue; }
+        }
+    }
     let fresh = !dest.join("app.properties").exists();
     match sync(&src, &dest, true, fresh) {
         Ok(n) => {
@@ -115,6 +127,7 @@ o.put_string("lib", &lib);
 o.put_array("installed", installed);
 o.put_array("refreshed", refreshed);
 o.put_array("linked", linked);
+o.put_array("through", through);
 o.put_array("missing", missing);
 o.put_int("files", files);
 o.put_array("deleted", deleted);

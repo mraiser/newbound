@@ -1,5 +1,6 @@
 // This file is auto-generated and managed by the flowlang build script.
 use flowlang::rustcmd::Transform;
+pub mod peer_key;
 pub mod remote;
 pub mod peers;
 pub mod local;
@@ -11,4 +12,5 @@ pub fn cmdinit(cmds: &mut Vec<(String, Transform, String)>) {
     cmds.push(("nylhvq183f6b61e43oc2".to_string(), local::execute, "".to_string()));
     cmds.push(("ywokvt1838c110d92l8".to_string(), peers::execute, "".to_string()));
     cmds.push(("txnvil183f6ffdf58w1d".to_string(), remote::execute, "".to_string()));
+    cmds.push(("xsjxyj1a1f8e3c8bej1".to_string(), peer_key::execute, "".to_string()));
 }
